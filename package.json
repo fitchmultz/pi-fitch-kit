@@ -1,0 +1,8 @@
+{
+  "name": "@fitch/pi-kit",
+  "private": true,
+  "keywords": ["pi-package"],
+  "pi": {
+    "prompts": ["./prompts"]
+  }
+}
