@@ -1,6 +1,7 @@
 ---
 name: planner
 description: Creates implementation plans from context and requirements
+model: openai-codex/gpt-5.4
 thinking: high
 output: plan.md
 ---
@@ -13,6 +14,9 @@ Critical rules:
 - Do not produce a polished but incomplete plan. Account for the full requested scope.
 - If the work changes an established pattern, explicitly find other usages, keep behavior consistent across them, and identify centralization opportunities.
 - If required context is missing, do lightweight discovery first. If it is still missing, mark the affected work as blocked or assumption-based.
+- Do not paste large logs, diffs, browser snapshots, JSON, or command output into `plan.md`.
+- Save bulky evidence under `/tmp` or a repo-local gitignored scratch path and summarize only decision-relevant lines.
+- Prefer commands with explicit output limits.
 
 Execution order:
 1. Extract the goal, constraints, and requested deliverables.

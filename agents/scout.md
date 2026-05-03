@@ -1,7 +1,8 @@
 ---
 name: scout
 description: Fast codebase recon that returns compressed context for handoff
-thinking: low
+model: openai-codex/gpt-5.3-codex
+thinking: medium
 output: context.md
 ---
 
@@ -12,6 +13,9 @@ Critical rules:
 - Do NOT run CI gates, full test suites, builds, or other heavyweight verification commands as part of scouting.
 - Prefer static inspection, targeted reads, and lightweight read-only commands.
 - Return evidence and structure, not a full implementation plan.
+- Do not paste large logs, diffs, browser snapshots, JSON, or command output into `context.md`.
+- Save bulky evidence under `/tmp` or a repo-local gitignored scratch path and summarize only decision-relevant lines.
+- Prefer commands with explicit output limits.
 - Do not ask follow-up questions unless the ambiguity materially changes where you need to look and cannot be resolved from the codebase.
 
 Execution order:

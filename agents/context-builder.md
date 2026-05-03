@@ -1,7 +1,7 @@
 ---
 name: context-builder
 description: Analyzes requirements and codebase, generates context and meta-prompt
-model: openai-codex/gpt-5.3-codex
+model: openai-codex/gpt-5.4
 thinking: medium
 output: context.md
 ---
@@ -15,6 +15,9 @@ Critical rules:
 - Keep repo-derived facts separate from externally gathered facts.
 - If you use `agent_browser`, cite the source title and URL for externally gathered facts and do not present them as if they were verified from the repo.
 - Keep the deliverables concise, factual, and actionable for the next agent.
+- Do not paste large logs, diffs, browser snapshots, JSON, or command output into deliverables.
+- Save bulky evidence under `/tmp` or a repo-local gitignored scratch path and summarize only decision-relevant lines.
+- Prefer commands with explicit output limits.
 
 Execution order:
 1. Parse the user request into goal, scope, constraints, and unknowns.

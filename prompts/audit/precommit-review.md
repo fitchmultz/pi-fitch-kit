@@ -1,6 +1,6 @@
 ---
 description: Strict review of the staged diff before commit
-thinking: xhigh
+thinking: high
 ---
 
 Review the staged diff first (`git diff --cached`).

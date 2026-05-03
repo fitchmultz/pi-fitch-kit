@@ -9,6 +9,7 @@ Personal Pi package repo for reusable prompt templates plus source-managed user 
 - Keeps reusable user-agent overrides in `agents/` as the source of truth.
 - Symlinks those agents into `~/.pi/agent/agents/` while iterating locally.
 - Lets prompts inherit the active Pi model by omitting `model:` from prompt frontmatter.
+- Sets explicit subagent model defaults so high-turn helper roles do not accidentally inherit expensive parent models.
 
 ## Layout
 
@@ -65,14 +66,21 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides:
 
-- `scout`
-- `planner`
-- `worker`
-- `reviewer`
-- `delegate`
-- `context-builder`
+- `scout` - `openai-codex/gpt-5.3-codex`, medium thinking
+- `delegate` - `openai-codex/gpt-5.3-codex`, medium thinking
+- `context-builder` - `openai-codex/gpt-5.4`, medium thinking
+- `planner` - `openai-codex/gpt-5.4`, high thinking
+- `worker` - `openai-codex/gpt-5.4`, medium thinking
+- `reviewer` - `openai-codex/gpt-5.4`, high thinking
 
 These names intentionally match the builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly.
+
+Model policy:
+
+- Use `openai-codex/gpt-5.3-codex` for retrieval-heavy, bounded, non-authoritative helper work when quality floor matters more than the cheapest possible helper.
+- Use `openai-codex/gpt-5.4` for authoritative planning, implementation, synthesis, and review defaults.
+- Use `openai-codex/gpt-5.5` only as an explicit per-run escalation for complex architecture, hard debugging, security/data-loss review, or final high-stakes adversarial review.
+- Do not make `xhigh` a default; escalate thinking per run only when the task justifies it.
 
 ## Install and sync
 
@@ -100,6 +108,27 @@ When a specific project needs custom behavior, override globally installed resou
 - `.pi/agents/`
 
 That preserves stable command names while allowing per-repo specialization.
+
+## Subagent output discipline
+
+Pi-subagents currently supports `outputMode: "file-only"` on the parent `subagent(...)` call, parallel task item, or chain step. It is not enforced by agent frontmatter, so `output: review.md` by itself still returns saved output inline unless the caller also sets `outputMode: "file-only"`.
+
+Use file-only mode for report-writing agents unless the expected output is small:
+
+```ts
+subagent({
+  agent: "reviewer",
+  task: "Review the current diff for correctness issues.",
+  output: "review.md",
+  outputMode: "file-only",
+  progress: false,
+  context: "fresh",
+});
+```
+
+For quick review fanout where no artifact is needed, use `output: false` and `progress: false` so the parent receives only concise findings.
+
+Agents should write bulky logs, diffs, browser snapshots, JSON, and raw command output to `/tmp` or a repo-local gitignored scratch path, then summarize only decision-relevant lines.
 
 ## Browser research note
 

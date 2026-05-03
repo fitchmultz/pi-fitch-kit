@@ -1,6 +1,6 @@
 ---
 description: Audit a Pi extension or package for UX, reliability, and maintainability
-thinking: xhigh
+thinking: high
 ---
 
 Focus area (optional): $@
