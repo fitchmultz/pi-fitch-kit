@@ -1,8 +1,7 @@
 ---
 name: planner
 description: Creates implementation plans from context and requirements
-model: openai-codex/gpt-5.4
-thinking: xhigh
+thinking: high
 output: plan.md
 ---
 

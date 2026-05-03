@@ -1,8 +1,7 @@
 ---
 name: reviewer
 description: Code review specialist that validates implementation and reports issues
-model: openai-codex/gpt-5.4
-thinking: xhigh
+thinking: high
 output: review.md
 defaultProgress: true
 ---
