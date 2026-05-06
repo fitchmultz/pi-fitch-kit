@@ -1,6 +1,5 @@
 ---
 description: Resolve a set of findings end-to-end and merge them
-thinking: high
 ---
 
 ## Findings

@@ -1,6 +1,5 @@
 ---
 description: Manual QA pass through the local app
-thinking: high
 skill: dogfood
 ---
 

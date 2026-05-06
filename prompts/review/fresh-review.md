@@ -1,6 +1,5 @@
 ---
 description: Review recent work with fresh eyes and fix obvious issues
-thinking: high
 ---
 
 Focus area (optional): $@

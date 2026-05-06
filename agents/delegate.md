@@ -1,7 +1,7 @@
 ---
 name: delegate
 description: Lightweight subagent for bounded tasks with no default reads
-model: openai-codex/gpt-5.3-codex
+# model: openai-codex/gpt-5.3-codex
 thinking: medium
 ---
 

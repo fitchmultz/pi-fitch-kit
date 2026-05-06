@@ -1,7 +1,7 @@
 ---
 name: scout
 description: Fast codebase recon that returns compressed context for handoff
-model: openai-codex/gpt-5.3-codex
+# model: openai-codex/gpt-5.3-codex
 thinking: medium
 output: context.md
 ---

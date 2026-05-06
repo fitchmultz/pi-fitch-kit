@@ -1,6 +1,5 @@
 ---
 description: Whole-repo maintenance and best-practices audit
-thinking: high
 skill: comprehensive-codebase-audit
 ---
 
