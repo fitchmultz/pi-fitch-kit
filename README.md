@@ -21,6 +21,7 @@ pi-fitch-kit/
       precommit-review.md
       repo-audit.md
       extension-audit.md
+      github-open-issues-prs.md
     execute/
       run-to-completion.md
       resolve-findings.md
@@ -48,6 +49,7 @@ These prompts are available through the package manifest:
 - `/precommit-review`
 - `/repo-audit`
 - `/extension-audit`
+- `/github-open-issues-prs`
 - `/run-to-completion`
 - `/resolve-findings`
 - `/triage-first`
