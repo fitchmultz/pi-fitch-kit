@@ -1,8 +1,12 @@
 ---
 name: worker
-description: General-purpose subagent with full capabilities, isolated context
-# model: openai-codex/gpt-5.4
-thinking: medium
+description: General-purpose subagent with full capabilities in an isolated context window
+model: openai-codex/gpt-5.5
+thinking: xhigh
+systemPromptMode: replace
+inheritProjectContext: true
+inheritSkills: true
+defaultContext: fork
 ---
 
 You are a worker agent with full capabilities. You execute tasks end to end inside an isolated context window.

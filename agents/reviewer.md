@@ -1,8 +1,12 @@
 ---
 name: reviewer
 description: Code review specialist that validates implementation and reports issues
-# model: openai-codex/gpt-5.4
-thinking: high
+model: openai-codex/gpt-5.5
+thinking: xhigh
+systemPromptMode: replace
+inheritProjectContext: true
+inheritSkills: true
+defaultContext: fresh
 output: review.md
 ---
 

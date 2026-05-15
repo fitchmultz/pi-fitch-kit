@@ -9,7 +9,7 @@ Personal Pi package repo for reusable prompt templates plus source-managed user 
 - Keeps reusable user-agent overrides in `agents/` as the source of truth.
 - Symlinks those agents into `~/.pi/agent/agents/` while iterating locally.
 - Lets prompts inherit the active Pi model by omitting `model:` from prompt frontmatter.
-- Sets explicit subagent model defaults so high-turn helper roles do not accidentally inherit expensive parent models.
+- Pins subagents to `openai-codex/gpt-5.5` with per-role thinking (see Agents) so behavior is stable across machines.
 
 ## Layout
 
@@ -33,7 +33,9 @@ pi-fitch-kit/
   agents/
     context-builder.md
     delegate.md
+    oracle.md
     planner.md
+    researcher.md
     reviewer.md
     scout.md
     worker.md
@@ -66,23 +68,22 @@ Notes:
 
 ## Agents
 
-`agents/` stores the reusable source copies of the user-level subagent overrides:
+`agents/` stores the reusable source copies of the user-level subagent overrides. **Model:** `openai-codex/gpt-5.5` for every role below. Thinking varies by role:
 
-- `scout` - `openai-codex/gpt-5.3-codex`, medium thinking
-- `delegate` - `openai-codex/gpt-5.3-codex`, medium thinking
-- `context-builder` - `openai-codex/gpt-5.4`, medium thinking
-- `planner` - `openai-codex/gpt-5.4`, high thinking
-- `worker` - `openai-codex/gpt-5.4`, medium thinking
-- `reviewer` - `openai-codex/gpt-5.4`, high thinking
+- `scout` — low
+- `researcher` — high (`tools:` omitted; briefs grounded on repo + task-supplied material unless you add web/MCP tooling separately)
+- `planner` — xhigh
+- `worker` — xhigh
+- `reviewer` — xhigh
+- `context-builder` — medium
+- `oracle` — xhigh
+- `delegate` — xhigh
 
-These names intentionally match the builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly.
+These names intentionally match the builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
 
 Model policy:
 
-- Use `openai-codex/gpt-5.3-codex` for retrieval-heavy, bounded, non-authoritative helper work when quality floor matters more than the cheapest possible helper.
-- Use `openai-codex/gpt-5.4` for authoritative planning, implementation, synthesis, and review defaults.
-- Use `openai-codex/gpt-5.5` only as an explicit per-run escalation for complex architecture, hard debugging, security/data-loss review, or final high-stakes adversarial review.
-- Do not make `xhigh` a default; escalate thinking per run only when the task justifies it.
+- Subagents are pinned to **`openai-codex/gpt-5.5`** with the thinking levels above; **`tools:` is intentionally omitted** on every override so children receive Pi’s normal builtin/extension tool surface (see pi-subagents README for MCP direct-tool nuances).
 
 ## Install and sync
 

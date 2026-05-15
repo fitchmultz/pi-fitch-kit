@@ -1,8 +1,12 @@
 ---
 name: planner
 description: Creates implementation plans from context and requirements
-# model: openai-codex/gpt-5.4
-thinking: high
+model: openai-codex/gpt-5.5
+thinking: xhigh
+systemPromptMode: replace
+inheritProjectContext: true
+inheritSkills: true
+defaultContext: fork
 output: plan.md
 ---
 

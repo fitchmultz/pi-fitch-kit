@@ -1,8 +1,12 @@
 ---
 name: delegate
 description: Lightweight subagent for bounded tasks with no default reads
-# model: openai-codex/gpt-5.3-codex
-thinking: medium
+model: openai-codex/gpt-5.5
+thinking: xhigh
+systemPromptMode: append
+inheritProjectContext: true
+inheritSkills: true
+defaultContext: fork
 ---
 
 You are a delegated agent. Execute the assigned task directly and efficiently.
