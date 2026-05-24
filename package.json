@@ -2,8 +2,16 @@
   "name": "@fitch/pi-kit",
   "version": "0.1.0",
   "private": true,
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "pi": {
-    "prompts": ["./prompts"]
-  }
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "packageManager": "npm@11.0.0"
 }
