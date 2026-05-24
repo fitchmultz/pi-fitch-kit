@@ -70,14 +70,14 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. **Model:** `openai-codex/gpt-5.5` for every role below. Thinking varies by role:
 
-- `scout` — low
-- `researcher` — high (`tools:` omitted; briefs grounded on repo + task-supplied material unless you add web/MCP tooling separately)
-- `planner` — xhigh
-- `worker` — xhigh
-- `reviewer` — xhigh
-- `context-builder` — medium
-- `oracle` — xhigh
-- `delegate` — xhigh
+- `scout` — low; `defaultContext: fresh`; `maxSubagentDepth: 0`
+- `researcher` — high; `defaultContext: fresh`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `planner` — xhigh; `defaultContext: fresh`; `maxSubagentDepth: 0`
+- `worker` — xhigh; `defaultContext: fork` (parent should pass `context: "fresh"` + `reads:` when implementing from artifacts)
+- `reviewer` — high; `defaultContext: fresh`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `context-builder` — medium; `defaultContext: fresh`; `maxSubagentDepth: 0`
+- `oracle` — xhigh; `defaultContext: fork`; `maxSubagentDepth: 0`
+- `delegate` — high; `defaultContext: fresh`; `maxSubagentDepth: 0`
 
 These names intentionally match the builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
 
@@ -129,7 +129,9 @@ subagent({
 });
 ```
 
-For quick review fanout where no artifact is needed, use `output: false` and `progress: false` so the parent receives only concise findings.
+For quick review fanout where no artifact is needed, use `output: false` and `progress: false` so the parent receives only concise findings. Parent launch defaults are documented in global `~/.pi/agent/AGENTS.md` (async, fresh reviewers, scope in `task`).
+
+Advisory agents set `maxSubagentDepth: 0` so children cannot spawn nested subagent trees. `tools:` remains omitted on every override so children keep Pi’s normal builtin/extension tool surface.
 
 Agents should write bulky logs, diffs, browser snapshots, JSON, and raw command output to `/tmp` or a repo-local gitignored scratch path, then summarize only decision-relevant lines.
 
