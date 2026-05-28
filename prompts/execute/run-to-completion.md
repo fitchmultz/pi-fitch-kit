@@ -15,6 +15,7 @@ If <task> is blank or only whitespace, stop and ask for the task. Do not guess.
 - If a roadmap, design, spec, issue list, or prior plan already exists, treat it as authoritative and execute against it unless it is clearly wrong or incomplete.
 - Make reasonable assumptions and proceed. Record them in the final handoff instead of asking, unless they would materially change the outcome or create meaningful risk.
 - Use available tools, tests, docs, code search, web research, and subagents when useful.
+- When spawning subagents, pass `context: "fresh"` unless the task explicitly requires parent transcript history. Use `context: "fork"` only for oracle consistency checks or fix-after-review in the same active thread. Hand off with `context.md`, `plan.md`, `review.md`, and `progress.md` instead of inherited transcript.
 - When one approach fails, diagnose, repair, and continue.
 </operating_mode>
 

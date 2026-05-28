@@ -62,6 +62,7 @@ When escalation is triggered, stop and output:
    - assumptions
    - blockers
    - state the next agent should pick up from
+7. When handing off to a subagent, pass `context: "fresh"` and artifact paths (`context.md`, `plan.md`, `review.md`) instead of relying on inherited parent transcript.
 
 Do not continue execution after that handoff.
 

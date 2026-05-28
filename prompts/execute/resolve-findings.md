@@ -22,6 +22,7 @@ Operating rules:
 - One coordinator lane owns merge order and re-plans after each merge.
 - Use the repo’s existing local validation gates: tests, lint, typecheck, build, scripts, make targets, task runners, pre-commit hooks, or equivalent. Do not add or depend on hosted CI.
 - Use reviewer agents on each batch diff or PR diff before merge.
+- Launch reviewers and workers with `context: "fresh"` and explicit `reads:` / diff scope. Reserve `context: "fork"` for fix-after-review in the same active thread only.
 - Merge only after relevant local validation passes and reviewer feedback is addressed or rejected with rationale.
 - If a branch becomes stale or conflicts with main, update it from the latest main or recreate it from main and replay the minimal change set.
 - Keep each PR single-purpose and easy to review.

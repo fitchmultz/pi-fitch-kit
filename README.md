@@ -9,7 +9,7 @@ Personal Pi package repo for reusable prompt templates plus source-managed user 
 - Keeps reusable user-agent overrides in `agents/` as the source of truth.
 - Symlinks those agents into `~/.pi/agent/agents/` while iterating locally.
 - Lets prompts inherit the active Pi model by omitting `model:` from prompt frontmatter.
-- Pins subagents to `openai-codex/gpt-5.5` with per-role thinking (see Agents) so behavior is stable across machines.
+- Pins subagent models and thinking per role in `agents/` (see Agents).
 
 ## Layout
 
@@ -68,22 +68,35 @@ Notes:
 
 ## Agents
 
-`agents/` stores the reusable source copies of the user-level subagent overrides. **Model:** `openai-codex/gpt-5.5` for every role below. Thinking varies by role:
+`agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — low; `defaultContext: fresh`; `maxSubagentDepth: 0`
-- `researcher` — high; `defaultContext: fresh`; `defaultProgress: false`; `maxSubagentDepth: 0`
-- `planner` — xhigh; `defaultContext: fresh`; `maxSubagentDepth: 0`
-- `worker` — xhigh; `defaultContext: fork` (parent should pass `context: "fresh"` + `reads:` when implementing from artifacts)
-- `reviewer` — high; `defaultContext: fresh`; `defaultProgress: false`; `maxSubagentDepth: 0`
-- `context-builder` — medium; `defaultContext: fresh`; `maxSubagentDepth: 0`
-- `oracle` — xhigh; `defaultContext: fork`; `maxSubagentDepth: 0`
-- `delegate` — high; `defaultContext: fresh`; `maxSubagentDepth: 0`
+- `scout` — `cursor/composer-2.5`, thinking off; `defaultContext: fresh`; `inheritSkills: false`; `maxSubagentDepth: 0`
+- `researcher` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `planner` — `openai-codex/gpt-5.5`, thinking xhigh; `defaultContext: fresh`; `maxSubagentDepth: 0`
+- `worker` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh` (parent passes `context: "fork"` only for fix-after-review)
+- `reviewer` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `context-builder` — `openai-codex/gpt-5.5`, thinking medium; `defaultContext: fresh`; `maxSubagentDepth: 0`
+- `oracle` — `openai-codex/gpt-5.5`, thinking xhigh; `defaultContext: fork`; `maxSubagentDepth: 0`
+- `delegate` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `maxSubagentDepth: 0`
 
 These names intentionally match the builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
 
 Model policy:
 
-- Subagents are pinned to **`openai-codex/gpt-5.5`** with the thinking levels above; **`tools:` is intentionally omitted** on every override so children receive Pi’s normal builtin/extension tool surface (see pi-subagents README for MCP direct-tool nuances).
+- Scouts and other read-only agents use cheaper models where output is verifiable.
+- Implementation, review, planning, and oracle roles stay on **`openai-codex/gpt-5.5`** unless A/B data supports a cheaper route.
+- **`tools:` is intentionally omitted** on every override so children receive Pi’s normal builtin/extension tool surface (see pi-subagents README for MCP direct-tool nuances).
+
+## Subagent context policy
+
+When spawning subagents from parent prompts or code:
+
+- Pass `context: "fresh"` unless the task explicitly requires parent transcript history.
+- Use `context: "fork"` only for oracle consistency checks or fix-after-review in the same active thread.
+- Hand off with artifacts (`context.md`, `plan.md`, `review.md`, `progress.md`) instead of inherited transcript.
+- Do not mix scout/reviewer/researcher calls into the same parallel batch as worker/oracle unless each step’s context policy is intentional.
+
+Requires pi-subagents with per-agent context resolution (not whole-invocation fork promotion when any agent defaults to fork).
 
 ## Install and sync
 
