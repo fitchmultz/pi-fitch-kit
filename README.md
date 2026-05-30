@@ -7,7 +7,7 @@ Personal Pi package repo for reusable prompt templates plus source-managed user 
 - Keeps reusable prompt templates in one package repo.
 - Loads prompts recursively through `package.json#pi.prompts`.
 - Keeps reusable user-agent overrides in `agents/` as the source of truth.
-- Symlinks those agents into `~/.pi/agent/agents/` while iterating locally.
+- Installs a small package extension that symlinks those agents into `~/.pi/agent/agents/` on Pi startup/reload.
 - Lets prompts inherit the active Pi model by omitting `model:` from prompt frontmatter.
 - Pins subagent models and thinking per role in `agents/` (see Agents).
 
@@ -23,6 +23,7 @@ pi-fitch-kit/
       extension-audit.md
       github-open-issues-prs.md
     execute/
+      create-goal.md
       run-to-completion.md
       resolve-findings.md
       triage-first.md
@@ -39,6 +40,8 @@ pi-fitch-kit/
     reviewer.md
     scout.md
     worker.md
+  extensions/
+    sync-agents.ts
   scripts/
     sync-agents.sh
   README.md
@@ -52,6 +55,7 @@ These prompts are available through the package manifest:
 - `/repo-audit`
 - `/extension-audit`
 - `/github-open-issues-prs`
+- `/create-goal`
 - `/run-to-completion`
 - `/resolve-findings`
 - `/triage-first`
@@ -63,8 +67,8 @@ Notes:
 - Prompt discovery in plain `prompts/` folders is non-recursive, so this repo uses `pi.prompts: ["./prompts"]` and relies on package directory loading to pick up the nested prompt files.
 - Prompt filenames are the slash-command names.
 - Prompt `description:` values improve autocomplete.
-- Prompt frontmatter intentionally omits `model:` so prompts inherit the current Pi model.
-- `thinking:` is set on audit/review/orchestration prompts because the global default is low.
+- Prompt frontmatter intentionally omits `model:`, `thinking:`, and other extension-only fields so prompts stay compatible with native Pi prompt templates.
+- Prompts may ask the agent to use a named workflow/skill in the body, but they do not depend on prompt-template skill injection.
 
 ## Agents
 
@@ -98,7 +102,7 @@ When spawning subagents from parent prompts or code:
 
 Requires pi-subagents with per-agent context resolution (not whole-invocation fork promotion when any agent defaults to fork).
 
-## Install and sync
+## Install
 
 Install the package globally from this local path:
 
@@ -106,13 +110,14 @@ Install the package globally from this local path:
 pi install /Users/mitchfultz/Projects/AI/pi-fitch-kit
 ```
 
-Sync the user agents into `~/.pi/agent/agents/`:
-
-```bash
-bash scripts/sync-agents.sh
-```
-
 Because this is a local-path package install, Pi points at this repo directly instead of copying it. Edits here become the live source of truth.
+
+The package manifest loads:
+
+- prompt templates from `prompts/`
+- `extensions/sync-agents.ts`, which symlinks `agents/*.md` into `~/.pi/agent/agents/`
+
+That means the package install is the normal source of truth for both prompts and user agent overrides. `scripts/sync-agents.sh` remains only as a manual fallback if Pi is not running or extension loading is disabled.
 
 If you change prompts or agent definitions while Pi is already running, use `/reload` or start a fresh session so the current session picks up the updated resources.
 

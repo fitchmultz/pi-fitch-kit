@@ -6,6 +6,9 @@
     "pi-package"
   ],
   "pi": {
+    "extensions": [
+      "./extensions/sync-agents.ts"
+    ],
     "prompts": [
       "./prompts"
     ]

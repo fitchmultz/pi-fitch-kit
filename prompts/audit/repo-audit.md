@@ -1,9 +1,10 @@
 ---
 description: Whole-repo maintenance and best-practices audit
-skill: comprehensive-codebase-audit
 ---
 
 Focus area (optional): $@
+
+Use the comprehensive-codebase-audit workflow/skill if available.
 
 Audit the repository for the highest-value issues in architecture, security, performance, testing, and maintainability.
 

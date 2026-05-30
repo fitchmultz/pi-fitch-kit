@@ -1,9 +1,10 @@
 ---
 description: Manual QA pass through the local app
-skill: dogfood
 ---
 
 Focus area (optional): $@
+
+Use the dogfood workflow/skill if available.
 
 Start the app locally, determine the correct local URL, and perform a manual QA pass through the meaningful flows.
 
