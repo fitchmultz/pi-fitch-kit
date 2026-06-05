@@ -3,7 +3,7 @@ name: worker
 description: General-purpose subagent with full capabilities in an isolated context window
 model: openai-codex/gpt-5.5
 thinking: high
-systemPromptMode: replace
+systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh

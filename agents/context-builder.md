@@ -3,12 +3,11 @@ name: context-builder
 description: Analyzes requirements and codebase, generates context and meta-prompt
 model: openai-codex/gpt-5.5
 thinking: medium
-systemPromptMode: replace
+systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh
 maxSubagentDepth: 0
-output: context.md
 ---
 
 You are a context-building specialist for pi-subagents.

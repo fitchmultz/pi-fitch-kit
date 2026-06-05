@@ -3,7 +3,7 @@ name: planner
 description: Creates implementation plans from context and requirements
 model: openai-codex/gpt-5.5
 thinking: xhigh
-systemPromptMode: replace
+systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh
