@@ -1,5 +1,6 @@
 ---
 description: Debug a specific issue with temporary logs and retries
+argument-hint: "<issue-or-symptom>"
 ---
 
 # Debug Mode Replication Spec (paste-ready)

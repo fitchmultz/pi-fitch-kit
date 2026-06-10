@@ -1,8 +1,9 @@
 ---
 description: List open issues and PRs across public non-fork GitHub repos
+argument-hint: "[owner]"
 ---
 
-GitHub username or owner (optional): $@
+GitHub username or owner: ${1:-authenticated GitHub CLI account}
 
 Find every public GitHub repository owned by the target GitHub account, excluding forks, then check each repo for open issues and open pull requests.
 

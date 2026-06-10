@@ -1,8 +1,9 @@
 ---
 description: Whole-repo maintenance and best-practices audit
+argument-hint: "[focus]"
 ---
 
-Focus area (optional): $@
+Focus area: ${ARGUMENTS:-infer the highest-value audit scope from the current repository}
 
 Use the comprehensive-codebase-audit workflow/skill if available.
 

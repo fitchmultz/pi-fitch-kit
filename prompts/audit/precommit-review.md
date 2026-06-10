@@ -1,5 +1,6 @@
 ---
 description: Strict review of the staged diff before commit
+argument-hint: "[focus]"
 ---
 
 Review the staged diff first (`git diff --cached`).

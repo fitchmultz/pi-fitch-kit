@@ -67,6 +67,8 @@ Notes:
 - Prompt discovery in plain `prompts/` folders is non-recursive, so this repo uses `pi.prompts: ["./prompts"]` and relies on package directory loading to pick up the nested prompt files.
 - Prompt filenames are the slash-command names.
 - Prompt `description:` values improve autocomplete.
+- Prompt `argument-hint:` values show expected optional or required arguments in autocomplete.
+- Optional-scope prompts use native prompt-template defaults like `${ARGUMENTS:-...}` so blank invocations produce useful scoped instructions instead of empty placeholders.
 - Prompt frontmatter intentionally omits `model:`, `thinking:`, and other extension-only fields so prompts stay compatible with native Pi prompt templates.
 - Prompts may ask the agent to use a named workflow/skill in the body, but they do not depend on prompt-template skill injection.
 

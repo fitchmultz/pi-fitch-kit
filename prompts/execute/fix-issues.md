@@ -1,5 +1,6 @@
 ---
 description: Use orchestrator to triage and fix all GitHub issues
+argument-hint: "[scope]"
 ---
 
 Act as the orchestrator for this project until all issues/tasks are cleared up. No bailing out.

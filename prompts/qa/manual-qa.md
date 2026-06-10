@@ -1,8 +1,9 @@
 ---
 description: Manual QA pass through the local app
+argument-hint: "[focus]"
 ---
 
-Focus area (optional): $@
+Focus area: ${ARGUMENTS:-infer the highest-value local app flows from the current repository}
 
 Use the dogfood workflow/skill if available.
 

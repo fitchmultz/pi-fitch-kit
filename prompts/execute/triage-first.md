@@ -1,5 +1,6 @@
 ---
 description: Triage a task first, then either proceed safely or hand off clearly
+argument-hint: "<task>"
 ---
 
 <task>

@@ -1,5 +1,6 @@
 ---
 description: Execute a task end-to-end with high autonomy
+argument-hint: "<task>"
 ---
 
 <task>
