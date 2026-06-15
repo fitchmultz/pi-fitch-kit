@@ -23,17 +23,22 @@ pi-fitch-kit/
       extension-audit.md
       github-open-issues-prs.md
     execute/
-      create-goal.md
+      debug-mode.md
+      fix-issues.md
+      mine-workflows.md
+      optimize-skill.md
       run-to-completion.md
       resolve-findings.md
       triage-first.md
     review/
       fresh-review.md
+      hard-review.md
     qa/
       manual-qa.md
   agents/
     context-builder.md
     delegate.md
+    fixer.md
     oracle.md
     planner.md
     researcher.md
@@ -55,11 +60,15 @@ These prompts are available through the package manifest:
 - `/repo-audit`
 - `/extension-audit`
 - `/github-open-issues-prs`
-- `/create-goal`
+- `/debug-mode`
+- `/fix-issues`
+- `/mine-workflows`
+- `/optimize-skill`
 - `/run-to-completion`
 - `/resolve-findings`
 - `/triage-first`
 - `/fresh-review`
+- `/hard-review`
 - `/manual-qa`
 
 Notes:
@@ -76,11 +85,12 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — `cursor/composer-2.5`, thinking off; `defaultContext: fresh`; `inheritSkills: false`; `maxSubagentDepth: 0`
-- `researcher` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `defaultProgress: false`; `maxSubagentDepth: 0`
-- `planner` — `openai-codex/gpt-5.5`, thinking xhigh; `defaultContext: fresh`; `maxSubagentDepth: 0`
+- `scout` — `openai-codex/gpt-5.5`, thinking medium; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
+- `researcher` — `openai-codex/gpt-5.5`, thinking xhigh; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `planner` — `openai-codex/gpt-5.5`, thinking xhigh; `defaultContext: fresh`; `output: plan.md`; `maxSubagentDepth: 0`
 - `worker` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh` (parent passes `context: "fork"` only for fix-after-review)
-- `reviewer` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `fixer` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; bounded remediation from an explicit fix list
+- `reviewer` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `defaultProgress: false`; `output: false`; `maxSubagentDepth: 0`
 - `context-builder` — `openai-codex/gpt-5.5`, thinking medium; `defaultContext: fresh`; `maxSubagentDepth: 0`
 - `oracle` — `openai-codex/gpt-5.5`, thinking xhigh; `defaultContext: fork`; `maxSubagentDepth: 0`
 - `delegate` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `maxSubagentDepth: 0`
@@ -134,22 +144,23 @@ That preserves stable command names while allowing per-repo specialization.
 
 ## Subagent output discipline
 
-Pi-subagents currently supports `outputMode: "file-only"` on the parent `subagent(...)` call, parallel task item, or chain step. It is not enforced by agent frontmatter, so `output: review.md` by itself still returns saved output inline unless the caller also sets `outputMode: "file-only"`.
+Pi-subagents supports `outputMode: "file-only"` on the parent `subagent(...)` call, parallel task item, or chain step. It is not enforced by agent frontmatter, so an `output` path by itself still returns saved output inline unless the caller also sets `outputMode: "file-only"`. With current pi-subagents, relative output paths inherited from agent defaults are materialized under the run artifact directory with unique names, so defaults like `context.md`, `research.md`, and `plan.md` do not collide in parallel runs or leave project-root files. Explicit parent-provided output paths are still honored as written. The default `reviewer` override uses `output: false`; ask for an output path only when a durable review artifact is needed.
 
-Use file-only mode for report-writing agents unless the expected output is small:
+Use file-only mode with explicit temp/session-artifact paths for report-writing agents when the expected output is large:
 
 ```ts
+const artifactDir = "/tmp/pi-hard-review.abc123";
 subagent({
   agent: "reviewer",
-  task: "Review the current diff for correctness issues.",
-  output: "review.md",
+  task: "Review the current diff for correctness issues. Do not edit files.",
+  output: `${artifactDir}/reviewer.md`,
   outputMode: "file-only",
   progress: false,
   context: "fresh",
 });
 ```
 
-For quick review fanout where no artifact is needed, use `output: false` and `progress: false` so the parent receives only concise findings. Parent launch defaults are documented in global `~/.pi/agent/AGENTS.md` (async, fresh reviewers, scope in `task`).
+For quick review fanout, the `reviewer` default already uses `output: false` and `defaultProgress: false`, so the parent receives findings without project files unless it overrides output behavior. For strict saved reviews, use `/hard-review`, which creates a temp artifact directory and gives each reviewer a distinct `output` path. Parent launch defaults are documented in global `~/.pi/agent/AGENTS.md` (async, fresh reviewers, scope in `task`).
 
 Advisory agents set `maxSubagentDepth: 0` so children cannot spawn nested subagent trees. `tools:` remains omitted on every override so children keep Pi’s normal builtin/extension tool surface.
 
