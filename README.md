@@ -87,13 +87,13 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — `openai-codex/gpt-5.5`, thinking medium; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
-- `researcher` — `openai-codex/gpt-5.5`, thinking xhigh; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
-- `planner` — `openai-codex/gpt-5.5`, thinking xhigh; `defaultContext: fresh`; `output: plan.md`; `maxSubagentDepth: 0`
-- `worker` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh` (parent passes `context: "fork"` only for fix-after-review)
-- `fixer` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; bounded remediation from an explicit fix list
+- `scout` — `openai-codex/gpt-5.5`, thinking low; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
+- `researcher` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `planner` — `openai-codex/gpt-5.5`, thinking xhigh; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2`; `output: plan.md`
+- `worker` — `zai/glm-5.2`, thinking xhigh; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2` (parent passes `context: "fork"` only for fix-after-review)
+- `fixer` — `zai/glm-5.2`, thinking xhigh; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
 - `reviewer` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `defaultProgress: false`; `output: false`; `maxSubagentDepth: 0`
-- `context-builder` — `openai-codex/gpt-5.5`, thinking medium; `defaultContext: fresh`; `maxSubagentDepth: 0`
+- `context-builder` — `openai-codex/gpt-5.5`, thinking low; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2`
 - `oracle` — `openai-codex/gpt-5.5`, thinking xhigh; `defaultContext: fork`; `maxSubagentDepth: 0`
 - `delegate` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `maxSubagentDepth: 0`
 
@@ -103,7 +103,7 @@ Model policy:
 
 - Scouts and other read-only agents use cheaper models where output is verifiable.
 - Implementation, review, planning, and oracle roles stay on **`openai-codex/gpt-5.5`** unless A/B data supports a cheaper route.
-- **`tools:` is intentionally omitted** on every override so children receive Pi’s normal builtin/extension tool surface (see pi-subagents README for MCP direct-tool nuances).
+- **`tools:` is intentionally omitted** on every override so children receive Pi’s normal builtin/extension tool surface. Nested-capable agents use `allowSubagents: true` instead of a static tool allowlist (requires current local `pi-subagents`).
 
 ## Subagent context policy
 
@@ -164,7 +164,7 @@ subagent({
 
 For quick review fanout, the `reviewer` default already uses `output: false` and `defaultProgress: false`, so the parent receives findings without project files unless it overrides output behavior. For strict saved reviews, use `/hard-review`, which creates a temp artifact directory and gives each reviewer a distinct `output` path. Parent launch defaults are documented in global `~/.pi/agent/AGENTS.md` (async, fresh reviewers, scope in `task`).
 
-Advisory agents set `maxSubagentDepth: 0` so children cannot spawn nested subagent trees. `tools:` remains omitted on every override so children keep Pi’s normal builtin/extension tool surface.
+Only `worker`, `planner`, and `context-builder` set `allowSubagents: true` with `maxSubagentDepth: 2`; they synthesize broad work and may fan out one layer when useful. Specialist/leaf agents (`scout`, `researcher`, `reviewer`, `fixer`, `delegate`, `oracle`) keep `maxSubagentDepth: 0` so they stay focused. `tools:` remains omitted on every override so children keep Pi’s normal builtin/extension tool surface.
 
 Agents should write bulky logs, diffs, browser snapshots, JSON, and raw command output to `/tmp` or a repo-local gitignored scratch path, then summarize only decision-relevant lines.
 
