@@ -2,7 +2,7 @@
 name: fixer
 description: Bounded remediation agent that applies an explicit list of fixes without broad replanning
 model: zai/glm-5.2
-thinking: high
+thinking: xhigh
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true

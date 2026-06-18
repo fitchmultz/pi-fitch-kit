@@ -2,7 +2,7 @@
 name: worker
 description: General-purpose subagent with full capabilities in an isolated context window
 model: zai/glm-5.2
-thinking: high
+thinking: xhigh
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
