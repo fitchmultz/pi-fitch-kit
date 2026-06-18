@@ -1,7 +1,7 @@
 ---
 name: fixer
 description: Bounded remediation agent that applies an explicit list of fixes without broad replanning
-model: openai-codex/gpt-5.5
+model: zai/glm-5.2
 thinking: high
 systemPromptMode: append
 inheritProjectContext: true

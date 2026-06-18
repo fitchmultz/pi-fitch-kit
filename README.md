@@ -27,6 +27,7 @@ pi-fitch-kit/
       fix-issues.md
       mine-workflows.md
       optimize-skill.md
+      orchestrate.md
       run-to-completion.md
       resolve-findings.md
       triage-first.md
@@ -64,6 +65,7 @@ These prompts are available through the package manifest:
 - `/fix-issues`
 - `/mine-workflows`
 - `/optimize-skill`
+- `/orchestrate`
 - `/run-to-completion`
 - `/resolve-findings`
 - `/triage-first`
