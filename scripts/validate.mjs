@@ -23,7 +23,7 @@ try {
     throw new Error(`Expected session_start handler, got events: ${events.join(", ")}`);
   }
 
-  await sessionStart({}, { ui: { notify: (message, level) => notices.push({ message, level }) } });
+  await sessionStart({}, { hasUI: true, ui: { notify: (message, level) => notices.push({ message, level }) } });
 
   const syncedDir = join(agentDir, "agents");
   const syncedAgents = readdirSync(syncedDir).sort();

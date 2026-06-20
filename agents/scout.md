@@ -2,7 +2,8 @@
 name: scout
 description: Fast codebase recon that returns compressed context for handoff
 model: openai-codex/gpt-5.5
-thinking: low
+fallbackModels: openai-codex/gpt-5.4
+thinking: medium
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true

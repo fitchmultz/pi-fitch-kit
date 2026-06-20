@@ -2,6 +2,7 @@
 name: worker
 description: General-purpose subagent with full capabilities in an isolated context window
 model: zai/glm-5.2
+fallbackModels: openai-codex/gpt-5.5
 thinking: xhigh
 systemPromptMode: append
 inheritProjectContext: true

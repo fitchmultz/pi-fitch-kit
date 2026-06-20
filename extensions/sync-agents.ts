@@ -2,11 +2,11 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, symlinkSyn
 import { basename, dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceDir = join(packageRoot, "agents");
-const targetDir = join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.HOME ?? "", ".pi", "agent"), "agents");
+const targetDir = join(getAgentDir(), "agents");
 
 function syncAgents(): { linked: number; skipped: number } {
   if (!existsSync(sourceDir)) return { linked: 0, skipped: 0 };
@@ -49,7 +49,7 @@ export default function fitchKit(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     const result = syncAgents();
-    if (result.skipped > 0) {
+    if (result.skipped > 0 && ctx.hasUI) {
       ctx.ui.notify(
         `pi-fitch-kit synced ${result.linked} agent symlink(s); skipped ${result.skipped} non-symlink target(s) in ${targetDir}`,
         "warning",

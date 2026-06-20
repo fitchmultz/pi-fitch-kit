@@ -2,6 +2,7 @@
 name: delegate
 description: Lightweight subagent for bounded tasks with no default reads
 model: openai-codex/gpt-5.5
+fallbackModels: openai-codex/gpt-5.4
 thinking: high
 systemPromptMode: append
 inheritProjectContext: true

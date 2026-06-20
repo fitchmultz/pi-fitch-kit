@@ -2,6 +2,7 @@
 name: researcher
 description: Research specialist — concise briefs from repo context, supplied sources, and available Pi tools (no pinned tool allowlist)
 model: openai-codex/gpt-5.5
+fallbackModels: openai-codex/gpt-5.4
 thinking: high
 systemPromptMode: append
 inheritProjectContext: true

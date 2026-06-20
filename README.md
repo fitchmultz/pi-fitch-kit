@@ -87,22 +87,23 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — `openai-codex/gpt-5.5`, thinking low; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
-- `researcher` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
-- `planner` — `openai-codex/gpt-5.5`, thinking xhigh; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2`; `output: plan.md`
-- `worker` — `zai/glm-5.2`, thinking xhigh; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2` (parent passes `context: "fork"` only for fix-after-review)
-- `fixer` — `zai/glm-5.2`, thinking xhigh; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
-- `reviewer` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `defaultProgress: false`; `output: false`; `maxSubagentDepth: 0`
-- `context-builder` — `openai-codex/gpt-5.5`, thinking low; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2`
-- `oracle` — `openai-codex/gpt-5.5`, thinking xhigh; `defaultContext: fork`; `maxSubagentDepth: 0`
-- `delegate` — `openai-codex/gpt-5.5`, thinking high; `defaultContext: fresh`; `maxSubagentDepth: 0`
+- `scout` — `openai-codex/gpt-5.5`, thinking medium, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
+- `researcher` — `openai-codex/gpt-5.5`, thinking high, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `planner` — `openai-codex/gpt-5.5`, thinking xhigh, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2`; `output: plan.md`
+- `worker` — `zai/glm-5.2`, thinking xhigh, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2` (parent passes `context: "fork"` only for fix-after-review)
+- `fixer` — `zai/glm-5.2`, thinking high, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
+- `reviewer` — `openai-codex/gpt-5.5`, thinking high, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `defaultProgress: false`; `output: false`; `maxSubagentDepth: 0`
+- `context-builder` — `openai-codex/gpt-5.5`, thinking medium, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2`
+- `oracle` — `openai-codex/gpt-5.5`, thinking xhigh, fallback `openai-codex/gpt-5.4`; `defaultContext: fork`; `maxSubagentDepth: 0`
+- `delegate` — `openai-codex/gpt-5.5`, thinking high, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `maxSubagentDepth: 0`
 
 These names intentionally match the builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
 
 Model policy:
 
-- Scouts and other read-only agents use cheaper models where output is verifiable.
-- Implementation, review, planning, and oracle roles stay on **`openai-codex/gpt-5.5`** unless A/B data supports a cheaper route.
+- Agent routing favors quality and wall-clock performance over token cost.
+- GPT-5.5 roles fall back to **`openai-codex/gpt-5.4`** for provider resilience; GLM implementation roles fall back to **`openai-codex/gpt-5.5`** to preserve capability.
+- Implementation, review, planning, and oracle roles stay on strong coding/reasoning models unless A/B data supports a higher-quality route.
 - **`tools:` is intentionally omitted** on every override so children receive Pi’s normal builtin/extension tool surface. Nested-capable agents use `allowSubagents: true` instead of a static tool allowlist (requires current local `pi-subagents`).
 
 ## Subagent context policy
