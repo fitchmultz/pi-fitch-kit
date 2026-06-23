@@ -22,7 +22,7 @@
   },
   "packageManager": "npm@11.16.0",
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.79.10"
+    "@earendil-works/pi-coding-agent": "^0.80.1"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
