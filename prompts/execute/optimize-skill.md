@@ -25,6 +25,11 @@ Harden the named Agent Skill end-to-end so it is current, operational, agent-opt
 3. Run the skill validator before changes when available:
    `python3 ~/.agents/skills/agent-skill-engineering/scripts/validate_skill.py <skill-dir>`
 4. Identify the skill's trigger contract, core workflow, stop rules, helper scripts, evals, and validation expectations.
+   - Treat the frontmatter `description` as a router, not the workflow.
+   - Aim for ~180-320 chars unless collision risk needs more.
+   - Keep trigger nouns, implicit trigger cases, and near-miss exclusions.
+   - Cut process detail already present in `SKILL.md`, repeated "Use this skill when" phrasing when not needed, and generic quality claims.
+   - Quote YAML descriptions when they contain `:` or other punctuation likely to confuse frontmatter parsing.
 5. Verify current reality:
    - read current docs/help/source when they define correctness,
    - run safe CLI/tool smoke checks when relevant,
