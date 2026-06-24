@@ -3,7 +3,7 @@ description: Review recent work with fresh eyes and fix obvious issues
 argument-hint: "[focus]"
 ---
 
-Focus area: ${ARGUMENTS:-recent implementation, current diff, or most recent task-relevant changes}
+Focus area: ${1:-recent implementation, current diff, or most recent task-relevant changes}
 
 Carefully review the recent implementation and the relevant surrounding code with fresh eyes.
 If the current branch has staged or unstaged changes, inspect those first. Otherwise inspect the most recent task-relevant changes in the repo.

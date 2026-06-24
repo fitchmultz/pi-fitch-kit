@@ -79,7 +79,7 @@ Notes:
 - Prompt filenames are the slash-command names.
 - Prompt `description:` values improve autocomplete.
 - Prompt `argument-hint:` values show expected optional or required arguments in autocomplete.
-- Optional-scope prompts use native prompt-template defaults like `${ARGUMENTS:-...}` so blank invocations produce useful scoped instructions instead of empty placeholders.
+- Optional-scope prompts use native prompt-template defaults like `${1:-...}` so blank invocations produce useful scoped instructions instead of empty placeholders. Multi-word focus must be quoted (for example `/repo-audit "auth module"`).
 - Prompt frontmatter intentionally omits `model:`, `thinking:`, and other extension-only fields so prompts stay compatible with native Pi prompt templates.
 - Prompts may ask the agent to use a named workflow/skill in the body, but they do not depend on prompt-template skill injection.
 
@@ -173,14 +173,3 @@ Agents should write bulky logs, diffs, browser snapshots, JSON, and raw command 
 
 `agents/context-builder.md` is written to use `agent_browser` for live web research and page reading when local repo context is insufficient.
 
-## Current migration notes
-
-This repo is the new source of truth for the renamed prompt set:
-
-- `QA-QC.md` -> `manual-qa.md`
-- `double-check.md` -> `fresh-review.md`
-- `mini-gated-escalation.md` -> `triage-first.md`
-- `remediate-findings.md` -> `resolve-findings.md`
-- `task-execution.md` -> `run-to-completion.md`
-
-The legacy prompt files were moved out of `~/.pi/agent/prompts/` and backed up under `~/.pi/agent/prompt-backups/` during cutover so only the new package-backed slash commands remain active.

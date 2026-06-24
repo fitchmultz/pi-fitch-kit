@@ -3,7 +3,7 @@ description: Audit a Pi extension or package for UX, reliability, and maintainab
 argument-hint: "[focus]"
 ---
 
-Focus area: ${ARGUMENTS:-infer the highest-value Pi extension or package audit scope from the current repository}
+Focus area: ${1:-infer the highest-value Pi extension or package audit scope from the current repository}
 
 Audit the current Pi extension or package with a bias toward real user experience, installability, error handling, maintainability, and operational reliability.
 

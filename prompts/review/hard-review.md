@@ -3,7 +3,7 @@ description: Run a strict no-caveats subagent review gate with temp artifacts
 argument-hint: "[scope]"
 ---
 
-Scope: ${ARGUMENTS:-current uncommitted diff or most recent task-relevant changes}
+Scope: ${1:-current uncommitted diff or most recent task-relevant changes}
 
 Run a hard review gate. Quality bar: no known caveats, no shortcuts, no fragile paths, no hidden tech debt, and no false sign-off. Do not weaken this into a quick or material-only review.
 

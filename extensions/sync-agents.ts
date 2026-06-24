@@ -45,8 +45,6 @@ function syncAgents(): { linked: number; skipped: number } {
 }
 
 export default function fitchKit(pi: ExtensionAPI) {
-  syncAgents();
-
   pi.on("session_start", async (_event, ctx) => {
     const result = syncAgents();
     if (result.skipped > 0 && ctx.hasUI) {
