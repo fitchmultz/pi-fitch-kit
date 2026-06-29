@@ -87,24 +87,24 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — `openai-codex/gpt-5.5`, thinking medium, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
+- `scout` — `cursor/composer-2-5`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
 - `researcher` — `openai-codex/gpt-5.5`, thinking high, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
-- `planner` — `openai-codex/gpt-5.5`, thinking xhigh, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2`; `output: plan.md`
-- `worker` — `zai/glm-5.2`, thinking xhigh, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2` (parent passes `context: "fork"` only for fix-after-review)
-- `fixer` — `zai/glm-5.2`, thinking high, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
-- `reviewer` — `openai-codex/gpt-5.5`, thinking high, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `defaultProgress: false`; `output: false`; `maxSubagentDepth: 0`
-- `context-builder` — `openai-codex/gpt-5.5`, thinking medium, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2`
+- `planner` — `openai-codex/gpt-5.5`, thinking high, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2`; `output: plan.md`
+- `worker` — `openai-codex/gpt-5.5`, thinking medium, fallback `zai/glm-5.2`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0` (parent passes `context: "fork"` only for fix-after-review)
+- `fixer` — `openai-codex/gpt-5.5`, thinking low, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
+- `reviewer` — `openai-codex/gpt-5.5`, thinking medium, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
+- `context-builder` — `cursor/composer-2-5`, thinking low, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2`
 - `oracle` — `openai-codex/gpt-5.5`, thinking xhigh, fallback `openai-codex/gpt-5.4`; `defaultContext: fork`; `maxSubagentDepth: 0`
-- `delegate` — `openai-codex/gpt-5.5`, thinking high, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `maxSubagentDepth: 0`
+- `delegate` — `openai-codex/gpt-5.5`, thinking medium, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `maxSubagentDepth: 0`
 
 These names intentionally match the builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
 
 Model policy:
 
 - Agent routing favors quality and wall-clock performance over token cost.
-- GPT-5.5 roles fall back to **`openai-codex/gpt-5.4`** for provider resilience; GLM implementation roles fall back to **`openai-codex/gpt-5.5`** to preserve capability.
+- GPT-5.5 roles usually fall back to **`openai-codex/gpt-5.4`** for provider resilience; the worker falls back to **`zai/glm-5.2`** for implementation-path resilience.
 - Implementation, review, planning, and oracle roles stay on strong coding/reasoning models unless A/B data supports a higher-quality route.
-- **`tools:` is intentionally omitted** on every override so children receive Pi’s normal builtin/extension tool surface. Nested-capable agents use `allowSubagents: true` instead of a static tool allowlist (requires current local `pi-subagents`).
+- **`tools:` is intentionally omitted** on every override so children receive Pi’s normal builtin/extension tool surface. Only explicitly nested-capable planning/context agents use `allowSubagents: true` instead of a static tool allowlist (requires current local `pi-subagents`).
 
 ## Subagent context policy
 
@@ -165,7 +165,7 @@ subagent({
 
 For quick review fanout, the `reviewer` default already uses `output: false` and `defaultProgress: false`, so the parent receives findings without project files unless it overrides output behavior. For strict saved reviews, use `/hard-review`, which creates a temp artifact directory and gives each reviewer a distinct `output` path. Parent launch defaults are documented in global `~/.pi/agent/AGENTS.md` (async, fresh reviewers, scope in `task`).
 
-Only `worker`, `planner`, and `context-builder` set `allowSubagents: true` with `maxSubagentDepth: 2`; they synthesize broad work and may fan out one layer when useful. Specialist/leaf agents (`scout`, `researcher`, `reviewer`, `fixer`, `delegate`, `oracle`) keep `maxSubagentDepth: 0` so they stay focused. `tools:` remains omitted on every override so children keep Pi’s normal builtin/extension tool surface.
+Only `planner` and `context-builder` set `allowSubagents: true` with `maxSubagentDepth: 2`; they synthesize broad work and may fan out one layer when explicitly useful. Worker and specialist/leaf agents (`worker`, `scout`, `researcher`, `reviewer`, `fixer`, `delegate`, `oracle`) keep `maxSubagentDepth: 0` so they stay focused and cannot fall into child-orchestrator loops. `tools:` remains omitted on every override so children keep Pi’s normal builtin/extension tool surface.
 
 Agents should write bulky logs, diffs, browser snapshots, JSON, and raw command output to `/tmp` or a repo-local gitignored scratch path, then summarize only decision-relevant lines.
 
