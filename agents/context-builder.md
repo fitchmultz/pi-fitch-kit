@@ -2,7 +2,7 @@
 name: context-builder
 description: Analyzes requirements and codebase, generates context and meta-prompt
 model: cursor/composer-2-5
-fallbackModels: openai-codex/gpt-5.4
+fallbackModels: openai-codex/gpt-5.5
 thinking: low
 systemPromptMode: append
 inheritProjectContext: true

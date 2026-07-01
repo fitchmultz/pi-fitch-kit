@@ -78,9 +78,9 @@ Each work item should include:
 Most tasks should be 2-3 items. Use up to 5 only when the split is real. If it is naturally 1 item, skip orchestration ceremony and dispatch one bounded child.
 
 ## Phase 3: Dispatch work
-Default: **fresh child per work item**. The parent provides continuity through the plan/checklist and brief, not by making every child inherit the parent transcript.
+Default: **separate child per work item**. The parent provides continuity through the plan/checklist and brief, not by making every child inherit one long worker thread.
 
-Prefer fresh child context. Omit `context` when the selected agent's default already fits. Pass `context: "fresh"` or `context: "fork"` only when one policy should override every child in that call; use `fork` mainly for oracle drift checks or fix-after-review in the same active thread.
+Omit `context` when the selected agent's default fits. Pass `context: "fresh"` or `context: "fork"` only when one policy should override every child in that call. Prefer fresh context for read-only scouting/review; use forked context when the child needs the parent thread, an oracle drift check, or fix-after-review continuity.
 
 For implementation/remediation handoffs, prefer `acceptance` when the work is broad, goal-like, risky, or plan-based. Put the definition of done in `acceptance`, not only prose. Set `acceptance` on the child task/step that owns the session, not on a static parallel group or dynamic fanout group.
 
@@ -102,22 +102,22 @@ Do not include:
 Use the smallest coordination shape that holds:
 
 1. **Single child**: one natural item.
-2. **Verify-then-dispatch fresh loop**: default for multi-item implementation.
+2. **Verify-then-dispatch separate-child loop**: default for multi-item implementation.
    - Dispatch item 1.
    - Wait for result.
    - Verify against done criteria.
    - Update checklist.
-   - Dispatch item 2 fresh with current status.
+   - Dispatch item 2 as a separate child with current status.
 3. **Resume/steer same child**: use `subagent({ action: "resume", id, message })` when items are tightly coupled, the child has important working memory, or a review fix belongs in the same thread.
-4. **Parallel tasks**: use `subagent({ tasks: [...] })` only for independent work. Warn each child about sibling scope and overlapping files. Keep writes single-threaded unless children are isolated with `worktree: true` or scopes are truly disjoint.
+4. **Parallel tasks**: prefer parallel subagents for independent work. For parallel implementation/editing, strongly prefer `worktree: true` so each child gets an isolated git worktree instead of writing into the shared checkout. Warn each child about sibling scope and overlapping files.
 5. **Chain**: use `subagent({ chain: [...] })` for scout -> planner -> worker style flows when each phase should feed the next.
 6. **Async/background**: use only when the parent can do useful independent work or the user wants chat unblocked. Track the run ID and do not sleep-poll.
 
 ## Phase 5: Monitor and unblock
 The parent owns progress.
 
-- For foreground subagents, inspect the result before continuing.
-- For async children, use `subagent({ action: "status", id })`, `nudge`, `extend`, `resume`, or `interrupt` as appropriate.
+- For foreground subagents, inspect the result before continuing. Use `extend` only for an active foreground run with an existing timeout.
+- For async/background children, use `subagent({ action: "status", id })`, `nudge`, `resume`, or `interrupt` as appropriate. `resume` may revive from a persisted child session after completion/timeout; it is not the same OS process.
 - If a child blocks on a decision, answer narrowly. Use `intercom({ action: "pending" })` / `intercom({ action: "reply", ... })` only for real intercom/supervisor asks; otherwise use subagent resume/nudge/status controls.
 - If a child has the child-only `contact_supervisor` tool, it may use it for `need_decision`, `interview_request`, or meaningful `progress_update`; routine completion still returns through `subagent` results.
 - Do not end with active children unless async continuation was explicitly intended and the final status names the run IDs and next check.
@@ -140,8 +140,9 @@ Fix material findings and repeat review/verification until clean or blocked by a
 ## Phase 8: Final rollup
 Before claiming done:
 - Sweep diff/status for accidental churn, temp/debug junk, stale artifacts, generated files, docs/config drift, and unrelated changes.
+- If parallel worktree isolation was used, inspect the per-child diff stats and patch artifacts, apply/merge the intended changes into the main working branch, resolve conflicts there, and verify the merged result. Do not assume `worktree: true` auto-lands changes in the parent checkout.
+- Clean or explicitly report temporary plan/review/context artifacts, worktree patch artifacts, preserved worktrees, and temporary branches. Run `git worktree prune` and delete/prune child branches when no longer needed.
 - Run final relevant checks.
-- Clean or explicitly report temporary plan/review/context artifacts.
 - If a Pi goal is active, map every explicit requirement to evidence before `update_goal({ status: "complete" })`.
 </workflow>
 
@@ -156,7 +157,6 @@ Plan/context handoff:
 subagent({
   agent: "planner",
   task: "Create a concrete implementation plan for: <task>. Include work items, dependencies, files, risks, and validation. Do not edit code.",
-  context: "fresh",
   output: "/tmp/pi-orchestrate-plan.md",
   outputMode: "file-only"
 })
@@ -167,7 +167,6 @@ Worker with acceptance:
 subagent({
   agent: "worker",
   task: "Read /tmp/pi-orchestrate-plan.md first. Implement item 1 only: <brief>. Leave items 2-3 alone.",
-  context: "fresh",
   reads: ["/tmp/pi-orchestrate-plan.md"],
   acceptance: {
     criteria: [
@@ -194,6 +193,24 @@ subagent({
 })
 ```
 
+Parallel implementation with worktree isolation:
+```ts
+subagent({
+  tasks: [
+    { agent: "worker", task: "Implement independent item A. Avoid item B scope." },
+    { agent: "worker", task: "Implement independent item B. Avoid item A scope." }
+  ],
+  concurrency: 2,
+  worktree: true
+})
+```
+
+Worktree requirements and parent duties:
+- `worktree: true` requires a clean git working tree and a git repo.
+- Do not use task-level `cwd` overrides with worktree isolation unless they match the shared cwd.
+- The tool appends per-child diff stats and writes full patch artifacts; it cleans worktrees/temp branches automatically when diff capture succeeds.
+- The parent must inspect/apply the intended patches into the main branch, resolve conflicts, verify, then delete unneeded patch/temp artifacts and prune any preserved worktrees or branches.
+
 Review gate:
 ```ts
 subagent({
@@ -211,7 +228,7 @@ subagent({
 Use intercom only when a visible peer or child escalation needs live coordination:
 - `intercom({ action: "list" })` / `status` are the source of truth for connected local sessions and target names.
 - `intercom({ action: "send", to: "<session>", message: "..." })` is non-blocking context/progress; default wakes idle recipients.
-- `intercom({ action: "ask", to: "<session>", message: "..." })` waits for a reply; use only when blocked on the answer.
+- `intercom({ action: "ask", to: "<session>", message: "..." })` waits for a reply; use only when blocked on the answer. If a default ask returns `reason: "peer_idle"`, the message was delivered but no reply was available yet.
 - `intercom({ action: "reply", message: "..." })` answers the active/single pending ask.
 - `intercom({ action: "pending" })` disambiguates multiple pending asks.
 - For active recipients, use `delivery: "queue"` for normal follow-up and `delivery: "steer"` only for urgent redirection. Use passive delivery only for human-visible breadcrumbs, never for needed agent coordination.
@@ -224,7 +241,7 @@ Prefer `subagent({ action: "status" | "nudge" | "resume", id, ... })` for manage
 - Keep simple tasks simple. Orchestration should reduce risk, context load, or wall-clock time.
 - Parent coordinates; children scout, plan, implement, or review.
 - Give children goals, scope, context, boundaries, done criteria, and stop rules; let them reason.
-- Use defaults for `model`, `timeoutMs`, `output`, `concurrency`, `worktree`, and `context` unless there is a concrete reason to override.
+- Use defaults for `model`, `timeoutMs`, `output`, `concurrency`, and `context` unless there is a concrete reason to override; use `worktree: true` proactively for parallel editing/implementation isolation.
 - Prefer deletion/consolidation over new ceremony.
 - Verify before declaring completion.
 </operating_principles>
