@@ -28,7 +28,6 @@ pi-fitch-kit/
       mine-workflows.md
       optimize-skill.md
       orchestrate.md
-      run-to-completion.md
       resolve-findings.md
       triage-first.md
     review/
@@ -66,7 +65,6 @@ These prompts are available through the package manifest:
 - `/mine-workflows`
 - `/optimize-skill`
 - `/orchestrate`
-- `/run-to-completion`
 - `/resolve-findings`
 - `/triage-first`
 - `/fresh-review`
@@ -167,7 +165,7 @@ subagent({
 });
 ```
 
-For quick review fanout, the `reviewer` default already uses `output: false` and `defaultProgress: false`, so the parent receives findings without project files unless it overrides output behavior. For strict saved reviews, use `/hard-review`, which creates a temp artifact directory and gives each reviewer a distinct `output` path. Parent launch defaults are documented in global `~/.pi/agent/AGENTS.md` (async, fresh reviewers, scope in `task`).
+For quick review fanout, the `reviewer` default already uses `output: false` and no default progress file, so the parent receives findings without project files unless it overrides output behavior. For strict saved reviews, use `/hard-review`, which creates a temp artifact directory and gives each reviewer a distinct `output` path. Parent launch defaults are documented in global `~/.pi/agent/AGENTS.md` (async, fresh reviewers, scope in `task`).
 
 Only `planner` and `context-builder` set `allowSubagents: true` with `maxSubagentDepth: 1`; they synthesize broad work and may fan out one layer when explicitly useful. Worker and specialist/leaf agents (`worker`, `scout`, `researcher`, `reviewer`, `fixer`, `oracle`, `ui-designer`) keep `maxSubagentDepth: 0` so they stay focused and cannot fall into child-orchestrator loops. `tools:` remains omitted on every override so children keep Pi’s normal builtin/extension tool surface.
 

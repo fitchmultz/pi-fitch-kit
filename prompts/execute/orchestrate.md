@@ -258,7 +258,7 @@ Prefer `subagent({ action: "status" | "nudge" | "resume", id, ... })` for manage
 - Parent coordinates; children scout, plan, implement, or review.
 - Give children goals, scope, context, boundaries, done criteria, and stop rules; let them reason.
 - Use defaults for `model`, `timeoutMs`, `output`, `concurrency`, and `context` unless there is a concrete reason to override; use `worktree: true` proactively for parallel editing/implementation isolation.
-- Model overrides are deliberate: prefer `openai-codex/*` for GPT and Cursor Anthropic for UI/design escalation.
+- Model overrides are deliberate: prefer `openai-codex/*` for GPT and configured Claude Code routes for UI/design escalation.
 - Worker/researcher defaults intentionally use medium effort for speed and quota. Override them to `openai-codex/gpt-5.5:high` when the child owns high-risk, hard-debug, broad multi-file, architecture/API/security, data-loss, lifecycle/state, release-blocking, or expensive-to-repeat work.
 - The parent is usually strong enough to plan; delegate planning/oracle work only when isolation, diversity, risk, or scope makes it useful.
 - Prefer deletion/consolidation over new ceremony.

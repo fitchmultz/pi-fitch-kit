@@ -1,7 +1,11 @@
 #!/usr/bin/env node
-import { mkdtempSync, readdirSync, lstatSync, readlinkSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, lstatSync, readlinkSync, rmSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-fitch-kit-agent-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
@@ -38,7 +42,19 @@ try {
     }
   }
 
-  console.log(JSON.stringify({ ok: true, events, syncedAgents, notices }, null, 2));
+  const conflictPath = join(syncedDir, "worker.md");
+  rmSync(conflictPath, { force: true });
+  writeFileSync(conflictPath, "local override\n", "utf-8");
+  const sync = spawnSync("bash", [join(__dirname, "sync-agents.sh")], {
+    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir },
+    encoding: "utf-8",
+  });
+  if (sync.status !== 0) throw new Error(`Manual sync failed: ${sync.stderr || sync.stdout}`);
+  if (lstatSync(conflictPath).isSymbolicLink() || readFileSync(conflictPath, "utf-8") !== "local override\n") {
+    throw new Error("Manual sync overwrote an existing non-symlink agent file");
+  }
+
+  console.log(JSON.stringify({ ok: true, events, syncedAgents, notices, manualSyncConflictPreserved: true }, null, 2));
 } finally {
   rmSync(agentDir, { recursive: true, force: true });
 }

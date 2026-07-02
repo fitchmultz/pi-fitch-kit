@@ -31,10 +31,17 @@ for target in "$DST"/*.md "$DST"/*.chain.md; do
 done
 
 count=0
+skipped=0
 for f in "$ROOT"/agents/*.md "$ROOT"/agents/*.chain.md; do
-  ln -sfn "$f" "$DST/$(basename "$f")"
-  printf 'linked %s -> %s\n' "$DST/$(basename "$f")" "$f"
+  target="$DST/$(basename "$f")"
+  if [[ -e "$target" && ! -L "$target" ]]; then
+    printf 'skipped existing non-symlink %s\n' "$target"
+    skipped=$((skipped + 1))
+    continue
+  fi
+  ln -sfn "$f" "$target"
+  printf 'linked %s -> %s\n' "$target" "$f"
   count=$((count + 1))
 done
 
-echo "Synced ${count} agent file(s), removed ${removed} stale symlink(s) in $DST"
+echo "Synced ${count} agent file(s), skipped ${skipped} conflict(s), removed ${removed} stale symlink(s) in $DST"
