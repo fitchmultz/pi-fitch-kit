@@ -1,15 +1,15 @@
 ---
 name: planner
 description: Creates implementation plans from context and requirements
-model: openai-codex/gpt-5.5
-fallbackModels: openai-codex/gpt-5.4
-thinking: high
+model: cursor/claude-fable-5@300k
+fallbackModels: openai-codex/gpt-5.5
+thinking: medium
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh
 allowSubagents: true
-maxSubagentDepth: 2
+maxSubagentDepth: 1
 output: plan.md
 ---
 

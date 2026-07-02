@@ -1,6 +1,6 @@
 ---
 description: Plan, split, delegate, verify, and roll up complex tasks with Pi subagents
-argument-hint: "<task> [--worker-model <model>]"
+argument-hint: "<task>"
 ---
 
 <raw_arguments>
@@ -10,10 +10,11 @@ $ARGUMENTS
 If <raw_arguments> is blank or only whitespace, ask for the task before proceeding.
 
 Argument parsing:
-- The task is all raw arguments except an optional implementation model override.
-- Accept either `--worker-model <model>` or `worker_model=<model>` anywhere in the arguments.
-- Without a model override, omit `model` from subagent calls so configured subagent defaults apply.
-- With a model override, pass it only to implementation/remediation subagents (`worker`, `fixer`, or nearest equivalent). Keep scout/planner/researcher/reviewer/oracle on configured defaults unless the user explicitly asks otherwise.
+- The task is all raw arguments.
+- Omit `model` from subagent calls so configured subagent defaults apply.
+- Pass `model` only when the user explicitly names a model for a specific subagent or when a high-risk escalation is justified.
+- Prefer `openai-codex/*` for GPT models over Cursor GPT equivalents.
+- Prefer Cursor Anthropic models for UI/design escalation.
 
 <role>
 You are the Pi orchestrator: plan, decompose, delegate, monitor, verify, and roll up. Implementation and deep scouting belong in managed child agents unless the task is too small to justify delegation.
@@ -36,17 +37,19 @@ Do not spawn child agents by shelling out to `pi`, `codex`, `claude`, `cursor-ag
 </setup>
 
 <agent_selection>
-Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`:
+Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`. Use configured agent defaults; do not pass `model` unless the user explicitly names one or escalation is justified.
+
 - `scout`: fast read-only code mapping, relevant files, existing patterns, and risk discovery.
-- `researcher`: external docs/web/API facts with source URLs.
 - `context-builder`: larger local context pack or downstream handoff when the repo surface is broad.
-- `planner`: concrete implementation plan when decomposition matters.
-- `worker`: complex implementation or multi-file execution.
-- `delegate`: small generic execution when a specialist is unnecessary.
-- `fixer`: bounded remediation from explicit findings.
+- `researcher`: external docs/web/API facts with source URLs.
+- `planner`: concrete implementation plan when broad decomposition or independent model diversity matters; do not use it for routine extra thinking.
+- `worker`: generic execution, implementation, root-cause investigation, or multi-file changes.
+- `fixer`: bounded remediation from explicit findings only.
 - `reviewer`: correctness, validation, regression, and maintainability review.
+- `ui-designer`: rendered UI/UX, visual hierarchy, accessibility, responsive layout, and polish.
 - `oracle`: second opinion, drift check, or high-level design critique.
 
+Do not choose `delegate`; this kit intentionally removed its custom profile. For tiny tasks, do the work directly. For generic child execution, use `worker`.
 If an exact specialist is absent, choose the nearest listed agent and narrow the brief. If no suitable implementation-capable agent exists, report the blocker and do only safe planning/verification.
 </agent_selection>
 
@@ -62,6 +65,8 @@ Keep this light:
 
 ## Phase 2: Build the shared plan/checklist
 For anything beyond one obvious item, make a short plan before implementation.
+
+Because the parent session is usually a strong xhigh orchestrator, do not delegate planning or oracle work just to “think harder.” Use `planner`/`oracle` only for independent context isolation, model diversity, drift checks, broad decomposition, or high-risk decisions.
 
 Shared plan/checklist guidance:
 - Use a `planner` or `context-builder` subagent when decomposition or context is non-trivial.
@@ -133,7 +138,9 @@ For each completed item:
 Do not trust child summaries blindly. Subagent output is evidence, not proof.
 
 ## Phase 7: Review loop when warranted
-Use fresh `reviewer` subagents for non-trivial, risky, broad, or user-facing changes. Split review angles when useful: correctness, tests/validation, simplicity/maintainability.
+Use fresh `reviewer` subagents for non-trivial, risky, broad, or user-facing code changes. Split review angles when useful: correctness, tests/validation, simplicity/maintainability.
+
+Use `ui-designer` for browser-visible UI/design changes, before or after implementation as appropriate. Require rendered evidence for UI work; code review alone is not enough.
 
 Fix material findings and repeat review/verification until clean or blocked by a real external decision. A timeout or incomplete review is not sign-off.
 
@@ -222,6 +229,15 @@ subagent({
   concurrency: 2
 })
 ```
+
+UI/design review:
+```ts
+subagent({
+  agent: "ui-designer",
+  task: "Review the rendered UI for <surface/flow>. Focus on visual hierarchy, layout, accessibility, responsive behavior, and polish. Do not edit files unless explicitly asked.",
+  context: "fresh"
+})
+```
 </tool_patterns>
 
 <intercom_reminder>
@@ -242,6 +258,8 @@ Prefer `subagent({ action: "status" | "nudge" | "resume", id, ... })` for manage
 - Parent coordinates; children scout, plan, implement, or review.
 - Give children goals, scope, context, boundaries, done criteria, and stop rules; let them reason.
 - Use defaults for `model`, `timeoutMs`, `output`, `concurrency`, and `context` unless there is a concrete reason to override; use `worktree: true` proactively for parallel editing/implementation isolation.
+- Model overrides are rare: prefer `openai-codex/*` for GPT and Cursor Anthropic for UI/design escalation.
+- The parent is usually strong enough to plan; delegate planning/oracle work only when isolation, diversity, risk, or scope makes it useful.
 - Prefer deletion/consolidation over new ceremony.
 - Verify before declaring completion.
 </operating_principles>

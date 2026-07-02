@@ -38,13 +38,13 @@ pi-fitch-kit/
       manual-qa.md
   agents/
     context-builder.md
-    delegate.md
     fixer.md
     oracle.md
     planner.md
     researcher.md
     reviewer.md
     scout.md
+    ui-designer.md
     worker.md
   extensions/
     sync-agents.ts
@@ -87,23 +87,26 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — `cursor/composer-2-5`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
-- `researcher` — `openai-codex/gpt-5.5`, thinking high, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
-- `planner` — `openai-codex/gpt-5.5`, thinking high, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2`; `output: plan.md`
-- `worker` — `openai-codex/gpt-5.5`, thinking medium, fallback `zai/glm-5.2`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0` (parent passes `context: "fork"` only for fix-after-review)
-- `fixer` — `openai-codex/gpt-5.5`, thinking low, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
-- `reviewer` — `openai-codex/gpt-5.5`, thinking medium, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
-- `context-builder` — `cursor/composer-2-5`, thinking low, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 2`
-- `oracle` — `openai-codex/gpt-5.5`, thinking xhigh, fallback `openai-codex/gpt-5.4`; `defaultContext: fork`; `maxSubagentDepth: 0`
-- `delegate` — `openai-codex/gpt-5.5`, thinking medium, fallback `openai-codex/gpt-5.4`; `defaultContext: fresh`; `maxSubagentDepth: 0`
+- `scout` — `cursor/composer-2-5`, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
+- `researcher` — `openai-codex/gpt-5.5`, thinking high, fallback `cursor/claude-fable-5@300k`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `planner` — `cursor/claude-fable-5@300k`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`; `output: plan.md`
+- `worker` — `openai-codex/gpt-5.5`, thinking high, fallback `cursor/claude-fable-5@300k`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0` (parent passes `context: "fork"` only for fix-after-review)
+- `fixer` — `openai-codex/gpt-5.5`, thinking high, fallback `cursor/claude-fable-5@300k`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
+- `reviewer` — `cursor/claude-fable-5@300k`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
+- `context-builder` — `cursor/composer-2-5`, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`
+- `oracle` — `cursor/claude-fable-5@300k`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fork`; `maxSubagentDepth: 0`
+- `ui-designer` — `cursor/claude-fable-5@300k`, thinking high, fallback `cursor/claude-opus-4-8@300k`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
 
-These names intentionally match the builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
+Most names intentionally match builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly; `ui-designer` is an added specialist. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
 
 Model policy:
 
-- Agent routing favors quality and wall-clock performance over token cost.
-- GPT-5.5 roles usually fall back to **`openai-codex/gpt-5.4`** for provider resilience; the worker falls back to **`zai/glm-5.2`** for implementation-path resilience.
-- Implementation, review, planning, and oracle roles stay on strong coding/reasoning models unless A/B data supports a higher-quality route.
+- Agent routing favors expected quality while avoiding frontier spend where it does not matter.
+- `cursor/composer-2-5` handles cheap breadth and context gathering; its thinking level is intentionally omitted because Pi ignores custom thinking for that model.
+- `openai-codex/gpt-5.5` handles targeted fixing, research, and default implementation where subscription quota is best.
+- Cursor Anthropic models handle planning, review, oracle, and UI judgment where quality, model diversity, and visual taste matter more.
+- Because the parent session is usually `openai-codex/gpt-5.5` at xhigh, use planner/oracle for independent perspective or isolation—not routine extra thinking.
+- Default Anthropic route uses `cursor/claude-fable-5@300k`; escalate manually only for high-risk work that actually needs more context or effort.
 - **`tools:` is intentionally omitted** on every override so children receive Pi’s normal builtin/extension tool surface. Only explicitly nested-capable planning/context agents use `allowSubagents: true` instead of a static tool allowlist (requires current local `pi-subagents`).
 
 ## Subagent context policy
@@ -165,7 +168,7 @@ subagent({
 
 For quick review fanout, the `reviewer` default already uses `output: false` and `defaultProgress: false`, so the parent receives findings without project files unless it overrides output behavior. For strict saved reviews, use `/hard-review`, which creates a temp artifact directory and gives each reviewer a distinct `output` path. Parent launch defaults are documented in global `~/.pi/agent/AGENTS.md` (async, fresh reviewers, scope in `task`).
 
-Only `planner` and `context-builder` set `allowSubagents: true` with `maxSubagentDepth: 2`; they synthesize broad work and may fan out one layer when explicitly useful. Worker and specialist/leaf agents (`worker`, `scout`, `researcher`, `reviewer`, `fixer`, `delegate`, `oracle`) keep `maxSubagentDepth: 0` so they stay focused and cannot fall into child-orchestrator loops. `tools:` remains omitted on every override so children keep Pi’s normal builtin/extension tool surface.
+Only `planner` and `context-builder` set `allowSubagents: true` with `maxSubagentDepth: 1`; they synthesize broad work and may fan out one layer when explicitly useful. Worker and specialist/leaf agents (`worker`, `scout`, `researcher`, `reviewer`, `fixer`, `oracle`, `ui-designer`) keep `maxSubagentDepth: 0` so they stay focused and cannot fall into child-orchestrator loops. `tools:` remains omitted on every override so children keep Pi’s normal builtin/extension tool surface.
 
 Agents should write bulky logs, diffs, browser snapshots, JSON, and raw command output to `/tmp` or a repo-local gitignored scratch path, then summarize only decision-relevant lines.
 

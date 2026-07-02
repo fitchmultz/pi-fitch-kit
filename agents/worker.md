@@ -2,8 +2,8 @@
 name: worker
 description: General-purpose subagent with full capabilities in an isolated context window
 model: openai-codex/gpt-5.5
-fallbackModels: zai/glm-5.2
-thinking: medium
+fallbackModels: cursor/claude-fable-5@300k
+thinking: high
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true

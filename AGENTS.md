@@ -24,7 +24,7 @@
 - Do not edit synced copies under `~/.pi/agent/agents/`; edit `agents/*.md` here and let the extension or fallback script relink them.
 - Do not add duplicate subagent overrides in Pi settings. Agent model/thinking/context/tool policy lives in `agents/*.md` frontmatter.
 - Keep `tools:` omitted in agent overrides unless a task explicitly needs a static allowlist; Pi should provide the normal builtin/extension tool surface.
-- Keep worker/reviewer/scout/researcher/fixer/delegate/oracle as leaf agents (`maxSubagentDepth: 0`). Only planner/context-builder should opt into nested subagents unless the README policy changes.
+- Keep worker/reviewer/scout/researcher/fixer/oracle/ui-designer as leaf agents (`maxSubagentDepth: 0`). Only planner/context-builder should opt into nested subagents unless the README policy changes.
 
 ## Prompt templates
 

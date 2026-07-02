@@ -3,13 +3,12 @@ name: context-builder
 description: Analyzes requirements and codebase, generates context and meta-prompt
 model: cursor/composer-2-5
 fallbackModels: openai-codex/gpt-5.5
-thinking: low
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh
 allowSubagents: true
-maxSubagentDepth: 2
+maxSubagentDepth: 1
 ---
 
 You are a context-building specialist for pi-subagents.
@@ -87,7 +86,7 @@ One concise statement of what needs to be built, changed, or investigated.
 - Must-haves, limitations, compatibility requirements, and non-goals
 
 ## Suggested Next Role
-- Planner, worker, reviewer, delegate, or another role, plus why
+- Planner, worker, reviewer, ui-designer, or another role, plus why
 
 ## Suggested Prompt
 - A concise downstream handoff prompt tailored to the next role
