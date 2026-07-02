@@ -23,7 +23,8 @@
 - Use npm and Node `>=22.19.0`; do not introduce another package manager.
 - Do not edit synced copies under `~/.pi/agent/agents/`; edit `agents/*.md` here and let the extension or fallback script relink them.
 - Do not add duplicate subagent overrides in Pi settings. Agent model/thinking/context/tool policy lives in `agents/*.md` frontmatter.
-- When launching these subagents directly, use worker/researcher medium-effort defaults for routine work. Override worker/researcher to `openai-codex/gpt-5.5:high` when the child owns high-risk, hard-debug, broad multi-file, architecture/API/security, data-loss, lifecycle/state, release-blocking, or expensive-to-repeat work.
+- Use configured agent defaults first: worker/researcher/scout/context-builder are medium-effort, reviewer/fixer are high-effort, and oracle is xhigh forked-context by default. Override worker/researcher upward only when the child owns high-risk, hard-debug, broad multi-file, architecture/API/security, data-loss, lifecycle/state, release-blocking, or expensive-to-repeat work.
+- `claude-code/*` models route through Claude Code CLI inside `pi-subagents`, not Pi's global model registry. Do not make Claude Code the primary model for fork-required agents unless the task includes a compact handoff; Claude Code cannot import a Pi fork transcript.
 - Keep `tools:` omitted in agent overrides unless a task explicitly needs a static allowlist; Pi should provide the normal builtin/extension tool surface.
 - Keep worker/reviewer/scout/researcher/fixer/oracle/ui-designer as leaf agents (`maxSubagentDepth: 0`). Only planner/context-builder should opt into nested subagents unless the README policy changes.
 

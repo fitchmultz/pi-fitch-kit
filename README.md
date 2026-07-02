@@ -87,27 +87,27 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — `cursor/composer-2-5`, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
-- `researcher` — `openai-codex/gpt-5.5`, thinking medium, fallback `cursor/claude-fable-5@300k`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
-- `planner` — `cursor/claude-fable-5@300k`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`; `output: plan.md`
-- `worker` — `openai-codex/gpt-5.5`, thinking medium, fallback `cursor/claude-fable-5@300k`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0` (parent passes `context: "fork"` only for fix-after-review)
-- `fixer` — `openai-codex/gpt-5.5`, thinking high, fallback `cursor/claude-fable-5@300k`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
-- `reviewer` — `cursor/claude-fable-5@300k`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
-- `context-builder` — `cursor/composer-2-5`, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`
-- `oracle` — `cursor/claude-fable-5@300k`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fork`; `maxSubagentDepth: 0`
-- `ui-designer` — `cursor/claude-fable-5@300k`, thinking high, fallback `cursor/claude-opus-4-8@300k`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
+- `scout` — `cursor/composer-2-5`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
+- `researcher` — `openai-codex/gpt-5.5`, thinking medium, fallback `claude-code/fable`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `planner` — `claude-code/fable`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`; `output: plan.md`
+- `worker` — `openai-codex/gpt-5.5`, thinking medium, fallback `claude-code/fable`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0` (parent passes `context: "fork"` only for fix-after-review)
+- `fixer` — `openai-codex/gpt-5.5`, thinking high, fallback `claude-code/fable`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
+- `reviewer` — `openai-codex/gpt-5.5`, thinking high, fallback `claude-code/fable`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
+- `context-builder` — `cursor/composer-2-5`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`
+- `oracle` — `openai-codex/gpt-5.5`, thinking xhigh, fallback `claude-code/fable`; `defaultContext: fork`; `maxSubagentDepth: 0`
+- `ui-designer` — `claude-code/fable`, thinking medium, fallback `claude-code/opus`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
 
 Most names intentionally match builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly; `ui-designer` is an added specialist. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
 
 Model policy:
 
 - Agent routing favors expected quality while avoiding frontier spend where it does not matter.
-- `cursor/composer-2-5` handles cheap breadth and context gathering; its thinking level is intentionally omitted because Pi ignores custom thinking for that model.
-- `openai-codex/gpt-5.5` handles default implementation and research at medium effort where subscription quota is best; `fixer` stays high because explicit remediation should not half-fix known findings.
+- `cursor/composer-2-5` handles cheap breadth and context gathering; `thinking: medium` is kept in frontmatter for consistent status/override display even if the provider ignores it.
+- `openai-codex/gpt-5.5` handles default implementation, research, review, and forked oracle work; `fixer`/`reviewer` stay high because explicit remediation and strict review should not half-fix known findings.
+- `claude-code/fable` and `claude-code/opus` route through Claude Code CLI inside `pi-subagents` using the user's Claude Code subscription, not Pi's global model registry.
 - Invoking agents may override worker/researcher to `openai-codex/gpt-5.5:high` when the child owns high-risk, hard-debug, broad multi-file, architecture/API/security, data-loss, lifecycle/state, release-blocking, or expensive-to-repeat work.
-- Cursor Anthropic models handle planning, review, oracle, and UI judgment where quality, model diversity, and visual taste matter more.
+- Claude Code handles planning, UI judgment, and fallback model diversity for fresh-context children. Do not make Claude Code the primary route for fork-required work unless the task includes a compact handoff; Claude Code cannot import a Pi fork transcript.
 - Because the parent session is usually `openai-codex/gpt-5.5` at xhigh, use planner/oracle for independent perspective or isolation—not routine extra thinking.
-- Default Anthropic route uses `cursor/claude-fable-5@300k`; escalate manually only for high-risk work that actually needs more context or effort.
 - **`tools:` is intentionally omitted** on every override so children receive Pi’s normal builtin/extension tool surface. Only explicitly nested-capable planning/context agents use `allowSubagents: true` instead of a static tool allowlist (requires current local `pi-subagents`).
 
 ## Subagent context policy

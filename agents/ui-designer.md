@@ -3,7 +3,7 @@ name: ui-designer
 description: Visual/UI design specialist for rendered UX, layout, accessibility, and polish
 model: claude-code/fable
 fallbackModels: claude-code/opus
-thinking: high
+thinking: medium
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
