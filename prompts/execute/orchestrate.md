@@ -12,7 +12,8 @@ If <raw_arguments> is blank or only whitespace, ask for the task before proceedi
 Argument parsing:
 - The task is all raw arguments.
 - Omit `model` from subagent calls so configured subagent defaults apply.
-- Pass `model` only when the user explicitly names a model for a specific subagent or when a high-risk escalation is justified.
+- Usually omit `model` so configured subagent defaults apply.
+- Override worker/researcher to `openai-codex/gpt-5.5:high` when the child owns high-risk, hard-debug, broad multi-file, architecture/API/security, data-loss, lifecycle/state, release-blocking, or expensive-to-repeat work.
 - Prefer `openai-codex/*` for GPT models over Cursor GPT equivalents.
 - Prefer Cursor Anthropic models for UI/design escalation.
 
@@ -37,13 +38,13 @@ Do not spawn child agents by shelling out to `pi`, `codex`, `claude`, `cursor-ag
 </setup>
 
 <agent_selection>
-Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`. Use configured agent defaults; do not pass `model` unless the user explicitly names one or escalation is justified.
+Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`. Use configured defaults for routine work; override worker/researcher upward when risk and ownership justify the extra spend.
 
 - `scout`: fast read-only code mapping, relevant files, existing patterns, and risk discovery.
 - `context-builder`: larger local context pack or downstream handoff when the repo surface is broad.
-- `researcher`: external docs/web/API facts with source URLs.
+- `researcher`: quota-efficient external docs/web/API facts with source URLs.
 - `planner`: concrete implementation plan when broad decomposition or independent model diversity matters; do not use it for routine extra thinking.
-- `worker`: generic execution, implementation, root-cause investigation, or multi-file changes.
+- `worker`: quota-efficient generic execution, implementation, root-cause investigation, or multi-file changes.
 - `fixer`: bounded remediation from explicit findings only.
 - `reviewer`: correctness, validation, regression, and maintainability review.
 - `ui-designer`: rendered UI/UX, visual hierarchy, accessibility, responsive layout, and polish.
@@ -258,7 +259,8 @@ Prefer `subagent({ action: "status" | "nudge" | "resume", id, ... })` for manage
 - Parent coordinates; children scout, plan, implement, or review.
 - Give children goals, scope, context, boundaries, done criteria, and stop rules; let them reason.
 - Use defaults for `model`, `timeoutMs`, `output`, `concurrency`, and `context` unless there is a concrete reason to override; use `worktree: true` proactively for parallel editing/implementation isolation.
-- Model overrides are rare: prefer `openai-codex/*` for GPT and Cursor Anthropic for UI/design escalation.
+- Model overrides are deliberate: prefer `openai-codex/*` for GPT and Cursor Anthropic for UI/design escalation.
+- Worker/researcher defaults intentionally use medium effort for speed and quota. Override them to `openai-codex/gpt-5.5:high` when the child owns high-risk, hard-debug, broad multi-file, architecture/API/security, data-loss, lifecycle/state, release-blocking, or expensive-to-repeat work.
 - The parent is usually strong enough to plan; delegate planning/oracle work only when isolation, diversity, risk, or scope makes it useful.
 - Prefer deletion/consolidation over new ceremony.
 - Verify before declaring completion.

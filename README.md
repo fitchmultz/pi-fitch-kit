@@ -88,9 +88,9 @@ Notes:
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
 - `scout` — `cursor/composer-2-5`, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
-- `researcher` — `openai-codex/gpt-5.5`, thinking high, fallback `cursor/claude-fable-5@300k`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `researcher` — `openai-codex/gpt-5.5`, thinking medium, fallback `cursor/claude-fable-5@300k`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
 - `planner` — `cursor/claude-fable-5@300k`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`; `output: plan.md`
-- `worker` — `openai-codex/gpt-5.5`, thinking high, fallback `cursor/claude-fable-5@300k`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0` (parent passes `context: "fork"` only for fix-after-review)
+- `worker` — `openai-codex/gpt-5.5`, thinking medium, fallback `cursor/claude-fable-5@300k`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0` (parent passes `context: "fork"` only for fix-after-review)
 - `fixer` — `openai-codex/gpt-5.5`, thinking high, fallback `cursor/claude-fable-5@300k`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
 - `reviewer` — `cursor/claude-fable-5@300k`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
 - `context-builder` — `cursor/composer-2-5`, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`
@@ -103,7 +103,8 @@ Model policy:
 
 - Agent routing favors expected quality while avoiding frontier spend where it does not matter.
 - `cursor/composer-2-5` handles cheap breadth and context gathering; its thinking level is intentionally omitted because Pi ignores custom thinking for that model.
-- `openai-codex/gpt-5.5` handles targeted fixing, research, and default implementation where subscription quota is best.
+- `openai-codex/gpt-5.5` handles default implementation and research at medium effort where subscription quota is best; `fixer` stays high because explicit remediation should not half-fix known findings.
+- Invoking agents may override worker/researcher to `openai-codex/gpt-5.5:high` when the child owns high-risk, hard-debug, broad multi-file, architecture/API/security, data-loss, lifecycle/state, release-blocking, or expensive-to-repeat work.
 - Cursor Anthropic models handle planning, review, oracle, and UI judgment where quality, model diversity, and visual taste matter more.
 - Because the parent session is usually `openai-codex/gpt-5.5` at xhigh, use planner/oracle for independent perspective or isolation—not routine extra thinking.
 - Default Anthropic route uses `cursor/claude-fable-5@300k`; escalate manually only for high-risk work that actually needs more context or effort.

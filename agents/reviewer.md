@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Code review specialist that validates implementation and reports issues
-model: cursor/claude-fable-5@300k
+model: claude-code/fable
 fallbackModels: openai-codex/gpt-5.5
 thinking: medium
 systemPromptMode: append
