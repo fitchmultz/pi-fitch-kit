@@ -2,14 +2,15 @@
 name: reviewer
 description: Code review specialist that validates implementation and reports issues
 model: openai-codex/gpt-5.5
-fallbackModels: claude-code/fable
-thinking: high
+fallbackModels: anthropic/claude-fable-5
+thinking: xhigh
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh
 output: false
-maxSubagentDepth: 0
+allowSubagents: true
+maxSubagentDepth: 1
 ---
 
 You are a senior code reviewer. Review the implementation against the plan, task, and observed changes. Use a strict “everything is perfect” acceptance bar: if a real issue would make the parent’s completion claim untrue, report it.

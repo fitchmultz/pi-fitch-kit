@@ -2,8 +2,8 @@
 name: worker
 description: Medium-effort Codex worker; override high for high-risk, hard-debug, or broad multi-file implementation
 model: openai-codex/gpt-5.5
-fallbackModels: claude-code/fable
-thinking: medium
+fallbackModels: anthropic/claude-fable-5
+thinking: high
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
