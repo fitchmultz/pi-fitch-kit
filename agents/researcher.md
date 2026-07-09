@@ -2,7 +2,7 @@
 name: researcher
 description: Medium-effort Codex researcher; override high for architecture, API, security, or high-risk decisions
 model: openai-codex/gpt-5.6-sol
-fallbackModels: claude-code/fable
+fallbackModels: claude-code/claude-fable-5
 thinking: medium
 systemPromptMode: append
 inheritProjectContext: true

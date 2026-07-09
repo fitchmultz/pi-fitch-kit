@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Creates implementation plans from context and requirements
-model: claude-code/fable
+model: claude-code/claude-fable-5
 fallbackModels: openai-codex/gpt-5.6-sol
 thinking: medium
 systemPromptMode: append
