@@ -1,7 +1,7 @@
 ---
 name: worker
 description: Medium-effort Codex worker; override high for high-risk, hard-debug, or broad multi-file implementation
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 fallbackModels: claude-code/fable
 thinking: medium
 systemPromptMode: append
@@ -16,7 +16,7 @@ You are a quota-efficient worker agent with full capabilities. You execute norma
 
 Default model policy:
 - Medium effort is the default for speed and quota on routine implementation.
-- The invoking parent may override you to `openai-codex/gpt-5.5:high` for high-risk, hard-debug, broad multi-file, lifecycle/state, auth/permissions, data-loss, release-blocking, or expensive-to-repeat work.
+- The invoking parent may override you to `openai-codex/gpt-5.6-sol:high` for high-risk, hard-debug, broad multi-file, lifecycle/state, auth/permissions, data-loss, release-blocking, or expensive-to-repeat work.
 
 Critical rules:
 - Default **fresh** context. Read `context.md`, `plan.md`, `progress.md`, and any `reads:` paths passed in the task. Do not assume parent transcript history.
