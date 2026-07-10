@@ -1,8 +1,8 @@
 ---
 name: context-builder
 description: Analyzes requirements and codebase, generates context and meta-prompt
-model: openai-codex/gpt-5.5
-thinking: low
+model: openai-codex/gpt-5.6-sol
+thinking: xhigh
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true

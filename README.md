@@ -85,27 +85,25 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — `cursor/composer-2-5`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
-- `researcher` — `openai-codex/gpt-5.5`, thinking medium, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
-- `planner` — `anthropic/claude-fable-5`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`; `output: plan.md`
-- `worker` — `openai-codex/gpt-5.5`, thinking medium, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0` (parent may pass `context: "fork"` only for fix-after-review)
-- `fixer` — `openai-codex/gpt-5.5`, thinking high, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
-- `reviewer` — `openai-codex/gpt-5.5`, thinking high, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
-- `context-builder` — `cursor/composer-2-5`, thinking medium, fallback `openai-codex/gpt-5.5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`
-- `oracle` — `openai-codex/gpt-5.5`, thinking xhigh, no Claude Code fallback because it requires forked Pi transcript context; `defaultContext: fork`; `maxSubagentDepth: 0`
-- `ui-designer` — `anthropic/claude-fable-5`, thinking medium, fallback `anthropic/opus`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
+- `scout` — `openai-codex/gpt-5.6-sol`, thinking max, no fallback; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
+- `researcher` — `openai-codex/gpt-5.6-sol`, thinking max, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `planner` — `openai-codex/gpt-5.6-sol`, thinking max, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`; `output: plan.md`
+- `worker` — `openai-codex/gpt-5.6-sol`, thinking max, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0` (parent may pass `context: "fork"` only for fix-after-review)
+- `fixer` — `openai-codex/gpt-5.6-sol`, thinking max, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
+- `reviewer` — `openai-codex/gpt-5.6-sol`, thinking max, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
+- `context-builder` — `openai-codex/gpt-5.6-sol`, thinking xhigh, no fallback; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`
+- `oracle` — `openai-codex/gpt-5.6-sol`, thinking max, no Claude Code fallback because it requires forked Pi transcript context; `defaultContext: fork`; `maxSubagentDepth: 0`
+- `ui-designer` — `anthropic/claude-fable-5`, thinking max, fallback `cursor/opus-4.8@300k:slow`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
 
 Most names intentionally match builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly; `ui-designer` is an added specialist. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
 
 Model policy:
 
-- Agent routing favors expected quality while avoiding frontier spend where it does not matter.
-- `cursor/composer-2-5` handles cheap breadth and context gathering; `thinking: medium` is kept in frontmatter for consistent status/override display even if the provider ignores it.
-- `openai-codex/gpt-5.5` handles default implementation, research, review, and forked oracle work; `fixer`/`reviewer` stay high because explicit remediation and strict review should not half-fix known findings.
-- `anthropic/claude-fable-5` and `anthropic/opus` route through Claude Code CLI inside `pi-subagents` using the user's Claude Code subscription, not Pi's global model registry.
-- Invoking agents may override worker/researcher to `openai-codex/gpt-5.5:high` when the child owns high-risk, hard-debug, broad multi-file, architecture/API/security, data-loss, lifecycle/state, release-blocking, or expensive-to-repeat work.
-- Claude Code handles planning, UI judgment, and fallback model diversity for fresh-context children. Do not use Claude Code as primary or fallback routing for fork-default agents unless the task includes a compact handoff; Claude Code cannot import a Pi fork transcript.
-- Because the parent session is usually `openai-codex/gpt-5.5` at xhigh, use planner/oracle for independent perspective or isolation—not routine extra thinking.
+- `openai-codex/gpt-5.6-sol` is the primary model for every agent except `ui-designer`; reasoning stays xhigh for context building and max for the remaining GPT roles.
+- `anthropic/claude-fable-5` routes through Claude Code CLI inside `pi-subagents` using the user's Claude Code subscription, not Pi's global model registry. It is the `ui-designer` primary and the configured fallback for fresh-context planner, implementation, research, and review roles.
+- Use configured model and thinking defaults unless a concrete routing, provider-capability, model-diversity, or cost requirement justifies an override.
+- Do not use Claude Code as primary or fallback routing for fork-default agents unless the task includes a compact handoff; Claude Code cannot import a Pi fork transcript.
+- Because GPT-5.6 Sol is shared across most roles, use planner/oracle for role and context isolation—not model diversity or routine extra thinking.
 - **`tools:` is intentionally omitted** on every override so children receive Pi’s normal builtin/extension tool surface. Only explicitly nested-capable planning/context agents use `allowSubagents: true` instead of a static tool allowlist (requires current local `pi-subagents`).
 
 ## Subagent context policy
@@ -174,4 +172,3 @@ Agents should write bulky logs, diffs, browser snapshots, JSON, and raw command 
 ## Browser research note
 
 `agents/context-builder.md` is written to use `agent_browser` for live web research and page reading when local repo context is insufficient.
-

@@ -1,9 +1,9 @@
 ---
 name: planner
 description: Creates implementation plans from context and requirements
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 fallbackModels: anthropic/claude-fable-5
-thinking: xhigh
+thinking: max
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true

@@ -1,8 +1,8 @@
 ---
 name: oracle
 description: High-context decision-consistency oracle that protects inherited state and prevents drift
-model: openai-codex/gpt-5.5
-thinking: xhigh
+model: openai-codex/gpt-5.6-sol
+thinking: max
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
