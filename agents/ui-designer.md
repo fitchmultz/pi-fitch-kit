@@ -1,8 +1,8 @@
 ---
 name: ui-designer
 description: Visual/UI design specialist for rendered UX, layout, accessibility, and polish
-model: anthropic/claude-fable-5
-fallbackModels: cursor/opus-4.8@300k:slow
+model: openai-codex/gpt-5.6-sol
+fallbackModels: anthropic/claude-fable-5
 thinking: max
 systemPromptMode: replace
 inheritProjectContext: true
