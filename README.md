@@ -103,7 +103,6 @@ Model policy:
 - `cursor/grok-4.5` handles cheap breadth and context gathering; `thinking: medium` is kept in frontmatter for consistent status/override display even if the provider ignores it.
 - `openai-codex/gpt-5.6-sol` handles default implementation, research, review, and forked oracle work; `fixer`/`reviewer` stay high because explicit remediation and strict review should not half-fix known findings.
 - `claude-code/claude-fable-5` and `claude-code/opus` route through Claude Code CLI inside `pi-subagents` using the user's Claude Code subscription, not Pi's global model registry.
-- Invoking agents may override worker/researcher to `openai-codex/gpt-5.6-sol:high` when the child owns high-risk, hard-debug, broad multi-file, architecture/API/security, data-loss, lifecycle/state, release-blocking, or expensive-to-repeat work.
 - Claude Code handles planning, UI judgment, and fallback model diversity for fresh-context children. Do not use Claude Code as primary or fallback routing for fork-default agents unless the task includes a compact handoff; Claude Code cannot import a Pi fork transcript.
 - Because the parent session is usually `openai-codex/gpt-5.6-sol` at xhigh, use planner/oracle for independent perspective or isolation—not routine extra thinking.
 - **`tools:` is intentionally omitted** on every override so children receive Pi’s normal builtin/extension tool surface. Only explicitly nested-capable planning/context agents use `allowSubagents: true` instead of a static tool allowlist (requires current local `pi-subagents`).
