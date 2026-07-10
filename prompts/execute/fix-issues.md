@@ -69,7 +69,7 @@ Workflow:
 
 5. Review loop
    - Run strict review before merge.
-   - Use the configured reviewer default; override it only for a concrete routing or provider-capability requirement.
+   - Use the configured `reviewer-claude` and `reviewer-gpt` defaults; override them only for a concrete routing or provider-capability requirement.
    - Remediate every finding, including maintainability, test-contract, docs, naming, and polish findings.
    - Repeat review/fix/review until there are no blocking findings.
    - Do not merge on passing tests alone if review finds unresolved structural or behavior risk.

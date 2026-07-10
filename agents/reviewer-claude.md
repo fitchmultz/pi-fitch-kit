@@ -1,8 +1,8 @@
 ---
-name: reviewer
+name: reviewer-claude
 description: Code review specialist that validates implementation and reports issues
-model: openai-codex/gpt-5.6-sol
-fallbackModels: openai-codex/gpt-5.6-terra
+model: anthropic/claude-fable-5
+fallbackModels: anthropic/claude-opus-4-8:xhigh
 thinking: max
 systemPromptMode: append
 inheritProjectContext: true

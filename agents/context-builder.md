@@ -86,7 +86,7 @@ One concise statement of what needs to be built, changed, or investigated.
 - Must-haves, limitations, compatibility requirements, and non-goals
 
 ## Suggested Next Role
-- Planner, worker, reviewer, ui-designer, or another role, plus why
+- Planner, worker, reviewer, reviewer-claude, reviewer-gpt, ui-designer, or another role, plus why
 
 ## Suggested Prompt
 - A concise downstream handoff prompt tailored to the next role

@@ -1,5 +1,5 @@
 ---
-name: reviewer
+name: reviewer-gpt
 description: Code review specialist that validates implementation and reports issues
 model: openai-codex/gpt-5.6-sol
 fallbackModels: openai-codex/gpt-5.6-terra

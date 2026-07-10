@@ -45,7 +45,9 @@ Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`.
 - `planner`: concrete implementation plan when broad decomposition, fresh-context isolation, or an independent planning pass matters; do not use it for routine extra thinking.
 - `worker`: generic execution, implementation, root-cause investigation, or multi-file changes.
 - `fixer`: bounded remediation from explicit findings only.
-- `reviewer`: correctness, validation, regression, and maintainability review.
+- `reviewer`: GPT-backed default reviewer matching `reviewer-gpt`.
+- `reviewer-claude`: Claude-backed correctness, validation, regression, and maintainability review.
+- `reviewer-gpt`: GPT-backed correctness, validation, regression, and maintainability review.
 - `ui-designer`: rendered UI/UX, visual hierarchy, accessibility, responsive layout, and polish.
 - `oracle`: second opinion, drift check, or high-level design critique.
 
@@ -138,7 +140,7 @@ For each completed item:
 Do not trust child summaries blindly. Subagent output is evidence, not proof.
 
 ## Phase 7: Review loop when warranted
-Use fresh `reviewer` subagents for non-trivial, risky, broad, or user-facing code changes. Split review angles when useful: correctness, tests/validation, simplicity/maintainability.
+Use fresh `reviewer-claude` and `reviewer-gpt` subagents for non-trivial, risky, broad, or user-facing code changes. Split review angles when useful: correctness, tests/validation, simplicity/maintainability.
 
 Use `ui-designer` for browser-visible UI/design changes, before or after implementation as appropriate. Require rendered evidence for UI work; code review alone is not enough.
 
@@ -223,8 +225,8 @@ Review gate:
 subagent({
   context: "fresh",
   tasks: [
-    { agent: "reviewer", task: "Review the current diff for correctness and plan fit. Do not edit." },
-    { agent: "reviewer", task: "Review the current diff for validation gaps and unnecessary complexity. Do not edit." }
+    { agent: "reviewer-claude", task: "Review the current diff for correctness and plan fit. Do not edit." },
+    { agent: "reviewer-gpt", task: "Review the current diff for validation gaps and unnecessary complexity. Do not edit." }
   ],
   concurrency: 2
 })
