@@ -93,7 +93,7 @@ Notes:
 - `reviewer` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `claude-code/claude-fable-5`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
 - `context-builder` — `cursor/grok-4.5`, thinking medium, fallback `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`
 - `oracle` — `openai-codex/gpt-5.6-sol`, thinking xhigh, no Claude Code fallback because it requires forked Pi transcript context; `defaultContext: fork`; `maxSubagentDepth: 0`
-- `ui-designer` — `claude-code/claude-fable-5`, thinking medium, fallback `claude-code/opus`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
+- `ui-designer` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
 
 Most names intentionally match builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly; `ui-designer` is an added specialist. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
 
