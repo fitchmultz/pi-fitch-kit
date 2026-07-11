@@ -87,17 +87,17 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — `openai-codex/gpt-5.6-sol`, thinking max, no fallback; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
-- `researcher` — `openai-codex/gpt-5.6-sol`, thinking max, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
-- `planner` — `openai-codex/gpt-5.6-sol`, thinking max, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`; `output: plan.md`
-- `worker` — `openai-codex/gpt-5.6-sol`, thinking max, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0` (parent may pass `context: "fork"` only for fix-after-review)
-- `fixer` — `openai-codex/gpt-5.6-sol`, thinking max, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
-- `reviewer` — matches `reviewer-gpt`: `openai-codex/gpt-5.6-sol`, thinking max, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: true`; `maxSubagentDepth: 1`
-- `reviewer-claude` — `anthropic/claude-fable-5`, thinking max, fallback `anthropic/claude-opus-4-8:xhigh`; `defaultContext: fresh`; `output: false`; `allowSubagents: true`; `maxSubagentDepth: 1`
-- `reviewer-gpt` — `openai-codex/gpt-5.6-sol`, thinking max, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: true`; `maxSubagentDepth: 1`
-- `context-builder` — `openai-codex/gpt-5.6-sol`, thinking xhigh, no fallback; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`
-- `oracle` — `openai-codex/gpt-5.6-sol`, thinking max, no Claude Code fallback because it requires forked Pi transcript context; `defaultContext: fork`; `maxSubagentDepth: 0`
-- `ui-designer` — `openai-codex/gpt-5.6-sol`, thinking max, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
+- `scout` — `openai-codex/gpt-5.6-sol`, thinking medium, no fallback; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
+- `researcher` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `planner` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`; `output: plan.md`
+- `worker` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0` (parent may pass `context: "fork"` only for fix-after-review)
+- `fixer` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
+- `reviewer` — matches `reviewer-gpt`: `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: true`; `maxSubagentDepth: 1`
+- `reviewer-claude` — `anthropic/claude-fable-5`, thinking xhigh, fallback `anthropic/claude-opus-4-8:xhigh`; `defaultContext: fresh`; `output: false`; `allowSubagents: true`; `maxSubagentDepth: 1`
+- `reviewer-gpt` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: true`; `maxSubagentDepth: 1`
+- `context-builder` — `openai-codex/gpt-5.6-sol`, thinking medium, no fallback; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`
+- `oracle` — `openai-codex/gpt-5.6-sol`, thinking xhigh, no Claude Code fallback because it requires forked Pi transcript context; `defaultContext: fork`; `maxSubagentDepth: 0`
+- `ui-designer` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
 
 Most names intentionally match builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly; `reviewer-claude`, `reviewer-gpt`, and `ui-designer` are added specialists. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
 

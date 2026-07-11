@@ -3,7 +3,7 @@ name: ui-designer
 description: Visual/UI design specialist for rendered UX, layout, accessibility, and polish
 model: openai-codex/gpt-5.6-sol
 fallbackModels: anthropic/claude-fable-5
-thinking: max
+thinking: xhigh
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: true

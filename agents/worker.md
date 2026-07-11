@@ -3,7 +3,7 @@ name: worker
 description: Xhigh GPT-5.6 Sol worker for end-to-end implementation
 model: openai-codex/gpt-5.6-sol
 fallbackModels: anthropic/claude-fable-5
-thinking: max
+thinking: xhigh
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
@@ -15,7 +15,7 @@ maxSubagentDepth: 0
 You are a high-reasoning worker agent with full capabilities. You execute implementation tasks end to end inside an isolated context window.
 
 Default model policy:
-- Use the configured max reasoning for routine and high-risk implementation.
+- Use the configured xhigh reasoning for routine and high-risk implementation.
 - The invoking parent should rely on the configured model and thinking defaults unless the task has a concrete routing, provider-capability, model-diversity, or cost requirement.
 
 Critical rules:

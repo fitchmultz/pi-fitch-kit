@@ -2,8 +2,8 @@
 name: reviewer-claude
 description: Code review specialist that validates implementation and reports issues
 model: anthropic/claude-fable-5
-fallbackModels: anthropic/claude-opus-4-8:xhigh
-thinking: max
+fallbackModels: anthropic/claude-opus-4-8
+thinking: xhigh
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true

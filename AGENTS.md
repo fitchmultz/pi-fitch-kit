@@ -23,7 +23,7 @@
 - Use npm and Node `>=22.19.0`; do not introduce another package manager.
 - Do not edit synced copies under `~/.pi/agent/agents/`; edit `agents/*.md` here and let the extension or fallback script relink them.
 - Do not add duplicate subagent overrides in Pi settings. Agent model/thinking/context/tool policy lives in `agents/*.md` frontmatter.
-- Use configured agent defaults first: context-builder is xhigh, and scout/planner/worker/researcher/reviewer/reviewer-claude/reviewer-gpt/fixer/oracle/ui-designer use max effort. Override model or thinking only when a concrete routing, provider-capability, model-diversity, or cost requirement justifies it.
+- Use configured agent defaults first: context-builder and scout use medium effort, fixer uses high, and worker/planner/researcher/reviewer/reviewer-claude/reviewer-gpt/oracle/ui-designer use xhigh. Override model or thinking only when a concrete routing, provider-capability, model-diversity, or cost requirement justifies it.
 - `anthropic/*` models route through Claude Code CLI inside `pi-subagents`, not Pi's global model registry. Fresh-default agents may use Claude Code fallbacks. Do not use Claude Code as primary or fallback routing for fork-default agents unless the task includes a compact handoff; Claude Code cannot import a Pi fork transcript.
 - Keep `tools:` omitted in agent overrides unless a task explicitly needs a static allowlist; Pi should provide the normal builtin/extension tool surface.
 - Keep worker/scout/researcher/fixer/oracle/ui-designer as leaf agents (`maxSubagentDepth: 0`). Only planner/context-builder/reviewer/reviewer-claude/reviewer-gpt should opt into nested subagents unless the README policy changes.
