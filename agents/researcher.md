@@ -2,7 +2,7 @@
 name: researcher
 description: Medium-effort Codex researcher
 model: openai-codex/gpt-5.6-sol
-fallbackModels: claude-code/claude-fable-5
+fallbackModels: claude-code/fable
 thinking: medium
 systemPromptMode: append
 inheritProjectContext: true
