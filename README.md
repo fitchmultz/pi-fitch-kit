@@ -7,7 +7,7 @@ Personal Pi package repo for reusable prompt templates plus source-managed user 
 - Keeps reusable prompt templates in one package repo.
 - Loads prompts recursively through `package.json#pi.prompts`.
 - Keeps reusable user-agent overrides in `agents/` as the source of truth.
-- Installs a small package extension that symlinks those agents into `~/.pi/agent/agents/` on Pi startup/reload.
+- Installs a small package extension that symlinks those agents into `~/.pi/agent/agents/` on Pi startup/reload, repairs malformed package links, removes stale links into this checkout's `agents/` directory, and preserves local files.
 - Lets prompts inherit the active Pi model by omitting `model:` from prompt frontmatter.
 - Pins subagent models and thinking per role in `agents/` (see Agents).
 
@@ -22,6 +22,7 @@ pi-fitch-kit/
       repo-audit.md
       extension-audit.md
       github-open-issues-prs.md
+      extract-process-improvements.md
     execute/
       debug-mode.md
       fix-issues.md
@@ -61,6 +62,7 @@ These prompts are available through the package manifest:
 - `/extension-audit`
 - `/github-open-issues-prs`
 - `/debug-mode`
+- `/extract-process-improvements`
 - `/fix-issues`
 - `/mine-workflows`
 - `/optimize-skill`
@@ -133,7 +135,7 @@ The package manifest loads:
 - prompt templates from `prompts/`
 - `extensions/sync-agents.ts`, which symlinks `agents/*.md` into `~/.pi/agent/agents/`
 
-That means the package install is the normal source of truth for both prompts and user agent overrides. `scripts/sync-agents.sh` remains only as a manual fallback if Pi is not running or extension loading is disabled.
+That means the package install is the normal source of truth for both prompts and user agent overrides. Sync mutations share Pi's per-file mutation queue, so overlapping startup/reload work cannot race within a Pi process. `scripts/sync-agents.sh` remains only as a manual fallback if Pi is not running or extension loading is disabled.
 
 If you change prompts or agent definitions while Pi is already running, use `/reload` or start a fresh session so the current session picks up the updated resources.
 
