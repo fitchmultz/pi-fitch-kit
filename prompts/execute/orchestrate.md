@@ -41,7 +41,7 @@ Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`.
 - `scout`: fast read-only code mapping, relevant files, existing patterns, and risk discovery.
 - `context-builder`: larger local context pack or downstream handoff when the repo surface is broad.
 - `researcher`: quota-efficient external docs/web/API facts with source URLs.
-- `planner`: concrete implementation plan when broad decomposition or independent model diversity matters; do not use it for routine extra thinking.
+- `planner`: concrete implementation plan when broad decomposition or isolated planning context matters; do not use it for routine extra thinking.
 - `worker`: quota-efficient generic execution, implementation, root-cause investigation, or multi-file changes.
 - `fixer`: bounded remediation from explicit findings only.
 - `reviewer`: correctness, validation, regression, and maintainability review.
@@ -65,7 +65,7 @@ Keep this light:
 ## Phase 2: Build the shared plan/checklist
 For anything beyond one obvious item, make a short plan before implementation.
 
-Because the parent session is usually a strong xhigh orchestrator, do not delegate planning or oracle work just to “think harder.” Use `planner`/`oracle` only for independent context isolation, model diversity, drift checks, broad decomposition, or high-risk decisions.
+Because the parent session is usually a strong xhigh orchestrator, do not delegate planning or oracle work just to “think harder.” Use `planner`/`oracle` only for independent context isolation, drift checks, broad decomposition, or high-risk decisions.
 
 Shared plan/checklist guidance:
 - Use a `planner` or `context-builder` subagent when decomposition or context is non-trivial.

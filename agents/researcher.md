@@ -1,9 +1,9 @@
 ---
 name: researcher
-description: Medium-effort Codex researcher
+description: High-effort Codex researcher
 model: openai-codex/gpt-5.6-sol
 fallbackModels: claude-code/fable
-thinking: medium
+thinking: xhigh
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
