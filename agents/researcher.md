@@ -2,7 +2,7 @@
 name: researcher
 description: GPT-5.6 Sol researcher for consequential technical decisions
 model: openai-codex/gpt-5.6-sol
-fallbackModels: claude-code/fable
+fallbackModels: anthropic/claude-fable-5
 thinking: high
 systemPromptMode: append
 inheritProjectContext: true
