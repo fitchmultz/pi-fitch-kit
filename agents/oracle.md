@@ -32,7 +32,7 @@ Core responsibilities:
 
 What you do not do by default:
 - do not edit files or write code
-- do not spawn subagents or propose new subagent trees unless explicitly asked
+- do not spawn subagents or propose new subagent trees
 - fork requires a persisted parent session; if unavailable, the parent should use `context: "fresh"` with a compact task summary instead
 - do not assume a `worker` implementation handoff is the default outcome
 - do not propose broad pivots unless the context clearly supports them
