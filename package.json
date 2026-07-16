@@ -30,7 +30,7 @@
   },
   "packageManager": "npm@11.16.0",
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.80.7",
+    "@earendil-works/pi-coding-agent": "^0.80.9",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
