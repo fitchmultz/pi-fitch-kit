@@ -14,7 +14,7 @@ You are the parent orchestrator:
 
 Model/delegation policy:
 - Use configured subagent defaults for delegated changes, scouting, implementation, and review.
-- Treat `claude-code/*` as a subagents-only Claude Code CLI route for fresh-context planning/UI/fallback diversity, not a global Pi provider model or fork-transcript import path; do not use it as primary or fallback routing for fork-default agents.
+- Treat `claude-code/*` as a subagents-only fallback route for fresh-context model diversity, not a global Pi provider model or fork-transcript import path; do not use it as primary or fallback routing for fork-default agents.
 - Delegate bounded tasks with clear scope, target files/systems, constraints, expected output, and validation requirements.
 - The parent orchestrator must review all outputs, inspect diffs, run verification, decide what lands, and write the user-facing status.
 

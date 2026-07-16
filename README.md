@@ -87,13 +87,13 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — `cursor/grok-4.5`, thinking medium, fallback `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
+- `scout` — `cursor/grok-4.5`, thinking high, fallback `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
 - `researcher` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `claude-code/fable`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
 - `planner` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `claude-code/fable`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`; `output: plan.md`
 - `worker` — `openai-codex/gpt-5.6-sol`, thinking medium, fallback `claude-code/fable`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0` (parent may pass `context: "fork"` only for fix-after-review)
 - `fixer` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `claude-code/fable`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
-- `reviewer` — `openai-codex/gpt-5.6-sol`, thinking max, fallback `claude-code/fable`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
-- `context-builder` — `cursor/grok-4.5`, thinking medium, fallback `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`
+- `reviewer` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `claude-code/fable`; `/hard-review` raises it to max; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
+- `context-builder` — `cursor/grok-4.5`, thinking high, fallback `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; `allowSubagents: true`; `maxSubagentDepth: 1`; `output: context.md`
 - `oracle` — `openai-codex/gpt-5.6-sol`, thinking xhigh, no Claude Code fallback because it requires forked Pi transcript context; `defaultContext: fork`; `maxSubagentDepth: 0`
 - `ui-designer` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
 
@@ -102,8 +102,8 @@ Most names intentionally match builtin `pi-subagents` names so the user-level ve
 Model policy:
 
 - Agent routing favors expected quality while avoiding frontier spend where it does not matter.
-- `cursor/grok-4.5` handles cheap breadth and context gathering; `thinking: medium` is kept in frontmatter for consistent status/override display even if the provider ignores it.
-- `openai-codex/gpt-5.6-sol` handles default implementation, research, planning, review, and forked oracle work; `fixer` stays high and `reviewer` uses max because explicit remediation and strict review should not half-fix known findings.
+- `cursor/grok-4.5` handles fast breadth and context gathering at high effort through the model suffix.
+- `openai-codex/gpt-5.6-sol` handles default implementation, research, planning, review, and forked oracle work; `fixer` stays high, routine review uses xhigh, and `/hard-review` explicitly raises review to max.
 - `claude-code/fable` and `claude-code/opus` route through Claude Code CLI inside `pi-subagents` using the user's Claude Code subscription, not Pi's global model registry.
 - Claude Code handles fallback model diversity for fresh-context children. Do not use Claude Code as primary or fallback routing for fork-default agents unless the task includes a compact handoff; Claude Code cannot import a Pi fork transcript.
 - Because the parent session is usually `openai-codex/gpt-5.6-sol` at xhigh, use planner/oracle for independent context isolation—not routine extra thinking.
@@ -166,7 +166,7 @@ subagent({
 });
 ```
 
-For quick review fanout, the `reviewer` default already uses `output: false` and no default progress file, so the parent receives findings without project files unless it overrides output behavior. For strict saved reviews, use `/hard-review`, which creates a temp artifact directory and gives each reviewer a distinct `output` path. Parent launch defaults are documented in global `~/.pi/agent/AGENTS.md` (async, fresh reviewers, scope in `task`).
+For quick review fanout, the `reviewer` default already uses `output: false` and no default progress file, so the parent receives findings without project files unless it overrides output behavior. For strict saved reviews, use `/hard-review`, which raises reviewers to max thinking, creates a temp artifact directory, and gives each reviewer a distinct `output` path. Parent launch defaults are documented in global `~/.pi/agent/AGENTS.md` (async, fresh reviewers, scope in `task`).
 
 Only `planner` and `context-builder` set `allowSubagents: true` with `maxSubagentDepth: 1`; they synthesize broad work and may fan out one layer when explicitly useful. Worker and specialist/leaf agents (`worker`, `scout`, `researcher`, `reviewer`, `fixer`, `oracle`, `ui-designer`) keep `maxSubagentDepth: 0` so they stay focused and cannot fall into child-orchestrator loops. `tools:` remains omitted on every override so children keep Pi’s normal builtin/extension tool surface.
 

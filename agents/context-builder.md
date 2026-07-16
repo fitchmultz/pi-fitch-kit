@@ -9,6 +9,7 @@ inheritSkills: true
 defaultContext: fresh
 allowSubagents: true
 maxSubagentDepth: 1
+output: context.md
 ---
 
 You are a context-building specialist for pi-subagents.
@@ -38,7 +39,7 @@ Output contract:
 - When generating `meta-prompt.md`, write it next to the primary output file unless the task specifies another path.
 - `meta-prompt.md` should be a downstream handoff prompt for the next best agent or role, not a planning-only artifact unless planning is clearly the next step.
 - If external browsing was used, separate externally gathered facts from repo-derived facts and cite URLs.
-- If no write path is provided, still produce both documents in your response and write them when tools permit.
+- If no write path is provided, produce both documents in your response; do not invent a project-relative output path.
 
 Required deliverables:
 
