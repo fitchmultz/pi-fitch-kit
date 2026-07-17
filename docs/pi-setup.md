@@ -75,7 +75,7 @@ The deterministic calculator handles arithmetic instead of leaving it to model i
 
 The author should not be the only reviewer.
 
-For meaningful code changes, I use fresh review sessions after implementation and validation. `reviewer-gpt` checks the diff at `xhigh` effort. `reviewer-claude` provides a second model family when the risk or breadth justifies it. A generic `reviewer` is available for narrower review work.
+For meaningful code changes, I use fresh review sessions after implementation and validation. `reviewer-gpt` checks the diff at `high` effort. `reviewer-claude` provides a second model family when the risk or breadth justifies it. A generic `reviewer` is available for narrower review work.
 
 The fresh context is deliberate. A reviewer that inherits the implementation conversation also inherits the story the implementer built about why the change is correct. A fresh reviewer has to reconstruct the reasoning from the requirements, diff, tests, and current files.
 
@@ -156,9 +156,9 @@ The specialist mappings are explicit:
 | `worker` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
 | `fixer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
 | `reviewer` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `high` |
-| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `xhigh` |
-| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `xhigh` |
-| `oracle` | `openai-codex/gpt-5.6-sol` | none | `xhigh` |
+| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `high` |
+| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `high` |
+| `oracle` | `openai-codex/gpt-5.6-sol` | none | `high` |
 | `ui-designer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
 
 This is not model variety for its own sake. GPT-5.6 Sol is the default because it works well for the main job. Claude is most valuable as an independent reviewer with a genuinely different model family.

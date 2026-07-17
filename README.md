@@ -34,9 +34,9 @@ The 11 profile files remain canonical under `agents/`:
 | `worker` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
 | `fixer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
 | `reviewer` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | high | fresh |
-| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | xhigh | fresh |
-| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | xhigh | fresh |
-| `oracle` | `openai-codex/gpt-5.6-sol` | none | xhigh | fork |
+| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | high | fresh |
+| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | high | fresh |
+| `oracle` | `openai-codex/gpt-5.6-sol` | none | high | fork |
 | `ui-designer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
 
 The older files under `prompts/audit`, `prompts/execute`, `prompts/qa`, and `prompts/review` remain tracked historical workflow sources. They are not package resources and are not loaded by default.

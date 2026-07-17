@@ -68,7 +68,7 @@ Keep this light:
 ## Phase 2: Build the shared plan/checklist
 For anything beyond one obvious item, make a short plan before implementation.
 
-Because the parent session is usually a strong xhigh orchestrator, do not delegate planning or oracle work just to “think harder.” Use `planner`/`oracle` only for fresh/fork context isolation, drift checks, broad decomposition, or high-risk decisions.
+Because the parent session is usually a strong orchestrator, do not delegate planning or oracle work just to “think harder.” Use `planner`/`oracle` only for fresh/fork context isolation, drift checks, broad decomposition, or high-risk decisions.
 
 Shared plan/checklist guidance:
 - Use a `planner` or `context-builder` subagent when decomposition or context is non-trivial.
@@ -258,7 +258,7 @@ Prefer `subagent({ action: "status" | "nudge" | "resume", id, ... })` for manage
 - Give children goals, scope, context, boundaries, done criteria, and stop rules; let them reason.
 - Use defaults for `model`, `timeoutMs`, `output`, `concurrency`, and `context` unless there is a concrete reason to override; use `worktree: true` proactively for parallel editing/implementation isolation.
 - Model overrides are deliberate: use the configured role defaults and reserve Anthropic routes for the Claude reviewer or fallback model diversity.
-- Reasoning effort is role-specific: scouting/context use medium, routine planning/research/implementation/review/UI use high, and reviewer-gpt/reviewer-claude/oracle use xhigh.
+- Reasoning effort is role-specific: scouting/context use medium, routine planning/research/implementation/review/UI use high, and reviewer-gpt/reviewer-claude/oracle use high.
 - The parent is usually strong enough to plan; delegate planning/oracle work only when context isolation, drift checking, risk, or scope makes it useful.
 - Prefer deletion/consolidation over new ceremony.
 - Verify before declaring completion.
