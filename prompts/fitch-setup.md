@@ -7,7 +7,7 @@ Run the Fitch Pi setup in `${1:-setup}` mode. This is a main-session-led setup p
 
 ## Authority
 
-1. Locate this prompt's installed `@fitch/pi-kit` package root from Pi's package/resource information. Read `<package-root>/setup-manifest.json` as the single source of truth. Also read the active Pi 0.80.9 package, prompt, extension, settings, security, and model documentation before changing anything.
+1. Locate this prompt's installed `@fitch/pi-kit` package root from Pi's package/resource information. Read `<package-root>/setup-manifest.json` as the single source of truth. Also read the active Pi 0.80.10 package, prompt, extension, settings, security, and model documentation before changing anything.
 2. Use only sources and versions in the manifest. Run each user-scoped package install as `pi install <exact source> --no-approve` so project-local configuration cannot affect installation. Never convert a commit to a branch/tag, drop an npm version, vendor another Pi package, or silently substitute a model or component.
 3. Never read or copy `auth.json`, credential/key/token stores, browser profiles, raw sessions, generated service payloads/responses, private endpoints, or service data. Provider and service authentication belongs to the user through documented login flows.
 4. Do not make service writes, commits, pushes, merges, deployments, production changes, account changes, or security/privacy changes.

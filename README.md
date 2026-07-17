@@ -41,14 +41,14 @@ The 11 profile files remain canonical under `agents/`:
 
 The older files under `prompts/audit`, `prompts/execute`, `prompts/qa`, and `prompts/review` remain tracked historical workflow sources. They are not package resources and are not loaded by default.
 
-`setup-manifest.json` is the setup authority for Pi 0.80.9, Node 24+, required models, exact external package sources, optional Cursor support, Agent Browser's external runtime, and setup choices. Third-party Pi packages are installed from those pins rather than vendored here.
+`setup-manifest.json` is the setup authority for Pi 0.80.10, Node 24+, required models, exact external package sources, optional Cursor support, Agent Browser's external runtime, and setup choices. Third-party Pi packages are installed from those pins rather than vendored here.
 
 ## Setup
 
 Requirements:
 
 1. Node.js 24 or newer.
-2. Pi exactly 0.80.9.
+2. Pi exactly 0.80.10.
 3. Exact access to `openai-codex/gpt-5.6-sol`, `openai-codex/gpt-5.6-terra`, `anthropic/claude-fable-5`, and `anthropic/claude-opus-4-8`. Setup stops rather than substitutes.
 4. User-owned provider authentication through Pi's documented login flows. Cursor and WorkOS integrations are optional.
 
@@ -91,7 +91,7 @@ npm pack --dry-run --json >/tmp/pi-fitch-kit-pack.json
 node -e "const p=require('/tmp/pi-fitch-kit-pack.json'); if(!p[0] || p[0].error) process.exit(1)"
 ```
 
-`npm run check` type-checks against Pi 0.80.9, runs the calculator check, validates resources, profiles/models, immutable pins, add-only concurrent profile linking, trusted live nested instructions, and setup/working-agreement contracts, then loads the package in an isolated Pi resource loader to prove that exactly two extensions and `/fitch-setup` are discovered.
+`npm run check` type-checks against Pi 0.80.10, runs the calculator check, validates resources, profiles/models, immutable pins, add-only concurrent profile linking, trusted live nested instructions, and setup/working-agreement contracts, then loads the package in an isolated Pi resource loader to prove that exactly two extensions and `/fitch-setup` are discovered.
 
 For runtime-facing edits, install the reviewed checkout in Pi and use `/reload` or a fresh session before harmless runtime verification.
 

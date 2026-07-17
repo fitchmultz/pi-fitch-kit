@@ -1,6 +1,6 @@
 # How I actually use pi at WorkOS
 
-_Last updated July 16, 2026. This reflects my live pi 0.80.9 setup and an eight-day sample of how I used it._
+_Last updated July 16, 2026. This reflects my live pi 0.80.10 setup and an eight-day sample of how I used it._
 
 I wrote this for a WorkOS engineer who is new to pi.
 
@@ -300,7 +300,7 @@ The existing workflow prompt collection should move out of the default installat
 
 Onboarding is:
 
-1. Install Node.js 24 or newer and pi 0.80.9.
+1. Install Node.js 24 or newer and pi 0.80.10.
 2. Start pi and authenticate ChatGPT/Codex and Claude through their documented user-owned login flows.
 3. Paste the bootstrap prompt below after replacing the explicit placeholder with the real authorized public commit.
 4. Run `/reload`, then `/fitch-setup`.

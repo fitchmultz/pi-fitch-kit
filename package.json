@@ -56,8 +56,8 @@
     "expr-eval-fork": "3.0.3"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.80.9",
-    "@earendil-works/pi-coding-agent": "0.80.9",
+    "@earendil-works/pi-ai": "0.80.10",
+    "@earendil-works/pi-coding-agent": "0.80.10",
     "@types/node": "24.13.3",
     "typescript": "7.0.2"
   },

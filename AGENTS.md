@@ -25,7 +25,7 @@ Keep `README.md` aligned with setup, resources, profiles, release status, and se
 - Install a reviewed checkout: `pi install /absolute/path/to/pi-fitch-kit`
 - Reload runtime changes: `/reload` or a fresh Pi session
 
-Use npm with Node `>=24`. TypeScript must check against exact dev dependency `@earendil-works/pi-coding-agent@0.80.9`.
+Use npm with Node `>=24`. TypeScript must check against exact dev dependency `@earendil-works/pi-coding-agent@0.80.10`.
 
 ## Editing rules
 

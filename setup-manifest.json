@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "runtime": {
-    "pi": "0.80.9",
+    "pi": "0.80.10",
     "node": ">=24"
   },
   "kit": {

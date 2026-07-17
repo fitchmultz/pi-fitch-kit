@@ -68,13 +68,13 @@ same(packageJson.files, [
 ], "Published file allowlist changed");
 assert(packageJson.engines?.node === ">=24", "Node engine must be >=24");
 same(packageJson.dependencies, { "decimal.js": "10.6.0", "expr-eval-fork": "3.0.3" }, "Calculator runtime pins changed");
-assert(packageJson.devDependencies?.["@earendil-works/pi-coding-agent"] === "0.80.9", "Pi dev types must be pinned to 0.80.9");
+assert(packageJson.devDependencies?.["@earendil-works/pi-coding-agent"] === "0.80.10", "Pi dev types must be pinned to 0.80.10");
 for (const peer of ["@earendil-works/pi-ai", "@earendil-works/pi-coding-agent"]) {
   assert(packageJson.peerDependencies?.[peer] === "*", `${peer} must remain a wildcard peer`);
   assert(packageJson.peerDependenciesMeta?.[peer]?.optional === true, `${peer} must remain optional`);
 }
 assert(lock.packages?.[""]?.engines?.node === ">=24", "Lockfile Node engine is stale");
-assert(lock.packages?.["node_modules/@earendil-works/pi-coding-agent"]?.version === "0.80.9", "Lockfile Pi dev version is stale");
+assert(lock.packages?.["node_modules/@earendil-works/pi-coding-agent"]?.version === "0.80.10", "Lockfile Pi dev version is stale");
 for (const resource of [...packageJson.pi.extensions, ...packageJson.pi.prompts]) {
   assert(existsSync(join(root, resource)), `Missing Pi resource ${resource}`);
 }
@@ -121,7 +121,7 @@ const exactCoreSources = [
   "npm:pi-edit-session-in-place@0.1.26",
   "npm:pi-copy-message@1.0.11",
 ];
-same(manifest.runtime, { pi: "0.80.9", node: ">=24" }, "Runtime contract changed");
+same(manifest.runtime, { pi: "0.80.10", node: ">=24" }, "Runtime contract changed");
 same(manifest.requiredModels, [
   "openai-codex/gpt-5.6-sol",
   "openai-codex/gpt-5.6-terra",
