@@ -3,7 +3,7 @@ name: worker
 description: Medium-effort Codex worker for implementation
 model: openai-codex/gpt-5.6-sol
 fallbackModels: claude-code/fable
-thinking: medium
+thinking: high
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true

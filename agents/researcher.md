@@ -3,7 +3,7 @@ name: researcher
 description: High-effort Codex researcher
 model: openai-codex/gpt-5.6-sol
 fallbackModels: claude-code/fable
-thinking: xhigh
+thinking: high
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
