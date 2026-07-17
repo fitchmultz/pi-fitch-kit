@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "runtime": {
+    "pi": "0.80.9",
+    "node": ">=24"
+  },
+  "kit": {
+    "repository": "https://github.com/fitchmultz/pi-fitch-kit"
+  },
+  "requiredModels": [
+    "openai-codex/gpt-5.6-sol",
+    "openai-codex/gpt-5.6-terra",
+    "anthropic/claude-fable-5",
+    "anthropic/claude-opus-4-8"
+  ],
+  "kitResources": {
+    "extensions": [
+      "extensions/nested-agents.ts",
+      "extensions/calculator/index.ts"
+    ],
+    "agentSyncScript": "scripts/sync-agents.mjs",
+    "prompt": "prompts/fitch-setup.md",
+    "agentProfiles": 11,
+    "workingAgreementTemplate": "templates/working-agreement.md"
+  },
+  "corePackages": [
+    {
+      "id": "subagents",
+      "source": "git:github.com/fitchmultz/pi-subagents@3dc8b01c365594b73dbe1db0d041ae20715394b7"
+    },
+    {
+      "id": "intercom",
+      "source": "git:github.com/fitchmultz/pi-intercom@e604bb84cb41542c1a2f7e7fd0327c66084617dc"
+    },
+    {
+      "id": "ponytail",
+      "source": "git:github.com/DietrichGebert/ponytail@16f29800fd2681bdf24f3eb4ccffe38be3baec6b"
+    },
+    {
+      "id": "ask-question",
+      "source": "git:github.com/fitchmultz/pi-ask-question@06fe72b3326cc178c821754a524021a4da83162d"
+    },
+    {
+      "id": "fff",
+      "source": "npm:@ff-labs/pi-fff@0.10.0"
+    },
+    {
+      "id": "agent-browser",
+      "source": "npm:pi-agent-browser-native@0.2.68",
+      "externalPrerequisite": {
+        "package": "agent-browser",
+        "version": "0.32.0",
+        "installCommand": "npm install --global agent-browser@0.32.0",
+        "runtimeDownloadCommand": "agent-browser install"
+      }
+    },
+    {
+      "id": "mcp",
+      "source": "npm:pi-mcp-adapter@2.11.0"
+    },
+    {
+      "id": "goal",
+      "source": "npm:pi-codex-goal@0.1.37"
+    },
+    {
+      "id": "stash",
+      "source": "npm:@fitchmultz/pi-stash@0.1.24"
+    },
+    {
+      "id": "verbosity",
+      "source": "npm:pi-verbosity-control@0.3.0"
+    },
+    {
+      "id": "tool-duration",
+      "source": "npm:pi-tool-duration@0.1.4"
+    },
+    {
+      "id": "edit-session",
+      "source": "npm:pi-edit-session-in-place@0.1.26"
+    },
+    {
+      "id": "copy-message",
+      "source": "npm:pi-copy-message@1.0.11"
+    }
+  ],
+  "optionalPackages": [
+    {
+      "id": "cursor",
+      "source": "npm:pi-cursor-sdk@0.1.59"
+    }
+  ],
+  "optionalIntegrations": [
+    "Linear",
+    "Slack",
+    "Horizon",
+    "Notion",
+    "Cloudflare"
+  ],
+  "workingAgreementSections": [
+    "baseline",
+    "workos"
+  ]
+}

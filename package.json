@@ -2,32 +2,73 @@
   "name": "@fitch/pi-kit",
   "version": "0.1.0",
   "private": true,
+  "description": "Opinionated public-core Pi workflow package for Fitch agent profiles, setup, nested instructions, and deterministic calculation",
+  "license": "MIT",
+  "author": "Mitch Fultz",
+  "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
+  "bugs": {
+    "url": "https://github.com/fitchmultz/pi-fitch-kit/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fitchmultz/pi-fitch-kit.git"
+  },
   "type": "module",
+  "files": [
+    "agents/",
+    "extensions/",
+    "scripts/sync-agents.mjs",
+    "scripts/sync-agents.sh",
+    "prompts/fitch-setup.md",
+    "templates/working-agreement.md",
+    "setup-manifest.json",
+    "docs/pi-setup.md",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "check": "node --check extensions/sync-agents.ts && node scripts/validate.mjs"
+    "typecheck": "tsc --noEmit",
+    "check:calculator": "node --experimental-strip-types extensions/calculator/check.ts",
+    "smoke:package": "node scripts/package-smoke.mjs",
+    "check": "npm run typecheck && npm run check:calculator && node scripts/validate.mjs && npm run smoke:package"
   },
   "keywords": [
-    "pi-package"
+    "pi-package",
+    "pi-coding-agent",
+    "coding-agent"
   ],
   "pi": {
     "extensions": [
-      "./extensions/sync-agents.ts"
+      "./extensions/nested-agents.ts",
+      "./extensions/calculator/index.ts"
     ],
     "prompts": [
-      "./prompts"
+      "./prompts/fitch-setup.md"
     ]
   },
   "engines": {
-    "node": ">=22.19.0"
+    "node": ">=24"
   },
   "packageManager": "npm@11.16.0",
+  "dependencies": {
+    "decimal.js": "10.6.0",
+    "expr-eval-fork": "3.0.3"
+  },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.80.1"
+    "@earendil-works/pi-ai": "0.80.9",
+    "@earendil-works/pi-coding-agent": "0.80.9",
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2"
   },
   "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*"
   },
   "peerDependenciesMeta": {
+    "@earendil-works/pi-ai": {
+      "optional": true
+    },
     "@earendil-works/pi-coding-agent": {
       "optional": true
     }
