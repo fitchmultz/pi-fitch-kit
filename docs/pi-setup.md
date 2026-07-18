@@ -1,6 +1,6 @@
 # How I actually use pi at WorkOS
 
-_Last updated July 16, 2026. This reflects my live pi 0.80.10 setup and an eight-day sample of how I used it._
+_Last updated July 18, 2026. This reflects my live pi 0.80.10 setup and an eight-day sample of how I used it._
 
 I wrote this for a WorkOS engineer who is new to pi.
 
@@ -61,7 +61,7 @@ These agents start with fresh context. They receive a focused task instead of th
 
 Most of the time, the main session makes the change itself. That keeps the design, implementation, and validation loop in one accountable place.
 
-A `worker` is useful when an implementation item is genuinely independent, needs an isolated worktree, or can proceed in parallel without creating coordination overhead. A `fixer` is narrower still: it gets an explicit list of confirmed findings and applies only those fixes.
+A `debugger` reproduces a failure and proves its root cause without editing. A `worker` is useful when an implementation item is genuinely independent, needs an isolated worktree, or can proceed in parallel without creating coordination overhead. A `fixer` is narrower still: it gets an explicit list of confirmed findings and applies only those fixes.
 
 The parent reads the resulting files and diffs. A child reporting success is evidence to check, not proof that the task is done.
 
@@ -75,7 +75,7 @@ The deterministic calculator handles arithmetic instead of leaving it to model i
 
 The author should not be the only reviewer.
 
-For meaningful code changes, I use fresh review sessions after implementation and validation. `reviewer-gpt` checks the diff at `high` effort. `reviewer-claude` provides a second model family when the risk or breadth justifies it. A generic `reviewer` is available for narrower review work.
+For meaningful code changes, I use fresh review sessions after implementation and validation. `reviewer-gpt` checks the diff at `xhigh` effort. `reviewer-claude` provides a second model family when the risk or breadth justifies it. A generic `reviewer` is available for narrower review work.
 
 The fresh context is deliberate. A reviewer that inherits the implementation conversation also inherits the story the implementer built about why the change is correct. A fresh reviewer has to reconstruct the reasoning from the requirements, diff, tests, and current files.
 
@@ -132,14 +132,16 @@ I keep a larger bench than a new user needs, but I do not use every profile equa
 | Role | Profiles | When I use them |
 |---|---|---|
 | Reconnaissance | `scout`, `researcher`, `context-builder` | Map unfamiliar code, verify an external contract, or produce a clean cross-system handoff |
+| Diagnosis | `debugger` | Reproduce a failure, prove the root cause, and define the smallest regression check before remediation |
 | Independent review | `reviewer`, `reviewer-gpt`, `reviewer-claude` | Challenge correctness, validation, maintainability, and completion claims |
 | Bounded implementation | `worker`, `fixer` | Implement an independent item or apply a confirmed finding list |
 | Direction and planning | `planner`, `oracle` | Split genuinely broad work or compare the current direction with earlier decisions |
 | Product review | `ui-designer` | Review rendered behavior, accessibility, responsive layout, and polish |
+| Writing | `writer` | Draft documentation, guides, announcements, and polished human-facing copy |
 
-Ten profiles start fresh. `oracle` is the exception because its job is to compare the current direction with the parent conversation and catch contradictions.
+Twelve profiles start fresh. `oracle` is the exception because its job is to compare the current direction with the parent conversation and catch contradictions.
 
-Most are leaf agents and cannot launch more children. Only `planner` and `context-builder` can delegate one level deeper. That keeps a focused job from quietly turning into an unbounded hierarchy.
+All profiles are leaf agents and cannot launch more children. That keeps a focused job from quietly turning into an unbounded hierarchy.
 
 ### The models
 
@@ -151,17 +153,21 @@ The specialist mappings are explicit:
 |---|---|---|---|
 | `scout` | `openai-codex/gpt-5.6-sol` | none | `medium` |
 | `context-builder` | `openai-codex/gpt-5.6-sol` | none | `medium` |
-| `researcher` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
+| `debugger` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
+| `researcher` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `xhigh` |
 | `planner` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
 | `worker` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
-| `fixer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
+| `fixer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `medium` |
 | `reviewer` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `high` |
-| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `high` |
-| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `high` |
-| `oracle` | `openai-codex/gpt-5.6-sol` | none | `high` |
+| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `xhigh` |
+| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `xhigh` |
+| `oracle` | `openai-codex/gpt-5.6-sol` | none | `xhigh` |
 | `ui-designer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
+| `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `high` |
 
-This is not model variety for its own sake. GPT-5.6 Sol is the default because it works well for the main job. Claude is most valuable as an independent reviewer with a genuinely different model family.
+This is not model variety for its own sake. GPT-5.6 Sol is the default because it works well for the main job. Medium effort covers scouting, context building, and bounded remediation; high covers routine specialist work; xhigh is reserved for consequential research, final review gates, and oracle decisions. Claude is most valuable as an independent reviewer and writer with a genuinely different model family.
+
+The profile body is what the model reads as its role prompt, so it contains task instructions, evidence standards, boundaries, and output expectations. Model, effort, and context stay in frontmatter; launch guidance stays in orchestration documentation instead of being narrated back to the model.
 
 I also keep Cursor-backed models in the in-session model picker. Cursor is useful but optional for the setup I want colleagues to adopt.
 
@@ -311,7 +317,7 @@ Onboarding is:
 The bootstrap pins the immutable package commit that passed review and validation:
 
 ```text
-Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@bce44baabe4b70debf71d5ed1f2c063987470d93 --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
+Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@__PUBLIC_COMMIT_REQUIRED_BEFORE_RELEASE__ --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
 ```
 
 The bootstrap uses pi as the installer. `setup-manifest.json` is the pin authority and `/fitch-setup` is the setup procedure. There is no runtime bootstrap command or custom wizard.

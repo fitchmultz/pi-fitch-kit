@@ -3,11 +3,13 @@
 ## 0.1.0 - Unreleased
 
 - Targeted and validated Pi 0.80.10 with Node 24 or newer.
-- Aligned `oracle`, `reviewer-claude`, and `reviewer-gpt` with the active WorkOS `high` effort defaults.
+- Tuned effort by role: `fixer` uses medium; `researcher`, `reviewer-gpt`, `reviewer-claude`, and `oracle` use xhigh; the remaining existing defaults stay unchanged.
+- Added read-only `debugger` and human-facing `writer` profiles.
+- Reworked model-facing agent bodies around role instructions and evidence contracts instead of model and launch configuration.
 - Reframed the package around one accountable main Pi session with fresh specialist agents for bounded scouting, research, implementation, and review.
 - Added a version-pinned setup manifest and the preview-first `/fitch-setup` prompt.
 - Added the bounded deterministic calculator and nested project instructions guarded by Pi's real project-trust boundary.
-- Kept all eleven agent profiles while removing the older workflow prompt collection from default package loading.
+- Kept all thirteen agent profiles as leaves while removing the older workflow prompt collection from default package loading.
 - Moved profile linking out of session startup into one add-only setup script that is safe under concurrent runs, never replaces or deletes existing targets, and distinguishes created, unchanged, and skipped paths.
 - Added a selectable working-agreement template, public Git metadata, MIT licensing, type checking, package validation, and dry-run packaging.
 

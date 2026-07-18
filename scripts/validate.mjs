@@ -81,19 +81,21 @@ for (const resource of [...packageJson.pi.extensions, ...packageJson.pi.prompts]
 
 const expectedAgents = {
   "context-builder.md": ["openai-codex/gpt-5.6-sol", undefined, "medium", "fresh"],
-  "fixer.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
-  "oracle.md": ["openai-codex/gpt-5.6-sol", undefined, "high", "fork"],
+  "debugger.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
+  "fixer.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "medium", "fresh"],
+  "oracle.md": ["openai-codex/gpt-5.6-sol", undefined, "xhigh", "fork"],
   "planner.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
-  "researcher.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
-  "reviewer-claude.md": ["anthropic/claude-fable-5", "anthropic/claude-opus-4-8", "high", "fresh"],
-  "reviewer-gpt.md": ["openai-codex/gpt-5.6-sol", "openai-codex/gpt-5.6-terra", "high", "fresh"],
+  "researcher.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "xhigh", "fresh"],
+  "reviewer-claude.md": ["anthropic/claude-fable-5", "anthropic/claude-opus-4-8", "xhigh", "fresh"],
+  "reviewer-gpt.md": ["openai-codex/gpt-5.6-sol", "openai-codex/gpt-5.6-terra", "xhigh", "fresh"],
   "reviewer.md": ["openai-codex/gpt-5.6-sol", "openai-codex/gpt-5.6-terra", "high", "fresh"],
   "scout.md": ["openai-codex/gpt-5.6-sol", undefined, "medium", "fresh"],
   "ui-designer.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
   "worker.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
+  "writer.md": ["anthropic/claude-fable-5", "anthropic/claude-opus-4-8", "high", "fresh"],
 };
 const agentNames = readdirSync(join(root, "agents")).filter((name) => name.endsWith(".md")).sort();
-same(agentNames, Object.keys(expectedAgents).sort(), "Agent profiles must be exactly the expected 11 files");
+same(agentNames, Object.keys(expectedAgents).sort(), "Agent profiles must be exactly the expected 13 files");
 for (const name of agentNames) {
   const source = read(`agents/${name}`);
   const frontmatter = source.match(/^---\n([\s\S]*?)\n---/)?.[1];
@@ -103,6 +105,7 @@ for (const name of agentNames) {
     return [line.slice(0, separator), line.slice(separator + 1).trim()];
   }));
   same([fields.model, fields.fallbackModels, fields.thinking, fields.defaultContext], expectedAgents[name], `${name} model policy changed`);
+  assert(fields.allowSubagents !== "true" && Number(fields.maxSubagentDepth ?? 0) === 0, `${name} must remain a leaf agent`);
   assert(!("tools" in fields), `${name} must not hardcode a tools allowlist`);
 }
 
@@ -180,6 +183,7 @@ for (const marker of [
 includesAll(agreement, ["Never replace unrelated content", "stop and ask", "external writes", "Use Linear", "reviewer-gpt"], "Working agreement");
 const readme = read("README.md");
 const setupGuide = read("docs/pi-setup.md");
+const setupPost = read("docs/pi-setup-post.md");
 const releasePlaceholder = "__PUBLIC_COMMIT_REQUIRED_BEFORE_RELEASE__";
 const kitSource = "git:github.com/fitchmultz/pi-fitch-kit";
 const bootstrapRef = (text, label) => {
@@ -205,14 +209,16 @@ for (const invalid of [
 }
 const readmeRef = bootstrapRef(readme, "README");
 const guideRef = bootstrapRef(setupGuide, "Setup guide");
-assert(readmeRef === guideRef, "Bootstrap examples pin different package commits");
+const postRef = bootstrapRef(setupPost, "Setup post");
+assert(readmeRef === guideRef && guideRef === postRef, "Bootstrap examples pin different package commits");
 if (readmeRef !== releasePlaceholder) {
-  assert(!readme.includes(releasePlaceholder) && !setupGuide.includes(releasePlaceholder), "Released docs retain the pre-release placeholder");
+  assert(!readme.includes(releasePlaceholder) && !setupGuide.includes(releasePlaceholder) && !setupPost.includes(releasePlaceholder), "Released docs retain the pre-release placeholder");
 }
 includesAll(readme, ["private: true", "/fitch-setup", "not loaded by default", "--no-approve"], "README");
-includesAll(read("CHANGELOG.md"), ["0.1.0 - Unreleased", "/fitch-setup", "eleven agent profiles"], "CHANGELOG");
-includesAll(read("AGENTS.md"), ["public-core source", "exactly 11", "private: true", "CONFIG_DIR_NAME", "setup-time and add-only"], "AGENTS.md");
+includesAll(read("CHANGELOG.md"), ["0.1.0 - Unreleased", "/fitch-setup", "thirteen agent profiles"], "CHANGELOG");
+includesAll(read("AGENTS.md"), ["public-core source", "exactly 13", "private: true", "CONFIG_DIR_NAME", "setup-time and add-only"], "AGENTS.md");
 includesAll(setupGuide, ["/fitch-setup", "--no-approve"], "Setup guide");
+includesAll(setupPost, ["/fitch-setup", "--no-approve", "`debugger`", "`writer`"], "Setup post");
 
 for (const file of ["index.ts", "eval.ts", "decimal.ts", "check.ts"]) {
   assert(existsSync(join(root, "extensions/calculator", file)), `Missing calculator file ${file}`);

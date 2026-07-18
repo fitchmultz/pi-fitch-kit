@@ -9,7 +9,7 @@ Canonical sources:
 - `setup-manifest.json` for supported Pi/Node versions, exact models, pinned core packages, optional Cursor, and Agent Browser's external prerequisite.
 - `package.json#pi` for the only resources Pi loads: trusted nested instructions, calculator, and `/fitch-setup`.
 - `scripts/sync-agents.mjs` for add-only, setup-time profile linking.
-- `agents/*.md` for exactly 11 reusable user-level subagent profiles and their model/thinking/context policy.
+- `agents/*.md` for exactly 13 reusable user-level subagent profiles and their model/thinking/context policy.
 - `templates/working-agreement.md` for independently selectable baseline and WorkOS managed blocks.
 - `prompts/fitch-setup.md` for the main-session-led setup procedure.
 
@@ -30,11 +30,12 @@ Use npm with Node `>=24`. TypeScript must check against exact dev dependency `@e
 ## Editing rules
 
 - Do not edit synced files under `~/.pi/agent/agents/`; edit `agents/*.md` here.
-- Keep exactly 11 profiles and preserve the Sol-backed `scout` mapping. Do not duplicate agent overrides in settings.
+- Keep exactly 13 leaf profiles and preserve the Sol-backed `scout` mapping. Do not duplicate agent overrides in settings or enable nested subagents.
+- Keep model-facing agent bodies focused on actionable role instructions, evidence standards, boundaries, and outputs. Agent model, effort, and context policy belongs in frontmatter; parent-launch guidance belongs in orchestration docs.
 - Keep runtime Pi imports as wildcard optional peers. Runtime third-party libraries belong in `dependencies`.
 - Do not vendor external Pi packages, add a bootstrap runtime command, or build a setup wizard. Use the manifest, pasteable bootstrap prompt, and `/fitch-setup`.
 - Keep package installs immutable. Do not replace exact versions/commits with ranges, tags, or branches.
-- Keep `private: true`. Both bootstrap examples must use the same immutable 40-character reviewed package commit. During release they may retain the explicit pre-release placeholder only until that package commit exists; replace it in a docs-only follow-up. Do not put a self-referential install pin in `setup-manifest.json`.
+- Keep `private: true`. All three bootstrap examples must use the same immutable 40-character reviewed package commit. During release they may retain the explicit pre-release placeholder only until that package commit exists; replace it in a docs-only follow-up. Do not put a self-referential install pin in `setup-manifest.json`.
 - Nested project instructions must use `CONFIG_DIR_NAME`, require both `hasTrustRequiringProjectResources(cwd)` and `ctx.isProjectTrusted()`, re-read each turn, suppress duplicate context files, ignore empty/missing files, and never create trust-trigger resources.
 - Agent sync is setup-time and add-only. It must skip every existing file or foreign symlink, never replace or remove a target, remain safe when processes race to create the same missing link, and report created, unchanged, and skipped paths separately.
 - Setup must preview writes, preserve unrelated configuration, block on missing exact models or malformed/conflicting config, and never read credentials/raw sessions/browser profiles/service payloads or make service writes.

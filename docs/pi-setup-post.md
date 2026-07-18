@@ -12,14 +12,19 @@ I start pi in the repository and give the issue to the main session. That sessio
 
 It can fetch the Linear issue, find the relevant Slack thread, and inspect approved context in Horizon, our internal engineering MCP service. FFF maps the code, callers, tests, and repository conventions. If the behavior is browser-visible, Agent Browser checks the real flow before and after the change.
 
-Fresh specialists help when there is a reason:
+Specialists help when there is a reason:
 
 - `scout` maps unfamiliar or broad code without editing;
 - `researcher` checks a current external contract or documentation;
 - `context-builder` prepares a compact handoff across several systems;
+- `debugger` proves a root cause before remediation;
 - `worker` implements a genuinely independent item;
 - `fixer` applies a confirmed list of findings;
-- `reviewer-gpt` and `reviewer-claude` challenge the completed diff from fresh context.
+- `planner` decomposes genuinely broad work;
+- `oracle` checks the current direction against established decisions;
+- `ui-designer` reviews rendered behavior, accessibility, layout, and polish;
+- `reviewer`, `reviewer-gpt`, and `reviewer-claude` challenge the completed diff from fresh context;
+- `writer` handles polished human-facing documentation and announcements.
 
 Most of the time, the main session still implements the change. It reads specialist output, decides what to do, edits the code, runs the meaningful checks, and verifies the actual behavior. A child saying that work passed is evidence to inspect, not proof.
 
@@ -31,7 +36,7 @@ That is the recurring shape: gather connected evidence, use focused parallel hel
 
 Fresh context is the main benefit. The implementation session accumulates assumptions as it works. A fresh scout or reviewer has to reconstruct the answer from the requirements, current files, diff, and validation instead of inheriting the implementer's story.
 
-The roles are bounded on purpose. A scout reads. A worker implements one named item. A fixer applies a confirmed list. A reviewer reports findings without editing. Narrow authority makes the output easier for the main session to verify and keeps a small delegation from turning into an agent hierarchy.
+The roles are bounded on purpose. A scout reads. A debugger diagnoses. A worker implements one named item. A fixer applies a confirmed list. A reviewer reports findings without editing. A writer produces copy without publishing it. Narrow authority makes the output easier for the main session to verify and keeps a small delegation from turning into an agent hierarchy.
 
 Different jobs also deserve different effort. Reconnaissance uses less reasoning budget than a difficult review. Claude is useful selectively as a second model family, not as automatic fanout on every task.
 
@@ -75,7 +80,7 @@ The public package is [`fitchmultz/pi-fitch-kit`](https://github.com/fitchmultz/
 After installing pi and authenticating ChatGPT/Codex and Claude through their documented login flows, paste this into a pi session:
 
 ```text
-Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@bce44baabe4b70debf71d5ed1f2c063987470d93 --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
+Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@__PUBLIC_COMMIT_REQUIRED_BEFORE_RELEASE__ --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
 ```
 
 Run `/reload`, then `/fitch-setup`.

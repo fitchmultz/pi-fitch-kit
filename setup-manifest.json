@@ -20,7 +20,7 @@
     ],
     "agentSyncScript": "scripts/sync-agents.mjs",
     "prompt": "prompts/fitch-setup.md",
-    "agentProfiles": 11,
+    "agentProfiles": 13,
     "workingAgreementTemplate": "templates/working-agreement.md"
   },
   "corePackages": [

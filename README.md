@@ -2,16 +2,18 @@
 
 Opinionated public-core package for the Pi workflow Mitch Fultz uses: one accountable main session, fresh specialists for bounded context/research/review, exact model routing, and evidence before completion.
 
-> **Release status:** public Git package at `https://github.com/fitchmultz/pi-fitch-kit`. The bootstrap installs immutable reviewed package commit `bce44baabe4b70debf71d5ed1f2c063987470d93`. The npm package remains `private: true` to prevent accidental registry publication.
+> **Release status:** public Git package at `https://github.com/fitchmultz/pi-fitch-kit`. This revision is awaiting its immutable bootstrap pin. The npm package remains `private: true` to prevent accidental registry publication.
 
 ## Workflow
 
 The main Pi session owns the task. It gathers connected context, maps the code, decides and usually implements, validates the real behavior, reviews specialist output, and reports the result. Subagents are optional focused help, not an autonomous scout-to-worker pipeline:
 
 - `scout`, `researcher`, and `context-builder` gather bounded evidence.
+- `debugger` proves root causes before remediation.
 - `worker` and `fixer` handle isolated implementation or confirmed repair lists.
 - `reviewer`, `reviewer-gpt`, and `reviewer-claude` provide fresh independent review.
 - `planner`, `oracle`, and `ui-designer` cover broad decomposition, inherited-decision checks, and rendered product review.
+- `writer` handles human-facing documentation, guides, announcements, and polished copy.
 
 ## Package resources
 
@@ -23,21 +25,25 @@ Pi loads exactly:
 
 The package also includes `scripts/sync-agents.mjs`. `/fitch-setup` runs it once, after preview and approval, to add missing profile symlinks. It never replaces or deletes an existing file or symlink, so concurrent setup runs are harmless. Its report separates newly created, unchanged, and skipped paths.
 
-The 11 profile files remain canonical under `agents/`:
+The 13 profile files remain canonical under `agents/`:
 
 | Profile | Primary | Fallback | Thinking | Context |
 |---|---|---|---|---|
 | `scout` | `openai-codex/gpt-5.6-sol` | none | medium | fresh |
 | `context-builder` | `openai-codex/gpt-5.6-sol` | none | medium | fresh |
-| `researcher` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
+| `debugger` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
+| `researcher` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | xhigh | fresh |
 | `planner` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
 | `worker` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
-| `fixer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
+| `fixer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | medium | fresh |
 | `reviewer` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | high | fresh |
-| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | high | fresh |
-| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | high | fresh |
-| `oracle` | `openai-codex/gpt-5.6-sol` | none | high | fork |
+| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | xhigh | fresh |
+| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | xhigh | fresh |
+| `oracle` | `openai-codex/gpt-5.6-sol` | none | xhigh | fork |
 | `ui-designer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
+| `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | high | fresh |
+
+Frontmatter owns runtime policy. Each model-facing body stays focused on the role's work, evidence standard, boundaries, and output rather than explaining model or launch configuration. All 13 profiles remain leaf agents.
 
 The older files under `prompts/audit`, `prompts/execute`, `prompts/qa`, and `prompts/review` remain tracked historical workflow sources. They are not package resources and are not loaded by default.
 
@@ -66,7 +72,7 @@ Run `/reload` or start a fresh Pi session, then invoke `/fitch-setup` (or `/fitc
 Paste this into Pi. It installs the immutable reviewed package commit rather than a branch or tag. The setup manifest deliberately does not try to pin the package to itself because a Git commit cannot contain its own hash:
 
 ```text
-Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@bce44baabe4b70debf71d5ed1f2c063987470d93 --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
+Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@__PUBLIC_COMMIT_REQUIRED_BEFORE_RELEASE__ --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
 ```
 
 This pasteable prompt plus `/fitch-setup` is the bootstrap. There is no runtime bootstrap command or wizard framework.

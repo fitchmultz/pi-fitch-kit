@@ -35,7 +35,7 @@ Before any write or install, show one complete preview containing:
 
 - every selected exact package source and exact `pi install <source> --no-approve` command;
 - every filesystem path that may change and whether it will be created, merged, symlinked, or left alone;
-- the exact model mapping from all 11 files in `<package-root>/agents/`;
+- the exact model mapping from all 13 files in `<package-root>/agents/`;
 - the selected working-agreement blocks from `<package-root>/templates/working-agreement.md`;
 - the subagent trust merge `projectTrust.childRuns: "inherit"` in `~/.pi/agent/extensions/subagent/config.json`;
 - that `.pi/agent/AGENTS.md` is ignored unless the project already contains another Pi-recognized trust-gated resource and the project is trusted; do not create a trigger resource without explicit approval;
