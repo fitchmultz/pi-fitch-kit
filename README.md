@@ -37,6 +37,7 @@ pi-fitch-kit/
       manual-qa.md
   agents/
     context-builder.md
+    debugger.md
     fixer.md
     oracle.md
     planner.md
@@ -47,6 +48,12 @@ pi-fitch-kit/
     scout.md
     ui-designer.md
     worker.md
+    writer.md
+  docs/
+    Model_Reference_Sheet_Artificial_Analysis_2026-07-18.docx
+    Model_Reference_Sheet_Artificial_Analysis_2026-07-18.pdf
+    pi-setup-post.md
+    pi-setup.md
   extensions/
     sync-agents.ts
   scripts/
@@ -87,30 +94,36 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — `openai-codex/gpt-5.6-terra`, thinking medium, no fallback; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
-- `researcher` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `scout` — `openai-codex/gpt-5.6-sol`, thinking medium, no fallback; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
+- `context-builder` — `openai-codex/gpt-5.6-sol`, thinking medium, no fallback; `defaultContext: fresh`; `allowSubagents: false`
+- `debugger` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; read-only root-cause diagnosis; `output: diagnosis.md`; `maxSubagentDepth: 0`
+- `fixer` — `openai-codex/gpt-5.6-sol`, thinking medium, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
+- `researcher` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
 - `planner` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: false`; `output: plan.md`
 - `worker` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0`
-- `fixer` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
 - `reviewer` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
-- `reviewer-claude` — `anthropic/claude-fable-5`, thinking xhigh, fallback `anthropic/claude-opus-4-8`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
 - `reviewer-gpt` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
-- `context-builder` — `openai-codex/gpt-5.6-sol`, thinking medium, no fallback; `defaultContext: fresh`; `allowSubagents: false`
+- `reviewer-claude` — `anthropic/claude-fable-5`, thinking xhigh, fallback `anthropic/claude-opus-4-8`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
 - `oracle` — `openai-codex/gpt-5.6-sol`, thinking xhigh, no Claude Code fallback because it requires forked Pi transcript context; `defaultContext: fork`; `maxSubagentDepth: 0`
 - `ui-designer` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
+- `writer` — `anthropic/claude-fable-5`, thinking high, fallback `anthropic/claude-opus-4-8`; `defaultContext: fresh`; `output: draft.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
 
-Most names intentionally match builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly; `reviewer-claude`, `reviewer-gpt`, and `ui-designer` are added specialists. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
+Most names intentionally match builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly; `debugger`, `reviewer-claude`, `reviewer-gpt`, `ui-designer`, and `writer` are added specialists. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
+
+Frontmatter owns runtime policy. Each model-facing body stays focused on the role's work, evidence standard, boundaries, and output rather than explaining model or launch configuration.
 
 Model policy:
 
-- `openai-codex/gpt-5.6-sol` is the primary model for every agent except the Terra-backed `scout` and Claude-backed `reviewer-claude`.
-- Effort is medium for scouting/context, high for routine planning/research/implementation/review/UI work, and xhigh only for the required GPT review gate, Claude review, and oracle decisions.
-- `anthropic/claude-fable-5` routes through Claude Code CLI in this environment using the user's Claude Code subscription, not Pi's global model registry. It is the `reviewer-claude` primary and the configured fallback for fresh-context planning, implementation, research, and UI roles.
+- `openai-codex/gpt-5.6-sol` is the primary model for every agent except the Claude-backed `reviewer-claude` and `writer`.
+- Effort is medium for scouting, context building, and bounded remediation; high for routine planning, debugging, implementation, review, UI, and writing; xhigh for consequential research, required review gates, and oracle decisions.
+- `anthropic/claude-fable-5` routes through Claude Code CLI in this environment using the user's Claude Code subscription, not Pi's global model registry. It is the `reviewer-claude` and `writer` primary and the configured fallback for fresh-context planning, debugging, implementation, remediation, research, and UI roles.
 - `reviewer` and `reviewer-gpt` fall back to `openai-codex/gpt-5.6-terra` so GPT review paths stay on OpenAI models.
 - Use configured model and thinking defaults unless a concrete routing, provider-capability, model-diversity, or cost requirement justifies an override.
 - Do not use Claude Code as primary or fallback routing for forked invocations; use fresh context with a compact handoff because Claude Code cannot import a Pi fork transcript.
 - Because GPT-5.6 Sol is shared across most roles, use planner/oracle for role and context isolation—not model diversity or routine extra thinking.
 - **`tools:` is intentionally omitted** on every override so agents receive Pi’s normal builtin/extension tool surface. Every override remains a leaf agent and cannot spawn nested subagents.
+
+Benchmark rationale and the source metrics are available as [PDF](docs/Model_Reference_Sheet_Artificial_Analysis_2026-07-18.pdf) and [DOCX](docs/Model_Reference_Sheet_Artificial_Analysis_2026-07-18.docx).
 
 ## Subagent context policy
 
@@ -128,7 +141,7 @@ Requires pi-subagents with per-agent context resolution (not whole-invocation fo
 Install the package globally from this local path:
 
 ```bash
-pi install /Users/mitchfultz/Projects/AI/pi-fitch-kit
+pi install /Users/mitchfultz/Projects/pi-stuff/pi-fitch-kit
 ```
 
 Because this is a local-path package install, Pi points at this repo directly instead of copying it. Edits here become the live source of truth.

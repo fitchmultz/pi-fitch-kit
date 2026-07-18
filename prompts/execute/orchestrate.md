@@ -43,12 +43,14 @@ Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`.
 - `context-builder`: larger local context pack or downstream handoff when the repo surface is broad.
 - `researcher`: focused external docs/web/API facts with source URLs.
 - `planner`: concrete implementation plan when broad decomposition, fresh-context isolation, or an independent planning pass matters; do not use it for routine extra thinking.
-- `worker`: generic execution, implementation, root-cause investigation, or multi-file changes.
+- `debugger`: read-only reproduction and root-cause diagnosis before remediation.
+- `worker`: generic execution, implementation, or multi-file changes.
 - `fixer`: bounded remediation from explicit findings only.
 - `reviewer`: GPT-backed general reviewer for routine checks.
 - `reviewer-claude`: Claude-backed correctness, validation, regression, and maintainability review.
 - `reviewer-gpt`: GPT-backed correctness, validation, regression, and maintainability review.
 - `ui-designer`: rendered UI/UX, visual hierarchy, accessibility, responsive layout, and polish.
+- `writer`: human-facing documentation, guides, announcements, and polished copy.
 - `oracle`: second opinion, drift check, or high-level design critique.
 
 Do not choose `delegate`; this kit intentionally removed its custom profile. For tiny tasks, do the work directly. For generic child execution, use `worker`.
@@ -68,7 +70,7 @@ Keep this light:
 ## Phase 2: Build the shared plan/checklist
 For anything beyond one obvious item, make a short plan before implementation.
 
-Because the parent session is usually a strong xhigh orchestrator, do not delegate planning or oracle work just to “think harder.” Use `planner`/`oracle` only for fresh/fork context isolation, drift checks, broad decomposition, or high-risk decisions.
+Because the parent session can usually plan directly, do not delegate planning or oracle work just to “think harder.” Use `planner`/`oracle` only for fresh/fork context isolation, drift checks, broad decomposition, or high-risk decisions.
 
 Shared plan/checklist guidance:
 - Use a `planner` or `context-builder` subagent when decomposition or context is non-trivial.
@@ -258,7 +260,7 @@ Prefer `subagent({ action: "status" | "nudge" | "resume", id, ... })` for manage
 - Give children goals, scope, context, boundaries, done criteria, and stop rules; let them reason.
 - Use defaults for `model`, `timeoutMs`, `output`, `concurrency`, and `context` unless there is a concrete reason to override; use `worktree: true` proactively for parallel editing/implementation isolation.
 - Model overrides are deliberate: use the configured role defaults and reserve Claude Code routes for the Claude reviewer or fallback model diversity.
-- Reasoning effort is role-specific: scouting/context use medium, routine planning/research/implementation/review/UI use high, and reviewer-gpt/reviewer-claude/oracle use xhigh.
+- Use each profile's configured reasoning default unless the task has a concrete reason to override it.
 - The parent is usually strong enough to plan; delegate planning/oracle work only when context isolation, drift checking, risk, or scope makes it useful.
 - Prefer deletion/consolidation over new ceremony.
 - Verify before declaring completion.

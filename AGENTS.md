@@ -15,7 +15,7 @@
 - Install deps: `npm install`
 - Validate repo: `npm run check`
 - Manual agent sync fallback: `bash scripts/sync-agents.sh`
-- Install/update package in Pi from this checkout: `pi install /Users/mitchfultz/Projects/AI/pi-fitch-kit`
+- Install/update package in Pi from this checkout: `pi install /Users/mitchfultz/Projects/pi-stuff/pi-fitch-kit`
 - After changing prompts or agents in a running Pi session, use `/reload` or start a fresh session before runtime verification.
 
 ## Editing rules
@@ -23,7 +23,8 @@
 - Use npm and Node `>=22.19.0`; do not introduce another package manager.
 - Do not edit synced copies under `~/.pi/agent/agents/`; edit `agents/*.md` here and let the extension or fallback script relink them.
 - Do not add duplicate subagent overrides in Pi settings. Agent model/thinking/context/tool policy lives in `agents/*.md` frontmatter.
-- Use configured agent defaults first: context-builder and scout use medium effort; planner, researcher, worker, fixer, reviewer, and ui-designer use high; reviewer-gpt, reviewer-claude, and oracle use xhigh. Override model or thinking only when a concrete routing, provider-capability, model-diversity, or cost requirement justifies it.
+- Keep model-facing agent bodies focused on actionable role instructions, evidence standards, boundaries, and outputs. Agent model, effort, and context policy belongs in frontmatter; parent-launch guidance belongs in orchestration docs.
+- Use configured agent defaults first. Override model or thinking only when a concrete routing, provider-capability, model-diversity, or cost requirement justifies it.
 - `anthropic/*` models route through Claude Code CLI in this environment, not Pi's global model registry. Fresh-default agents may use Claude Code fallbacks. Do not use Claude Code as primary or fallback routing for forked invocations; use fresh context with a compact handoff because Claude Code cannot import a Pi fork transcript.
 - Keep `tools:` omitted in agent overrides unless a task explicitly needs a static allowlist; Pi should provide the normal builtin/extension tool surface.
 - Keep every agent as a leaf agent; do not opt into nested subagents unless the README policy changes.

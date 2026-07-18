@@ -1,6 +1,6 @@
 # My pi setup, and why I run agents this way
 
-_Updated July 16, 2026 for pi 0.80.9._
+_Updated July 18, 2026 for pi 0.80.10._
 
 A few people have asked about my terminal agent setup. This is what I'm running and why. If you want to get set up like this, ping me. I'm happy to pair on it, and it doesn't matter if you've never used pi before.
 
@@ -13,7 +13,7 @@ Pi is in the same general category as Claude Code or Codex CLI. Out of the box i
 With Node.js 22.19 or newer, you can be running it in a few minutes:
 
 ```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.80.9
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.80.10
 pi
 ```
 
@@ -23,7 +23,7 @@ Once pi opens, run `/login` and pick a provider.
 
 **1. A written working agreement.** Every session reads my global `AGENTS.md`, plus any repo-specific instructions. It's rules of engagement, not coding trivia: make local reversible changes without asking, ask before anything external or destructive, check real evidence instead of guessing, verify the end state before claiming done, and stop before merge unless I said merge. This file does more for consistent output than any model setting.
 
-**2. Fresh subagents.** Instead of one agent carrying a giant conversation until it gets dumb, I hand clean briefs to child agents. A scout maps the relevant code. A worker implements a bounded task. A fresh reviewer tries to prove the result wrong. Think of it like giving a teammate a tight one-pager instead of forwarding a 400-message Slack thread.
+**2. Fresh subagents.** Instead of one agent carrying a giant conversation until it gets dumb, I hand clean briefs to child agents. A scout maps the relevant code. A debugger proves a root cause before remediation. A worker implements a bounded task. A fresh reviewer tries to prove the result wrong. A writer handles polished human-facing copy. Think of it like giving a teammate a tight one-pager instead of forwarding a 400-message Slack thread.
 
 Most of these roles currently use the same GPT-5.6 Sol model. The value is the clean context and clear job, not pretending each agent has a personality.
 
