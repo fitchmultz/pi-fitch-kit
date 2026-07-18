@@ -317,7 +317,7 @@ Onboarding is:
 The bootstrap pins the immutable package commit that passed review and validation:
 
 ```text
-Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@__PUBLIC_COMMIT_REQUIRED_BEFORE_RELEASE__ --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
+Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@4aaad82ba734fec94b008b5b2ee8d59f990735bb --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
 ```
 
 The bootstrap uses pi as the installer. `setup-manifest.json` is the pin authority and `/fitch-setup` is the setup procedure. There is no runtime bootstrap command or custom wizard.

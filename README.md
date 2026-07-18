@@ -2,7 +2,7 @@
 
 Opinionated public-core package for the Pi workflow Mitch Fultz uses: one accountable main session, fresh specialists for bounded context/research/review, exact model routing, and evidence before completion.
 
-> **Release status:** public Git package at `https://github.com/fitchmultz/pi-fitch-kit`. This revision is awaiting its immutable bootstrap pin. The npm package remains `private: true` to prevent accidental registry publication.
+> **Release status:** public Git package at `https://github.com/fitchmultz/pi-fitch-kit`. The bootstrap installs immutable reviewed package commit `4aaad82ba734fec94b008b5b2ee8d59f990735bb`. The npm package remains `private: true` to prevent accidental registry publication.
 
 ## Workflow
 
@@ -72,7 +72,7 @@ Run `/reload` or start a fresh Pi session, then invoke `/fitch-setup` (or `/fitc
 Paste this into Pi. It installs the immutable reviewed package commit rather than a branch or tag. The setup manifest deliberately does not try to pin the package to itself because a Git commit cannot contain its own hash:
 
 ```text
-Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@__PUBLIC_COMMIT_REQUIRED_BEFORE_RELEASE__ --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
+Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@4aaad82ba734fec94b008b5b2ee8d59f990735bb --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
 ```
 
 This pasteable prompt plus `/fitch-setup` is the bootstrap. There is no runtime bootstrap command or wizard framework.
