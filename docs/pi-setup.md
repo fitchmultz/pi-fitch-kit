@@ -8,7 +8,7 @@ The useful part of my setup is not the number of packages I have installed. It i
 
 That distinction matters. This is not an autonomous swarm, and my normal workflow is not scout → worker → reviewer. The main session is the lead engineer.
 
-This guide describes both the live workflow and the package needed to reproduce it. A local public-core implementation now exists, but the repository is not public and no public release commit exists yet.
+This guide describes both the live workflow and the public package needed to reproduce it.
 
 The best way to explain the setup is to follow a realistic task, then pull apart the pieces that made it work.
 
@@ -23,7 +23,7 @@ Pi's core stays small. You choose the instructions, models, tools, and integrati
 - Agent profiles give a fresh pi session a bounded role and model policy.
 - Sessions preserve the conversation and tool history so work can continue, compact, branch, or resume.
 
-You do not need to understand all of that before starting. The setup I want to publish will let pi explain the choices and make the approved changes itself.
+You do not need to understand all of that before starting. The published setup lets pi explain the choices and make the approved changes itself.
 
 ## A representative task
 
@@ -248,7 +248,7 @@ The complete core includes:
 - the exact OpenAI and Anthropic role mappings;
 - FFF, Agent Browser, MCP, subagents, Intercom, calculator, structured questions, and Ponytail;
 - goal, stash, verbosity, duration, session-editing, and message-copying tools;
-- harmless validation for every installed capability.
+- harmless validation when available, with any remaining manual verification reported.
 
 The following remain explicit choices:
 
@@ -257,9 +257,9 @@ The following remain explicit choices:
 - WorkOS process rules such as Linear tracking, worktrees, and mandatory pre-commit review;
 - any project-specific instructions.
 
-## The package I want to publish
+## The public package
 
-The local public-core implementation repurposes and sanitizes `pi-fitch-kit` around this contract. It is still private, and its bootstrap examples intentionally use a public-commit placeholder, so this implementation status is not a claim that the GitHub install target exists yet.
+The public `pi-fitch-kit` package repurposes and sanitizes the original personal repository around this contract.
 
 The public package is designed to:
 
@@ -272,12 +272,12 @@ The public package is designed to:
 - show a plan before writing files;
 - stop for authentication, service login, paid features, or user-owned process decisions;
 - never read or copy credential stores, browser profiles, raw sessions, or service payloads;
-- reload pi and run one harmless smoke test for every selected capability;
+- reload pi and run a harmless smoke test when one exists, otherwise report the required manual verification;
 - report every changed file, installed source, validation result, and remaining manual step.
 
-The structured-question tool already lives in its own repository. I plan to make that repository public rather than duplicate the extension in the kit.
+The structured-question tool is published separately as `pi-ask-question` rather than duplicated in the kit.
 
-The package's dependency set should cover:
+The package's dependency set covers:
 
 - `git:github.com/fitchmultz/pi-subagents`;
 - `git:github.com/fitchmultz/pi-intercom`;
@@ -294,7 +294,7 @@ The package's dependency set should cover:
 - the public `pi-ask-question` Git source;
 - optional `npm:pi-cursor-sdk`.
 
-The existing workflow prompt collection should move out of the default installation. A setup prompt is infrastructure; a library of rarely used workflow commands is not core.
+The existing workflow prompt collection stays out of the default installation. A setup prompt is infrastructure; a library of rarely used workflow commands is not core.
 
 ## How the bootstrap works
 
@@ -302,16 +302,16 @@ Onboarding is:
 
 1. Install Node.js 24 or newer and pi 0.80.10.
 2. Start pi and authenticate ChatGPT/Codex and Claude through their documented user-owned login flows.
-3. Paste the bootstrap prompt below after replacing the explicit placeholder with the real authorized public commit.
+3. Paste the bootstrap prompt below.
 4. Run `/reload`, then `/fitch-setup`.
 5. Choose complete core or individual components, optional Cursor, integrations, and working-agreement sections.
 6. Review every proposed package, path, model mapping, and change.
 7. Apply the approved setup, reload, and run harmless smoke checks.
 
-The package is not public yet, so the placeholder makes this deliberately non-runnable rather than pretending a public commit exists:
+The bootstrap pins the immutable package commit that passed review and validation:
 
 ```text
-Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@__PUBLIC_COMMIT_REQUIRED_BEFORE_RELEASE__ --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
+Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@bce44baabe4b70debf71d5ed1f2c063987470d93 --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
 ```
 
 The bootstrap uses pi as the installer. `setup-manifest.json` is the pin authority and `/fitch-setup` is the setup procedure. There is no runtime bootstrap command or custom wizard.
@@ -335,8 +335,8 @@ The package and guide must never distribute:
 
 Every engineer authenticates their own providers and services. Consequential external writes, production actions, account changes, and merges still require explicit authorization.
 
-## What comes next
+## Release discipline
 
-Before release, review and validate the local public-core implementation, make every referenced Fitch dependency public, commit the package, replace the explicit placeholder in a docs-only follow-up with that immutable package commit, and test the flow as a fresh WorkOS engineer install. None of those release actions are implied by the local implementation.
+The bootstrap commit is immutable. Future package changes need the same review and validation cycle, a new package commit, and a docs-only pin update. A fresh isolated install remains the final release check.
 
-Only after that should I derive the shorter post or adapt the setup for a general public audience.
+The shorter post and any general-public adaptation should be derived from this canonical guide.

@@ -2,7 +2,7 @@
 
 Opinionated public-core package for the Pi workflow Mitch Fultz uses: one accountable main session, fresh specialists for bounded context/research/review, exact model routing, and evidence before completion.
 
-> **Release status:** the repository is not public yet. The public Git URL is reserved as `https://github.com/fitchmultz/pi-fitch-kit`, but no public commit is claimed. The bootstrap examples intentionally contain `__PUBLIC_COMMIT_REQUIRED_BEFORE_RELEASE__`. The npm package is `private: true` to prevent accidental publication.
+> **Release status:** public Git package at `https://github.com/fitchmultz/pi-fitch-kit`. The bootstrap installs immutable reviewed package commit `bce44baabe4b70debf71d5ed1f2c063987470d93`. The npm package remains `private: true` to prevent accidental registry publication.
 
 ## Workflow
 
@@ -61,12 +61,12 @@ pi install /absolute/path/to/pi-fitch-kit
 
 Run `/reload` or start a fresh Pi session, then invoke `/fitch-setup` (or `/fitch-setup verify`). Profile links are not created until the setup preview is approved. Existing files and symlinks are skipped and reported, never overwritten.
 
-### Future public bootstrap
+### Public bootstrap
 
-During an authorized release, commit and validate the package first. Then replace the placeholder below in a docs-only commit with that immutable package commit. A Git commit cannot contain its own hash, so the setup manifest deliberately does not try to pin the package to itself. Until then this is deliberately not runnable:
+Paste this into Pi. It installs the immutable reviewed package commit rather than a branch or tag. The setup manifest deliberately does not try to pin the package to itself because a Git commit cannot contain its own hash:
 
 ```text
-Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@__PUBLIC_COMMIT_REQUIRED_BEFORE_RELEASE__ --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
+Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@bce44baabe4b70debf71d5ed1f2c063987470d93 --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
 ```
 
 This pasteable prompt plus `/fitch-setup` is the bootstrap. There is no runtime bootstrap command or wizard framework.
