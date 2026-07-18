@@ -178,10 +178,41 @@ for (const marker of [
   assert(agreement.split(marker).length === 2, `Working agreement marker must occur once: ${marker}`);
 }
 includesAll(agreement, ["Never replace unrelated content", "stop and ask", "external writes", "Use Linear", "reviewer-gpt"], "Working agreement");
-includesAll(read("README.md"), ["not public yet", "private: true", "/fitch-setup", "not loaded by default", "__PUBLIC_COMMIT_REQUIRED_BEFORE_RELEASE__", "--no-approve"], "README");
+const readme = read("README.md");
+const setupGuide = read("docs/pi-setup.md");
+const releasePlaceholder = "__PUBLIC_COMMIT_REQUIRED_BEFORE_RELEASE__";
+const kitSource = "git:github.com/fitchmultz/pi-fitch-kit";
+const bootstrapRef = (text, label) => {
+  assert(text.split(kitSource).length === 2, `${label} must reference the kit Git source exactly once`);
+  const escapedKitSource = kitSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = text.match(new RegExp("`pi install " + escapedKitSource + "@([^`\\s]+) --no-approve`"));
+  assert(match, `${label} must contain exactly one complete backticked kit install command`);
+  const ref = match[1];
+  assert(ref === releasePlaceholder || /^[0-9a-f]{40}$/.test(ref), `${label} bootstrap pin is neither the release placeholder nor a full commit`);
+  return ref;
+};
+const releaseHashFixture = "a".repeat(40);
+const validBootstrapFixture = "`pi install " + kitSource + "@" + releaseHashFixture + " --no-approve`";
+assert(bootstrapRef(validBootstrapFixture, "Valid bootstrap fixture") === releaseHashFixture, "Valid bootstrap fixture failed");
+for (const invalid of [
+  "`pi install " + kitSource + "@main --no-approve`",
+  "`pi install " + kitSource + "@" + releaseHashFixture + " --no-approve && echo unsafe`",
+  `${validBootstrapFixture}\n${validBootstrapFixture}`,
+]) {
+  let rejected = false;
+  try { bootstrapRef(invalid, "Invalid bootstrap fixture"); } catch { rejected = true; }
+  assert(rejected, `Unsafe bootstrap fixture passed validation: ${invalid}`);
+}
+const readmeRef = bootstrapRef(readme, "README");
+const guideRef = bootstrapRef(setupGuide, "Setup guide");
+assert(readmeRef === guideRef, "Bootstrap examples pin different package commits");
+if (readmeRef !== releasePlaceholder) {
+  assert(!readme.includes(releasePlaceholder) && !setupGuide.includes(releasePlaceholder), "Released docs retain the pre-release placeholder");
+}
+includesAll(readme, ["private: true", "/fitch-setup", "not loaded by default", "--no-approve"], "README");
 includesAll(read("CHANGELOG.md"), ["0.1.0 - Unreleased", "/fitch-setup", "eleven agent profiles"], "CHANGELOG");
 includesAll(read("AGENTS.md"), ["public-core source", "exactly 11", "private: true", "CONFIG_DIR_NAME", "setup-time and add-only"], "AGENTS.md");
-includesAll(read("docs/pi-setup.md"), ["local public-core implementation", "/fitch-setup", "__PUBLIC_COMMIT_REQUIRED_BEFORE_RELEASE__"], "Setup guide");
+includesAll(setupGuide, ["/fitch-setup", "--no-approve"], "Setup guide");
 
 for (const file of ["index.ts", "eval.ts", "decimal.ts", "check.ts"]) {
   assert(existsSync(join(root, "extensions/calculator", file)), `Missing calculator file ${file}`);
