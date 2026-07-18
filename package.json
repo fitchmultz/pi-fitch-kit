@@ -4,18 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "npm run typecheck && node scripts/validate.mjs",
-    "typecheck": "tsc --noEmit --skipLibCheck --allowImportingTsExtensions --module nodenext --moduleResolution nodenext --target es2022 extensions/sync-agents.ts"
+    "check": "node --check extensions/sync-agents.ts && node scripts/validate.mjs"
   },
   "keywords": [
     "pi-package"
-  ],
-  "files": [
-    "agents",
-    "extensions",
-    "prompts",
-    "scripts/sync-agents.sh",
-    "README.md"
   ],
   "pi": {
     "extensions": [
@@ -30,8 +22,7 @@
   },
   "packageManager": "npm@11.16.0",
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.80.9",
-    "typescript": "^5.9.3"
+    "@earendil-works/pi-coding-agent": "^0.80.1"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"

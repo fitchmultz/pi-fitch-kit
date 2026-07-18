@@ -1,4 +1,5 @@
 .DS_Store
+node_modules/
 
 # CueLoop local/runtime state (do not commit)
 .cueloop/

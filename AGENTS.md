@@ -23,10 +23,11 @@
 - Use npm and Node `>=22.19.0`; do not introduce another package manager.
 - Do not edit synced copies under `~/.pi/agent/agents/`; edit `agents/*.md` here and let the extension or fallback script relink them.
 - Do not add duplicate subagent overrides in Pi settings. Agent model/thinking/context/tool policy lives in `agents/*.md` frontmatter.
-- Use configured agent defaults first: worker is medium-effort; scout/context-builder/fixer are high-effort; researcher/planner/reviewer/ui-designer/oracle are xhigh; hard-review explicitly raises reviewer to max; and oracle is forked-context by default.
-- `claude-code/*` models route through Claude Code CLI inside `pi-subagents`, not Pi's global model registry. Fresh-default agents may use Claude Code fallbacks. Do not use Claude Code as primary or fallback routing for fork-default agents unless the task includes a compact handoff; Claude Code cannot import a Pi fork transcript.
+- Keep model-facing agent bodies focused on actionable role instructions, evidence standards, boundaries, and outputs. Agent model, effort, and context policy belongs in frontmatter; parent-launch guidance belongs in orchestration docs.
+- Use configured agent defaults first. Override model or thinking only when a concrete routing, provider-capability, model-diversity, or cost requirement justifies it.
+- `claude-code/*` models route through Claude Code CLI in this environment, not Pi's global model registry. Fresh-default agents may use Claude Code fallbacks. Do not use Claude Code as primary or fallback routing for forked invocations; use fresh context with a compact handoff because Claude Code cannot import a Pi fork transcript.
 - Keep `tools:` omitted in agent overrides unless a task explicitly needs a static allowlist; Pi should provide the normal builtin/extension tool surface.
-- Keep worker/reviewer/scout/researcher/fixer/oracle/ui-designer as leaf agents (`maxSubagentDepth: 0`). Only planner/context-builder should opt into nested subagents unless the README policy changes.
+- Keep every agent as a leaf agent; do not opt into nested subagents unless the README policy changes.
 
 ## Prompt templates
 

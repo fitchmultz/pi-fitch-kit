@@ -11,8 +11,7 @@ Process:
 1. Inspect the repo state and identify the exact review scope.
 2. Create a unique temp artifact directory with `mktemp -d "/tmp/pi-hard-review.XXXXXXXXXX"`.
 3. Use `subagent({ action: "list" })` if the available agents are not already known in this session.
-4. Launch one or more fresh-context `reviewer` subagents with:
-   - `model: "openai-codex/gpt-5.6-sol:max"`
+4. Launch fresh-context `reviewer-claude` and `reviewer-gpt` subagents with:
    - no edits
    - strict “everything is perfect” acceptance bar
    - permission to run focused read-only inspection commands, tests, typechecks, linters, or builds when needed
