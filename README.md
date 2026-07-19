@@ -94,13 +94,13 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — `cursor/grok-4.5`, thinking high, fallback `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
-- `context-builder` — `cursor/grok-4.5`, thinking high, fallback `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; `allowSubagents: false`
+- `scout` — `xai/grok-4.5`, thinking high, fallback `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
+- `context-builder` — `xai/grok-4.5`, thinking high, fallback `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; `allowSubagents: false`
 - `debugger` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `claude-code/fable`; `defaultContext: fresh`; read-only root-cause diagnosis; `output: diagnosis.md`; `maxSubagentDepth: 0`
-- `fixer` — `cursor/grok-4.5`, thinking high, fallbacks `openai-codex/gpt-5.6-sol` then `claude-code/fable`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
+- `fixer` — `xai/grok-4.5`, thinking high, fallbacks `openai-codex/gpt-5.6-sol` then `claude-code/fable`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
 - `researcher` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `claude-code/fable`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
 - `planner` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `claude-code/fable`; `defaultContext: fresh`; `allowSubagents: false`; `output: plan.md`
-- `worker` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `claude-code/fable`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0`
+- `worker` — `xai/grok-4.5`, thinking high, fallbacks `openai-codex/gpt-5.6-sol` then `claude-code/fable`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0`
 - `reviewer` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
 - `reviewer-gpt` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
 - `reviewer-claude` — `claude-code/fable`, thinking xhigh, fallback `claude-code/opus`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
@@ -114,14 +114,14 @@ Frontmatter owns runtime policy. Each model-facing body stays focused on the rol
 
 Model policy:
 
-- `cursor/grok-4.5` at high effort is the fast/value primary for `scout`, `context-builder`, and `fixer`; each falls back to `openai-codex/gpt-5.6-sol`, and `fixer` retains Claude as its second fallback.
-- `openai-codex/gpt-5.6-sol` remains primary for coding, diagnosis, planning, research, GPT review, UI, and oracle work. It is also the non-Cursor fallback for the Grok-backed roles.
+- `xai/grok-4.5` at high effort is the fast/value primary for `scout`, `context-builder`, `fixer`, and `worker`; all four fall back to `openai-codex/gpt-5.6-sol`, while `fixer` and `worker` retain Claude as their second fallback.
+- `openai-codex/gpt-5.6-sol` remains primary for diagnosis, planning, research, GPT review, UI, and oracle work. It is also the quality fallback for every Grok-backed role.
 - Effort is high for Grok-backed and routine specialist work; xhigh is reserved for consequential research, required review gates, and oracle decisions.
 - `claude-code/fable` routes through Claude Code CLI in this environment using the user's Claude Code subscription, not Pi's global model registry. It is the `reviewer-claude` and `writer` primary and the configured fallback for fresh-context planning, debugging, implementation, remediation, research, and UI roles.
 - `reviewer` and `reviewer-gpt` fall back to `openai-codex/gpt-5.6-terra` so GPT review paths stay on OpenAI models.
 - Use configured model and thinking defaults unless a concrete routing, provider-capability, model-diversity, or cost requirement justifies an override.
 - Do not use Claude Code as primary or fallback routing for forked invocations; use fresh context with a compact handoff because Claude Code cannot import a Pi fork transcript.
-- Grok is routed through `pi-cursor-sdk`; if Cursor is unavailable, the affected profiles use their explicit Sol fallback. Use planner/oracle for role and context isolation, not routine extra thinking.
+- Grok uses Pi's built-in xAI provider; authenticate with `/login xai` using a Grok/X subscription or xAI API key. Use planner/oracle for role and context isolation, not routine extra thinking.
 - **`tools:` is intentionally omitted** on every override so agents receive Pi’s normal builtin/extension tool surface. Every override remains a leaf agent and cannot spawn nested subagents.
 
 Benchmark rationale and the Artificial Analysis plus CursorBench 3.2 source metrics are available as [PDF](docs/Model_Reference_Sheet_Artificial_Analysis_2026-07-18.pdf) and [DOCX](docs/Model_Reference_Sheet_Artificial_Analysis_2026-07-18.docx). Grok's exact CursorBench rank is discounted because Cursor disclosed training-data contamination, but its independent speed, cost, and quality evidence still supports the fast/value roles above.

@@ -151,13 +151,13 @@ The specialist mappings are explicit:
 
 | Profile | Primary model | Fallback | Thinking |
 |---|---|---|---|
-| `scout` | `cursor/grok-4.5` | `openai-codex/gpt-5.6-sol` | `high` |
-| `context-builder` | `cursor/grok-4.5` | `openai-codex/gpt-5.6-sol` | `high` |
+| `scout` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol` | `high` |
+| `context-builder` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol` | `high` |
 | `debugger` | `openai-codex/gpt-5.6-sol` | `claude-code/fable` | `high` |
 | `researcher` | `openai-codex/gpt-5.6-sol` | `claude-code/fable` | `xhigh` |
 | `planner` | `openai-codex/gpt-5.6-sol` | `claude-code/fable` | `high` |
-| `worker` | `openai-codex/gpt-5.6-sol` | `claude-code/fable` | `high` |
-| `fixer` | `cursor/grok-4.5` | `openai-codex/gpt-5.6-sol`, then `claude-code/fable` | `high` |
+| `worker` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol`, then `claude-code/fable` | `high` |
+| `fixer` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol`, then `claude-code/fable` | `high` |
 | `reviewer` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `high` |
 | `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `xhigh` |
 | `reviewer-claude` | `claude-code/fable` | `claude-code/opus` | `xhigh` |
@@ -165,17 +165,17 @@ The specialist mappings are explicit:
 | `ui-designer` | `openai-codex/gpt-5.6-sol` | `claude-code/fable` | `high` |
 | `writer` | `claude-code/fable` | `claude-code/opus` | `high` |
 
-This is not model variety for its own sake. GPT-5.6 Sol remains the quality-first coding, diagnosis, planning, research, and review model. Grok 4.5 at high effort handles scouting, context building, and bounded fixes because it is unusually fast and inexpensive while remaining competitive on agentic work. Claude is most valuable as an independent reviewer and writer with a genuinely different model family. Xhigh remains reserved for consequential research, final review gates, and oracle decisions.
+This is not model variety for its own sake. GPT-5.6 Sol remains the quality-first diagnosis, planning, research, and review model and the first fallback for every Grok-backed role. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Claude is most valuable as an independent reviewer and writer with a genuinely different model family. Xhigh remains reserved for consequential research, final review gates, and oracle decisions.
 
 The profile body is what `pi-subagents` passes as the role system prompt, so it contains task instructions, evidence standards, boundaries, and output expectations. Model, effort, and context stay in frontmatter; launch guidance stays in orchestration documentation instead of being narrated back to the model.
 
 The benchmark rationale and Artificial Analysis plus CursorBench 3.2 source metrics are available as [PDF](./Model_Reference_Sheet_Artificial_Analysis_2026-07-18.pdf) and [DOCX](./Model_Reference_Sheet_Artificial_Analysis_2026-07-18.docx). Cursor reports Grok 4.5 high at 66.7% and $1.51/task, while the independent Artificial Analysis snapshot records 88 tok/s, 16.3 seconds E2E, 54 intelligence, 45.7 agentic, and 72.4 coding. Cursor disclosed that Grok benefited from an older Cursor codebase snapshot in training, so I discount its exact CursorBench rank rather than discard the independently corroborated speed/value signal.
 
-`pi-cursor-sdk` exposes this route as `cursor/grok-4.5`. Cursor remains optional for colleagues: the three Grok-backed profiles fall back explicitly to GPT-5.6 Sol when that route is unavailable. Declining a new Cursor installation does not disable an already installed provider or rewrite these checked-in profiles.
+Pi exposes `xai/grok-4.5` through its built-in xAI provider. Authenticate with `/login xai` using a Grok/X subscription or xAI API key. All four Grok-backed profiles fall back explicitly to GPT-5.6 Sol; `fixer` and `worker` then fall back to Fable.
 
-A faithful installer should use these exact current mappings, show them before writing configuration, and stop with a precise missing-model list if a required route is unavailable. It should not silently substitute a model that happens to look similar. A Sol-only preference is a separate, explicit local override; it is not implied by declining the optional package install.
+A faithful installer should use these exact current mappings, show them before writing configuration, and stop with a precise missing-model list if a required route is unavailable. It should not silently substitute a model that happens to look similar.
 
-For the full setup, a teammate needs ChatGPT Plus or Pro with Codex authentication and Claude Pro or Max authentication. Pi's Claude subscription route uses Anthropic extra usage, which may be billed per token rather than drawn from the normal plan limit. Cursor authentication is optional but recommended for the fast/value Grok routes.
+For the full setup, a teammate needs ChatGPT Plus or Pro with Codex authentication, Claude Pro or Max authentication, and xAI authentication. Pi's Claude subscription route uses Anthropic extra usage, which may be billed per token rather than drawn from the normal plan limit.
 
 ### Sessions and small friction reducers
 
@@ -216,7 +216,7 @@ A second model family is useful when it provides an independent reading of the s
 
 ### Routing controls effort and cost
 
-Scouting, context assembly, and confirmed repair lists benefit more from low elapsed time than from the last few points of coding quality. Grok high gives those roles a fast, inexpensive first pass; Sol and Claude remain the quality gates.
+Scouting, context assembly, bounded implementation, and confirmed repair lists benefit from low elapsed time under a smart parent agent. Grok high gives those roles fast, strong execution; Sol and Claude remain the quality gates.
 
 ## What the usage evidence says
 
@@ -253,14 +253,13 @@ The complete core includes:
 
 - the working-agreement template and nested project instructions;
 - the full specialist bench;
-- the exact OpenAI and Anthropic role mappings plus optional Grok primaries with explicit Sol fallback;
+- the exact OpenAI, Anthropic, and xAI role mappings with explicit Sol fallbacks;
 - FFF, Agent Browser, MCP, subagents, Intercom, calculator, structured questions, and Ponytail;
 - goal, stash, verbosity, duration, session-editing, and message-copying tools;
 - harmless validation for every installed capability.
 
 The following remain explicit choices:
 
-- enabling `cursor/grok-4.5` through `pi-cursor-sdk`; without it the affected profiles use Sol;
 - Linear, Slack, Horizon, Notion, and Cloudflare integration setup;
 - WorkOS process rules such as Linear tracking, worktrees, and mandatory pre-commit review;
 - any project-specific instructions.
@@ -300,8 +299,7 @@ The package's dependency set should cover:
 - `npm:pi-tool-duration`;
 - `npm:pi-edit-session-in-place`;
 - `npm:pi-copy-message`;
-- the public `pi-ask-question` Git source;
-- optional `npm:pi-cursor-sdk`.
+- the public `pi-ask-question` Git source.
 
 The existing workflow prompt collection should move out of the default installation. A setup prompt is infrastructure; a library of rarely used workflow commands is not core.
 
@@ -311,7 +309,7 @@ Once the package meets that contract, onboarding should be:
 
 1. Install the supported Node.js and pi versions.
 2. Start pi.
-3. Authenticate ChatGPT/Codex and Claude through `/login`.
+3. Authenticate ChatGPT/Codex, Claude, and xAI through `/login`.
 4. Paste one bootstrap prompt from this guide.
 5. Let pi install the pinned public kit and inspect the available models.
 6. Choose the complete core or individual components.
