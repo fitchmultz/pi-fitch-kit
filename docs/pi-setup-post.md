@@ -1,6 +1,6 @@
 # My pi setup, and why I run agents this way
 
-_Updated July 18, 2026 for pi 0.80.10._
+_Updated July 19, 2026 for pi 0.80.10._
 
 A few people have asked about my terminal agent setup. This is what I'm running and why. If you want to get set up like this, ping me. I'm happy to pair on it, and it doesn't matter if you've never used pi before.
 
@@ -25,7 +25,9 @@ Once pi opens, run `/login` and pick a provider.
 
 **2. Fresh subagents.** Instead of one agent carrying a giant conversation until it gets dumb, I hand clean briefs to child agents. A scout maps the relevant code. A debugger proves a root cause before remediation. A worker implements a bounded task. A fresh reviewer tries to prove the result wrong. A writer handles polished human-facing copy. Think of it like giving a teammate a tight one-pager instead of forwarding a 400-message Slack thread.
 
-Most of these roles currently use the same GPT-5.6 Sol model. The value is the clean context and clear job, not pretending each agent has a personality.
+The quality-first coding, diagnosis, and review roles use GPT-5.6 Sol. The speed-sensitive scout, context-builder, and fixer use `cursor/grok-4.5` at high effort, with explicit Sol fallback when Cursor is unavailable. Fable handles cross-model review and writing. The value still comes from clean context and a clear job, not pretending each agent has a personality.
+
+Grok earned a real role here because it is both fast and strong: CursorBench reports 66.7% at $1.51/task, and the separate Artificial Analysis snapshot reports 88 tok/s and 16.3 seconds end to end. Cursor disclosed benchmark contamination for Grok, so I discount that exact 66.7% rank rather than ignore the independently corroborated speed and cost advantage.
 
 **3. A real review gate.** For code changes in `workos/*`, a fresh GPT reviewer runs my thermo-nuclear maintainability review before commit, push, or merge. Any later code change invalidates the sign-off. When a change is broad or risky, `/hard-review` adds separate GPT and Claude passes. I don't trust a model to be the only grader of its own homework.
 
@@ -62,11 +64,11 @@ The parent session stays responsible throughout. Child-agent summaries are evide
 Once core pi is installed, you can paste this into a session:
 
 ```text
-Set up pi on this machine for a scout, worker, and reviewer workflow. Read the active installed pi docs before changing anything.
+Set up pi on this machine for a scout, context-builder, fixer, worker, and reviewer workflow. Read the active installed pi docs before changing anything.
 
-Install these public packages: git:github.com/fitchmultz/pi-subagents, git:github.com/fitchmultz/pi-intercom, npm:pi-agent-browser-native, npm:pi-mcp-adapter, npm:@ff-labs/pi-fff, and git:github.com/DietrichGebert/ponytail. Use the two fitchmultz Git forks, not the older npm releases. Review each source, resolve and install an exact version or commit, and record it. For the browser wrapper, follow its installed README and install the compatible upstream agent-browser version and browser runtime before running its doctor. Do not install anything else without asking.
+Install these public packages: git:github.com/fitchmultz/pi-subagents, git:github.com/fitchmultz/pi-intercom, npm:pi-agent-browser-native, npm:pi-mcp-adapter, npm:@ff-labs/pi-fff, and git:github.com/DietrichGebert/ponytail. If I approve Cursor support, also install npm:pi-cursor-sdk. Use the two fitchmultz Git forks, not the older npm releases. Review each source, resolve and install an exact version or commit, and record it. For the browser wrapper, follow its installed README and install the compatible upstream agent-browser version and browser runtime before running its doctor. Do not install anything else without asking.
 
-Create my working agreement in ~/.pi/agent/AGENTS.md; focused orchestrate, triage-first, hard-review, and manual-qa prompts under ~/.pi/agent/prompts; fresh scout and reviewer profiles plus a bounded worker under ~/.pi/agent/agents; approved model overrides in ~/.pi/agent/models.json; and a child trust policy set to inherit in ~/.pi/agent/extensions/subagent/config.json. Inherit forwards explicit parent --approve or --no-approve CLI flags, not an interactive trust decision. Use no-approve for untrusted repositories and only models I can authenticate to.
+Create my working agreement in ~/.pi/agent/AGENTS.md; focused orchestrate, triage-first, hard-review, and manual-qa prompts under ~/.pi/agent/prompts; fresh scout, context-builder, fixer, worker, and reviewer profiles under ~/.pi/agent/agents; approved model overrides in ~/.pi/agent/models.json; and a child trust policy set to inherit in ~/.pi/agent/extensions/subagent/config.json. When Cursor is installed and authenticated, route scout, context-builder, and fixer through cursor/grok-4.5 at high effort. Scout and context-builder fall back to openai-codex/gpt-5.6-sol. Fixer falls back first to openai-codex/gpt-5.6-sol and then to claude-code/fable. If Cursor is not installed, make Sol the primary for those three profiles instead of creating a knowingly unavailable route. Inherit forwards explicit parent --approve or --no-approve CLI flags, not an interactive trust decision. Use no-approve for untrusted repositories and only models I can authenticate to.
 
 For useful parts of this setup that aren't publicly installable, build my own smallest equivalent under ~/.pi/agent with current public pi APIs instead of trying to copy the original package. Offer a structured question tool, deterministic calculator, and nested project-instruction loader separately, and create only the ones I approve. Treat paid modes, custom provider endpoints, and company integrations as separate opt-in decisions.
 
