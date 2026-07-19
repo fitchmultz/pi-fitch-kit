@@ -100,7 +100,7 @@ Notes:
 - `fixer` — `cursor/grok-4.5`, thinking high, fallbacks `openai-codex/gpt-5.6-sol` then `anthropic/claude-fable-5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
 - `researcher` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
 - `planner` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: false`; `output: plan.md`
-- `worker` — `cursor/grok-4.5:fast`, thinking high, fallbacks `openai-codex/gpt-5.6-sol` then `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0`
+- `worker` — `cursor/grok-4.5:slow`, thinking high, fallbacks `openai-codex/gpt-5.6-sol` then `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0`
 - `reviewer` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
 - `reviewer-gpt` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
 - `reviewer-claude` — `anthropic/claude-fable-5`, thinking xhigh, fallback `anthropic/claude-opus-4-8`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
@@ -115,7 +115,7 @@ Frontmatter owns runtime policy. Each model-facing body stays focused on the rol
 Model policy:
 
 - `cursor/grok-4.5` at high effort is the fast/value primary for `scout`, `context-builder`, and `fixer`; each falls back to `openai-codex/gpt-5.6-sol`, and `fixer` retains Claude as its second fallback.
-- `cursor/grok-4.5:fast` is the primary for `worker`, with fallbacks `openai-codex/gpt-5.6-sol` then `anthropic/claude-fable-5`.
+- `cursor/grok-4.5:slow` is the primary for `worker`, with fallbacks `openai-codex/gpt-5.6-sol` then `anthropic/claude-fable-5`.
 - `openai-codex/gpt-5.6-sol` remains primary for coding, diagnosis, planning, research, GPT review, UI, and oracle work. It is also the non-Cursor fallback for the Grok-backed roles.
 - Effort is high for Grok-backed and routine specialist work; xhigh is reserved for consequential research, required review gates, and oracle decisions.
 - `anthropic/claude-fable-5` routes through Claude Code CLI in this environment using the user's Claude Code subscription, not Pi's global model registry. It is the `reviewer-claude` and `writer` primary and the configured fallback for fresh-context planning, debugging, implementation, remediation, research, and UI roles.

@@ -1,7 +1,7 @@
 ---
 name: worker
 description: End-to-end implementation specialist for bounded tasks
-model: cursor/grok-4.5:fast
+model: cursor/grok-4.5:slow
 fallbackModels: openai-codex/gpt-5.6-sol, anthropic/claude-fable-5
 thinking: high
 systemPromptMode: append
