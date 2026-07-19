@@ -16,18 +16,15 @@ Run the Fitch Pi setup in `${1:-setup}` mode. This is a main-session-led setup p
 
 Inspect only non-secret state needed for the plan: `node --version`, `pi --version`, `pi list --no-approve`, `PI_OFFLINE=1 pi --list-models --no-approve`, package metadata/docs, path existence/type, and the structural keys of relevant JSON configuration. These forms prevent project-local resources and online catalog refreshes from affecting pre-approval inspection. Ask before any online refresh. Do not print whole user configuration files. If JSON is malformed, managed markers conflict, or an intended path is an unrelated non-symlink, stop and ask rather than replacing it.
 
-Require the manifest's Node and Pi runtime requirements. Require every exact route in `requiredModels`; check the offline, no-approve Pi model list and any provider route supplied by a selected package as applicable. If Cursor support is selected, also require every route under `optionalModels.cursor`. If Cursor is not selected, do not treat an unavailable optional Grok route as a missing requirement. Make clear that declining Cursor installation does not disable a preinstalled Cursor provider or rewrite the checked-in profiles: they use Grok whenever that route is available and fall back to Sol only when it cannot run. A Sol-only routing preference requires a separate explicit local override outside this add-only setup. Treat model listing as catalog evidence, not authentication proof. Ask the user to complete the documented ChatGPT/Codex and Claude login flows, plus Cursor authentication when selected. Use a documented non-secret auth-status surface when available; otherwise ask before the smallest no-session live provider probe. Never resolve or print credentials. Without auth-status or approved live-probe evidence, report authentication as unverified and do not claim setup complete.
-
-A route supplied by a selected but not-yet-installed exact package may be marked pending in the preview, but verify it immediately after that package install and before working-agreement or integration writes. If any exact model is then unavailable, report the precise missing list and stop. Leave already approved package installs reported as partial setup and do not substitute a similarly named model.
+Require the manifest's Node and Pi runtime requirements and every exact route in `requiredModels`, including Pi's built-in `xai/grok-4.5` route. Treat model listing as catalog evidence, not authentication proof. Ask the user to complete the documented xAI, ChatGPT/Codex, and Claude login flows. For xAI, direct the user to `/login xai` and the documented Grok/X subscription or API-key choice. Use a documented non-secret auth-status surface when available; otherwise ask before the smallest no-session live provider probe. Never resolve or print credentials. Without auth-status or approved live-probe evidence, report authentication as unverified and do not claim setup complete. If any exact model is unavailable, report the precise missing list and stop rather than substituting a similarly named model.
 
 ## Choose
 
 Unless mode is `verify`, ask the user to choose:
 
 1. Complete core, meaning every `corePackages` entry plus the kit's bundled extensions, prompt, profiles, and selected working-agreement blocks; or component selection from the manifest.
-2. Whether to install optional Cursor support for the `cursor/grok-4.5` primaries used by `scout`, `context-builder`, and `fixer`. This controls package installation only. Declining Cursor installation does not disable a preinstalled Cursor provider or change the checked-in routing.
-3. Which, if any, WorkOS integrations (Linear, Slack, Horizon, Notion, Cloudflare) they want to configure. Authentication is manual and per-user; do not test by reading service payloads.
-4. Whether to adopt the baseline working-agreement block, the optional WorkOS process block, both, or neither.
+2. Which, if any, WorkOS integrations (Linear, Slack, Horizon, Notion, Cloudflare) they want to configure. Authentication is manual and per-user; do not test by reading service payloads.
+3. Whether to adopt the baseline working-agreement block, the optional WorkOS process block, both, or neither.
 
 ## Preview and apply
 
@@ -35,7 +32,7 @@ Before any write or install, show one complete preview containing:
 
 - every selected exact package source and exact `pi install <source> --no-approve` command;
 - every filesystem path that may change and whether it will be created, merged, symlinked, or left alone;
-- the exact model mapping from all 13 files in `<package-root>/agents/`, including which Grok primaries require optional Cursor, which declared Sol fallbacks apply when that route cannot run, and that declining Cursor installation does not disable a preinstalled Cursor provider;
+- the exact model mapping from all 13 files in `<package-root>/agents/`, including the four `xai/grok-4.5` primaries, their declared Sol fallbacks, and the Fable second fallback for `fixer` and `worker`;
 - the selected working-agreement blocks from `<package-root>/templates/working-agreement.md`;
 - the subagent trust merge `projectTrust.childRuns: "inherit"` in `~/.pi/agent/extensions/subagent/config.json`;
 - that `.pi/agent/AGENTS.md` is ignored unless the project already contains another Pi-recognized trust-gated resource and the project is trusted; do not create a trigger resource without explicit approval;

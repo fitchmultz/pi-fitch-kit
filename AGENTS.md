@@ -6,7 +6,7 @@ This repository is the public-core source for `@fitch/pi-kit`.
 
 Canonical sources:
 
-- `setup-manifest.json` for supported Pi/Node versions, exact models, pinned core packages, optional Cursor, and Agent Browser's external prerequisite.
+- `setup-manifest.json` for supported Pi/Node versions, exact models, pinned core packages, and Agent Browser's external prerequisite.
 - `package.json#pi` for the only resources Pi loads: trusted nested instructions, calculator, and `/fitch-setup`.
 - `scripts/sync-agents.mjs` for add-only, setup-time profile linking.
 - `agents/*.md` for exactly 13 reusable user-level subagent profiles and their model/thinking/context policy.
@@ -30,7 +30,7 @@ Use npm with Node `>=24`. TypeScript must check against exact dev dependency `@e
 ## Editing rules
 
 - Do not edit synced files under `~/.pi/agent/agents/`; edit `agents/*.md` here.
-- Keep exactly 13 leaf profiles. Preserve the high-effort Grok-primary mappings for `scout`, `context-builder`, and `fixer`: the first two fall back to Sol, while `fixer` falls back to Sol and then Fable. Do not duplicate agent overrides in settings or enable nested subagents.
+- Keep exactly 13 leaf profiles. Preserve the high-effort `xai/grok-4.5` primaries for `scout`, `context-builder`, `fixer`, and `worker`: all four fall back to Sol, while `fixer` and `worker` then fall back to Fable. Do not duplicate agent overrides in settings or enable nested subagents.
 - Keep model-facing agent bodies focused on actionable role instructions, evidence standards, boundaries, and outputs. Agent model, effort, and context policy belongs in frontmatter; parent-launch guidance belongs in orchestration docs.
 - Keep runtime Pi imports as wildcard optional peers. Runtime third-party libraries belong in `dependencies`.
 - Do not vendor external Pi packages, add a bootstrap runtime command, or build a setup wizard. Use the manifest, pasteable bootstrap prompt, and `/fitch-setup`.

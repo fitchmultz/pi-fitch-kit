@@ -82,18 +82,18 @@ for (const resource of [...packageJson.pi.extensions, ...packageJson.pi.prompts]
 }
 
 const expectedAgents = {
-  "context-builder.md": ["cursor/grok-4.5", "openai-codex/gpt-5.6-sol", "high", "fresh"],
+  "context-builder.md": ["xai/grok-4.5", "openai-codex/gpt-5.6-sol", "high", "fresh"],
   "debugger.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
-  "fixer.md": ["cursor/grok-4.5", "openai-codex/gpt-5.6-sol, anthropic/claude-fable-5", "high", "fresh"],
+  "fixer.md": ["xai/grok-4.5", "openai-codex/gpt-5.6-sol, anthropic/claude-fable-5", "high", "fresh"],
   "oracle.md": ["openai-codex/gpt-5.6-sol", undefined, "xhigh", "fork"],
   "planner.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
   "researcher.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "xhigh", "fresh"],
   "reviewer-claude.md": ["anthropic/claude-fable-5", "anthropic/claude-opus-4-8", "xhigh", "fresh"],
   "reviewer-gpt.md": ["openai-codex/gpt-5.6-sol", "openai-codex/gpt-5.6-terra", "xhigh", "fresh"],
   "reviewer.md": ["openai-codex/gpt-5.6-sol", "openai-codex/gpt-5.6-terra", "high", "fresh"],
-  "scout.md": ["cursor/grok-4.5", "openai-codex/gpt-5.6-sol", "high", "fresh"],
+  "scout.md": ["xai/grok-4.5", "openai-codex/gpt-5.6-sol", "high", "fresh"],
   "ui-designer.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
-  "worker.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
+  "worker.md": ["xai/grok-4.5", "openai-codex/gpt-5.6-sol, anthropic/claude-fable-5", "high", "fresh"],
   "writer.md": ["anthropic/claude-fable-5", "anthropic/claude-opus-4-8", "high", "fresh"],
 };
 const agentNames = readdirSync(join(root, "agents")).filter((name) => name.endsWith(".md")).sort();
@@ -128,14 +128,15 @@ const exactCoreSources = [
 ];
 same(manifest.runtime, { pi: "0.80.10", node: ">=24" }, "Runtime contract changed");
 same(manifest.requiredModels, [
+  "xai/grok-4.5",
   "openai-codex/gpt-5.6-sol",
   "openai-codex/gpt-5.6-terra",
   "anthropic/claude-fable-5",
   "anthropic/claude-opus-4-8",
 ], "Required exact models changed");
-same(manifest.optionalModels, { cursor: ["cursor/grok-4.5"] }, "Optional exact models changed");
+assert(!("optionalModels" in manifest), "Manifest retains obsolete optional model routes");
 same(manifest.corePackages.map(({ source }) => source), exactCoreSources, "Core package pins changed");
-same(manifest.optionalPackages, [{ id: "cursor", source: "npm:pi-cursor-sdk@0.1.59" }], "Optional Cursor pin changed");
+assert(!("optionalPackages" in manifest), "Manifest retains obsolete optional provider packages");
 same(manifest.kit, { repository: "https://github.com/fitchmultz/pi-fitch-kit" }, "Kit metadata must not contain a self-referential install pin");
 const browser = manifest.corePackages.find(({ id }) => id === "agent-browser");
 same(browser?.externalPrerequisite, {
@@ -162,10 +163,10 @@ includesAll(setupPrompt, [
   "raw sessions",
   "service payloads/responses",
   "stop",
-  "do not substitute a similarly named model",
-  "optionalModels",
+  "rather than substituting a similarly named model",
+  "xai/grok-4.5",
+  "/login xai",
   "declared Sol fallbacks",
-  "Declining Cursor installation does not disable a preinstalled Cursor provider",
   "catalog evidence, not authentication proof",
   "Never resolve or print credentials",
   "Preview and apply",
@@ -220,13 +221,16 @@ assert(readmeRef === guideRef && guideRef === postRef, "Bootstrap examples pin d
 if (readmeRef !== releasePlaceholder) {
   assert(!readme.includes(releasePlaceholder) && !setupGuide.includes(releasePlaceholder) && !setupPost.includes(releasePlaceholder), "Released docs retain the pre-release placeholder");
 }
-includesAll(readme, ["private: true", "/fitch-setup", "not loaded by default", "--no-approve", "Declining Cursor installation does not disable a preinstalled Cursor provider"], "README");
+includesAll(readme, ["private: true", "/fitch-setup", "not loaded by default", "--no-approve", "xai/grok-4.5", "/login xai"], "README");
 includesAll(read("CHANGELOG.md"), ["0.1.0 - Unreleased", "/fitch-setup", "thirteen agent profiles"], "CHANGELOG");
 const projectInstructions = read("AGENTS.md");
-includesAll(projectInstructions, ["public-core source", "exactly 13", "Grok-primary mappings", "falls back to Sol and then Fable", "private: true", "CONFIG_DIR_NAME", "setup-time and add-only"], "AGENTS.md");
+includesAll(projectInstructions, ["public-core source", "exactly 13", "xai/grok-4.5", "fall back to Sol", "private: true", "CONFIG_DIR_NAME", "setup-time and add-only"], "AGENTS.md");
 assert(!projectInstructions.includes("Sol-backed `scout`"), "AGENTS.md retains the stale Sol-primary scout contract");
-includesAll(setupGuide, ["/fitch-setup", "--no-approve", "Declining Cursor installation does not disable a preinstalled Cursor provider"], "Setup guide");
-includesAll(setupPost, ["/fitch-setup", "--no-approve", "`debugger`", "`writer`", "Declining Cursor installation does not disable a preinstalled Cursor provider"], "Setup post");
+includesAll(setupGuide, ["/fitch-setup", "--no-approve", "xai/grok-4.5", "/login xai"], "Setup guide");
+includesAll(setupPost, ["/fitch-setup", "--no-approve", "`debugger`", "`writer`", "xai/grok-4.5", "/login xai"], "Setup post");
+for (const [label, source] of [["README", readme], ["setup guide", setupGuide], ["setup post", setupPost], ["setup prompt", setupPrompt], ["AGENTS.md", projectInstructions], ...agentNames.map((name) => [name, read(`agents/${name}`)])]) {
+  assert(!source.includes("cursor/grok-4.5") && !source.includes("pi-cursor-sdk"), `${label} retains the obsolete Cursor Grok route`);
+}
 
 for (const file of ["index.ts", "eval.ts", "decimal.ts", "check.ts"]) {
   assert(existsSync(join(root, "extensions/calculator", file)), `Missing calculator file ${file}`);
@@ -347,7 +351,6 @@ console.log(JSON.stringify({
   piResources: { extensions: packageJson.pi.extensions.length, prompts: packageJson.pi.prompts.length },
   agents: agentNames.length,
   corePins: exactCoreSources.length,
-  optionalPins: manifest.optionalPackages.length,
   agentLinking: ["setup-time", "add-only", "created-vs-unchanged", "conflicts-reported", "concurrent-safe"],
   nestedInstructions: ["native-trust-resource-required", "trusted-only", "deduplicated", "empty-safe", "enoent-safe", "live-edit"],
   calculator: "source-and-pins-validated",
