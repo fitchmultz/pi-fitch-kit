@@ -1,7 +1,7 @@
 ---
 name: scout
 description: Fast codebase recon that returns compressed context for handoff
-model: cursor/grok-4.5
+model: xai/grok-4.5
 fallbackModels: openai-codex/gpt-5.6-sol
 thinking: high
 systemPromptMode: append
