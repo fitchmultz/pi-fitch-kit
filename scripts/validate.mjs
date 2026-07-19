@@ -62,6 +62,8 @@ same(packageJson.files, [
   "templates/working-agreement.md",
   "setup-manifest.json",
   "docs/pi-setup.md",
+  "docs/Model_Reference_Sheet_Artificial_Analysis_2026-07-18.docx",
+  "docs/Model_Reference_Sheet_Artificial_Analysis_2026-07-18.pdf",
   "README.md",
   "CHANGELOG.md",
   "LICENSE",
@@ -80,16 +82,16 @@ for (const resource of [...packageJson.pi.extensions, ...packageJson.pi.prompts]
 }
 
 const expectedAgents = {
-  "context-builder.md": ["openai-codex/gpt-5.6-sol", undefined, "medium", "fresh"],
+  "context-builder.md": ["cursor/grok-4.5", "openai-codex/gpt-5.6-sol", "high", "fresh"],
   "debugger.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
-  "fixer.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "medium", "fresh"],
+  "fixer.md": ["cursor/grok-4.5", "openai-codex/gpt-5.6-sol, anthropic/claude-fable-5", "high", "fresh"],
   "oracle.md": ["openai-codex/gpt-5.6-sol", undefined, "xhigh", "fork"],
   "planner.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
   "researcher.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "xhigh", "fresh"],
   "reviewer-claude.md": ["anthropic/claude-fable-5", "anthropic/claude-opus-4-8", "xhigh", "fresh"],
   "reviewer-gpt.md": ["openai-codex/gpt-5.6-sol", "openai-codex/gpt-5.6-terra", "xhigh", "fresh"],
   "reviewer.md": ["openai-codex/gpt-5.6-sol", "openai-codex/gpt-5.6-terra", "high", "fresh"],
-  "scout.md": ["openai-codex/gpt-5.6-sol", undefined, "medium", "fresh"],
+  "scout.md": ["cursor/grok-4.5", "openai-codex/gpt-5.6-sol", "high", "fresh"],
   "ui-designer.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
   "worker.md": ["openai-codex/gpt-5.6-sol", "anthropic/claude-fable-5", "high", "fresh"],
   "writer.md": ["anthropic/claude-fable-5", "anthropic/claude-opus-4-8", "high", "fresh"],
@@ -131,6 +133,7 @@ same(manifest.requiredModels, [
   "anthropic/claude-fable-5",
   "anthropic/claude-opus-4-8",
 ], "Required exact models changed");
+same(manifest.optionalModels, { cursor: ["cursor/grok-4.5"] }, "Optional exact models changed");
 same(manifest.corePackages.map(({ source }) => source), exactCoreSources, "Core package pins changed");
 same(manifest.optionalPackages, [{ id: "cursor", source: "npm:pi-cursor-sdk@0.1.59" }], "Optional Cursor pin changed");
 same(manifest.kit, { repository: "https://github.com/fitchmultz/pi-fitch-kit" }, "Kit metadata must not contain a self-referential install pin");
@@ -160,6 +163,9 @@ includesAll(setupPrompt, [
   "service payloads/responses",
   "stop",
   "do not substitute a similarly named model",
+  "optionalModels",
+  "declared Sol fallbacks",
+  "Declining Cursor installation does not disable a preinstalled Cursor provider",
   "catalog evidence, not authentication proof",
   "Never resolve or print credentials",
   "Preview and apply",
@@ -214,11 +220,13 @@ assert(readmeRef === guideRef && guideRef === postRef, "Bootstrap examples pin d
 if (readmeRef !== releasePlaceholder) {
   assert(!readme.includes(releasePlaceholder) && !setupGuide.includes(releasePlaceholder) && !setupPost.includes(releasePlaceholder), "Released docs retain the pre-release placeholder");
 }
-includesAll(readme, ["private: true", "/fitch-setup", "not loaded by default", "--no-approve"], "README");
+includesAll(readme, ["private: true", "/fitch-setup", "not loaded by default", "--no-approve", "Declining Cursor installation does not disable a preinstalled Cursor provider"], "README");
 includesAll(read("CHANGELOG.md"), ["0.1.0 - Unreleased", "/fitch-setup", "thirteen agent profiles"], "CHANGELOG");
-includesAll(read("AGENTS.md"), ["public-core source", "exactly 13", "private: true", "CONFIG_DIR_NAME", "setup-time and add-only"], "AGENTS.md");
-includesAll(setupGuide, ["/fitch-setup", "--no-approve"], "Setup guide");
-includesAll(setupPost, ["/fitch-setup", "--no-approve", "`debugger`", "`writer`"], "Setup post");
+const projectInstructions = read("AGENTS.md");
+includesAll(projectInstructions, ["public-core source", "exactly 13", "Grok-primary mappings", "falls back to Sol and then Fable", "private: true", "CONFIG_DIR_NAME", "setup-time and add-only"], "AGENTS.md");
+assert(!projectInstructions.includes("Sol-backed `scout`"), "AGENTS.md retains the stale Sol-primary scout contract");
+includesAll(setupGuide, ["/fitch-setup", "--no-approve", "Declining Cursor installation does not disable a preinstalled Cursor provider"], "Setup guide");
+includesAll(setupPost, ["/fitch-setup", "--no-approve", "`debugger`", "`writer`", "Declining Cursor installation does not disable a preinstalled Cursor provider"], "Setup post");
 
 for (const file of ["index.ts", "eval.ts", "decimal.ts", "check.ts"]) {
   assert(existsSync(join(root, "extensions/calculator", file)), `Missing calculator file ${file}`);

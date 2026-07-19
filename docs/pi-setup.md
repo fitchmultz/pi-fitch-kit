@@ -1,6 +1,6 @@
 # How I actually use pi at WorkOS
 
-_Last updated July 18, 2026. This reflects my live pi 0.80.10 setup and an eight-day sample of how I used it._
+_Last updated July 19, 2026. This reflects my live pi 0.80.10 setup and an eight-day sample of how I used it._
 
 I wrote this for a WorkOS engineer who is new to pi.
 
@@ -151,13 +151,13 @@ The specialist mappings are explicit:
 
 | Profile | Primary model | Fallback | Thinking |
 |---|---|---|---|
-| `scout` | `openai-codex/gpt-5.6-sol` | none | `medium` |
-| `context-builder` | `openai-codex/gpt-5.6-sol` | none | `medium` |
+| `scout` | `cursor/grok-4.5` | `openai-codex/gpt-5.6-sol` | `high` |
+| `context-builder` | `cursor/grok-4.5` | `openai-codex/gpt-5.6-sol` | `high` |
 | `debugger` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
 | `researcher` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `xhigh` |
 | `planner` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
 | `worker` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
-| `fixer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `medium` |
+| `fixer` | `cursor/grok-4.5` | `openai-codex/gpt-5.6-sol`, then `anthropic/claude-fable-5` | `high` |
 | `reviewer` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `high` |
 | `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `xhigh` |
 | `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `xhigh` |
@@ -165,15 +165,17 @@ The specialist mappings are explicit:
 | `ui-designer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
 | `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `high` |
 
-This is not model variety for its own sake. GPT-5.6 Sol is the default because it works well for the main job. Medium effort covers scouting, context building, and bounded remediation; high covers routine specialist work; xhigh is reserved for consequential research, final review gates, and oracle decisions. Claude is most valuable as an independent reviewer and writer with a genuinely different model family.
+This is not model variety for its own sake. GPT-5.6 Sol remains the quality-first coding, diagnosis, planning, research, and review model. Grok 4.5 at high effort handles scouting, context building, and bounded fixes because it is unusually fast and inexpensive while remaining competitive on agentic work. Claude is most valuable as an independent reviewer and writer with a genuinely different model family. Xhigh remains reserved for consequential research, final review gates, and oracle decisions.
 
 The profile body is what the model reads as its role prompt, so it contains task instructions, evidence standards, boundaries, and output expectations. Model, effort, and context stay in frontmatter; launch guidance stays in orchestration documentation instead of being narrated back to the model.
 
-I also keep Cursor-backed models in the in-session model picker. Cursor is useful but optional for the setup I want colleagues to adopt.
+The benchmark rationale and Artificial Analysis plus CursorBench 3.2 source metrics are available as [PDF](./Model_Reference_Sheet_Artificial_Analysis_2026-07-18.pdf) and [DOCX](./Model_Reference_Sheet_Artificial_Analysis_2026-07-18.docx). Cursor reports Grok 4.5 high at 66.7% and $1.51/task, while the independent Artificial Analysis snapshot records 88 tok/s, 16.3 seconds E2E, 54 intelligence, 45.7 agentic, and 72.4 coding. Cursor disclosed that Grok benefited from an older Cursor codebase snapshot in training, so I discount its exact CursorBench rank rather than discard the independently corroborated speed/value signal.
 
-A faithful installer should use these exact current mappings, show them before writing configuration, and stop with a precise missing-model list if a required primary or fallback model is unavailable. It should not silently substitute a model that happens to look similar.
+`pi-cursor-sdk` exposes this route as `cursor/grok-4.5`. Cursor remains optional: the three Grok-backed profiles fall back explicitly to GPT-5.6 Sol when that route is unavailable. Declining Cursor installation does not disable a preinstalled Cursor provider or rewrite these checked-in profiles.
 
-For the full setup, a teammate needs ChatGPT Plus or Pro with Codex authentication and Claude Pro or Max authentication. Pi's Claude subscription route uses Anthropic extra usage, which may be billed per token rather than drawn from the normal plan limit. Cursor authentication is optional.
+A faithful installer should use these exact current mappings, show them before writing configuration, and stop with a precise missing-model list if a required route is unavailable. It should not silently substitute a model that happens to look similar. A Sol-only preference is a separate, explicit local override; it is not implied by declining the optional package install.
+
+For the full setup, a teammate needs ChatGPT Plus or Pro with Codex authentication and Claude Pro or Max authentication. Pi's Claude subscription route uses Anthropic extra usage, which may be billed per token rather than drawn from the normal plan limit. Cursor authentication is optional but recommended for the fast/value Grok routes.
 
 ### Sessions and small friction reducers
 
@@ -214,7 +216,7 @@ A second model family is useful when it provides an independent reading of the s
 
 ### Routing controls effort and cost
 
-Scouting does not need the same reasoning budget as a difficult design review. Role-specific model and effort settings let me spend more only where it changes the result.
+Scouting, context assembly, and confirmed repair lists benefit more from low elapsed time than from the last few points of coding quality. Grok high gives those roles a fast, inexpensive first pass; Sol and Claude remain the quality gates.
 
 ## What the usage evidence says
 
@@ -251,14 +253,14 @@ The complete core includes:
 
 - the working-agreement template and nested project instructions;
 - the full specialist bench;
-- the exact OpenAI and Anthropic role mappings;
+- the exact OpenAI and Anthropic role mappings plus optional Grok primaries with explicit Sol fallback;
 - FFF, Agent Browser, MCP, subagents, Intercom, calculator, structured questions, and Ponytail;
 - goal, stash, verbosity, duration, session-editing, and message-copying tools;
 - harmless validation when available, with any remaining manual verification reported.
 
 The following remain explicit choices:
 
-- Cursor models and `pi-cursor-sdk`;
+- enabling `cursor/grok-4.5` through `pi-cursor-sdk`; without it the affected profiles use Sol;
 - Linear, Slack, Horizon, Notion, and Cloudflare integration setup;
 - WorkOS process rules such as Linear tracking, worktrees, and mandatory pre-commit review;
 - any project-specific instructions.

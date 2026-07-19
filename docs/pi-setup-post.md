@@ -1,5 +1,7 @@
 # How I actually use pi at WorkOS
 
+_Updated July 19, 2026 for pi 0.80.10._
+
 I wrote this for WorkOS engineers who are curious about my pi setup but have not used pi before.
 
 Pi is a terminal coding agent in the same category as Claude Code or Codex CLI. Its core is deliberately small. The useful part of my setup is the workflow around it: connected context, fast repository search, fresh specialist sessions, independent review, and one main session that remains accountable for the work.
@@ -38,7 +40,9 @@ Fresh context is the main benefit. The implementation session accumulates assump
 
 The roles are bounded on purpose. A scout reads. A debugger diagnoses. A worker implements one named item. A fixer applies a confirmed list. A reviewer reports findings without editing. A writer produces copy without publishing it. Narrow authority makes the output easier for the main session to verify and keeps a small delegation from turning into an agent hierarchy.
 
-Different jobs also deserve different effort. Reconnaissance uses less reasoning budget than a difficult review. Claude is useful selectively as a second model family, not as automatic fanout on every task.
+Different jobs also deserve different routing. GPT-5.6 Sol remains the quality-first coding, diagnosis, and review model. The speed-sensitive `scout`, `context-builder`, and `fixer` use `cursor/grok-4.5` at high effort, with explicit Sol fallback when Cursor is unavailable. Claude is useful selectively as a second model family for review and writing, not as automatic fanout on every task.
+
+Grok earns that role from two independent views. CursorBench 3.2 reports 66.7% at $1.51/task, while the Artificial Analysis snapshot records 88 tok/s and 16.3 seconds end to end. Cursor disclosed that Grok benefited from an older Cursor codebase snapshot in training, so I discount its exact CursorBench rank rather than ignore the independently corroborated speed, cost, and competitive quality. The complete benchmark sheet is available as [PDF](./Model_Reference_Sheet_Artificial_Analysis_2026-07-18.pdf) and [DOCX](./Model_Reference_Sheet_Artificial_Analysis_2026-07-18.docx).
 
 ## What is on the normal path
 
@@ -75,7 +79,7 @@ That last contrast is important. The main session usually implements. Specialist
 
 ## Install the public setup
 
-The public package is [`fitchmultz/pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit). It targets Node.js 24 or newer and pi 0.80.10. A faithful setup also requires access to the exact ChatGPT/Codex and Anthropic models in the package manifest; it stops instead of silently substituting another model. Cursor is optional.
+The public package is [`fitchmultz/pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit). It targets Node.js 24 or newer and pi 0.80.10. A faithful setup requires access to the exact ChatGPT/Codex and Anthropic models in the package manifest; it stops instead of silently substituting another model. Cursor is optional. Selecting it installs `pi-cursor-sdk`. Declining Cursor installation does not disable a preinstalled Cursor provider or rewrite routing. The three Grok-backed profiles use Sol only when the Grok route cannot run.
 
 After installing pi and authenticating ChatGPT/Codex and Claude through their documented login flows, paste this into a pi session:
 
@@ -85,7 +89,7 @@ Read the active Pi package, prompt, extension, settings, security, and model doc
 
 Run `/reload`, then `/fitch-setup`.
 
-The setup recommends the complete core but lets you choose components. It asks separately about Cursor, WorkOS integrations, baseline working-agreement rules, and optional WorkOS process rules such as Linear tracking, worktrees, and mandatory review. It previews commands and paths before changing them, preserves existing files and configuration, and stops for authentication, paid features, malformed config, or missing exact models.
+The setup recommends the complete core but lets you choose components. It asks separately about Cursor, WorkOS integrations, baseline working-agreement rules, and optional WorkOS process rules such as Linear tracking, worktrees, and mandatory review. The preview names the Grok primaries and Sol fallbacks before changing anything. It preserves existing files and configuration and stops for authentication, paid features, malformed config, or missing exact models.
 
 Every engineer authenticates their own providers and services. The package does not copy credentials, OAuth state, browser profiles, sessions, private endpoints, or service responses. Pi extensions run with the user's permissions, so project trust is an input-loading gate, not a sandbox. Use `--no-approve` in repositories you do not trust.
 

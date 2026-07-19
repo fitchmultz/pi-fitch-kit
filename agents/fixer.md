@@ -1,9 +1,9 @@
 ---
 name: fixer
 description: Bounded remediation agent that applies an explicit list of fixes without broad replanning
-model: openai-codex/gpt-5.6-sol
-fallbackModels: anthropic/claude-fable-5
-thinking: medium
+model: cursor/grok-4.5
+fallbackModels: openai-codex/gpt-5.6-sol, anthropic/claude-fable-5
+thinking: high
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true

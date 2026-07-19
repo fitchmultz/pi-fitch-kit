@@ -30,7 +30,7 @@ Use npm with Node `>=24`. TypeScript must check against exact dev dependency `@e
 ## Editing rules
 
 - Do not edit synced files under `~/.pi/agent/agents/`; edit `agents/*.md` here.
-- Keep exactly 13 leaf profiles and preserve the Sol-backed `scout` mapping. Do not duplicate agent overrides in settings or enable nested subagents.
+- Keep exactly 13 leaf profiles. Preserve the high-effort Grok-primary mappings for `scout`, `context-builder`, and `fixer`: the first two fall back to Sol, while `fixer` falls back to Sol and then Fable. Do not duplicate agent overrides in settings or enable nested subagents.
 - Keep model-facing agent bodies focused on actionable role instructions, evidence standards, boundaries, and outputs. Agent model, effort, and context policy belongs in frontmatter; parent-launch guidance belongs in orchestration docs.
 - Keep runtime Pi imports as wildcard optional peers. Runtime third-party libraries belong in `dependencies`.
 - Do not vendor external Pi packages, add a bootstrap runtime command, or build a setup wizard. Use the manifest, pasteable bootstrap prompt, and `/fitch-setup`.

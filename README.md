@@ -29,13 +29,13 @@ The 13 profile files remain canonical under `agents/`:
 
 | Profile | Primary | Fallback | Thinking | Context |
 |---|---|---|---|---|
-| `scout` | `openai-codex/gpt-5.6-sol` | none | medium | fresh |
-| `context-builder` | `openai-codex/gpt-5.6-sol` | none | medium | fresh |
+| `scout` | `cursor/grok-4.5` | `openai-codex/gpt-5.6-sol` | high | fresh |
+| `context-builder` | `cursor/grok-4.5` | `openai-codex/gpt-5.6-sol` | high | fresh |
 | `debugger` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
 | `researcher` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | xhigh | fresh |
 | `planner` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
 | `worker` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
-| `fixer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | medium | fresh |
+| `fixer` | `cursor/grok-4.5` | `openai-codex/gpt-5.6-sol`, then `anthropic/claude-fable-5` | high | fresh |
 | `reviewer` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | high | fresh |
 | `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | xhigh | fresh |
 | `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | xhigh | fresh |
@@ -43,11 +43,13 @@ The 13 profile files remain canonical under `agents/`:
 | `ui-designer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
 | `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | high | fresh |
 
-Frontmatter owns runtime policy. Each model-facing body stays focused on the role's work, evidence standard, boundaries, and output rather than explaining model or launch configuration. All 13 profiles remain leaf agents.
+Frontmatter owns runtime policy. Each model-facing body stays focused on the role's work, evidence standard, boundaries, and output rather than explaining model or launch configuration. All 13 profiles remain leaf agents. Grok is the fast/value route for scouting, context building, and confirmed fixes; Sol remains the quality-first coding and review route, and Claude remains the independent review and writing route.
+
+The Artificial Analysis plus CursorBench 3.2 rationale and source metrics are included as [PDF](docs/Model_Reference_Sheet_Artificial_Analysis_2026-07-18.pdf) and [DOCX](docs/Model_Reference_Sheet_Artificial_Analysis_2026-07-18.docx). Grok's exact CursorBench rank is discounted because Cursor disclosed training-data contamination, but independent speed, cost, agentic, and coding results support the fast/value assignment.
 
 The older files under `prompts/audit`, `prompts/execute`, `prompts/qa`, and `prompts/review` remain tracked historical workflow sources. They are not package resources and are not loaded by default.
 
-`setup-manifest.json` is the setup authority for Pi 0.80.10, Node 24+, required models, exact external package sources, optional Cursor support, Agent Browser's external runtime, and setup choices. Third-party Pi packages are installed from those pins rather than vendored here.
+`setup-manifest.json` is the setup authority for Pi 0.80.10, Node 24+, required models, the optional `cursor/grok-4.5` route, exact external package sources, Agent Browser's external runtime, and setup choices. Third-party Pi packages are installed from those pins rather than vendored here.
 
 ## Setup
 
@@ -56,7 +58,8 @@ Requirements:
 1. Node.js 24 or newer.
 2. Pi exactly 0.80.10.
 3. Exact access to `openai-codex/gpt-5.6-sol`, `openai-codex/gpt-5.6-terra`, `anthropic/claude-fable-5`, and `anthropic/claude-opus-4-8`. Setup stops rather than substitutes.
-4. User-owned provider authentication through Pi's documented login flows. Cursor and WorkOS integrations are optional.
+4. Optional access to `cursor/grok-4.5` through `pi-cursor-sdk`. When that route cannot run, the Grok-backed profiles use their declared Sol fallbacks.
+5. User-owned provider authentication through Pi's documented login flows. Cursor and WorkOS integrations are optional.
 
 For development from a reviewed checkout:
 
@@ -79,7 +82,7 @@ This pasteable prompt plus `/fitch-setup` is the bootstrap. There is no runtime 
 
 ## Setup behavior
 
-`/fitch-setup` reads the manifest, inspects non-secret state, and offers complete core or component selection. It asks separately about Cursor, WorkOS service integrations, baseline working-agreement rules, and optional WorkOS process rules. Before applying anything it previews every exact package command, model mapping, path, merge, symlink, and reload requirement.
+`/fitch-setup` reads the manifest, inspects non-secret state, and offers complete core or component selection. It asks separately about Cursor, WorkOS service integrations, baseline working-agreement rules, and optional WorkOS process rules. Cursor selection controls whether setup installs `pi-cursor-sdk`. Declining Cursor installation does not disable a preinstalled Cursor provider or rewrite routing. The three Grok-backed profiles use Sol only when the Grok route cannot run. Before applying anything the setup previews every exact package command, model mapping, path, merge, symlink, and reload requirement.
 
 Configuration is merged narrowly. Managed working-agreement blocks update in place without replacing unrelated `AGENTS.md` content. Malformed JSON, broken markers, conflicting files, or missing exact models stop for a user decision. The global `agent-browser@0.32.0` prerequisite and its runtime download always require separate approval. Verification uses harmless local/read-only smokes and never service writes.
 

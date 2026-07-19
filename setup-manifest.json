@@ -13,6 +13,11 @@
     "anthropic/claude-fable-5",
     "anthropic/claude-opus-4-8"
   ],
+  "optionalModels": {
+    "cursor": [
+      "cursor/grok-4.5"
+    ]
+  },
   "kitResources": {
     "extensions": [
       "extensions/nested-agents.ts",
