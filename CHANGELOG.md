@@ -2,10 +2,12 @@
 
 ## Agent routing and specialist profiles
 
-- Tuned effort by role: medium for bounded remediation, high for routine implementation, and xhigh for consequential research, final review gates, and oracle decisions.
+- Routed `scout`, `context-builder`, and `fixer` through `cursor/grok-4.5` at high effort, with explicit GPT-5.6 Sol fallback, for faster and cheaper bounded delegation.
+- Discounted Grok's exact CursorBench rank because of Cursor's disclosed contamination while retaining the independent Artificial Analysis speed/value evidence; Sol and Fable remain the final quality gates.
+- Tuned effort by role: high for Grok-backed and routine implementation work, and xhigh for consequential research, final review gates, and oracle decisions.
 - Added read-only `debugger` and human-facing `writer` profiles.
 - Reworked model-facing instructions to describe the job and evidence contract instead of narrating model configuration.
-- Added the 18 July 2026 Artificial Analysis model reference sheet in PDF and DOCX formats.
+- Added the 18 July 2026 Artificial Analysis and CursorBench 3.2 model reference sheet in PDF and DOCX formats.
 
 ## Prompt renames — cutover to package-backed slash commands
 
