@@ -3,7 +3,7 @@ name: reviewer-claude
 description: Independent cross-model reviewer for assumptions, edge cases, and product risk
 model: claude-code/fable
 fallbackModels: claude-code/opus
-thinking: xhigh
+thinking: high
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true
