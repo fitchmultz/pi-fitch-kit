@@ -120,6 +120,7 @@ These process rules are part of explaining my workflow, but the installer should
 | Calculator | Deterministic arithmetic and small statistical checks |
 | Ask Question | Structured input when a user-owned decision is genuinely required |
 | Ponytail | Always-on pressure toward existing helpers, standard-library features, deletion, and the smallest root-cause fix |
+| Cursor SDK | Supplies the `cursor/grok-4.5` first fallback for Grok-backed agents |
 
 I do not invoke Ponytail when a task looks complicated. I installed it once, enabled its default Full mode, and leave it enabled for every response. It is baseline behavior, not a workflow I have to remember to run.
 
@@ -151,31 +152,31 @@ The specialist mappings are explicit:
 
 | Profile | Primary model | Fallback | Thinking |
 |---|---|---|---|
-| `scout` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol` | `high` |
-| `context-builder` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol` | `high` |
+| `scout` | `xai/grok-4.5` | `cursor/grok-4.5`, then `openai-codex/gpt-5.6-sol` | `high` |
+| `context-builder` | `xai/grok-4.5` | `cursor/grok-4.5`, then `openai-codex/gpt-5.6-sol` | `high` |
 | `debugger` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
 | `researcher` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `xhigh` |
 | `planner` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
-| `worker` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol`, then `anthropic/claude-fable-5` | `high` |
-| `fixer` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol`, then `anthropic/claude-fable-5` | `high` |
+| `worker` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `anthropic/claude-fable-5` | `high` |
+| `fixer` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `anthropic/claude-fable-5` | `high` |
 | `reviewer` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `high` |
 | `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `xhigh` |
-| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `xhigh` |
+| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `high` |
 | `oracle` | `openai-codex/gpt-5.6-sol` | none | `xhigh` |
 | `ui-designer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
 | `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `high` |
 
-This is not model variety for its own sake. GPT-5.6 Sol remains the quality-first diagnosis, planning, research, and review model and the first fallback for every Grok-backed role. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Claude is most valuable as an independent reviewer and writer with a genuinely different model family. Xhigh remains reserved for consequential research, final review gates, and oracle decisions.
+This is not model variety for its own sake. GPT-5.6 Sol remains the quality-first diagnosis, planning, research, and GPT review model and the quality fallback for every Grok-backed role. The Cursor route provides the first fallback to the same Grok 4.5 model before switching model families. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Claude is most valuable as an independent reviewer and writer with a genuinely different model family. Xhigh remains reserved for consequential research, the GPT review gate, and oracle decisions.
 
 The profile body is what `pi-subagents` passes as the role system prompt, so it contains task instructions, evidence standards, boundaries, and output expectations. Model, effort, and context stay in frontmatter; launch guidance stays in orchestration documentation instead of being narrated back to the model.
 
 The benchmark rationale and Artificial Analysis plus CursorBench 3.2 source metrics are available as [PDF](./Model_Reference_Sheet_Artificial_Analysis_2026-07-18.pdf) and [DOCX](./Model_Reference_Sheet_Artificial_Analysis_2026-07-18.docx). Cursor reports Grok 4.5 high at 66.7% and $1.51/task, while the independent Artificial Analysis snapshot records 88 tok/s, 16.3 seconds E2E, 54 intelligence, 45.7 agentic, and 72.4 coding. Cursor disclosed that Grok benefited from an older Cursor codebase snapshot in training, so I discount its exact CursorBench rank rather than discard the independently corroborated speed/value signal.
 
-Pi exposes `xai/grok-4.5` through its built-in xAI provider. Authenticate with `/login xai` using a Grok/X subscription or xAI API key. All four Grok-backed profiles fall back explicitly to GPT-5.6 Sol; `fixer` and `worker` then fall back to Fable.
+Pi exposes `xai/grok-4.5` through its built-in xAI provider. Authenticate with `/login xai` using a Grok/X subscription or xAI API key. The separately installed `pi-cursor-sdk` package and a Cursor SDK API key supply `cursor/grok-4.5`. All four Grok-backed profiles fall back first to Cursor's Grok route and then GPT-5.6 Sol; `fixer` and `worker` finally fall back to Fable.
 
 A faithful installer should use these exact current mappings, show them before writing configuration, and stop with a precise missing-model list if a required route is unavailable. It should not silently substitute a model that happens to look similar.
 
-For the full setup, a teammate needs ChatGPT Plus or Pro with Codex authentication, Claude Pro or Max authentication, and xAI authentication. Pi's Claude subscription route uses Anthropic extra usage, which may be billed per token rather than drawn from the normal plan limit.
+For the full setup, a teammate needs ChatGPT Plus or Pro with Codex authentication, Claude Pro or Max authentication, xAI authentication, and a Cursor SDK API key. Pi's Claude subscription route uses Anthropic extra usage, which may be billed per token rather than drawn from the normal plan limit.
 
 ### Sessions and small friction reducers
 
@@ -253,7 +254,7 @@ The complete core includes:
 
 - the working-agreement template and nested project instructions;
 - the full specialist bench;
-- the exact OpenAI, Anthropic, and xAI role mappings with explicit Sol fallbacks;
+- the exact OpenAI, Anthropic, xAI, and Cursor role mappings with explicit Cursor and Sol fallbacks;
 - FFF, Agent Browser, MCP, subagents, Intercom, calculator, structured questions, and Ponytail;
 - goal, stash, verbosity, duration, session-editing, and message-copying tools;
 - harmless validation for every installed capability.
@@ -291,6 +292,7 @@ The package's dependency set should cover:
 - `git:github.com/fitchmultz/pi-intercom`;
 - `npm:@ff-labs/pi-fff`;
 - `npm:pi-agent-browser-native` plus its compatible upstream browser dependency;
+- `npm:pi-cursor-sdk`;
 - `npm:pi-mcp-adapter`;
 - `git:github.com/DietrichGebert/ponytail`;
 - `npm:pi-codex-goal`;
@@ -309,7 +311,7 @@ Once the package meets that contract, onboarding should be:
 
 1. Install the supported Node.js and pi versions.
 2. Start pi.
-3. Authenticate ChatGPT/Codex, Claude, and xAI through `/login`.
+3. Authenticate ChatGPT/Codex, Claude, and xAI through `/login`, then save a Cursor SDK API key through `/login` for `pi-cursor-sdk`.
 4. Paste one bootstrap prompt from this guide.
 5. Let pi install the pinned public kit and inspect the available models.
 6. Choose the complete core or individual components.
