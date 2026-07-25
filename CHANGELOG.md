@@ -1,5 +1,10 @@
 # Changelog
 
+## Current setup documentation
+
+- Refreshed the guides for Pi 0.82.0, the current optional review policy, project-trust behavior, active skill catalog, Macuse, Cursor SDK, Codex priority and compaction, and `pi-apply-edits` as the default file-mutation tool.
+- Removed stale mandatory-review, child-trust, repository-visibility, package, and setup-version claims.
+
 ## Agent routing and specialist profiles
 
 - Routed `scout`, `context-builder`, `fixer`, and `worker` through Pi's built-in `xai/grok-4.5` at high effort, with `cursor/grok-4.5` and GPT-5.6 Sol fallbacks, for much faster bounded delegation without giving up the parent's quality gate.

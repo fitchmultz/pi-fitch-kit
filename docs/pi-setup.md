@@ -1,6 +1,6 @@
 # How I actually use pi at WorkOS
 
-_Last updated July 19, 2026. This reflects my live pi 0.80.10 setup and an eight-day sample of how I used it._
+_Last updated July 24, 2026. This reflects my live pi 0.82.0 setup and an eight-day sample of how I used it._
 
 I wrote this for a WorkOS engineer who is new to pi.
 
@@ -39,7 +39,7 @@ The main session remains accountable for the whole task. Delegating part of the 
 
 ### 2. It gathers connected context
 
-The issue rarely contains the complete story. Through MCP tools, pi can read the Linear issue, find a relevant Slack thread, and inspect approved context in Horizon, our internal engineering MCP service. If the change involves documentation or infrastructure, it can also check Notion or Cloudflare.
+The issue rarely contains the complete story. Through MCP tools, pi can read the Linear issue, find relevant Slack or GitHub context, and inspect approved context in Horizon, our internal engineering MCP service. The current catalog also covers Plain, Granola, Notion, Cloudflare, Sentry, and Datadog when the task needs them.
 
 MCP is the adapter between pi and another service. Instead of scraping a site or asking me to paste everything into the terminal, pi gets typed operations for the service. Every teammate authenticates their own access. The setup never copies credentials or another person's service data.
 
@@ -73,17 +73,17 @@ The deterministic calculator handles arithmetic instead of leaving it to model i
 
 ### 6. Fresh reviewers challenge the result
 
-The author should not be the only reviewer.
+Independent review is selective, not a blanket commit gate.
 
-For meaningful code changes, I use fresh review sessions after implementation and validation. `reviewer-gpt` checks the diff at `xhigh` effort. `reviewer-claude` provides a second model family when the risk or breadth justifies it. A generic `reviewer` is available for narrower review work.
+For high-risk, broad, security-sensitive, data-loss-sensitive, or explicitly requested changes, I use fresh review sessions after implementation and validation. `reviewer-gpt` checks the diff at `xhigh` effort. `reviewer-claude` provides a second model family when model diversity is useful. A generic `reviewer` is available for narrower review work.
 
 The fresh context is deliberate. A reviewer that inherits the implementation conversation also inherits the story the implementer built about why the change is correct. A fresh reviewer has to reconstruct the reasoning from the requirements, diff, tests, and current files.
 
-For changes in `workos/*`, my personal process has a stricter gate: before commit, push, or merge, a fresh `reviewer-gpt` runs my maintainability review and must return with no required changes. Any later code change invalidates that sign-off.
+`/hard-review` deliberately runs both GPT and Claude reviewers when I want the strict gate. Ordinary changes can be committed and pushed after relevant validation without a formal review; I still stop before merge unless I explicitly authorized it.
 
 ### 7. The main session closes the loop
 
-Valid findings are fixed and reviewed again. The main session reruns the checks that prove the behavior, summarizes what changed, names remaining risk, and stops before a merge or other consequential action unless I explicitly authorized it.
+When review is used, valid findings are fixed and reviewed again. The main session reruns the checks that prove the behavior, summarizes what changed, names remaining risk, and stops before a merge or other consequential action unless I explicitly authorized it.
 
 That is the recurring shape of the setup: connected evidence, focused parallel help, main-session ownership, and independent verification.
 
@@ -101,7 +101,7 @@ My global agreement says, in plain language:
 - preserve unrelated work and prefer an isolated worktree for changes in `workos/*`;
 - use Linear for task tracking;
 - verify the real outcome before claiming completion;
-- run the required independent review before commit, push, or merge;
+- use independent review when I ask for it or when risk makes it worthwhile, not as a blanket commit or push gate;
 - stop before merge unless I explicitly requested it.
 
 A small nested-instruction extension also checks `<current project>/.pi/agent/AGENTS.md` on every turn. That lets a repository add pi-specific rules that take effect without restarting the session.
@@ -115,6 +115,8 @@ These process rules are part of explaining my workflow, but the installer should
 | FFF | Fast repository file and content search |
 | MCP | Typed access to Linear, Slack, Horizon, Notion, Cloudflare, and other approved services |
 | Agent Browser | Current documentation, browser-visible verification, dashboards, and screenshots |
+| Macuse | Native macOS app inspection and control when browser DOM or CLI tools are insufficient |
+| Apply Edits | Default file mutation tool, replacing Pi's built-in `edit` and `write` tools |
 | `pi-subagents` | Fresh specialist sessions, parallel work, isolated worktrees, and review artifacts |
 | `pi-intercom` | Coordination between separate local pi sessions |
 | Calculator | Deterministic arithmetic and small statistical checks |
@@ -122,9 +124,22 @@ These process rules are part of explaining my workflow, but the installer should
 | Ponytail | Always-on pressure toward existing helpers, standard-library features, deletion, and the smallest root-cause fix |
 | Cursor SDK | Supplies the `cursor/grok-4.5` first fallback for Grok-backed agents |
 
-I do not invoke Ponytail when a task looks complicated. I installed it once, enabled its default Full mode, and leave it enabled for every response. It is baseline behavior, not a workflow I have to remember to run.
+`pi-apply-edits` exposes `apply_edits` as the one active mutation tool and removes Pi's built-in `edit` and `write` tools before the first model turn. It supports exact edits, whole-file rewrites, and plan-first multi-file batches; the built-ins remain available through an explicit session opt-in and should stay enabled on platforms where existing-file replacement is unsupported.
+
+I do not invoke Ponytail when a task looks complicated. I installed it once, set its default to Ultra, and leave it enabled for every response. It is baseline behavior, not a workflow I have to remember to run.
 
 The `fitchmultz` Git forks of `pi-subagents` and `pi-intercom` are intentional. They contain newer behavior than the npm releases I evaluated.
+
+### The skill library
+
+`~/.agents/skills` is the source of truth for my user-authored skills. The current automatically matched set is:
+
+- `agent-skill-engineering`, `ask-clarifying-questions`, `comprehensive-codebase-audit`, `crabbox-platform-testing`, `deslop`, `dogfood`, `external-repo-integration`, and `handoff`;
+- `peekaboo`, `pi-extension-development`, `platform-validation`, `root-cause-triage`, `ssh-unix-ops`, `tdd`, `thermo-nuclear-code-quality-review`, and `verification-before-completion`.
+
+Package skills add `pi-subagents`, `pi-intercom`, `macuse`, `ponytail`, `ponytail-review`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, and `ponytail-help`. Pi keeps only skill names and descriptions in the base prompt, then loads a full `SKILL.md` when the task matches.
+
+`collaborative-coding`, `cueloop`, `gogcli`, `pdf`, `readme-great-demo`, `slides`, `weekly-review`, and `workflow-from-chats` remain installed but are excluded from normal Pi discovery. `bro` is explicit-only through `disable-model-invocation`. This keeps the default catalog focused without deleting occasional workflows.
 
 ### The specialist bench
 
@@ -146,7 +161,7 @@ All profiles are leaf agents and cannot launch more children. That keeps a focus
 
 ### The models
 
-My current main model is `openai-codex/gpt-5.6-sol` with thinking set to `max` and OpenAI answer verbosity set to `low`.
+My current main model is `openai-codex/gpt-5.6-sol` with thinking set to `max` and OpenAI answer verbosity set to `low`. Codex priority mode is enabled. When the session compacts, a local extension tries `xai/grok-4.5` at `high`, then `openai-codex/gpt-5.6-luna` at `high`, before falling back to the active model.
 
 The specialist mappings are explicit:
 
@@ -187,6 +202,8 @@ A few extensions make that daily use better:
 - goal tracking keeps a long-running objective and its completion contract attached to the session;
 - stash parks an editor draft while I send another message, then restores it;
 - low OpenAI verbosity keeps routine answers concise;
+- Codex priority mode lowers latency for the main model;
+- Grok-then-Luna compaction avoids spending the main model's maximum effort on summaries;
 - tool-duration annotations tell the model when an operation was actually slow;
 - session editing lets me rewind and correct an earlier turn;
 - message copying retrieves raw session text without terminal formatting.
@@ -253,28 +270,28 @@ The installer should offer two paths:
 The complete core includes:
 
 - the working-agreement template and nested project instructions;
-- the full specialist bench;
+- the full specialist bench and curated skill catalog;
 - the exact OpenAI, Anthropic, xAI, and Cursor role mappings with explicit Cursor and Sol fallbacks;
-- FFF, Agent Browser, MCP, subagents, Intercom, calculator, structured questions, and Ponytail;
-- goal, stash, verbosity, duration, session-editing, and message-copying tools;
+- FFF, Agent Browser, Macuse, MCP, subagents, Intercom, Apply Edits, calculator, structured questions, and Ponytail;
+- goal, stash, verbosity, duration, session-editing, message-copying, Codex priority, and custom compaction tools;
 - harmless validation for every installed capability.
 
 The following remain explicit choices:
 
-- Linear, Slack, Horizon, Notion, and Cloudflare integration setup;
-- WorkOS process rules such as Linear tracking, worktrees, and mandatory pre-commit review;
+- Linear, Slack, GitHub, Horizon, Plain, Granola, Notion, Cloudflare, Sentry, and Datadog integration setup;
+- WorkOS process rules such as Linear tracking, worktrees, and when independent review is warranted;
 - any project-specific instructions.
 
-## The package I want to publish
+## The package I want to finish
 
-The current `pi-fitch-kit` repository is still private and does not yet meet this contract. Today it mostly distributes my agent profiles and a prompt library. Publishing it unchanged would reproduce the wrong parts of the setup.
+The `pi-fitch-kit` repository is public, but its npm manifest remains private and it does not yet meet this contract. Today it mostly distributes my agent profiles and a prompt library. Treating it as the finished installer would reproduce the wrong parts of the setup.
 
-The plan is to repurpose and sanitize that repository as the public opinionated core package.
+The plan is to reshape and sanitize that repository into the complete opinionated core package.
 
 The public package should:
 
 - carry the specialist profiles and their exact model, context, effort, and delegation policies;
-- bundle the small deterministic calculator and nested-instruction extensions;
+- bundle the small deterministic calculator, nested-instruction, Codex priority, and custom compaction extensions;
 - provide one setup entry point;
 - install approved dependencies at exact npm versions or Git commits;
 - preserve unrelated user configuration;
@@ -284,7 +301,7 @@ The public package should:
 - reload pi and run one harmless smoke test for every selected capability;
 - report every changed file, installed source, validation result, and remaining manual step.
 
-The structured-question tool already lives in its own repository. I plan to make that repository public rather than duplicate the extension in the kit.
+The structured-question tool already lives in its own public repository, so the kit should install that source rather than duplicate the extension.
 
 The package's dependency set should cover:
 
@@ -294,6 +311,7 @@ The package's dependency set should cover:
 - `npm:pi-agent-browser-native` plus its compatible upstream browser dependency;
 - `npm:pi-cursor-sdk`;
 - `npm:pi-mcp-adapter`;
+- `git:github.com/fitchmultz/pi-apply-edits`;
 - `git:github.com/DietrichGebert/ponytail`;
 - `npm:pi-codex-goal`;
 - `npm:@fitchmultz/pi-stash`;
@@ -301,7 +319,9 @@ The package's dependency set should cover:
 - `npm:pi-tool-duration`;
 - `npm:pi-edit-session-in-place`;
 - `npm:pi-copy-message`;
-- the public `pi-ask-question` Git source.
+- `git:github.com/fitchmultz/pi-ask-question`.
+
+Macuse is part of my current setup, but its repository is private. The public kit must leave it unavailable or make it an explicit authenticated opt-in until a public source exists; it should not copy code from my installation or silently substitute another tool.
 
 The existing workflow prompt collection should move out of the default installation. A setup prompt is infrastructure; a library of rarely used workflow commands is not core.
 
@@ -321,15 +341,15 @@ Once the package meets that contract, onboarding should be:
 
 The bootstrap prompt should use pi as the installer. It should read the active installed pi documentation before changing anything, inspect existing configuration without reading credentials, and explain every decision that still belongs to the user.
 
-I am not including a pretend copy-paste installer in this draft. The package is still private and the current repository does not satisfy the contract above. The next implementation step is to make the package match the guide, then add the real version-pinned bootstrap prompt.
+I am not treating the shorter post's bootstrap prompt as a finished installer. The repository is public, but the current package does not satisfy the contract above. The next implementation step is to make the package match the guide, then add the real version-pinned bootstrap flow.
 
 ## Trust and security boundaries
 
 Pi extensions run with the permissions of the user who started pi. Project trust controls whether project-local settings and extensions load; it is not a sandbox.
 
-My personal setup always trusts project-local configuration because I normally work in repositories I already trust. The shared setup should keep Pi's safer project-trust prompt instead.
+My personal setup currently sets `defaultProjectTrust: always` because I normally work in repositories I already trust. A shared setup should keep Pi's safer project-trust prompt unless the user explicitly chooses otherwise.
 
-For subagents, the installer should set `projectTrust.childRuns: inherit` in `~/.pi/agent/extensions/subagent/config.json`. That forwards an explicit parent `--approve` or `--no-approve` CLI flag to non-interactive child sessions; it does not reuse a trust choice made interactively in the parent. Untrusted repositories should use `no-approve`.
+I have no subagent config override, so the current `pi-subagents` fork uses its default `projectTrust.childRuns: approve`; an explicitly started parent `--no-approve` run still keeps children at `--no-approve`. A shared installer should show `approve`, `inherit`, and `no-approve` as explicit choices instead of silently copying mine. Untrusted repositories should use `no-approve`.
 
 The package and guide must never distribute:
 
@@ -344,6 +364,6 @@ Every engineer authenticates their own providers and services. Consequential ext
 
 ## What comes next
 
-The canonical guide comes first. Once this description feels accurate, the next work is to audit and reshape `pi-fitch-kit`, make the question tool public, build the bootstrap flow, and validate it as a fresh WorkOS engineer install.
+The canonical guide comes first. The next work is to audit and reshape `pi-fitch-kit`, build the bootstrap flow, and validate it as a fresh WorkOS engineer install.
 
-Only after that should I derive the shorter post or adapt the setup for a general public audience.
+The shorter post should remain a derivative of this guide rather than becoming a second source of truth.
