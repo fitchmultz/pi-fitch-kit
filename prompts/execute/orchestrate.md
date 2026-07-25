@@ -47,8 +47,8 @@ Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`.
 - `worker`: generic execution, implementation, or multi-file changes.
 - `fixer`: bounded remediation from explicit findings only.
 - `reviewer`: GPT-backed general reviewer for routine checks.
-- `reviewer-claude`: Claude-backed correctness, validation, regression, and maintainability review.
-- `reviewer-gpt`: GPT-backed correctness, validation, regression, and maintainability review.
+- `reviewer-claude`: Claude-backed independent cross-model review for hidden assumptions, edge cases, and product risk; add for security, privacy, data, architecture, or large refactors.
+- `reviewer-gpt`: GPT-backed strict maintainability and correctness gate; the default review for non-trivial changes.
 - `ui-designer`: rendered UI/UX, visual hierarchy, accessibility, responsive layout, and polish.
 - `writer`: human-facing documentation, guides, announcements, and polished copy.
 - `oracle`: second opinion, drift check, or high-level design critique.
@@ -120,7 +120,7 @@ Use the smallest coordination shape that holds:
 3. **Resume/steer same child**: use `subagent({ action: "resume", id, message })` when items are tightly coupled, the child has important working memory, or a review fix belongs in the same thread.
 4. **Parallel tasks**: prefer parallel subagents for independent work. For parallel implementation/editing, strongly prefer `worktree: true` so each child gets an isolated git worktree instead of writing into the shared checkout. Warn each child about sibling scope and overlapping files.
 5. **Chain**: use `subagent({ chain: [...] })` for scout -> planner -> worker style flows when each phase should feed the next.
-6. **Async/background**: use only when the parent can do useful independent work or the user wants chat unblocked. Track the run ID and do not sleep-poll.
+6. **Async/background**: launch async whenever dispatching several agents at once (parallel tasks or multiple singles), and otherwise when the parent can do useful independent work or the user wants chat unblocked. Track the run IDs and do not sleep-poll.
 
 ## Phase 5: Monitor and unblock
 The parent owns progress.
@@ -142,7 +142,7 @@ For each completed item:
 Do not trust child summaries blindly. Subagent output is evidence, not proof.
 
 ## Phase 7: Review loop when warranted
-Use a fresh `reviewer-gpt` for non-trivial code changes. Add `reviewer-claude` for high-risk, security-sensitive, data-loss-sensitive, broad, or large-refactor changes, or when an explicit hard review needs model diversity. Split review angles when both run: GPT for structure and maintainability, Claude for correctness and validation.
+Use a fresh `reviewer-gpt` for non-trivial code changes. Add `reviewer-claude` for high-risk, security-sensitive, data-loss-sensitive, broad, or large-refactor changes, or when an explicit hard review needs model diversity. Split review angles when both run: GPT for structure, maintainability, and correctness; Claude for hidden assumptions, edge cases, and product risk.
 
 Use `ui-designer` for browser-visible UI/design changes, before or after implementation as appropriate. Require rendered evidence for UI work; code review alone is not enough.
 

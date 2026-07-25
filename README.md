@@ -103,10 +103,10 @@ Notes:
 - `worker` — `xai/grok-4.5`, thinking high, fallbacks `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `anthropic/claude-fable-5`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0`
 - `reviewer` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
 - `reviewer-gpt` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
-- `reviewer-claude` — `anthropic/claude-fable-5`, thinking high, fallback `anthropic/claude-opus-4-8`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
+- `reviewer-claude` — `anthropic/claude-fable-5`, thinking xhigh, fallback `anthropic/claude-opus-5`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
 - `oracle` — `openai-codex/gpt-5.6-sol`, thinking xhigh, no Claude Code fallback because it requires forked Pi transcript context; `defaultContext: fork`; `maxSubagentDepth: 0`
 - `ui-designer` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `anthropic/claude-fable-5`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
-- `writer` — `anthropic/claude-fable-5`, thinking high, fallback `anthropic/claude-opus-4-8`; `defaultContext: fresh`; `output: draft.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `writer` — `anthropic/claude-fable-5`, thinking high, fallback `anthropic/claude-opus-5`; `defaultContext: fresh`; `output: draft.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
 
 Most names intentionally match builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly; `debugger`, `reviewer-claude`, `reviewer-gpt`, `ui-designer`, and `writer` are added specialists. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
 
