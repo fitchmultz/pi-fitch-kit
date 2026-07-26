@@ -1,5 +1,13 @@
 # Changelog
 
+## Convergent reviewer loop — 26 July 2026
+
+- Gave every finding a `blocks|fix-if-cheap|follow-up` disposition alongside its severity in `reviewer`, `reviewer-gpt`, and `reviewer-claude`. The four-level severity scale was previously decorative because any finding at any level blocked acceptance, which made the review loop non-terminating on large diffs.
+- Changed the acceptance sentinel from `No findings. Everything I checked is acceptable.` to `No blocking findings.`, so non-blocking items are still reported without holding up a shippable change.
+- Kept detection strict. Reviewers apply judgment to a finding's disposition, never to whether it gets reported, and may not mark maintainership, structure, naming, or size concerns as blocking on preference alone.
+- Told reviewers not to re-report findings the brief records as already declined. Fresh context meant every rerun re-litigated tradeoffs that had been consciously accepted in an earlier round.
+- Left `ui-designer` and the `hard-review` prompt on the original sentinel; they are separate review surfaces, not part of the PR gate loop.
+
 ## Agent routing refresh on CursorBench 3.2 — 26 July 2026
 
 - Promoted `debugger` and `planner` to `anthropic/claude-opus-5` at high effort, where Opus 5 scores 66.7% for $3.91/task against GPT-5.6 Sol high's 60.4% for $2.28. Diagnosis and planning errors propagate into downstream work, so the extra cost buys the most there. Both keep Fable 5 as a same-provider model-level fallback and their former Sol primary as the cross-provider fallback.
