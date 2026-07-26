@@ -25,7 +25,8 @@
 - Do not add duplicate subagent overrides in Pi settings. Agent model/thinking/context/tool policy lives in `agents/*.md` frontmatter.
 - Keep model-facing agent bodies focused on actionable role instructions, evidence standards, boundaries, and outputs. Agent model, effort, and context policy belongs in frontmatter; parent-launch guidance belongs in orchestration docs.
 - Use configured agent defaults first. Override model or thinking only when a concrete routing, provider-capability, model-diversity, or cost requirement justifies it.
-- `anthropic/*` models route through Claude Code CLI in this environment, not Pi's global model registry. Fresh-default agents may use Claude Code fallbacks. Do not use Claude Code as primary or fallback routing for forked invocations; use fresh context with a compact handoff because Claude Code cannot import a Pi fork transcript.
+- The Anthropic route is machine-specific: this work machine uses Pi's `anthropic` provider, and the personal machine uses the `claude-code` provider. Keep `anthropic/*` ids in agent frontmatter so both machines resolve the same overrides.
+- Do not use the `claude-code` provider as primary or fallback routing for forked invocations; use fresh context with a compact handoff because Claude Code cannot import a Pi fork transcript. `oracle` is the only fork-context override, so keep its chain non-Anthropic.
 - Keep `tools:` omitted in agent overrides unless a task explicitly needs a static allowlist; Pi should provide the normal builtin/extension tool surface.
 - Keep every agent as a leaf agent; do not opt into nested subagents unless the README policy changes.
 

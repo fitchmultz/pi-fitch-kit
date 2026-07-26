@@ -2,7 +2,7 @@
 name: reviewer
 description: Code review specialist that validates implementation and reports issues
 model: openai-codex/gpt-5.6-sol
-fallbackModels: openai-codex/gpt-5.6-terra
+fallbackModels: cursor/gpt-5.6-sol@272k, openai-codex/gpt-5.6-terra
 thinking: high
 systemPromptMode: append
 inheritProjectContext: true

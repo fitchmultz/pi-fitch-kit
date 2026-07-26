@@ -2,7 +2,7 @@
 name: researcher
 description: Evidence-driven technical researcher for consequential decisions
 model: openai-codex/gpt-5.6-sol
-fallbackModels: anthropic/claude-fable-5
+fallbackModels: anthropic/claude-opus-5
 thinking: xhigh
 systemPromptMode: append
 inheritProjectContext: true
