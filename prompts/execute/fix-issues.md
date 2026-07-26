@@ -71,7 +71,7 @@ Workflow:
    - Run strict review before merge.
    - Use the configured `reviewer-claude` and `reviewer-gpt` defaults; override them only for a concrete routing or provider-capability requirement.
    - Remediate every finding, including maintainability, test-contract, docs, naming, and polish findings.
-   - Repeat review/fix/review until there are no blocking findings.
+   - Launch both reviewers together with `async: true` and repeat review/fix/review until neither has blockers, nits, or other actionable findings.
    - Do not merge on passing tests alone if review finds unresolved structural or behavior risk.
 
 6. Verification

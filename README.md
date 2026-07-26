@@ -116,7 +116,7 @@ Model policy:
 
 - `xai/grok-4.5` at high effort is the fast/value primary for `scout`, `context-builder`, `fixer`, and `worker`; all four fall back first to `cursor/grok-4.5`, then `openai-codex/gpt-5.6-sol`, while `fixer` and `worker` retain Claude as their third fallback.
 - `openai-codex/gpt-5.6-sol` remains primary for diagnosis, planning, research, GPT review, UI, and oracle work. It is also the quality fallback for every Grok-backed role.
-- Effort is high for Grok-backed and routine specialist work, including Claude review; xhigh is reserved for consequential research, the GPT review gate, and oracle decisions.
+- Effort is high for Grok-backed and routine specialist work; xhigh is reserved for consequential research, both reviewer gates, and oracle decisions.
 - `anthropic/claude-fable-5` routes through Claude Code CLI in this environment using the user's Claude Code subscription, not Pi's global model registry. It is the `reviewer-claude` and `writer` primary and the configured fallback for fresh-context planning, debugging, implementation, remediation, research, and UI roles.
 - `reviewer` and `reviewer-gpt` fall back to `openai-codex/gpt-5.6-terra` so GPT review paths stay on OpenAI models.
 - Use configured model and thinking defaults unless a concrete routing, provider-capability, model-diversity, or cost requirement justifies an override.

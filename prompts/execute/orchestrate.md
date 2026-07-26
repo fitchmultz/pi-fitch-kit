@@ -47,8 +47,8 @@ Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`.
 - `worker`: generic execution, implementation, or multi-file changes.
 - `fixer`: bounded remediation from explicit findings only.
 - `reviewer`: GPT-backed general reviewer for routine checks.
-- `reviewer-claude`: Claude-backed independent cross-model review for hidden assumptions, edge cases, and product risk; add for security, privacy, data, architecture, or large refactors.
-- `reviewer-gpt`: GPT-backed strict maintainability and correctness gate; the default review for non-trivial changes.
+- `reviewer-claude`: Claude-backed independent cross-model review for hidden assumptions, edge cases, and product risk; pair with `reviewer-gpt` for every review gate.
+- `reviewer-gpt`: GPT-backed strict maintainability and correctness gate; pair with `reviewer-claude` for every review gate.
 - `ui-designer`: rendered UI/UX, visual hierarchy, accessibility, responsive layout, and polish.
 - `writer`: human-facing documentation, guides, announcements, and polished copy.
 - `oracle`: second opinion, drift check, or high-level design critique.
@@ -142,11 +142,11 @@ For each completed item:
 Do not trust child summaries blindly. Subagent output is evidence, not proof.
 
 ## Phase 7: Review loop when warranted
-Use a fresh `reviewer-gpt` for non-trivial code changes. Add `reviewer-claude` for high-risk, security-sensitive, data-loss-sensitive, broad, or large-refactor changes, or when an explicit hard review needs model diversity. Split review angles when both run: GPT for structure, maintainability, and correctness; Claude for hidden assumptions, edge cases, and product risk.
+Launch fresh `reviewer-gpt` and `reviewer-claude` Pi subagents together with `async: true`; never substitute an inline self-review. GPT owns structure, maintainability, and correctness. Claude owns hidden assumptions, edge cases, and product risk. Track both run IDs and inspect both results.
 
 Use `ui-designer` for browser-visible UI/design changes, before or after implementation as appropriate. Require rendered evidence for UI work; code review alone is not enough.
 
-Fix material findings and repeat review/verification until clean or blocked by a real external decision. A timeout or incomplete review is not sign-off.
+Fix every blocker, nit, and other actionable finding, rerun affected validation, then relaunch both reviewers together in async mode. Repeat until both accept the current state. A failed, timed-out, stale, or incomplete review is not sign-off.
 
 ## Phase 8: Final rollup
 Before claiming done:

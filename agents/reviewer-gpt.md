@@ -3,7 +3,7 @@ name: reviewer-gpt
 description: Strict maintainability and correctness gate for completed changes
 model: openai-codex/gpt-5.6-sol
 fallbackModels: openai-codex/gpt-5.6-terra
-thinking: max
+thinking: xhigh
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: true

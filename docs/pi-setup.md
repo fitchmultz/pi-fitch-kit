@@ -73,13 +73,11 @@ The deterministic calculator handles arithmetic instead of leaving it to model i
 
 ### 6. Fresh reviewers challenge the result
 
-Independent review is selective, not a blanket commit gate.
-
-For high-risk, broad, security-sensitive, data-loss-sensitive, or explicitly requested changes, I use fresh review sessions after implementation and validation. `reviewer-gpt` checks the diff at `xhigh` effort. `reviewer-claude` provides a second model family when model diversity is useful. A generic `reviewer` is available for narrower review work.
+Independent review runs after implementation and validation when the workflow requires a review gate. I launch fresh `reviewer-gpt` and `reviewer-claude` Pi subagents together in async mode. GPT checks structure, maintainability, and correctness; Claude challenges hidden assumptions, edge cases, and product risk. Every blocker, nit, and actionable finding is fixed before both reviewers rerun.
 
 The fresh context is deliberate. A reviewer that inherits the implementation conversation also inherits the story the implementer built about why the change is correct. A fresh reviewer has to reconstruct the reasoning from the requirements, diff, tests, and current files.
 
-`/hard-review` deliberately runs both GPT and Claude reviewers when I want the strict gate. Ordinary changes can be committed and pushed after relevant validation without a formal review; I still stop before merge unless I explicitly authorized it.
+`/hard-review` runs both reviewers for the strict gate. Every PR runs both before it is ready to ship; local non-PR work only needs a formal review when the workflow or risk requires one. I still stop before merge unless I explicitly authorized it.
 
 ### 7. The main session closes the loop
 
@@ -176,10 +174,10 @@ The specialist mappings are explicit:
 | `fixer` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `anthropic/claude-fable-5` | `high` |
 | `reviewer` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `high` |
 | `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `xhigh` |
-| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `high` |
+| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-5` | `xhigh` |
 | `oracle` | `openai-codex/gpt-5.6-sol` | none | `xhigh` |
 | `ui-designer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
-| `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `high` |
+| `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-5` | `high` |
 
 This is not model variety for its own sake. GPT-5.6 Sol remains the quality-first diagnosis, planning, research, and GPT review model and the quality fallback for every Grok-backed role. The Cursor route provides the first fallback to the same Grok 4.5 model before switching model families. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Claude is most valuable as an independent reviewer and writer with a genuinely different model family. Xhigh remains reserved for consequential research, the GPT review gate, and oracle decisions.
 
