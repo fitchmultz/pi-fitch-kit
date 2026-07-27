@@ -165,21 +165,21 @@ The specialist mappings are explicit:
 
 | Profile | Primary model | Fallback | Thinking |
 |---|---|---|---|
-| `scout` | `xai/grok-4.5` | `cursor/grok-4.5`, then `openai-codex/gpt-5.6-sol` | `high` |
-| `context-builder` | `xai/grok-4.5` | `cursor/grok-4.5`, then `openai-codex/gpt-5.6-sol` | `high` |
-| `debugger` | `anthropic/claude-opus-5` | `anthropic/claude-fable-5`, then `openai-codex/gpt-5.6-sol` | `high` |
-| `researcher` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-opus-5` | `xhigh` |
-| `planner` | `anthropic/claude-opus-5` | `anthropic/claude-fable-5`, then `openai-codex/gpt-5.6-sol` | `high` |
-| `worker` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `high` |
-| `fixer` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `high` |
-| `reviewer` | `openai-codex/gpt-5.6-sol` | `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra` | `high` |
-| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra` | `xhigh` |
+| `scout` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `high` |
+| `context-builder` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `high` |
+| `debugger` | `anthropic/claude-opus-5` | `anthropic/claude-fable-5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `high` |
+| `researcher` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `xhigh` |
+| `planner` | `anthropic/claude-opus-5` | `anthropic/claude-fable-5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `high` |
+| `worker` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `high` |
+| `fixer` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `high` |
+| `reviewer` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra` | `high` |
+| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra` | `xhigh` |
 | `reviewer-claude` | `anthropic/claude-opus-5` | `anthropic/claude-fable-5`, then `xai/grok-4.5` | `xhigh` |
-| `oracle` | `openai-codex/gpt-5.6-sol` | `cursor/gpt-5.6-sol@272k` | `xhigh` |
-| `ui-designer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-opus-5` | `high` |
+| `oracle` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, then `cursor/gpt-5.6-sol@272k` | `xhigh` |
+| `ui-designer` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `high` |
 | `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-5` | `high` |
 
-This is not model variety for its own sake. GPT-5.6 Sol remains the quality-first research, GPT review, UI, and oracle model and the quality fallback for every Grok-backed role. The Cursor route provides the first fallback to the same Grok 4.5 model before switching model families. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Claude Opus 5 now leads diagnosis, planning, and cross-model review, where a wrong conclusion is expensive and worth its higher per-task cost. Fable 5 keeps the writing role and stays the first Anthropic fallback where Opus 5 is primary. Xhigh remains reserved for consequential research, both review gates, and oracle decisions.
+This is not model variety for its own sake. GPT-5.6 Sol remains the quality-first research, GPT review, UI, and oracle model and the quality fallback for every Grok-backed role. Every `openai-codex/gpt-5.6-sol` entry is followed immediately by `openai/gpt-5.6-sol` so a Codex-route failure stays on the same model via the OpenAI API. The Cursor route provides the first fallback to the same Grok 4.5 model before switching model families. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Claude Opus 5 now leads diagnosis, planning, and cross-model review, where a wrong conclusion is expensive and worth its higher per-task cost. Fable 5 keeps the writing role and stays the first Anthropic fallback where Opus 5 is primary. Xhigh remains reserved for consequential research, both review gates, and oracle decisions.
 
 The profile body is what `pi-subagents` passes as the role system prompt, so it contains task instructions, evidence standards, boundaries, and output expectations. Model, effort, and context stay in frontmatter; launch guidance stays in orchestration documentation instead of being narrated back to the model.
 

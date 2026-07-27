@@ -94,18 +94,18 @@ Notes:
 
 `agents/` stores the reusable source copies of the user-level subagent overrides. Model and thinking vary by role:
 
-- `scout` — `xai/grok-4.5`, thinking high, fallbacks `cursor/grok-4.5` then `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
-- `context-builder` — `xai/grok-4.5`, thinking high, fallbacks `cursor/grok-4.5` then `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; `allowSubagents: false`
-- `debugger` — `anthropic/claude-opus-5`, thinking high, fallbacks `anthropic/claude-fable-5` then `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; read-only root-cause diagnosis; `output: diagnosis.md`; `maxSubagentDepth: 0`
-- `fixer` — `xai/grok-4.5`, thinking high, fallbacks `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `anthropic/claude-opus-5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
-- `researcher` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `anthropic/claude-opus-5`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
-- `planner` — `anthropic/claude-opus-5`, thinking high, fallbacks `anthropic/claude-fable-5` then `openai-codex/gpt-5.6-sol`; `defaultContext: fresh`; `allowSubagents: false`; `output: plan.md`
-- `worker` — `xai/grok-4.5`, thinking high, fallbacks `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `anthropic/claude-opus-5`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0`
-- `reviewer` — `openai-codex/gpt-5.6-sol`, thinking high, fallbacks `cursor/gpt-5.6-sol@272k` then `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
-- `reviewer-gpt` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallbacks `cursor/gpt-5.6-sol@272k` then `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
+- `scout` — `xai/grok-4.5`, thinking high, fallbacks `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol`; `defaultContext: fresh`; `output: context.md`; `maxSubagentDepth: 0`
+- `context-builder` — `xai/grok-4.5`, thinking high, fallbacks `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol`; `defaultContext: fresh`; `allowSubagents: false`
+- `debugger` — `anthropic/claude-opus-5`, thinking high, fallbacks `anthropic/claude-fable-5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol`; `defaultContext: fresh`; read-only root-cause diagnosis; `output: diagnosis.md`; `maxSubagentDepth: 0`
+- `fixer` — `xai/grok-4.5`, thinking high, fallbacks `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5`; `defaultContext: fresh`; bounded remediation from an explicit fix list; `maxSubagentDepth: 0`
+- `researcher` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallbacks `openai/gpt-5.6-sol` then `anthropic/claude-opus-5`; `defaultContext: fresh`; `output: research.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
+- `planner` — `anthropic/claude-opus-5`, thinking high, fallbacks `anthropic/claude-fable-5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol`; `defaultContext: fresh`; `allowSubagents: false`; `output: plan.md`
+- `worker` — `xai/grok-4.5`, thinking high, fallbacks `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5`; `defaultContext: fresh`; `allowSubagents: false`; `maxSubagentDepth: 0`
+- `reviewer` — `openai-codex/gpt-5.6-sol`, thinking high, fallbacks `openai/gpt-5.6-sol`, `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
+- `reviewer-gpt` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallbacks `openai/gpt-5.6-sol`, `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
 - `reviewer-claude` — `anthropic/claude-opus-5`, thinking xhigh, fallbacks `anthropic/claude-fable-5` then `xai/grok-4.5`; `defaultContext: fresh`; `output: false`; `allowSubagents: false`
-- `oracle` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallback `cursor/gpt-5.6-sol@272k` only, because forked Pi transcript context rules out an Anthropic route; `defaultContext: fork`; `maxSubagentDepth: 0`
-- `ui-designer` — `openai-codex/gpt-5.6-sol`, thinking high, fallback `anthropic/claude-opus-5`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
+- `oracle` — `openai-codex/gpt-5.6-sol`, thinking xhigh, fallbacks `openai/gpt-5.6-sol` then `cursor/gpt-5.6-sol@272k`, because forked Pi transcript context rules out an Anthropic route; `defaultContext: fork`; `maxSubagentDepth: 0`
+- `ui-designer` — `openai-codex/gpt-5.6-sol`, thinking high, fallbacks `openai/gpt-5.6-sol` then `anthropic/claude-opus-5`; `defaultContext: fresh`; `output: false`; `maxSubagentDepth: 0`
 - `writer` — `anthropic/claude-fable-5`, thinking high, fallback `anthropic/claude-opus-5`; `defaultContext: fresh`; `output: draft.md`; `defaultProgress: false`; `maxSubagentDepth: 0`
 
 Most names intentionally match builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly; `debugger`, `reviewer-claude`, `reviewer-gpt`, `ui-designer`, and `writer` are added specialists. Agent **model**, **thinking**, **inherit***, **defaultContext**, etc. live **only** in `agents/*.md` frontmatter—no duplicate `subagents.agentOverrides` in `settings.json`, so this repo stays the single source of truth after sync.
@@ -114,13 +114,13 @@ Frontmatter owns runtime policy. Each model-facing body stays focused on the rol
 
 Model policy:
 
-- `xai/grok-4.5` at high effort is the fast/value primary for `scout`, `context-builder`, `fixer`, and `worker`; all four fall back first to `cursor/grok-4.5`, then `openai-codex/gpt-5.6-sol`, while `fixer` and `worker` retain `anthropic/claude-opus-5` as their third fallback. Grok stays primary in these roles because it matches Opus 5 high's CursorBench score at roughly a third of the cost.
-- `openai-codex/gpt-5.6-sol` remains primary for research, GPT review, UI, and oracle work, the quality fallback for every Grok-backed role, and the cross-provider fallback for `debugger` and `planner`.
+- `xai/grok-4.5` at high effort is the fast/value primary for `scout`, `context-builder`, `fixer`, and `worker`; all four fall back first to `cursor/grok-4.5`, then `openai-codex/gpt-5.6-sol` with immediate `openai/gpt-5.6-sol`, while `fixer` and `worker` retain `anthropic/claude-opus-5` as their final fallback. Grok stays primary in these roles because it matches Opus 5 high's CursorBench score at roughly a third of the cost.
+- `openai-codex/gpt-5.6-sol` remains primary for research, GPT review, UI, and oracle work, the quality fallback for every Grok-backed role, and the cross-provider fallback for `debugger` and `planner`. Every `openai-codex/gpt-5.6-sol` entry is followed immediately by `openai/gpt-5.6-sol` so a Codex-route failure stays on the same model via the OpenAI API.
 - Effort is high for Grok-backed and routine specialist work; xhigh is reserved for consequential research, both reviewer gates, and oracle decisions.
 - `anthropic/claude-opus-5` is the primary for `debugger`, `planner`, and `reviewer-claude`, and the Anthropic fallback for `fixer`, `researcher`, `ui-designer`, and `worker`. It beats Fable 5 on both CursorBench score and cost at every effort level these overrides use.
 - `anthropic/claude-fable-5` is the `writer` primary because it leads the Artificial Analysis writing benchmark, and it stays the first fallback for `debugger`, `planner`, and `reviewer-claude`.
 - The Anthropic provider differs per machine: this work machine uses Pi's `anthropic` provider, while the personal machine uses the `claude-code` provider. Only the `claude-code` route carries the fork-transcript restriction below.
-- `reviewer` and `reviewer-gpt` fall back to `cursor/gpt-5.6-sol@272k` and then `openai-codex/gpt-5.6-terra`, so a provider-level Codex failure keeps full Sol quality before dropping to Terra. `oracle` uses the same Cursor route as its only fallback because it is fork-context and must stay non-Anthropic.
+- `reviewer` and `reviewer-gpt` fall back to `openai/gpt-5.6-sol`, then `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra`, so a Codex-route failure keeps full Sol quality before dropping to Terra. `oracle` uses `openai/gpt-5.6-sol` then the same Cursor route because it is fork-context and must stay non-Anthropic.
 - Use configured model and thinking defaults unless a concrete routing, provider-capability, model-diversity, or cost requirement justifies an override.
 - Do not use the `claude-code` provider as primary or fallback routing for forked invocations; use fresh context with a compact handoff because Claude Code cannot import a Pi fork transcript. This constrains `oracle`, the only fork-context override.
 - Grok primaries use Pi's built-in xAI provider; authenticate with `/login xai` using a Grok/X subscription or xAI API key. The `cursor/grok-4.5` fallback requires the separately installed `pi-cursor-sdk` package and a Cursor SDK API key. Use planner/oracle for role and context isolation, not routine extra thinking.
