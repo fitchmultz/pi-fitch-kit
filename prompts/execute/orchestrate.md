@@ -47,8 +47,8 @@ Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`.
 - `worker`: generic execution, implementation, or multi-file changes.
 - `fixer`: bounded remediation from explicit findings only.
 - `reviewer`: GPT-backed general reviewer for routine checks.
-- `reviewer-claude`: Claude-backed independent cross-model review for hidden assumptions, edge cases, and product risk; pair with `reviewer-gpt` for every review gate.
-- `reviewer-gpt`: GPT-backed strict maintainability and correctness gate; pair with `reviewer-claude` for every review gate.
+- `reviewer-claude`: Claude-backed independent cross-model review for hidden assumptions, edge cases, and product risk; add alongside `reviewer-gpt` only when a change warrants cross-model coverage.
+- `reviewer-gpt`: GPT-backed strict maintainability and correctness gate; the default review gate.
 - `ui-designer`: rendered UI/UX, visual hierarchy, accessibility, responsive layout, and polish.
 - `writer`: human-facing documentation, guides, announcements, and polished copy.
 - `oracle`: second opinion, drift check, or high-level design critique.
@@ -142,11 +142,11 @@ For each completed item:
 Do not trust child summaries blindly. Subagent output is evidence, not proof.
 
 ## Phase 7: Review loop when warranted
-Launch fresh `reviewer-gpt` and `reviewer-claude` Pi subagents together with `async: true`; never substitute an inline self-review. GPT owns structure, maintainability, and correctness. Claude owns hidden assumptions, edge cases, and product risk. Track both run IDs and inspect both results.
+Launch a fresh `reviewer-gpt` Pi subagent with `async: true`; never substitute an inline self-review. Track the run ID and inspect the result. Add `reviewer-claude` for cross-model coverage of hidden assumptions, edge cases, and product risk only when the change warrants it.
 
 Use `ui-designer` for browser-visible UI/design changes, before or after implementation as appropriate. Require rendered evidence for UI work; code review alone is not enough.
 
-Fix every blocker, nit, and other actionable finding, rerun affected validation, then relaunch both reviewers together in async mode. Repeat until both accept the current state. A failed, timed-out, stale, or incomplete review is not sign-off.
+Fix every blocking finding, plus every non-blocking one whose fix is small and low risk; file the rest as follow-ups. Rerun affected validation, then relaunch the reviewer in async mode. Repeat until it reports no blocking finding. A failed, timed-out, stale, or incomplete review is not sign-off.
 
 ## Phase 8: Final rollup
 Before claiming done:

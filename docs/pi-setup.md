@@ -73,11 +73,11 @@ The deterministic calculator handles arithmetic instead of leaving it to model i
 
 ### 6. Fresh reviewers challenge the result
 
-Independent review runs after implementation and validation when the workflow requires a review gate. I launch fresh `reviewer-gpt` and `reviewer-claude` Pi subagents together in async mode. GPT checks structure, maintainability, and correctness; Claude challenges hidden assumptions, edge cases, and product risk. Every blocker, nit, and actionable finding is fixed before both reviewers rerun.
+Independent review runs after implementation and validation when the workflow requires a review gate. I launch a fresh `reviewer-gpt` Pi subagent in async mode to check structure, maintainability, and correctness. `reviewer-claude` challenges hidden assumptions, edge cases, and product risk from a different model family, and it joins the gate when a change warrants cross-model coverage; the `hard-review` command always runs both. Blocking findings are fixed before the reviewer reruns, cheap non-blocking ones are fixed in place, and the rest become follow-ups.
 
 The fresh context is deliberate. A reviewer that inherits the implementation conversation also inherits the story the implementer built about why the change is correct. A fresh reviewer has to reconstruct the reasoning from the requirements, diff, tests, and current files.
 
-`/hard-review` runs both reviewers for the strict gate. Every PR runs both before it is ready to ship; local non-PR work only needs a formal review when the workflow or risk requires one. I still stop before merge unless I explicitly authorized it.
+`/hard-review` runs both reviewers for the strict gate. Every PR runs `reviewer-gpt` before it is ready to ship, and pulls in `reviewer-claude` when the change warrants a second model; local non-PR work only needs a formal review when the workflow or risk requires one. I still stop before merge unless I explicitly authorized it.
 
 ### 7. The main session closes the loop
 

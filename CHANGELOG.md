@@ -1,5 +1,12 @@
 # Changelog
 
+## Single-reviewer default gate — 26 July 2026
+
+- Made `reviewer-gpt` the default review gate. `reviewer-claude` is no longer required on every gate and joins only when a change warrants cross-model coverage.
+- Kept `/hard-review` as the explicit dual-reviewer command, so the Claude cross-model challenge is still one command away rather than removed.
+- Updated `orchestrate` phase 7, the `orchestrate` agent roster, and `fix-issues` step 5, which all hard-coded launching both reviewers and tracking both run IDs.
+- Replaced the stale "remediate every finding, including maintainability, naming, and polish" wording in `orchestrate` and `fix-issues` with the blocking-first disposition rule, since those two prompts still carried the churn-inducing bar that the reviewer profiles had already moved past.
+
 ## Convergent reviewer loop — 26 July 2026
 
 - Gave every finding a `blocks|fix-if-cheap|follow-up` disposition alongside its severity in `reviewer`, `reviewer-gpt`, and `reviewer-claude`. The four-level severity scale was previously decorative because any finding at any level blocked acceptance, which made the review loop non-terminating on large diffs.
