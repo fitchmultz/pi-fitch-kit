@@ -25,7 +25,7 @@ Once pi opens, run `/login` and pick a provider.
 
 **2. Fresh subagents.** Instead of one agent carrying a giant conversation until it gets dumb, I hand clean briefs to child agents. A scout maps the relevant code. A debugger proves a root cause before remediation. A worker implements a bounded task. A fresh reviewer tries to prove the result wrong. A writer handles polished human-facing copy. Think of it like giving a teammate a tight one-pager instead of forwarding a 400-message Slack thread.
 
-Diagnosis, planning, research, and the GPT review gates use GPT-5.6 Sol. The speed-sensitive scout, context-builder, fixer, and worker use `xai/grok-4.5` at high effort, falling back through `cursor/grok-4.5` before Sol. Claude Fable 5 handles writing, cross-model review, security review, and UI review, with Opus 5 behind it. The value still comes from clean context and a clear job, not pretending each agent has a personality.
+Diagnosis, planning, research, and the GPT review gates use GPT-5.6 Sol. The speed-sensitive scout, context-builder, fixer, and worker use `xai/grok-4.5` at high effort, falling back through `cursor/grok-4.5` before Sol. Claude Fable 5 handles writing, cross-model review, security review, and UI review. The value still comes from clean context and a clear job, not pretending each agent has a personality.
 
 Grok earned a real role here because it is both fast and strong: CursorBench reports 66.7% at $1.51/task, and the separate Artificial Analysis snapshot reports 88 tok/s and 16.3 seconds end to end. Cursor disclosed benchmark contamination for Grok, so I discount that exact 66.7% rank rather than ignore the independently corroborated speed and cost advantage.
 
@@ -73,7 +73,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-`/fitch-setup` reads the kit's pinned manifest, shows you one preview of every package it would install and every file it would touch, and asks which parts you want: the full agent bench, the prompts, the working-agreement template, integrations, trust posture. It installs exact pinned versions, never reads or copies credentials, and stops wherever a login or a real decision is needed. `/fitch-setup verify` checks an existing install for drift without changing anything.
+Installing the kit already gives you its bundled pieces on reload: the prompt library and the agent bench. `/fitch-setup` then reads the kit's pinned manifest, shows you one preview of every further package it would install and every file it would touch, and asks which parts you want: the working-agreement template, the pinned tool packages, integrations, trust posture. It installs exact pinned versions, never reads or copies credentials, and stops wherever a login or a real decision is needed. `/fitch-setup verify` checks an existing install for drift without changing anything.
 
 I used to keep a giant paste-in bootstrap prompt here. The manifest replaced it, because a pasted prompt can drift from reality and a checked manifest cannot.
 

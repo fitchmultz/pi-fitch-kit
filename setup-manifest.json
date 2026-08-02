@@ -11,16 +11,17 @@
   "requiredModels": [
     "xai/grok-4.5",
     "openai-codex/gpt-5.6-sol",
-    "openai/gpt-5.6-sol",
     "openai-codex/gpt-5.6-terra",
     "openai-codex/gpt-5.6-luna",
     "anthropic/claude-fable-5",
     "anthropic/claude-opus-5"
   ],
   "optionalModels": [
+    "openai/gpt-5.6-sol",
     "cursor/grok-4.5",
     "cursor/gpt-5.6-sol@272k"
   ],
+  "optionalModelsNote": "Fallback-only routes. openai/gpt-5.6-sol needs an OpenAI API key; the cursor/* routes need the pi-cursor-sdk package and a Cursor SDK API key. Missing them only removes those fallbacks.",
   "kitResources": {
     "extensions": ["extensions/sync-agents.ts"],
     "prompt": "prompts/fitch-setup.md",
@@ -119,6 +120,8 @@
     "Slack",
     "GitHub",
     "Horizon",
+    "Plain",
+    "Granola",
     "Notion",
     "Cloudflare",
     "Sentry",

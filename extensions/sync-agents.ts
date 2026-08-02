@@ -38,9 +38,17 @@ function syncAgents(): { linked: number; removed: number; skipped: number } {
     const source = join(sourceDir, name);
     const target = join(targetDir, basename(name));
 
-    if (existsSync(target)) {
-      const stat = lstatSync(target);
-      if (!stat.isSymbolicLink()) {
+    // lstat, not existsSync: existsSync follows symlinks, so a dangling link
+    // would look absent and the create below would throw EEXIST.
+    let existing;
+    try {
+      existing = lstatSync(target);
+    } catch {
+      existing = undefined;
+    }
+
+    if (existing) {
+      if (!existing.isSymbolicLink()) {
         skipped += 1;
         continue;
       }
@@ -49,6 +57,14 @@ function syncAgents(): { linked: number; removed: number; skipped: number } {
         linked += 1;
         continue;
       }
+      if (!current.startsWith(`${sourceDir}${sep}`)) {
+        // Foreign symlink: the user pointed this name somewhere else on
+        // purpose. Preserve it; this sync only manages its own links.
+        skipped += 1;
+        continue;
+      }
+      // Our own link to a renamed or removed source (possibly dangling):
+      // safe to repair because we created it.
       unlinkSync(target);
     }
 
@@ -64,7 +80,7 @@ export default function fitchKit(pi: ExtensionAPI) {
     const result = syncAgents();
     if (result.skipped > 0 && ctx.hasUI) {
       ctx.ui.notify(
-        `pi-fitch-kit synced ${result.linked} agent symlink(s), removed ${result.removed} stale symlink(s); skipped ${result.skipped} non-symlink target(s) in ${targetDir}`,
+        `pi-fitch-kit synced ${result.linked} agent symlink(s), removed ${result.removed} stale symlink(s); left ${result.skipped} non-symlink or foreign target(s) alone in ${targetDir}`,
         "warning",
       );
     }

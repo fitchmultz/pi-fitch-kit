@@ -34,7 +34,17 @@ count=0
 skipped=0
 for f in "$ROOT"/agents/*.md "$ROOT"/agents/*.chain.md; do
   target="$DST/$(basename "$f")"
-  if [[ -e "$target" && ! -L "$target" ]]; then
+  if [[ -L "$target" ]]; then
+    link="$(readlink "$target")"
+    case "$link" in
+      "$ROOT"/agents/*) ;;
+      *)
+        printf 'skipped foreign symlink %s -> %s\n' "$target" "$link"
+        skipped=$((skipped + 1))
+        continue
+        ;;
+    esac
+  elif [[ -e "$target" ]]; then
     printf 'skipped existing non-symlink %s\n' "$target"
     skipped=$((skipped + 1))
     continue

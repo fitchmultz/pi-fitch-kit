@@ -42,9 +42,44 @@ try {
     }
   }
 
+  // Symlink safety cases the extension must honor on resync:
+  // a foreign symlink is preserved, a dangling foreign symlink is preserved
+  // without throwing, and a dangling owned symlink is repaired.
+  const { symlinkSync, unlinkSync } = await import("node:fs");
+  const foreignSource = join(agentDir, "foreign-reviewer.md");
+  writeFileSync(foreignSource, "user-owned reviewer\n", "utf-8");
+  const foreignLink = join(syncedDir, "reviewer.md");
+  unlinkSync(foreignLink);
+  symlinkSync(foreignSource, foreignLink);
+
+  const danglingForeignLink = join(syncedDir, "writer.md");
+  unlinkSync(danglingForeignLink);
+  symlinkSync(join(agentDir, "missing-user-file.md"), danglingForeignLink);
+
+  const danglingOwnedLink = join(syncedDir, "scout.md");
+  const ownedTarget = resolve(dirname(readlinkSync(join(syncedDir, "oracle.md"))), "renamed-away.md");
+  unlinkSync(danglingOwnedLink);
+  symlinkSync(ownedTarget, danglingOwnedLink);
+
+  await sessionStart({}, { hasUI: false, ui: { notify: () => {} } });
+
+  if (resolve(dirname(foreignLink), readlinkSync(foreignLink)) !== foreignSource) {
+    throw new Error("Resync replaced a foreign symlink it does not own");
+  }
+  if (readlinkSync(danglingForeignLink) !== join(agentDir, "missing-user-file.md")) {
+    throw new Error("Resync replaced a dangling foreign symlink");
+  }
+  const repaired = resolve(dirname(danglingOwnedLink), readlinkSync(danglingOwnedLink));
+  if (!repaired.endsWith("/pi-fitch-kit/agents/scout.md")) {
+    throw new Error(`Resync did not repair a dangling owned symlink: ${repaired}`);
+  }
+
   const conflictPath = join(syncedDir, "worker.md");
   rmSync(conflictPath, { force: true });
   writeFileSync(conflictPath, "local override\n", "utf-8");
+  const bashForeignLink = join(syncedDir, "planner.md");
+  unlinkSync(bashForeignLink);
+  symlinkSync(foreignSource, bashForeignLink);
   const sync = spawnSync("bash", [join(__dirname, "sync-agents.sh")], {
     env: { ...process.env, PI_CODING_AGENT_DIR: agentDir },
     encoding: "utf-8",
@@ -52,6 +87,9 @@ try {
   if (sync.status !== 0) throw new Error(`Manual sync failed: ${sync.stderr || sync.stdout}`);
   if (lstatSync(conflictPath).isSymbolicLink() || readFileSync(conflictPath, "utf-8") !== "local override\n") {
     throw new Error("Manual sync overwrote an existing non-symlink agent file");
+  }
+  if (resolve(dirname(bashForeignLink), readlinkSync(bashForeignLink)) !== foreignSource) {
+    throw new Error("Manual sync replaced a foreign symlink it does not own");
   }
 
   // Manifest consistency: the setup prompt treats setup-manifest.json as the

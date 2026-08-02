@@ -18,13 +18,13 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-`/fitch-setup` reads [setup-manifest.json](setup-manifest.json), the machine-readable source of truth for exact package pins, required model routes, and kit resources. It previews everything before writing, asks which parts you want, and never touches credentials. `/fitch-setup verify` reports drift without changing anything. It exists because "copy my setup" should not mean an agent improvising from prose: the manifest is checkable, the prose is not.
+Installing the kit is itself the first choice: the prompt library loads with the package, and the agent bench links on reload. `/fitch-setup` then drives everything beyond that from [setup-manifest.json](setup-manifest.json), the machine-readable source of truth for exact package pins, required model routes, and kit resources. It previews before writing, asks which parts you want, and never touches credentials. `/fitch-setup verify` reports drift without changing anything. It exists because "copy my setup" should not mean an agent improvising from prose: the manifest is checkable, the prose is not.
 
 ## What this repo does
 
 - Keeps reusable prompt templates in one package repo, loaded recursively through `package.json#pi.prompts`.
 - Keeps the user-level subagent profiles in `agents/` as the single source of truth.
-- Bundles `extensions/sync-agents.ts`, which symlinks those profiles into `~/.pi/agent/agents/` on Pi startup/reload, so editing this repo edits the live bench. The sync is add-and-relink only for its own links and never replaces a file it does not own.
+- Bundles `extensions/sync-agents.ts`, which symlinks those profiles into `~/.pi/agent/agents/` on Pi startup/reload, so editing this repo edits the live bench. The sync manages only its own links: it never replaces a regular file or a symlink pointing anywhere else, so you can opt out of any bundled profile by putting your own file at that name.
 - Pins per-role model, fallback, and thinking policy in `agents/*.md` frontmatter; no duplicate overrides in `settings.json`.
 - Ships the setup entry point (`prompts/fitch-setup.md`), the pin manifest (`setup-manifest.json`), and a working-agreement template (`templates/working-agreement.md`).
 
@@ -37,7 +37,8 @@ pi-fitch-kit/
   LICENSE
   prompts/
     fitch-setup.md
-    audit/        precommit-review, repo-audit, extension-audit, github-open-issues-prs
+    audit/        precommit-review, repo-audit, extension-audit,
+                  extract-process-improvements, github-open-issues-prs
     execute/      debug-mode, fix-issues, mine-workflows, optimize-skill, orchestrate,
                   resolve-findings, triage-first
     review/       fresh-review, hard-review
@@ -62,7 +63,7 @@ pi-fitch-kit/
 
 ## Prompts
 
-Prompt filenames are the slash-command names: `/fitch-setup`, `/precommit-review`, `/repo-audit`, `/extension-audit`, `/github-open-issues-prs`, `/debug-mode`, `/fix-issues`, `/mine-workflows`, `/optimize-skill`, `/orchestrate`, `/resolve-findings`, `/triage-first`, `/fresh-review`, `/hard-review`, and `/manual-qa`.
+Prompt filenames are the slash-command names: `/fitch-setup`, `/precommit-review`, `/repo-audit`, `/extension-audit`, `/extract-process-improvements`, `/github-open-issues-prs`, `/debug-mode`, `/fix-issues`, `/mine-workflows`, `/optimize-skill`, `/orchestrate`, `/resolve-findings`, `/triage-first`, `/fresh-review`, `/hard-review`, and `/manual-qa`.
 
 Notes:
 
@@ -73,14 +74,14 @@ Notes:
 
 ## Agents
 
-`agents/` stores the fourteen specialist profiles. The exact per-role model, fallback, and thinking mapping lives in each file's frontmatter and is tabulated in [docs/pi-setup.md](docs/pi-setup.md); `npm run check` fails if a profile uses a model the manifest does not list, so the two cannot silently drift. Most names intentionally match builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly; `debugger`, `reviewer-claude`, `reviewer-gpt`, `reviewer-security`, `ui-designer`, and `writer` are added specialists.
+`agents/` stores the fourteen specialist profiles. The exact per-role model, fallback, and thinking mapping lives in each file's frontmatter and is tabulated in [docs/pi-setup.md](docs/pi-setup.md); `npm run check` fails if a profile uses a model route the manifest does not list, so the routes cannot silently drift; order and effort still live in the frontmatter alone. Most names intentionally match builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly; `debugger`, `reviewer-claude`, `reviewer-gpt`, `reviewer-security`, `ui-designer`, and `writer` are added specialists.
 
 Frontmatter owns runtime policy. Each model-facing body stays focused on the role's work, evidence standard, boundaries, and output rather than explaining model or launch configuration, because narrating configuration back to the model wastes prompt budget without changing behavior.
 
 Model policy, and why:
 
 - `xai/grok-4.5` at high effort is the primary for `scout`, `context-builder`, `fixer`, and `worker`. These roles run under a smart parent that checks their output, so elapsed time matters more than the last few points of quality, and Grok matches Opus 5 high's CursorBench score at roughly a third of the cost. All four fall back first to `cursor/grok-4.5` (same model, different provider), then to Sol; `fixer` and `worker` keep `anthropic/claude-opus-5` as a final fallback because unattended implementation should degrade to a stronger model, not a cheaper one.
-- `openai-codex/gpt-5.6-sol` is the primary for `debugger`, `researcher`, `planner`, `reviewer`, `reviewer-gpt`, and `oracle`, and the quality fallback for every Grok-backed role. Every `openai-codex/gpt-5.6-sol` entry is followed immediately by `openai/gpt-5.6-sol` so a Codex-route failure stays on the same model through the OpenAI API instead of switching families mid-task.
+- `openai-codex/gpt-5.6-sol` is the primary for `debugger`, `researcher`, `planner`, `reviewer`, `reviewer-gpt`, and `oracle`, and the quality fallback for every Grok-backed role. Every Sol-primary role keeps `openai/gpt-5.6-sol` in its fallback chain so a Codex-route failure can reach the same model through the OpenAI API instead of losing it entirely; that route needs an OpenAI API key and is optional.
 - `anthropic/claude-fable-5` is the primary for `writer` (it leads the Artificial Analysis writing benchmark), and for `reviewer-claude`, `reviewer-security`, and `ui-designer`, where the point is an independent second model family reading the same evidence. `anthropic/claude-opus-5` sits directly behind it on `writer`, `reviewer-claude`, and `ui-designer`.
 - Thinking is `high` for speed-sensitive and routine specialist work; `xhigh` is reserved for the roles where a wrong conclusion is expensive: consequential research, planning, the strict review gates, security review, UI review, and oracle decisions.
 - `reviewer` and `reviewer-gpt` fall back through `openai/gpt-5.6-sol`, then `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra`, keeping full Sol quality through two providers before dropping to Terra.

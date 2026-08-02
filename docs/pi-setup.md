@@ -184,7 +184,7 @@ The specialist mappings are explicit:
 | `ui-designer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `xhigh` |
 | `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-5` | `high` |
 
-This is not model variety for its own sake. GPT-5.6 Sol carries diagnosis, planning, research, GPT review, and oracle work, and it is the quality fallback for every Grok-backed role. Every `openai-codex/gpt-5.6-sol` entry is followed by `openai/gpt-5.6-sol` so a Codex-route failure stays on the same model via the OpenAI API. The Cursor route provides the first fallback to the same Grok 4.5 model before switching model families. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Opus 5 is the main session model, where a wrong conclusion is expensive and worth its higher per-task cost. Fable 5 leads writing, cross-model review, security review, and UI review. Xhigh is reserved for consequential research, planning, the strict review gates, UI review, and oracle decisions.
+This is not model variety for its own sake. GPT-5.6 Sol carries diagnosis, planning, research, GPT review, and oracle work, and it is the quality fallback for every Grok-backed role. Every Sol-primary role keeps `openai/gpt-5.6-sol` in its fallback chain so a Codex-route failure can reach the same model through the OpenAI API. The Cursor route provides the first fallback to the same Grok 4.5 model before switching model families. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Opus 5 is the main session model, where a wrong conclusion is expensive and worth its higher per-task cost. Fable 5 leads writing, cross-model review, security review, and UI review. Xhigh is reserved for consequential research, planning, the strict review gates, UI review, and oracle decisions.
 
 The profile body is what `pi-subagents` passes as the role system prompt, so it contains task instructions, evidence standards, boundaries, and output expectations. Model, effort, and context stay in frontmatter; launch guidance stays in orchestration documentation instead of being narrated back to the model.
 
@@ -196,7 +196,7 @@ Pi exposes `xai/grok-4.5` through its built-in xAI provider. Authenticate with `
 
 A faithful installer should use these exact current mappings, show them before writing configuration, and stop with a precise missing-model list if a required route is unavailable. It should not silently substitute a model that happens to look similar.
 
-For the full setup, a teammate needs ChatGPT Plus or Pro with Codex authentication, Claude Pro or Max authentication, xAI authentication, and a Cursor SDK API key. Pi's Claude subscription route uses Anthropic extra usage, which may be billed per token rather than drawn from the normal plan limit.
+For the full setup, a teammate needs ChatGPT Plus or Pro with Codex authentication, Claude Pro or Max authentication, and xAI authentication. Two optional keys deepen the fallbacks: an OpenAI API key keeps Sol reachable if the Codex route fails, and a Cursor SDK API key adds the `cursor/*` routes. Pi's Claude subscription route uses Anthropic extra usage, which may be billed per token rather than drawn from the normal plan limit.
 
 ### Sessions and small friction reducers
 
@@ -263,7 +263,7 @@ The important contrast is between main-session edits and delegated implementatio
 
 The sample also shows why I consider browser work, repository search, connected services, goal state, and stash part of the real setup rather than demo features.
 
-Workflow prompt templates did not show the same pattern, so I am not putting my existing prompt library in the recommended default. The public kit needs one setup entry point, not a catalog of commands I rarely invoke.
+Workflow prompt templates did not show the same pattern. They still ship with the kit because they live in the same package, but the setup story is one entry point; the rarely used commands just sit in autocomplete until wanted.
 
 ## What I would recommend to a WorkOS teammate
 
@@ -274,12 +274,14 @@ The installer should offer two paths:
 
 The complete core includes:
 
-- the working-agreement template and nested project instructions;
-- the full specialist bench and curated skill catalog;
+- the working-agreement template;
+- the full specialist bench and prompt library, which arrive with the kit itself;
 - the exact OpenAI, Anthropic, xAI, and Cursor role mappings with explicit Cursor and Sol fallbacks;
-- FFF, Agent Browser, Macuse, MCP, subagents, Intercom, Apply Edits, calculator, structured questions, and Ponytail;
-- goal, stash, todo list, session naming, verbosity, duration, session-editing, message-copying, Codex priority, and custom compaction tools;
+- FFF, Agent Browser, MCP, subagents, Intercom, Apply Edits, structured questions, todo list, session naming, goal, stash, verbosity, duration, session editing, message copying, Ponytail, and the Cursor SDK route;
+- offers to build the calculator, nested-instruction, Codex priority, and custom compaction equivalents you approve;
 - harmless validation for every installed capability.
+
+My skills live in `~/.agents/skills` and are not part of the kit; the setup preserves whatever skill library you already have instead of imposing mine.
 
 The following remain explicit choices:
 
@@ -291,7 +293,7 @@ The following remain explicit choices:
 
 The public [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) repository is that package. It carries the fourteen specialist profiles with their exact model, effort, context, and delegation policies, the prompt library, a small extension that symlinks the profiles into place on startup, and the setup path: a `/fitch-setup` entry point plus a `setup-manifest.json` that pins every dependency to an exact npm version or Git commit.
 
-The manifest exists because "copy my setup" should not mean an agent improvising from prose. Prose drifts; a manifest can be checked. The kit's own validation fails if the profiles, the manifest, and the setup prompt disagree, which is what keeps this guide and the installable thing from quietly diverging again.
+The manifest exists because "copy my setup" should not mean an agent improvising from prose. Prose drifts; a manifest can be checked. The kit's own validation fails if a profile uses a model route the manifest does not list, if a pinned resource goes missing, or if the setup prompt's profile count drifts. Prose can still lag; the frontmatter and the manifest are the authority.
 
 The rules `/fitch-setup` works under:
 
@@ -315,9 +317,9 @@ My small local extensions, the deterministic calculator, the nested-instruction 
 
 1. Install the supported Node.js and pi versions.
 2. Start pi.
-3. Authenticate ChatGPT/Codex, Claude, and xAI through `/login`. The Cursor SDK API key is optional and only feeds the `cursor/*` fallback routes.
-4. `pi install git:github.com/fitchmultz/pi-fitch-kit`, then `/reload`.
-5. Run `/fitch-setup`.
+3. Authenticate ChatGPT/Codex, Claude, and xAI through `/login`. An OpenAI API key and a Cursor SDK API key are optional and only feed fallback routes.
+4. `pi install git:github.com/fitchmultz/pi-fitch-kit`, then `/reload`. Installing the kit is consent for its bundled pieces: the prompt library loads with the package and the agent bench links on reload.
+5. Run `/fitch-setup` for everything beyond that.
 6. Choose the complete core or individual components, integrations, process rules, and trust posture.
 7. Review the single preview of every install command, file change, and model mapping.
 8. Apply, reload, and let it run the smoke checks.
