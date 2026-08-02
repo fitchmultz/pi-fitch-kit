@@ -4,7 +4,7 @@ description: Evidence-driven technical researcher for consequential decisions
 model: openai-codex/gpt-5.6-sol
 fallbackModels: openai/gpt-5.6-sol, anthropic/claude-opus-5
 thinking: xhigh
-systemPromptMode: append
+systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh

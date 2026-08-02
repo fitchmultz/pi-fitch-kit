@@ -4,7 +4,7 @@ description: Security and data-safety reviewer for changed code, dependencies, a
 model: openai-codex/gpt-5.6-sol
 fallbackModels: xai/grok-4.5, openai-codex/gpt-5.6-sol
 thinking: xhigh
-systemPromptMode: append
+systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh

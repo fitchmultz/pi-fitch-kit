@@ -4,7 +4,7 @@ description: High-context decision-consistency oracle that protects inherited st
 model: openai-codex/gpt-5.6-sol
 fallbackModels: openai/gpt-5.6-sol, cursor/gpt-5.6-sol@272k
 thinking: xhigh
-systemPromptMode: append
+systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fork

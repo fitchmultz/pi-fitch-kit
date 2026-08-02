@@ -4,7 +4,7 @@ description: Independent cross-model reviewer for assumptions, edge cases, and p
 model: anthropic/claude-fable-5
 fallbackModels: anthropic/claude-opus-5, xai/grok-4.5
 thinking: xhigh
-systemPromptMode: append
+systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh
