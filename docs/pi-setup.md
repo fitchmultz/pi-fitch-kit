@@ -1,6 +1,6 @@
 # How I actually use pi at WorkOS
 
-_Last updated July 24, 2026. This reflects my live pi 0.82.0 setup and an eight-day sample of how I used it._
+_Last updated August 1, 2026. This reflects my live pi 0.83.0 setup. The usage numbers near the end are still the July 8 through July 15 sample and have not been recounted._
 
 I wrote this for a WorkOS engineer who is new to pi.
 
@@ -113,7 +113,7 @@ These process rules are part of explaining my workflow, but the installer should
 | FFF | Fast repository file and content search |
 | MCP | Typed access to Linear, Slack, Horizon, Notion, Cloudflare, and other approved services |
 | Agent Browser | Current documentation, browser-visible verification, dashboards, and screenshots |
-| Macuse | Native macOS app inspection and control when browser DOM or CLI tools are insufficient |
+| Macuse | Native macOS app inspection and control when browser DOM or CLI tools are insufficient (private repository) |
 | Apply Edits | Default file mutation tool, replacing Pi's built-in `edit` and `write` tools |
 | `pi-subagents` | Fresh specialist sessions, parallel work, isolated worktrees, and review artifacts |
 | `pi-intercom` | Coordination between separate local pi sessions |
@@ -121,6 +121,9 @@ These process rules are part of explaining my workflow, but the installer should
 | Ask Question | Structured input when a user-owned decision is genuinely required |
 | Ponytail | Always-on pressure toward existing helpers, standard-library features, deletion, and the smallest root-cause fix |
 | Cursor SDK | Supplies the `cursor/grok-4.5` first fallback for Grok-backed agents |
+| Todo List | Nested task list that survives context compaction on multi-step work |
+| Session Name | Names each session so past work stays searchable |
+| PR Hawk | Watches my open pull requests and reports what needs attention (private repository) |
 
 `pi-apply-edits` exposes `apply_edits` as the one active mutation tool and removes Pi's built-in `edit` and `write` tools before the first model turn. It supports exact edits, whole-file rewrites, and plan-first multi-file batches; the built-ins remain available through an explicit session opt-in and should stay enabled on platforms where existing-file replacement is unsupported.
 
@@ -132,12 +135,12 @@ The `fitchmultz` Git forks of `pi-subagents` and `pi-intercom` are intentional. 
 
 `~/.agents/skills` is the source of truth for my user-authored skills. The current automatically matched set is:
 
-- `agent-skill-engineering`, `ask-clarifying-questions`, `comprehensive-codebase-audit`, `crabbox-platform-testing`, `deslop`, `dogfood`, `external-repo-integration`, and `handoff`;
-- `peekaboo`, `pi-extension-development`, `platform-validation`, `root-cause-triage`, `ssh-unix-ops`, `tdd`, `thermo-nuclear-code-quality-review`, and `verification-before-completion`.
+- `ask-clarifying-questions`, `deslop`, `diagram-creation`, `dogfood`, `external-repo-integration`, and `handoff`;
+- `pi-extension-development`, `propose-then-ship-pi`, `root-cause-triage`, `ssh-unix-ops`, `tdd`, `thermo-nuclear-code-quality-review`, and `verification-before-completion`.
 
 Package skills add `pi-subagents`, `pi-intercom`, `macuse`, `ponytail`, `ponytail-review`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, and `ponytail-help`. Pi keeps only skill names and descriptions in the base prompt, then loads a full `SKILL.md` when the task matches.
 
-`collaborative-coding`, `cueloop`, `gogcli`, `pdf`, `readme-great-demo`, `slides`, `weekly-review`, and `workflow-from-chats` remain installed but are excluded from normal Pi discovery. `bro` is explicit-only through `disable-model-invocation`. This keeps the default catalog focused without deleting occasional workflows.
+`agent-skill-engineering`, `collaborative-coding`, `comprehensive-codebase-audit`, `crabbox-platform-testing`, `cueloop`, `gogcli`, `pdf`, `peekaboo`, `platform-validation`, `readme-great-demo`, `slides`, `weekly-review`, and `workflow-from-chats` remain installed but are excluded from normal Pi discovery. `bro` and `propose-then-ship` are explicit-only through `disable-model-invocation`. This keeps the default catalog focused without deleting occasional workflows.
 
 ### The specialist bench
 
@@ -148,18 +151,19 @@ I keep a larger bench than a new user needs, but I do not use every profile equa
 | Reconnaissance | `scout`, `researcher`, `context-builder` | Map unfamiliar code, verify an external contract, or produce a clean cross-system handoff |
 | Diagnosis | `debugger` | Reproduce a failure, prove the root cause, and define the smallest regression check before remediation |
 | Independent review | `reviewer`, `reviewer-gpt`, `reviewer-claude` | Challenge correctness, validation, maintainability, and completion claims |
+| Security review | `reviewer-security` | Check changed code, dependencies, and exposed surfaces for security and data-safety problems |
 | Bounded implementation | `worker`, `fixer` | Implement an independent item or apply a confirmed finding list |
 | Direction and planning | `planner`, `oracle` | Split genuinely broad work or compare the current direction with earlier decisions |
 | Product review | `ui-designer` | Review rendered behavior, accessibility, responsive layout, and polish |
 | Writing | `writer` | Draft documentation, guides, announcements, and polished human-facing copy |
 
-Twelve profiles start fresh. `oracle` is the exception because its job is to compare the current direction with the parent conversation and catch contradictions.
+There are fourteen profiles. Thirteen start fresh. `oracle` is the exception because its job is to compare the current direction with the parent conversation and catch contradictions.
 
 All profiles are leaf agents and cannot launch more children. That keeps a focused job from quietly turning into an unbounded hierarchy.
 
 ### The models
 
-My current main model is `openai-codex/gpt-5.6-sol` with thinking set to `max` and OpenAI answer verbosity set to `low`. Codex priority mode is enabled. When the session compacts, a local extension tries `xai/grok-4.5` at `high`, then `openai-codex/gpt-5.6-luna` at `high`, before falling back to the active model.
+My current default main model is `anthropic/claude-opus-5` with thinking set to `max`. I switch the main session to `openai-codex/gpt-5.6-sol` for work where I want the Codex route, and both GPT-5.6 Sol routes run at `low` answer verbosity. Codex priority mode is enabled. The model picker is limited to `anthropic/claude-opus-5`, `anthropic/claude-fable-5`, `openai-codex/gpt-5.6-sol`, and `xai/grok-4.5`. When the session compacts, a local extension tries `xai/grok-4.5` at `high`, then `openai-codex/gpt-5.6-luna` at `high`, before falling back to the active model.
 
 The specialist mappings are explicit:
 
@@ -167,27 +171,28 @@ The specialist mappings are explicit:
 |---|---|---|---|
 | `scout` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `high` |
 | `context-builder` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `high` |
-| `debugger` | `anthropic/claude-opus-5` | `anthropic/claude-fable-5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `high` |
+| `debugger` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5`, then `openai/gpt-5.6-sol` | `high` |
 | `researcher` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `xhigh` |
-| `planner` | `anthropic/claude-opus-5` | `anthropic/claude-fable-5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `high` |
+| `planner` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5`, then `openai/gpt-5.6-sol` | `xhigh` |
 | `worker` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `high` |
 | `fixer` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `high` |
 | `reviewer` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra` | `high` |
 | `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra` | `xhigh` |
-| `reviewer-claude` | `anthropic/claude-opus-5` | `anthropic/claude-fable-5`, then `xai/grok-4.5` | `xhigh` |
+| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-5`, then `xai/grok-4.5` | `xhigh` |
+| `reviewer-security` | `anthropic/claude-fable-5` | `xai/grok-4.5`, then `openai-codex/gpt-5.6-terra` | `xhigh` |
 | `oracle` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, then `cursor/gpt-5.6-sol@272k` | `xhigh` |
 | `ui-designer` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `high` |
 | `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-5` | `high` |
 
-This is not model variety for its own sake. GPT-5.6 Sol remains the quality-first research, GPT review, UI, and oracle model and the quality fallback for every Grok-backed role. Every `openai-codex/gpt-5.6-sol` entry is followed immediately by `openai/gpt-5.6-sol` so a Codex-route failure stays on the same model via the OpenAI API. The Cursor route provides the first fallback to the same Grok 4.5 model before switching model families. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Claude Opus 5 now leads diagnosis, planning, and cross-model review, where a wrong conclusion is expensive and worth its higher per-task cost. Fable 5 keeps the writing role and stays the first Anthropic fallback where Opus 5 is primary. Xhigh remains reserved for consequential research, both review gates, and oracle decisions.
+This is not model variety for its own sake. GPT-5.6 Sol carries diagnosis, planning, research, GPT review, UI, and oracle work, and it is the quality fallback for every Grok-backed role. Every `openai-codex/gpt-5.6-sol` entry is followed by `openai/gpt-5.6-sol` so a Codex-route failure stays on the same model via the OpenAI API. The Cursor route provides the first fallback to the same Grok 4.5 model before switching model families. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Opus 5 is the main session model, where a wrong conclusion is expensive and worth its higher per-task cost. Fable 5 leads writing, cross-model review, and security review. Xhigh is reserved for consequential research, planning, the strict review gates, and oracle decisions.
 
 The profile body is what `pi-subagents` passes as the role system prompt, so it contains task instructions, evidence standards, boundaries, and output expectations. Model, effort, and context stay in frontmatter; launch guidance stays in orchestration documentation instead of being narrated back to the model.
 
 The benchmark rationale and Artificial Analysis plus CursorBench 3.2 source metrics are available as [PDF](./Model_Reference_Sheet_Artificial_Analysis_2026-07-26.pdf) and [DOCX](./Model_Reference_Sheet_Artificial_Analysis_2026-07-26.docx), refreshed from the live leaderboard on 26 July 2026. Cursor reports Grok 4.5 high at 66.7% and $1.51/task, while the independent Artificial Analysis snapshot records 88 tok/s, 16.3 seconds E2E, 54 intelligence, 45.7 agentic, and 72.4 coding. Cursor disclosed that Grok benefited from an older Cursor codebase snapshot in training, so I discount its exact CursorBench rank rather than discard the independently corroborated speed/value signal.
 
-The 26 July refresh grew CursorBench 3.2 from 42 to 50 entries by adding Claude Opus 5 at five effort levels and Gemini 3.6 Flash at three. No previously recorded value changed. Opus 5 wins on both score and cost against Fable 5 at low, high, and extra high effort, which covers every effort level these overrides use, so `anthropic/claude-opus-5` is the preferred Anthropic route for review and for Anthropic fallbacks. Opus 5 high also reaches 66.7% at $3.91, matching Grok 4.5 high's score without the contamination caveat and beating GPT-5.6 Sol extra high by 2.2 points at effectively the same cost. Fable 5 remains the `writer` primary because it leads the separate Artificial Analysis writing benchmark at roughly 2,810 Elo, which CursorBench does not measure. Claude Opus 4.8 and Sonnet 5 are now fully superseded and appear in no override. Neither Opus 5 nor Gemini 3.6 Flash has Artificial Analysis coverage, so their speed, latency, and general-capability profiles remain unverified.
+The 26 July refresh grew CursorBench 3.2 from 42 to 50 entries by adding Claude Opus 5 at five effort levels and Gemini 3.6 Flash at three. No previously recorded value changed. Opus 5 wins on both score and cost against Fable 5 at low, high, and extra high effort, which covers every effort level these overrides use, so `anthropic/claude-opus-5` is the main session model. Opus 5 high also reaches 66.7% at $3.91, matching Grok 4.5 high's score without the contamination caveat and beating GPT-5.6 Sol extra high by 2.2 points at effectively the same cost. Fable 5 leads `writer` because it tops the separate Artificial Analysis writing benchmark at roughly 2,810 Elo, which CursorBench does not measure. It also leads `reviewer-claude` and `reviewer-security`. Opus 5 sits directly behind it on `writer` and `reviewer-claude`. Claude Opus 4.8 and Sonnet 5 are now fully superseded and appear in no override. Neither Opus 5 nor Gemini 3.6 Flash has Artificial Analysis coverage, so their speed, latency, and general-capability profiles remain unverified.
 
-Pi exposes `xai/grok-4.5` through its built-in xAI provider. Authenticate with `/login xai` using a Grok/X subscription or xAI API key. The separately installed `pi-cursor-sdk` package and a Cursor SDK API key supply `cursor/grok-4.5`. All four Grok-backed profiles fall back first to Cursor's Grok route and then GPT-5.6 Sol; `fixer` and `worker` finally fall back to Opus 5. The same Cursor SDK key also supplies `cursor/gpt-5.6-sol@272k`, which is the first fallback for both GPT review gates and the only fallback for `oracle`, whose fork context rules out an Anthropic route.
+Pi exposes `xai/grok-4.5` through its built-in xAI provider. Authenticate with `/login xai` using a Grok/X subscription or xAI API key. The separately installed `pi-cursor-sdk` package and a Cursor SDK API key supply `cursor/grok-4.5`. All four Grok-backed profiles fall back first to Cursor's Grok route and then GPT-5.6 Sol; `fixer` and `worker` finally fall back to Opus 5. The same Cursor SDK key also supplies `cursor/gpt-5.6-sol@272k`, which sits behind the OpenAI API route on both GPT review gates and on `oracle`, whose fork context rules out an Anthropic route.
 
 A faithful installer should use these exact current mappings, show them before writing configuration, and stop with a precise missing-model list if a required route is unavailable. It should not silently substitute a model that happens to look similar.
 
@@ -273,7 +278,7 @@ The complete core includes:
 - the full specialist bench and curated skill catalog;
 - the exact OpenAI, Anthropic, xAI, and Cursor role mappings with explicit Cursor and Sol fallbacks;
 - FFF, Agent Browser, Macuse, MCP, subagents, Intercom, Apply Edits, calculator, structured questions, and Ponytail;
-- goal, stash, verbosity, duration, session-editing, message-copying, Codex priority, and custom compaction tools;
+- goal, stash, todo list, session naming, verbosity, duration, session-editing, message-copying, Codex priority, and custom compaction tools;
 - harmless validation for every installed capability.
 
 The following remain explicit choices:
@@ -319,9 +324,11 @@ The package's dependency set should cover:
 - `npm:pi-tool-duration`;
 - `npm:pi-edit-session-in-place`;
 - `npm:pi-copy-message`;
-- `git:github.com/fitchmultz/pi-ask-question`.
+- `git:github.com/fitchmultz/pi-ask-question`;
+- `git:github.com/fitchmultz/pi-todo-list`;
+- `git:github.com/fitchmultz/pi-session-name`.
 
-Macuse is part of my current setup, but its repository is private. The public kit must leave it unavailable or make it an explicit authenticated opt-in until a public source exists; it should not copy code from my installation or silently substitute another tool.
+Macuse and PR Hawk are part of my current setup, but their repositories are private. The public kit must leave them unavailable or make them an explicit authenticated opt-in until public sources exist; it should not copy code from my installation or silently substitute another tool.
 
 The existing workflow prompt collection should move out of the default installation. A setup prompt is infrastructure; a library of rarely used workflow commands is not core.
 

@@ -2,7 +2,7 @@
 name: debugger
 description: Root-cause diagnostician that reproduces failures and produces evidence-backed repair instructions
 model: openai-codex/gpt-5.6-sol
-fallbackModels: anthropic/claude-fable-5, openai-codex/gpt-5.6-sol, openai/gpt-5.6-sol
+fallbackModels: anthropic/claude-fable-5, openai/gpt-5.6-sol
 thinking: high
 systemPromptMode: append
 inheritProjectContext: true
