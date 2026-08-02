@@ -1,6 +1,6 @@
 # How I actually use pi at WorkOS
 
-_Last updated July 19, 2026. This reflects my live pi 0.80.10 setup and an eight-day sample of how I used it._
+_Last updated August 1, 2026. This reflects my live pi 0.83.0 setup. The usage numbers near the end are still the July 8 through July 15 sample and have not been recounted._
 
 I wrote this for a WorkOS engineer who is new to pi.
 
@@ -8,7 +8,7 @@ The useful part of my setup is not the number of packages I have installed. It i
 
 That distinction matters. This is not an autonomous swarm, and my normal workflow is not scout → worker → reviewer. The main session is the lead engineer.
 
-This guide describes both the live workflow and the public package needed to reproduce it.
+This guide describes both the live workflow and the package needed to reproduce it. The public installer is the next step; it is not ready yet.
 
 The best way to explain the setup is to follow a realistic task, then pull apart the pieces that made it work.
 
@@ -23,7 +23,7 @@ Pi's core stays small. You choose the instructions, models, tools, and integrati
 - Agent profiles give a fresh pi session a bounded role and model policy.
 - Sessions preserve the conversation and tool history so work can continue, compact, branch, or resume.
 
-You do not need to understand all of that before starting. The published setup lets pi explain the choices and make the approved changes itself.
+You do not need to understand all of that before starting. The setup I want to publish will let pi explain the choices and make the approved changes itself.
 
 ## A representative task
 
@@ -39,7 +39,7 @@ The main session remains accountable for the whole task. Delegating part of the 
 
 ### 2. It gathers connected context
 
-The issue rarely contains the complete story. Through MCP tools, pi can read the Linear issue, find a relevant Slack thread, and inspect approved context in Horizon, our internal engineering MCP service. If the change involves documentation or infrastructure, it can also check Notion or Cloudflare.
+The issue rarely contains the complete story. Through MCP tools, pi can read the Linear issue, find relevant Slack or GitHub context, and inspect approved context in Horizon, our internal engineering MCP service. The current catalog also covers Plain, Granola, Notion, Cloudflare, Sentry, and Datadog when the task needs them.
 
 MCP is the adapter between pi and another service. Instead of scraping a site or asking me to paste everything into the terminal, pi gets typed operations for the service. Every teammate authenticates their own access. The setup never copies credentials or another person's service data.
 
@@ -73,17 +73,15 @@ The deterministic calculator handles arithmetic instead of leaving it to model i
 
 ### 6. Fresh reviewers challenge the result
 
-The author should not be the only reviewer.
-
-For meaningful code changes, I use fresh review sessions after implementation and validation. `reviewer-gpt` checks the diff at `xhigh` effort. `reviewer-claude` provides a second model family when the risk or breadth justifies it. A generic `reviewer` is available for narrower review work.
+Independent review runs after implementation and validation when the workflow requires a review gate. I launch a fresh `reviewer-gpt` Pi subagent in async mode to check structure, maintainability, and correctness. `reviewer-claude` challenges hidden assumptions, edge cases, and product risk from a different model family, and it joins the gate when a change warrants cross-model coverage; the `hard-review` command always runs both. Blocking findings are fixed before the reviewer reruns, cheap non-blocking ones are fixed in place, and the rest become follow-ups.
 
 The fresh context is deliberate. A reviewer that inherits the implementation conversation also inherits the story the implementer built about why the change is correct. A fresh reviewer has to reconstruct the reasoning from the requirements, diff, tests, and current files.
 
-For changes in `workos/*`, my personal process has a stricter gate: before commit, push, or merge, a fresh `reviewer-gpt` runs my maintainability review and must return with no required changes. Any later code change invalidates that sign-off.
+`/hard-review` runs both reviewers for the strict gate. Every PR runs `reviewer-gpt` before it is ready to ship, and pulls in `reviewer-claude` when the change warrants a second model; local non-PR work only needs a formal review when the workflow or risk requires one. I still stop before merge unless I explicitly authorized it.
 
 ### 7. The main session closes the loop
 
-Valid findings are fixed and reviewed again. The main session reruns the checks that prove the behavior, summarizes what changed, names remaining risk, and stops before a merge or other consequential action unless I explicitly authorized it.
+When review is used, valid findings are fixed and reviewed again. The main session reruns the checks that prove the behavior, summarizes what changed, names remaining risk, and stops before a merge or other consequential action unless I explicitly authorized it.
 
 That is the recurring shape of the setup: connected evidence, focused parallel help, main-session ownership, and independent verification.
 
@@ -101,10 +99,10 @@ My global agreement says, in plain language:
 - preserve unrelated work and prefer an isolated worktree for changes in `workos/*`;
 - use Linear for task tracking;
 - verify the real outcome before claiming completion;
-- run the required independent review before commit, push, or merge;
+- use independent review when I ask for it or when risk makes it worthwhile, not as a blanket commit or push gate;
 - stop before merge unless I explicitly requested it.
 
-A small nested-instruction extension also checks `<current project>/.pi/agent/AGENTS.md` on every turn. That lets a repository add pi-specific rules that take effect without restarting the session. Because that file does not itself trigger Pi's project-trust flow, the public extension loads it only when the project already contains another Pi-recognized trust-gated resource and the user has trusted the project.
+A small nested-instruction extension also checks `<current project>/.pi/agent/AGENTS.md` on every turn. That lets a repository add pi-specific rules that take effect without restarting the session.
 
 These process rules are part of explaining my workflow, but the installer should not silently impose all of them on another engineer. It should show the rules and ask which ones they want.
 
@@ -115,15 +113,34 @@ These process rules are part of explaining my workflow, but the installer should
 | FFF | Fast repository file and content search |
 | MCP | Typed access to Linear, Slack, Horizon, Notion, Cloudflare, and other approved services |
 | Agent Browser | Current documentation, browser-visible verification, dashboards, and screenshots |
+| Macuse | Native macOS app inspection and control when browser DOM or CLI tools are insufficient (private repository) |
+| Apply Edits | Default file mutation tool, replacing Pi's built-in `edit` and `write` tools |
 | `pi-subagents` | Fresh specialist sessions, parallel work, isolated worktrees, and review artifacts |
 | `pi-intercom` | Coordination between separate local pi sessions |
 | Calculator | Deterministic arithmetic and small statistical checks |
 | Ask Question | Structured input when a user-owned decision is genuinely required |
 | Ponytail | Always-on pressure toward existing helpers, standard-library features, deletion, and the smallest root-cause fix |
+| Cursor SDK | Supplies the `cursor/grok-4.5` first fallback for Grok-backed agents |
+| Todo List | Nested task list that survives context compaction on multi-step work |
+| Session Name | Names each session so past work stays searchable |
+| PR Hawk | Watches my open pull requests and reports what needs attention (private repository) |
 
-I do not invoke Ponytail when a task looks complicated. I installed it once, enabled its default Full mode, and leave it enabled for every response. It is baseline behavior, not a workflow I have to remember to run.
+`pi-apply-edits` exposes `apply_edits` as the one active mutation tool and removes Pi's built-in `edit` and `write` tools before the first model turn. It supports exact edits, whole-file rewrites, and plan-first multi-file batches; the built-ins remain available through an explicit session opt-in and should stay enabled on platforms where existing-file replacement is unsupported.
+
+I do not invoke Ponytail when a task looks complicated. I installed it once, set its default to Ultra, and leave it enabled for every response. It is baseline behavior, not a workflow I have to remember to run.
 
 The `fitchmultz` Git forks of `pi-subagents` and `pi-intercom` are intentional. They contain newer behavior than the npm releases I evaluated.
+
+### The skill library
+
+`~/.agents/skills` is the source of truth for my user-authored skills. The current automatically matched set is:
+
+- `ask-clarifying-questions`, `deslop`, `diagram-creation`, `dogfood`, `external-repo-integration`, and `handoff`;
+- `pi-extension-development`, `propose-then-ship-pi`, `root-cause-triage`, `ssh-unix-ops`, `tdd`, `thermo-nuclear-code-quality-review`, and `verification-before-completion`.
+
+Package skills add `pi-subagents`, `pi-intercom`, `macuse`, `ponytail`, `ponytail-review`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, and `ponytail-help`. Pi keeps only skill names and descriptions in the base prompt, then loads a full `SKILL.md` when the task matches.
+
+`agent-skill-engineering`, `collaborative-coding`, `comprehensive-codebase-audit`, `crabbox-platform-testing`, `cueloop`, `gogcli`, `pdf`, `peekaboo`, `platform-validation`, `readme-great-demo`, `slides`, `weekly-review`, and `workflow-from-chats` remain installed but are excluded from normal Pi discovery. `bro` and `propose-then-ship` are explicit-only through `disable-model-invocation`. This keeps the default catalog focused without deleting occasional workflows.
 
 ### The specialist bench
 
@@ -134,48 +151,52 @@ I keep a larger bench than a new user needs, but I do not use every profile equa
 | Reconnaissance | `scout`, `researcher`, `context-builder` | Map unfamiliar code, verify an external contract, or produce a clean cross-system handoff |
 | Diagnosis | `debugger` | Reproduce a failure, prove the root cause, and define the smallest regression check before remediation |
 | Independent review | `reviewer`, `reviewer-gpt`, `reviewer-claude` | Challenge correctness, validation, maintainability, and completion claims |
+| Security review | `reviewer-security` | Check changed code, dependencies, and exposed surfaces for security and data-safety problems |
 | Bounded implementation | `worker`, `fixer` | Implement an independent item or apply a confirmed finding list |
 | Direction and planning | `planner`, `oracle` | Split genuinely broad work or compare the current direction with earlier decisions |
 | Product review | `ui-designer` | Review rendered behavior, accessibility, responsive layout, and polish |
 | Writing | `writer` | Draft documentation, guides, announcements, and polished human-facing copy |
 
-Twelve profiles start fresh. `oracle` is the exception because its job is to compare the current direction with the parent conversation and catch contradictions.
+There are fourteen profiles. Thirteen start fresh. `oracle` is the exception because its job is to compare the current direction with the parent conversation and catch contradictions.
 
 All profiles are leaf agents and cannot launch more children. That keeps a focused job from quietly turning into an unbounded hierarchy.
 
 ### The models
 
-My current main model is `openai-codex/gpt-5.6-sol` with thinking set to `max` and OpenAI answer verbosity set to `low`.
+My current default main model is `anthropic/claude-opus-5` with thinking set to `max`. I switch the main session to `openai-codex/gpt-5.6-sol` for work where I want the Codex route, and both GPT-5.6 Sol routes run at `low` answer verbosity. Codex priority mode is enabled. The model picker is limited to `anthropic/claude-opus-5`, `anthropic/claude-fable-5`, `openai-codex/gpt-5.6-sol`, and `xai/grok-4.5`. When the session compacts, a local extension tries `xai/grok-4.5` at `high`, then `openai-codex/gpt-5.6-luna` at `high`, before falling back to the active model.
 
 The specialist mappings are explicit:
 
 | Profile | Primary model | Fallback | Thinking |
 |---|---|---|---|
-| `scout` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol` | `high` |
-| `context-builder` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol` | `high` |
-| `debugger` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
-| `researcher` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `xhigh` |
-| `planner` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
-| `worker` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol`, then `anthropic/claude-fable-5` | `high` |
-| `fixer` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol`, then `anthropic/claude-fable-5` | `high` |
-| `reviewer` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `high` |
-| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | `xhigh` |
-| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `xhigh` |
-| `oracle` | `openai-codex/gpt-5.6-sol` | none | `xhigh` |
-| `ui-designer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | `high` |
-| `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | `high` |
+| `scout` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `high` |
+| `context-builder` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `high` |
+| `debugger` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5`, then `openai/gpt-5.6-sol` | `high` |
+| `researcher` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `xhigh` |
+| `planner` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5`, then `openai/gpt-5.6-sol` | `xhigh` |
+| `worker` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `high` |
+| `fixer` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `high` |
+| `reviewer` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra` | `high` |
+| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra` | `xhigh` |
+| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-5`, then `xai/grok-4.5` | `xhigh` |
+| `reviewer-security` | `anthropic/claude-fable-5` | `xai/grok-4.5`, then `openai-codex/gpt-5.6-terra` | `xhigh` |
+| `oracle` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, then `cursor/gpt-5.6-sol@272k` | `xhigh` |
+| `ui-designer` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `high` |
+| `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-5` | `high` |
 
-This is not model variety for its own sake. GPT-5.6 Sol remains the quality-first diagnosis, planning, research, and review model and the first fallback for every Grok-backed role. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Claude is most valuable as an independent reviewer and writer with a genuinely different model family. Xhigh remains reserved for consequential research, final review gates, and oracle decisions.
+This is not model variety for its own sake. GPT-5.6 Sol carries diagnosis, planning, research, GPT review, UI, and oracle work, and it is the quality fallback for every Grok-backed role. Every `openai-codex/gpt-5.6-sol` entry is followed by `openai/gpt-5.6-sol` so a Codex-route failure stays on the same model via the OpenAI API. The Cursor route provides the first fallback to the same Grok 4.5 model before switching model families. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Opus 5 is the main session model, where a wrong conclusion is expensive and worth its higher per-task cost. Fable 5 leads writing, cross-model review, and security review. Xhigh is reserved for consequential research, planning, the strict review gates, and oracle decisions.
 
-The profile body is what the model reads as its role prompt, so it contains task instructions, evidence standards, boundaries, and output expectations. Model, effort, and context stay in frontmatter; launch guidance stays in orchestration documentation instead of being narrated back to the model.
+The profile body is what `pi-subagents` passes as the role system prompt, so it contains task instructions, evidence standards, boundaries, and output expectations. Model, effort, and context stay in frontmatter; launch guidance stays in orchestration documentation instead of being narrated back to the model.
 
-The benchmark rationale and Artificial Analysis plus CursorBench 3.2 source metrics are available as [PDF](./Model_Reference_Sheet_Artificial_Analysis_2026-07-18.pdf) and [DOCX](./Model_Reference_Sheet_Artificial_Analysis_2026-07-18.docx). Cursor reports Grok 4.5 high at 66.7% and $1.51/task, while the independent Artificial Analysis snapshot records 88 tok/s, 16.3 seconds E2E, 54 intelligence, 45.7 agentic, and 72.4 coding. Cursor disclosed that Grok benefited from an older Cursor codebase snapshot in training, so I discount its exact CursorBench rank rather than discard the independently corroborated speed/value signal.
+The benchmark rationale and Artificial Analysis plus CursorBench 3.2 source metrics are available as [PDF](./Model_Reference_Sheet_Artificial_Analysis_2026-07-26.pdf) and [DOCX](./Model_Reference_Sheet_Artificial_Analysis_2026-07-26.docx), refreshed from the live leaderboard on 26 July 2026. Cursor reports Grok 4.5 high at 66.7% and $1.51/task, while the independent Artificial Analysis snapshot records 88 tok/s, 16.3 seconds E2E, 54 intelligence, 45.7 agentic, and 72.4 coding. Cursor disclosed that Grok benefited from an older Cursor codebase snapshot in training, so I discount its exact CursorBench rank rather than discard the independently corroborated speed/value signal.
 
-Pi exposes `xai/grok-4.5` through its built-in xAI provider. Authenticate with `/login xai` using a Grok/X subscription or xAI API key. All four Grok-backed profiles fall back explicitly to GPT-5.6 Sol; `fixer` and `worker` then fall back to Fable.
+The 26 July refresh grew CursorBench 3.2 from 42 to 50 entries by adding Claude Opus 5 at five effort levels and Gemini 3.6 Flash at three. No previously recorded value changed. Opus 5 wins on both score and cost against Fable 5 at low, high, and extra high effort, which covers every effort level these overrides use, so `anthropic/claude-opus-5` is the main session model. Opus 5 high also reaches 66.7% at $3.91, matching Grok 4.5 high's score without the contamination caveat and beating GPT-5.6 Sol extra high by 2.2 points at effectively the same cost. Fable 5 leads `writer` because it tops the separate Artificial Analysis writing benchmark at roughly 2,810 Elo, which CursorBench does not measure. It also leads `reviewer-claude` and `reviewer-security`. Opus 5 sits directly behind it on `writer` and `reviewer-claude`. Claude Opus 4.8 and Sonnet 5 are now fully superseded and appear in no override. Neither Opus 5 nor Gemini 3.6 Flash has Artificial Analysis coverage, so their speed, latency, and general-capability profiles remain unverified.
+
+Pi exposes `xai/grok-4.5` through its built-in xAI provider. Authenticate with `/login xai` using a Grok/X subscription or xAI API key. The separately installed `pi-cursor-sdk` package and a Cursor SDK API key supply `cursor/grok-4.5`. All four Grok-backed profiles fall back first to Cursor's Grok route and then GPT-5.6 Sol; `fixer` and `worker` finally fall back to Opus 5. The same Cursor SDK key also supplies `cursor/gpt-5.6-sol@272k`, which sits behind the OpenAI API route on both GPT review gates and on `oracle`, whose fork context rules out an Anthropic route.
 
 A faithful installer should use these exact current mappings, show them before writing configuration, and stop with a precise missing-model list if a required route is unavailable. It should not silently substitute a model that happens to look similar.
 
-For the full setup, a teammate needs ChatGPT Plus or Pro with Codex authentication, Claude Pro or Max authentication, and xAI authentication. Pi's Claude subscription route uses Anthropic extra usage, which may be billed per token rather than drawn from the normal plan limit.
+For the full setup, a teammate needs ChatGPT Plus or Pro with Codex authentication, Claude Pro or Max authentication, xAI authentication, and a Cursor SDK API key. Pi's Claude subscription route uses Anthropic extra usage, which may be billed per token rather than drawn from the normal plan limit.
 
 ### Sessions and small friction reducers
 
@@ -186,6 +207,8 @@ A few extensions make that daily use better:
 - goal tracking keeps a long-running objective and its completion contract attached to the session;
 - stash parks an editor draft while I send another message, then restores it;
 - low OpenAI verbosity keeps routine answers concise;
+- Codex priority mode lowers latency for the main model;
+- Grok-then-Luna compaction avoids spending the main model's maximum effort on summaries;
 - tool-duration annotations tell the model when an operation was actually slow;
 - session editing lets me rewind and correct an earlier turn;
 - message copying retrieves raw session text without terminal formatting.
@@ -252,45 +275,48 @@ The installer should offer two paths:
 The complete core includes:
 
 - the working-agreement template and nested project instructions;
-- the full specialist bench;
-- the exact OpenAI, Anthropic, and xAI role mappings with explicit Sol fallbacks;
-- FFF, Agent Browser, MCP, subagents, Intercom, calculator, structured questions, and Ponytail;
-- goal, stash, verbosity, duration, session-editing, and message-copying tools;
-- harmless validation when available, with any remaining manual verification reported.
+- the full specialist bench and curated skill catalog;
+- the exact OpenAI, Anthropic, xAI, and Cursor role mappings with explicit Cursor and Sol fallbacks;
+- FFF, Agent Browser, Macuse, MCP, subagents, Intercom, Apply Edits, calculator, structured questions, and Ponytail;
+- goal, stash, todo list, session naming, verbosity, duration, session-editing, message-copying, Codex priority, and custom compaction tools;
+- harmless validation for every installed capability.
 
 The following remain explicit choices:
 
-- Linear, Slack, Horizon, Notion, and Cloudflare integration setup;
-- WorkOS process rules such as Linear tracking, worktrees, and mandatory pre-commit review;
+- Linear, Slack, GitHub, Horizon, Plain, Granola, Notion, Cloudflare, Sentry, and Datadog integration setup;
+- WorkOS process rules such as Linear tracking, worktrees, and when independent review is warranted;
 - any project-specific instructions.
 
-## The public package
+## The package I want to finish
 
-The public `pi-fitch-kit` package repurposes and sanitizes the original personal repository around this contract.
+The `pi-fitch-kit` repository is public, but its npm manifest remains private and it does not yet meet this contract. Today it mostly distributes my agent profiles and a prompt library. Treating it as the finished installer would reproduce the wrong parts of the setup.
 
-The public package is designed to:
+The plan is to reshape and sanitize that repository into the complete opinionated core package.
+
+The public package should:
 
 - carry the specialist profiles and their exact model, context, effort, and delegation policies;
-- link missing profiles only after setup approval, using an add-only script that never replaces or deletes an existing target;
-- bundle the small deterministic calculator and nested-instruction extensions;
+- bundle the small deterministic calculator, nested-instruction, Codex priority, and custom compaction extensions;
 - provide one setup entry point;
 - install approved dependencies at exact npm versions or Git commits;
-- preserve unrelated user configuration, including every existing agent file and symlink;
+- preserve unrelated user configuration;
 - show a plan before writing files;
 - stop for authentication, service login, paid features, or user-owned process decisions;
 - never read or copy credential stores, browser profiles, raw sessions, or service payloads;
-- reload pi and run a harmless smoke test when one exists, otherwise report the required manual verification;
+- reload pi and run one harmless smoke test for every selected capability;
 - report every changed file, installed source, validation result, and remaining manual step.
 
-The structured-question tool is published separately as `pi-ask-question` rather than duplicated in the kit.
+The structured-question tool already lives in its own public repository, so the kit should install that source rather than duplicate the extension.
 
-The package's dependency set covers:
+The package's dependency set should cover:
 
 - `git:github.com/fitchmultz/pi-subagents`;
 - `git:github.com/fitchmultz/pi-intercom`;
 - `npm:@ff-labs/pi-fff`;
 - `npm:pi-agent-browser-native` plus its compatible upstream browser dependency;
+- `npm:pi-cursor-sdk`;
 - `npm:pi-mcp-adapter`;
+- `git:github.com/fitchmultz/pi-apply-edits`;
 - `git:github.com/DietrichGebert/ponytail`;
 - `npm:pi-codex-goal`;
 - `npm:@fitchmultz/pi-stash`;
@@ -298,37 +324,39 @@ The package's dependency set covers:
 - `npm:pi-tool-duration`;
 - `npm:pi-edit-session-in-place`;
 - `npm:pi-copy-message`;
-- the public `pi-ask-question` Git source.
+- `git:github.com/fitchmultz/pi-ask-question`;
+- `git:github.com/fitchmultz/pi-todo-list`;
+- `git:github.com/fitchmultz/pi-session-name`.
 
-The existing workflow prompt collection stays out of the default installation. A setup prompt is infrastructure; a library of rarely used workflow commands is not core.
+Macuse and PR Hawk are part of my current setup, but their repositories are private. The public kit must leave them unavailable or make them an explicit authenticated opt-in until public sources exist; it should not copy code from my installation or silently substitute another tool.
 
-## How the bootstrap works
+The existing workflow prompt collection should move out of the default installation. A setup prompt is infrastructure; a library of rarely used workflow commands is not core.
 
-Onboarding is:
+## How the bootstrap should work
 
-1. Install Node.js 24 or newer and pi 0.80.10.
-2. Start pi and authenticate ChatGPT/Codex, Claude, and xAI through their documented user-owned login flows.
-3. Paste the bootstrap prompt below.
-4. Run `/reload`, then `/fitch-setup`.
-5. Choose complete core or individual components, integrations, and working-agreement sections.
-6. Review every proposed package, path, model mapping, and change.
-7. Apply the approved setup, reload, and run harmless smoke checks.
+Once the package meets that contract, onboarding should be:
 
-The bootstrap pins the immutable package commit that passed review and validation:
+1. Install the supported Node.js and pi versions.
+2. Start pi.
+3. Authenticate ChatGPT/Codex, Claude, and xAI through `/login`, then save a Cursor SDK API key through `/login` for `pi-cursor-sdk`.
+4. Paste one bootstrap prompt from this guide.
+5. Let pi install the pinned public kit and inspect the available models.
+6. Choose the complete core or individual components.
+7. Choose WorkOS integrations and process rules.
+8. Review the proposed files and model mapping.
+9. Apply the setup, reload, and run the smoke checks.
 
-```text
-Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@97a542a5bdb06ff7d1419b868aa03429b25a10a9 --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
-```
+The bootstrap prompt should use pi as the installer. It should read the active installed pi documentation before changing anything, inspect existing configuration without reading credentials, and explain every decision that still belongs to the user.
 
-The bootstrap uses pi as the installer. `setup-manifest.json` is the pin authority and `/fitch-setup` is the setup procedure. There is no runtime bootstrap command or custom wizard.
+I am not treating the shorter post's bootstrap prompt as a finished installer. The repository is public, but the current package does not satisfy the contract above. The next implementation step is to make the package match the guide, then add the real version-pinned bootstrap flow.
 
 ## Trust and security boundaries
 
 Pi extensions run with the permissions of the user who started pi. Project trust controls whether project-local settings and extensions load; it is not a sandbox.
 
-My personal setup always trusts project-local configuration because I normally work in repositories I already trust. The shared setup should keep Pi's safer project-trust prompt instead.
+My personal setup currently sets `defaultProjectTrust: always` because I normally work in repositories I already trust. A shared setup should keep Pi's safer project-trust prompt unless the user explicitly chooses otherwise.
 
-For subagents, the installer should set `projectTrust.childRuns: inherit` in `~/.pi/agent/extensions/subagent/config.json`. That forwards an explicit parent `--approve` or `--no-approve` CLI flag to non-interactive child sessions; it does not reuse a trust choice made interactively in the parent. Untrusted repositories should use `no-approve`.
+I have no subagent config override, so the current `pi-subagents` fork uses its default `projectTrust.childRuns: approve`; an explicitly started parent `--no-approve` run still keeps children at `--no-approve`. A shared installer should show `approve`, `inherit`, and `no-approve` as explicit choices instead of silently copying mine. Untrusted repositories should use `no-approve`.
 
 The package and guide must never distribute:
 
@@ -341,8 +369,8 @@ The package and guide must never distribute:
 
 Every engineer authenticates their own providers and services. Consequential external writes, production actions, account changes, and merges still require explicit authorization.
 
-## Release discipline
+## What comes next
 
-The bootstrap commit is immutable. Future package changes need the same review and validation cycle, a new package commit, and a docs-only pin update. A fresh isolated install remains the final release check.
+The canonical guide comes first. The next work is to audit and reshape `pi-fitch-kit`, build the bootstrap flow, and validate it as a fresh WorkOS engineer install.
 
-The shorter post and any general-public adaptation should be derived from this canonical guide.
+The shorter post should remain a derivative of this guide rather than becoming a second source of truth.

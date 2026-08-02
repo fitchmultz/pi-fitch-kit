@@ -1,96 +1,104 @@
-# How I actually use pi at WorkOS
+# My pi setup, and why I run agents this way
 
-_Updated July 19, 2026 for pi 0.80.10._
+_Updated August 1, 2026 for pi 0.83.0._
 
-I wrote this for WorkOS engineers who are curious about my pi setup but have not used pi before.
+A few people have asked about my terminal agent setup. This is what I'm running and why. If you want to get set up like this, ping me. I'm happy to pair on it, and it doesn't matter if you've never used pi before.
 
-Pi is a terminal coding agent in the same category as Claude Code or Codex CLI. Its core is deliberately small. The useful part of my setup is the workflow around it: connected context, fast repository search, fresh specialist sessions, independent review, and one main session that remains accountable for the work.
+I use pi, a small terminal coding agent, plus a stack of packages that give it specialized agents, browser and company-service tools, saved workflows, and selective independent review. Most of my day-to-day engineering work flows through it now.
 
-## A representative task
+## What pi is, if you haven't used it
 
-Consider a sanitized example: a Linear issue asks for a behavior change that crosses an API and the Dashboard. The ticket is brief, relevant decisions are scattered through Slack, and the current product behavior needs to be checked before anything changes.
+Pi is in the same general category as Claude Code or Codex CLI. Out of the box it reads files, edits files, and runs shell commands. I add everything else through packages, local extensions, and config files.
 
-I start pi in the repository and give the issue to the main session. That session owns the task from start to finish.
+With Node.js 22.19 or newer, you can be running it in a few minutes:
 
-It can fetch the Linear issue, find the relevant Slack thread, and inspect approved context in Horizon, our internal engineering MCP service. FFF maps the code, callers, tests, and repository conventions. If the behavior is browser-visible, Agent Browser checks the real flow before and after the change.
-
-Specialists help when there is a reason:
-
-- `scout` maps unfamiliar or broad code without editing;
-- `researcher` checks a current external contract or documentation;
-- `context-builder` prepares a compact handoff across several systems;
-- `debugger` proves a root cause before remediation;
-- `worker` implements a genuinely independent item;
-- `fixer` applies a confirmed list of findings;
-- `planner` decomposes genuinely broad work;
-- `oracle` checks the current direction against established decisions;
-- `ui-designer` reviews rendered behavior, accessibility, layout, and polish;
-- `reviewer`, `reviewer-gpt`, and `reviewer-claude` challenge the completed diff from fresh context;
-- `writer` handles polished human-facing documentation and announcements.
-
-Most of the time, the main session still implements the change. It reads specialist output, decides what to do, edits the code, runs the meaningful checks, and verifies the actual behavior. A child saying that work passed is evidence to inspect, not proof.
-
-For meaningful code changes, a fresh reviewer runs after implementation and validation. In `workos/*`, my personal rules require a clean `reviewer-gpt` maintainability review before commit, push, or merge. Any later code change invalidates that sign-off. The main session fixes valid findings, reruns the checks, and stops before merge unless I explicitly authorized it.
-
-That is the recurring shape: gather connected evidence, use focused parallel help where it pays off, keep implementation accountable to one session, and review the completion claim independently.
-
-## Why the specialist sessions help
-
-Fresh context is the main benefit. The implementation session accumulates assumptions as it works. A fresh scout or reviewer has to reconstruct the answer from the requirements, current files, diff, and validation instead of inheriting the implementer's story.
-
-The roles are bounded on purpose. A scout reads. A debugger diagnoses. A worker implements one named item. A fixer applies a confirmed list. A reviewer reports findings without editing. A writer produces copy without publishing it. Narrow authority makes the output easier for the main session to verify and keeps a small delegation from turning into an agent hierarchy.
-
-Different jobs also deserve different routing. GPT-5.6 Sol remains the quality-first diagnosis and review model and the first fallback for every Grok-backed role. The speed-sensitive `scout`, `context-builder`, `fixer`, and `worker` use Pi's built-in `xai/grok-4.5` at high effort. Claude is useful selectively as a second model family for review and writing, not as automatic fanout on every task.
-
-Grok earns that role from two independent views. CursorBench 3.2 reports 66.7% at $1.51/task, while the Artificial Analysis snapshot records 88 tok/s and 16.3 seconds end to end. Cursor disclosed that Grok benefited from an older Cursor codebase snapshot in training, so I discount its exact CursorBench rank rather than ignore the independently corroborated speed, cost, and competitive quality. The complete benchmark sheet is available as [PDF](./Model_Reference_Sheet_Artificial_Analysis_2026-07-18.pdf) and [DOCX](./Model_Reference_Sheet_Artificial_Analysis_2026-07-18.docx).
-
-## What is on the normal path
-
-The working agreement matters more than any individual model setting. My global `AGENTS.md` tells pi to inspect real evidence instead of guessing, preserve unrelated work, make requested local and reversible changes without repeated permission, ask before consequential external actions, and verify the end state before claiming completion. Repository instructions add local commands and conventions.
-
-The tools I use regularly are:
-
-- FFF for fast repository search;
-- MCP for typed access to Linear, Slack, Horizon, Notion, Cloudflare, and other approved services;
-- Agent Browser for current documentation and browser-visible verification;
-- `pi-subagents` for fresh specialists, parallel work, and isolated worktrees;
-- `pi-intercom` for coordination between separate local pi sessions;
-- a deterministic calculator for arithmetic;
-- structured questions when a real user decision changes scope or safety;
-- goal, stash, low-verbosity, duration, session-editing, and message-copying tools for long-running work.
-
-Ponytail is always on in Full mode. It pushes the agent toward existing helpers, the standard library, native platform features, deletion, and the smallest root-cause fix. I do not remember to invoke it for complicated tasks; it is baseline behavior for every response.
-
-The sessions themselves are durable. I can resume yesterday's work, compact older context, branch from an earlier point, or fork a separate session without losing the original path.
-
-## This is how I actually use it
-
-I checked 139 top-level sessions from July 8 through July 15, 2026. I counted aggregate tool and session metadata, not raw conversations or service content.
-
-- MCP appeared in 63% of sessions.
-- Subagents appeared in 58%.
-- File edits or writes appeared in 57%.
-- Fresh reviewers appeared in 52%.
-- Browser work or web search appeared in 45%.
-- FFF appeared in 44%.
-- Worker or fixer profiles appeared in only 6%.
-
-That last contrast is important. The main session usually implements. Specialists are used much more often for evidence and independent review than as autonomous workers.
-
-## Install the public setup
-
-The public package is [`fitchmultz/pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit). It targets Node.js 24 or newer and pi 0.80.10. A faithful setup requires access to the exact xAI, ChatGPT/Codex, and Anthropic models in the package manifest; it stops instead of silently substituting another model. Authenticate xAI with `/login xai` using a Grok/X subscription or xAI API key. All four Grok-backed profiles fall back to Sol, while `fixer` and `worker` retain Fable as a second fallback.
-
-After installing pi and authenticating xAI, ChatGPT/Codex, and Claude through their documented login flows, paste this into a pi session:
-
-```text
-Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@97a542a5bdb06ff7d1419b868aa03429b25a10a9 --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
+```bash
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.83.0
+pi
 ```
 
-Run `/reload`, then `/fitch-setup`.
+Once pi opens, run `/login` and pick a provider.
 
-The setup recommends the complete core but lets you choose components. It asks separately about WorkOS integrations, baseline working-agreement rules, and optional WorkOS process rules such as Linear tracking, worktrees, and mandatory review. The preview names the Grok primaries and Sol fallbacks before changing anything. It preserves existing files and configuration and stops for authentication, paid features, malformed config, or missing exact models.
+## The parts that matter
 
-Every engineer authenticates their own providers and services. The package does not copy credentials, OAuth state, browser profiles, sessions, private endpoints, or service responses. Pi extensions run with the user's permissions, so project trust is an input-loading gate, not a sandbox. Use `--no-approve` in repositories you do not trust.
+**1. A written working agreement.** Every session reads my global `AGENTS.md`, plus any repo-specific instructions. It's rules of engagement, not coding trivia: make local reversible changes without asking, ask before anything external or destructive, check real evidence instead of guessing, verify the end state before claiming done, and stop before merge unless I said merge. This file does more for consistent output than any model setting.
 
-The complete walkthrough, exact agent mappings, package list, trust behavior, and verification contract are in [pi-setup.md](./pi-setup.md).
+**2. Fresh subagents.** Instead of one agent carrying a giant conversation until it gets dumb, I hand clean briefs to child agents. A scout maps the relevant code. A debugger proves a root cause before remediation. A worker implements a bounded task. A fresh reviewer tries to prove the result wrong. A writer handles polished human-facing copy. Think of it like giving a teammate a tight one-pager instead of forwarding a 400-message Slack thread.
+
+Diagnosis, planning, research, and the GPT review gates use GPT-5.6 Sol. The speed-sensitive scout, context-builder, fixer, and worker use `xai/grok-4.5` at high effort, falling back through `cursor/grok-4.5` before Sol. Claude Fable 5 handles writing, cross-model review, and security review, with Opus 5 behind it. The value still comes from clean context and a clear job, not pretending each agent has a personality.
+
+Grok earned a real role here because it is both fast and strong: CursorBench reports 66.7% at $1.51/task, and the separate Artificial Analysis snapshot reports 88 tok/s and 16.3 seconds end to end. Cursor disclosed benchmark contamination for Grok, so I discount that exact 66.7% rank rather than ignore the independently corroborated speed and cost advantage.
+
+The 26 July 2026 CursorBench refresh added Claude Opus 5, which now ties that same 66.7% at high effort for $3.91 without any contamination caveat. That does not displace Grok from the speed roles, where it costs a third as much for the same score, but it did make Opus 5 my default main-session model.
+
+**3. Selective independent review.** Review is not a blanket commit or push gate. I use a fresh GPT reviewer when I ask for it, when risk is high, or when an independent check clearly helps. `/hard-review` adds separate GPT and Claude passes for the strict cases. Ordinary changes can ship after relevant validation without review ceremony; merge still waits for explicit approval.
+
+**4. Reusable prompts and skills.** Common workflows are saved as package-backed slash commands such as `/hard-review`, `/fresh-review`, `/debug-mode`, `/manual-qa`, and `/orchestrate`, so I'm not retyping the perfect prompt from memory. `~/.agents/skills` is the source of truth for a curated active library covering root-cause triage, TDD, completion verification, code review, dogfooding, diagrams, external integrations, Pi extension work, SSH operations, handoffs, shipping a change end to end, and clarification. Package skills add subagent, Intercom, Macuse, and Ponytail workflows; Macuse is currently from a private repository. Pi loads the full playbook only when the task matches; document, demo, and occasional workflow skills stay excluded from the default catalog.
+
+My favorite is Ponytail. Agents love to over-build. Ponytail tells them to reuse what exists, prefer the standard library or native platform, and do less. I run its Ultra mode by default.
+
+**5. One file-mutation tool.** `pi-apply-edits` replaces Pi's built-in `edit` and `write` tools by default. It handles exact edits, whole-file rewrites, and plan-first multi-file batches through one `apply_edits` tool. The built-ins remain an explicit opt-in for compatibility.
+
+**6. Connected to the work.** MCP gives pi typed tools for Linear, Slack, GitHub, Notion, Plain, Horizon, Cloudflare, Granola, Sentry, and Datadog. Agent Browser handles live docs, dashboards, and web QA. Macuse handles native macOS apps when browser DOM or CLI tools cannot.
+
+The result is that pi can correlate the repo with the systems around it instead of making me paste context from five tabs. The connections load only when needed, and each teammate should authenticate their own access.
+
+**7. Sessions that survive.** Pi sessions are saved locally. I can resume yesterday's work, branch from an earlier point to try a different approach, or let pi summarize older context in a long thread. Closing a terminal doesn't throw away the day. My default main model is Claude Opus 5 at max thinking, and I switch to GPT-5.6 Sol when I want the Codex route, where answer verbosity stays low and Codex priority mode is on. Compaction uses Grok high, then Luna high, instead of spending the main model's maximum effort on summaries.
+
+## Why I use agents
+
+I use them for leverage on the boring parts and safety rails on the parts that matter.
+
+I checked an eight-day slice of my own session history: 139 top-level sessions, 58% using subagents, 63% using connected-service tools, and 45% using browser automation or web search. Those numbers match how I use the setup day to day. These aren't demo features.
+
+A real larger change usually looks like this:
+
+1. A scout maps the code and risks.
+2. A worker implements the scoped change.
+3. The parent session checks the actual files and runs the real validation.
+4. A fresh reviewer tears the completion claim apart.
+5. Valid findings get fixed and reviewed again.
+
+Small work skips the ceremony. If it's a one-file fix, I usually just ask for it. The machinery is for changes where being wrong is expensive or where independent work can happen in parallel.
+
+The parent session stays responsible throughout. Child-agent summaries are evidence, not proof.
+
+## Have pi help set it up
+
+Once core pi is installed, you can paste this into a session:
+
+```text
+Set up pi on this machine for my current specialist-agent workflow. Read the active installed pi docs before changing anything.
+
+Install these public packages: npm:pi-cursor-sdk, npm:pi-agent-browser-native, npm:pi-codex-goal, git:github.com/fitchmultz/pi-subagents, git:github.com/fitchmultz/pi-intercom, git:github.com/DietrichGebert/ponytail, npm:pi-edit-session-in-place, npm:@fitchmultz/pi-stash, npm:pi-copy-message, npm:pi-tool-duration, npm:pi-verbosity-control, npm:pi-mcp-adapter, git:github.com/fitchmultz/pi-ask-question, npm:@ff-labs/pi-fff, git:github.com/fitchmultz/pi-apply-edits, git:github.com/fitchmultz/pi-todo-list, and git:github.com/fitchmultz/pi-session-name. Use the listed Git sources exactly; the fitchmultz subagent and Intercom forks intentionally replace older npm releases. Review each source, resolve and install an exact version or commit, and record it. For the browser wrapper, follow its installed README and install the compatible upstream agent-browser version and browser runtime before running its doctor. Do not install anything else without asking.
+
+Create my working agreement in ~/.pi/agent/AGENTS.md; focused orchestrate, debug-mode, hard-review, fresh-review, and manual-qa prompts; the full scout, context-builder, debugger, researcher, planner, worker, fixer, reviewer, reviewer-gpt, reviewer-claude, reviewer-security, oracle, ui-designer, and writer bench under ~/.pi/agent/agents; and approved model overrides in ~/.pi/agent/models.json. Keep ~/.agents/skills as the canonical user-skill root, preserve its active and excluded selections when it exists, and do not duplicate skills under ~/.pi/agent/skills.
+
+Use anthropic/claude-opus-5 at max thinking for the main session, keep low answer verbosity on both GPT-5.6 Sol routes, and turn Codex priority mode on. Compact with xai/grok-4.5 at high, then openai-codex/gpt-5.6-luna at high. Route scout, context-builder, fixer, and worker through Pi's built-in xai/grok-4.5 at high effort. All four fall back first to cursor/grok-4.5, then openai-codex/gpt-5.6-sol with immediate openai/gpt-5.6-sol; fixer and worker finally fall back to anthropic/claude-opus-5. Route debugger at high and planner at extra high through openai-codex/gpt-5.6-sol, falling back to anthropic/claude-fable-5, then openai/gpt-5.6-sol. Route reviewer-claude and reviewer-security through anthropic/claude-fable-5 at extra high. Every openai-codex/gpt-5.6-sol primary or fallback is followed immediately by openai/gpt-5.6-sol. Authenticate xAI with /login xai using my Grok/X subscription or xAI API key, and save a Cursor SDK API key through /login for the pi-cursor-sdk route.
+
+Use pi-apply-edits as the default mutation tool and verify that apply_edits is active while built-in edit and write are hidden. If existing-file replacement is unsupported on this platform, keep the built-ins enabled and report that limitation. Show me the project-trust choices before changing them: my current personal setup uses defaultProjectTrust always and the pi-subagents default childRuns approve, but untrusted repositories should use no-approve. Use only models and services I can authenticate to.
+
+For useful parts of this setup that aren't publicly installable, build my own smallest equivalent under ~/.pi/agent with current public pi APIs instead of trying to copy the original package. Offer the deterministic calculator, nested project-instruction loader, Codex priority toggle, and custom compaction route separately, and create only the ones I approve. Macuse is currently private: leave it unavailable unless I provide an approved source, and do not copy it from another installation. Treat paid modes, custom provider endpoints, and company integrations as separate opt-in decisions.
+
+Preserve unrelated configuration. Do not read or copy credentials, OAuth stores, browser profiles, sessions, or service payloads. Stop when login, a secret, a paid feature, or a product decision is required. Tell me when to run /reload, then run the relevant doctor and discovery checks plus one harmless smoke for every installed or created capability. Report every change and remaining manual step.
+```
+
+The longer guide has the full model and agent mapping, package list, active skill catalog, trust choices, security boundaries, and validation expectations.
+
+## If you want this
+
+Don't copy my config directory. It mixes shareable settings with credentials, sessions, caches, and personal state. Install the public packages you need, then have pi create your prompts, agent profiles, and model overrides in the standard user paths. If a team wants to share those files, move the reviewed parts into a Git-backed pi package.
+
+I'd start in this order:
+
+1. Install pi, log in, and use it plain for a few days.
+2. Write a short `AGENTS.md` with your rules of engagement.
+3. Add a scout, a worker, and one fresh reviewer around a real change.
+4. Add a second model reviewer when the risk justifies it.
+5. Connect Linear, Slack, docs, observability, or browser tools as you need them.
+6. Turn workflows you keep repeating into prompt templates.
+7. Delete anything that becomes ceremony.
+
+The longer reference, including the agent roles, setup prompts, public package options, session behavior, security notes, and current model choices, is in [pi-setup.md](./pi-setup.md).
+
+Seriously, if any of this looks useful, grab me and we'll get you set up.
