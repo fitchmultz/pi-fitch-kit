@@ -26,7 +26,7 @@ Unless mode is `verify`, ask the user to choose:
 2. Which, if any, `optionalIntegrations` they want to configure through the MCP adapter. Authentication is manual and per-user; do not test by reading service payloads.
 3. Whether to adopt the baseline working-agreement block, the optional process block, both, or neither, from `<package-root>/templates/working-agreement.md`.
 4. Project-trust posture. Show `defaultProjectTrust` and the subagent `projectTrust.childRuns` options (`approve`, `inherit`, `no-approve`) as explicit choices with their tradeoffs. Untrusted repositories should use `no-approve`. Do not silently copy another person's trust settings.
-5. Which, if any, local-extension equivalents to build. Useful parts of the reference setup are not publicly installable: a deterministic calculator, a nested project-instruction loader, a Codex priority toggle, and a custom compaction route. For each one the user approves, build the smallest equivalent under `~/.pi/agent` with current public Pi APIs instead of copying anyone's installation, and include it in the preview and smokes. Create none by default.
+5. Which, if any, local-extension equivalents to build. Useful parts of the reference setup are not publicly installable: a deterministic calculator, a Codex priority toggle, and a custom compaction route. For each one the user approves, build the smallest equivalent under `~/.pi/agent` with current public Pi APIs instead of copying anyone's installation, and include it in the preview and smokes. Create none by default.
 
 ## Preview and apply
 

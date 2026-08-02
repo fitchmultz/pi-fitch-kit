@@ -1,5 +1,12 @@
 # Changelog
 
+## Live-setup rescan — 1 August 2026
+
+- Added `pi-change-working-dir` to the manifest core packages and the guide's tool set.
+- Removed the nested-instruction extension from the guide and the `/fitch-setup` local-equivalents offer; it is disabled in the live setup.
+- Marked PR Hawk as currently disabled; noted `propose-then-ship` is excluded in favor of its pi port.
+- Docs continue to state Opus 5 max as the default main model; a Fable 5 trial is an experiment, not the documented default.
+
 ## Shareable kit: pinned setup path plus current bench — 1 August 2026
 
 - Rebuilt the installer path on the live package instead of the pre-symlink layout: `setup-manifest.json` (schema 2) pins every core package to an exact npm version or commit, lists required and optional model routes, and points at the kit's own `sync-agents` extension instead of a separate sync script.

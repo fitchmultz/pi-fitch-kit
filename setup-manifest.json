@@ -54,6 +54,10 @@
       "source": "git:github.com/fitchmultz/pi-session-name@bd851ba19208a395b3be0fe006b2b3402cc20fbc"
     },
     {
+      "id": "change-working-dir",
+      "source": "git:github.com/fitchmultz/pi-change-working-dir@58437bd9f5c34bc5364aed9c6f3b91049e93f243"
+    },
+    {
       "id": "ponytail",
       "source": "git:github.com/DietrichGebert/ponytail@16f29800fd2681bdf24f3eb4ccffe38be3baec6b"
     },
