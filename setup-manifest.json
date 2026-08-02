@@ -1,67 +1,83 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "runtime": {
-    "pi": "0.80.10",
-    "node": ">=24"
+    "pi": "0.83.0",
+    "node": ">=22.19.0"
   },
   "kit": {
-    "repository": "https://github.com/fitchmultz/pi-fitch-kit"
+    "repository": "https://github.com/fitchmultz/pi-fitch-kit",
+    "installSource": "git:github.com/fitchmultz/pi-fitch-kit"
   },
   "requiredModels": [
     "xai/grok-4.5",
     "openai-codex/gpt-5.6-sol",
     "openai-codex/gpt-5.6-terra",
+    "openai-codex/gpt-5.6-luna",
     "anthropic/claude-fable-5",
-    "anthropic/claude-opus-4-8"
+    "anthropic/claude-opus-5"
   ],
+  "optionalModels": [
+    "openai/gpt-5.6-sol",
+    "cursor/grok-4.5",
+    "cursor/gpt-5.6-sol@272k"
+  ],
+  "optionalModelsNote": "Fallback-only routes. openai/gpt-5.6-sol needs an OpenAI API key; the cursor/* routes need the pi-cursor-sdk package and a Cursor SDK API key. Missing them only removes those fallbacks.",
   "kitResources": {
-    "extensions": [
-      "extensions/nested-agents.ts",
-      "extensions/calculator/index.ts"
-    ],
-    "agentSyncScript": "scripts/sync-agents.mjs",
+    "extensions": ["extensions/sync-agents.ts"],
     "prompt": "prompts/fitch-setup.md",
-    "agentProfiles": 13,
+    "agentProfiles": 14,
     "workingAgreementTemplate": "templates/working-agreement.md"
   },
   "corePackages": [
     {
       "id": "subagents",
-      "source": "git:github.com/fitchmultz/pi-subagents@3dc8b01c365594b73dbe1db0d041ae20715394b7"
+      "source": "git:github.com/fitchmultz/pi-subagents@4f55ff92c92581eff2ab79810d5f9b9087a7a14a"
     },
     {
       "id": "intercom",
-      "source": "git:github.com/fitchmultz/pi-intercom@e604bb84cb41542c1a2f7e7fd0327c66084617dc"
+      "source": "git:github.com/fitchmultz/pi-intercom@8c3e345056c3244d3442108aaf76f3d94f934f41"
     },
     {
-      "id": "ponytail",
-      "source": "git:github.com/DietrichGebert/ponytail@16f29800fd2681bdf24f3eb4ccffe38be3baec6b"
+      "id": "apply-edits",
+      "source": "git:github.com/fitchmultz/pi-apply-edits@1668d22a66a7d43d7aa06b3964fd27efda43b909"
     },
     {
       "id": "ask-question",
       "source": "git:github.com/fitchmultz/pi-ask-question@06fe72b3326cc178c821754a524021a4da83162d"
     },
     {
+      "id": "todo-list",
+      "source": "git:github.com/fitchmultz/pi-todo-list@78b7851eb06e22993c16b374255b8b362254ac2a"
+    },
+    {
+      "id": "session-name",
+      "source": "git:github.com/fitchmultz/pi-session-name@bd851ba19208a395b3be0fe006b2b3402cc20fbc"
+    },
+    {
+      "id": "ponytail",
+      "source": "git:github.com/DietrichGebert/ponytail@16f29800fd2681bdf24f3eb4ccffe38be3baec6b"
+    },
+    {
       "id": "fff",
-      "source": "npm:@ff-labs/pi-fff@0.10.0"
+      "source": "npm:@ff-labs/pi-fff@0.10.1"
     },
     {
       "id": "agent-browser",
-      "source": "npm:pi-agent-browser-native@0.2.68",
+      "source": "npm:pi-agent-browser-native@0.2.72",
       "externalPrerequisite": {
         "package": "agent-browser",
-        "version": "0.32.0",
-        "installCommand": "npm install --global agent-browser@0.32.0",
+        "version": "0.33.1",
+        "installCommand": "npm install --global agent-browser@0.33.1",
         "runtimeDownloadCommand": "agent-browser install"
       }
     },
     {
       "id": "mcp",
-      "source": "npm:pi-mcp-adapter@2.11.0"
+      "source": "npm:pi-mcp-adapter@2.17.0"
     },
     {
       "id": "goal",
-      "source": "npm:pi-codex-goal@0.1.37"
+      "source": "npm:pi-codex-goal@0.1.39"
     },
     {
       "id": "stash",
@@ -82,17 +98,34 @@
     {
       "id": "copy-message",
       "source": "npm:pi-copy-message@1.0.11"
+    },
+    {
+      "id": "cursor-sdk",
+      "source": "npm:pi-cursor-sdk@0.1.62",
+      "note": "Supplies the cursor/* fallback routes. Needs a Cursor SDK API key saved through /login; skipping it only removes those fallbacks."
+    }
+  ],
+  "privatePackages": [
+    {
+      "id": "macuse",
+      "reason": "Private repository. Native macOS app control stays unavailable unless the user provides an approved source."
+    },
+    {
+      "id": "pr-hawk",
+      "reason": "Private repository. Pull-request watching stays unavailable unless the user provides an approved source."
     }
   ],
   "optionalIntegrations": [
     "Linear",
     "Slack",
+    "GitHub",
     "Horizon",
+    "Plain",
+    "Granola",
     "Notion",
-    "Cloudflare"
+    "Cloudflare",
+    "Sentry",
+    "Datadog"
   ],
-  "workingAgreementSections": [
-    "baseline",
-    "workos"
-  ]
+  "workingAgreementSections": ["baseline", "process"]
 }

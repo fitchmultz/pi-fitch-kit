@@ -1,108 +1,134 @@
 # pi-fitch-kit
 
-Opinionated public-core package for the Pi workflow Mitch Fultz uses: one accountable main session, fresh specialists for bounded context/research/review, exact model routing, and evidence before completion.
+My live Pi setup as an installable package: specialist agent profiles, reusable slash commands, a startup extension that keeps them in sync, and a pinned setup path for anyone who wants to copy the workflow.
 
-> **Release status:** public Git package at `https://github.com/fitchmultz/pi-fitch-kit`. The bootstrap installs immutable reviewed package commit `97a542a5bdb06ff7d1419b868aa03429b25a10a9`. The npm package remains `private: true` to prevent accidental registry publication.
+Two documents explain the setup itself:
 
-## Workflow
+- [docs/pi-setup.md](docs/pi-setup.md) — the full guide: workflow, agents, models, skills, evidence, and security boundaries.
+- [docs/pi-setup-post.md](docs/pi-setup-post.md) — the short version, with the quickest way to get running.
 
-The main Pi session owns the task. It gathers connected context, maps the code, decides and usually implements, validates the real behavior, reviews specialist output, and reports the result. Subagents are optional focused help, not an autonomous scout-to-worker pipeline:
-
-- `scout`, `researcher`, and `context-builder` gather bounded evidence.
-- `debugger` proves root causes before remediation.
-- `worker` and `fixer` handle isolated implementation or confirmed repair lists.
-- `reviewer`, `reviewer-gpt`, and `reviewer-claude` provide fresh independent review.
-- `planner`, `oracle`, and `ui-designer` cover broad decomposition, inherited-decision checks, and rendered product review.
-- `writer` handles human-facing documentation, guides, announcements, and polished copy.
-
-## Package resources
-
-Pi loads exactly:
-
-- `extensions/nested-agents.ts`, which live-loads `<cwd>/.pi/agent/AGENTS.md` only after the project contains another Pi-recognized trust-gated resource and the user trusts it;
-- `extensions/calculator/index.ts`, the deterministic, bounded 40-digit calculator;
-- `prompts/fitch-setup.md`, exposed as `/fitch-setup`.
-
-The package also includes `scripts/sync-agents.mjs`. `/fitch-setup` runs it once, after preview and approval, to add missing profile symlinks. It never replaces or deletes an existing file or symlink, so concurrent setup runs are harmless. Its report separates newly created, unchanged, and skipped paths.
-
-The 13 profile files remain canonical under `agents/`:
-
-| Profile | Primary | Fallback | Thinking | Context |
-|---|---|---|---|---|
-| `scout` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol` | high | fresh |
-| `context-builder` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol` | high | fresh |
-| `debugger` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
-| `researcher` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | xhigh | fresh |
-| `planner` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
-| `worker` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol`, then `anthropic/claude-fable-5` | high | fresh |
-| `fixer` | `xai/grok-4.5` | `openai-codex/gpt-5.6-sol`, then `anthropic/claude-fable-5` | high | fresh |
-| `reviewer` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | high | fresh |
-| `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai-codex/gpt-5.6-terra` | xhigh | fresh |
-| `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | xhigh | fresh |
-| `oracle` | `openai-codex/gpt-5.6-sol` | none | xhigh | fork |
-| `ui-designer` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5` | high | fresh |
-| `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-4-8` | high | fresh |
-
-Frontmatter owns runtime policy. Each model-facing body stays focused on the role's work, evidence standard, boundaries, and output rather than explaining model or launch configuration. All 13 profiles remain leaf agents. Grok is the fast/value route for scouting, context building, bounded implementation, and confirmed fixes; Sol remains the quality fallback and primary diagnosis/review route, and Claude remains the independent review and writing route.
-
-The Artificial Analysis plus CursorBench 3.2 rationale and source metrics are included as [PDF](docs/Model_Reference_Sheet_Artificial_Analysis_2026-07-18.pdf) and [DOCX](docs/Model_Reference_Sheet_Artificial_Analysis_2026-07-18.docx). Grok's exact CursorBench rank is discounted because Cursor disclosed training-data contamination, but independent speed, cost, agentic, and coding results support the fast/value assignment.
-
-The older files under `prompts/audit`, `prompts/execute`, `prompts/qa`, and `prompts/review` remain tracked historical workflow sources. They are not package resources and are not loaded by default.
-
-`setup-manifest.json` is the setup authority for Pi 0.80.10, Node 24+, required models including `xai/grok-4.5`, exact external package sources, Agent Browser's external runtime, and setup choices. Third-party Pi packages are installed from those pins rather than vendored here.
-
-## Setup
-
-Requirements:
-
-1. Node.js 24 or newer.
-2. Pi exactly 0.80.10.
-3. Exact access to `xai/grok-4.5`, `openai-codex/gpt-5.6-sol`, `openai-codex/gpt-5.6-terra`, `anthropic/claude-fable-5`, and `anthropic/claude-opus-4-8`. Setup stops rather than substitutes.
-4. User-owned provider authentication through Pi's documented login flows, including `/login xai` with a Grok/X subscription or xAI API key. WorkOS integrations remain optional.
-
-For development from a reviewed checkout:
+If you work with me and want this setup, the intended path is:
 
 ```bash
-npm install
-pi install /absolute/path/to/pi-fitch-kit
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.83.0
+pi
+# /login for your providers, then:
+pi install git:github.com/fitchmultz/pi-fitch-kit
+# /reload, then:
+/fitch-setup
 ```
 
-Run `/reload` or start a fresh Pi session, then invoke `/fitch-setup` (or `/fitch-setup verify`). Profile links are not created until the setup preview is approved. Existing files and symlinks are skipped and reported, never overwritten.
+Installing the kit is itself the first choice: the prompt library loads with the package, and the agent bench links on reload. `/fitch-setup` then drives everything beyond that from [setup-manifest.json](setup-manifest.json), the machine-readable source of truth for exact package pins, required model routes, and kit resources. It previews before writing, asks which parts you want, and never touches credentials. `/fitch-setup verify` reports drift without changing anything. It exists because "copy my setup" should not mean an agent improvising from prose: the manifest is checkable, the prose is not.
 
-### Public bootstrap
+## What this repo does
 
-Paste this into Pi. It installs the immutable reviewed package commit rather than a branch or tag. The setup manifest deliberately does not try to pin the package to itself because a Git commit cannot contain its own hash:
+- Keeps reusable prompt templates in one package repo, loaded recursively through `package.json#pi.prompts`.
+- Keeps the user-level subagent profiles in `agents/` as the single source of truth.
+- Bundles `extensions/sync-agents.ts`, which symlinks those profiles into `~/.pi/agent/agents/` on Pi startup/reload, so editing this repo edits the live bench. The sync manages only its own links: it never replaces a regular file or a symlink pointing anywhere else, so you can opt out of any bundled profile by putting your own file at that name.
+- Pins per-role model, fallback, and thinking policy in `agents/*.md` frontmatter; no duplicate overrides in `settings.json`.
+- Ships the setup entry point (`prompts/fitch-setup.md`), the pin manifest (`setup-manifest.json`), and a working-agreement template (`templates/working-agreement.md`).
+
+## Layout
 
 ```text
-Read the active Pi package, prompt, extension, settings, security, and model documentation. Run exactly `pi install git:github.com/fitchmultz/pi-fitch-kit@97a542a5bdb06ff7d1419b868aa03429b25a10a9 --no-approve` to install the kit; do not substitute a branch, tag, package, version, or model. Do not read credentials, auth stores, browser profiles, raw sessions, or service payloads. Preview every command and changed path, preserve unrelated configuration, and stop on malformed/conflicting configuration. After installation, tell me to run /reload, then use /fitch-setup for the preview-first setup.
+pi-fitch-kit/
+  package.json
+  setup-manifest.json
+  LICENSE
+  prompts/
+    fitch-setup.md
+    audit/        precommit-review, repo-audit, extension-audit,
+                  extract-process-improvements, github-open-issues-prs
+    execute/      debug-mode, fix-issues, mine-workflows, optimize-skill, orchestrate,
+                  resolve-findings, triage-first
+    review/       fresh-review, hard-review
+    qa/           manual-qa
+  agents/
+    scout, context-builder, debugger, researcher, planner, worker, fixer,
+    reviewer, reviewer-gpt, reviewer-claude, reviewer-security, oracle,
+    ui-designer, writer
+  templates/
+    working-agreement.md
+  docs/
+    pi-setup.md
+    pi-setup-post.md
+    Model_Reference_Sheet_Artificial_Analysis_2026-07-26.{pdf,docx}
+  extensions/
+    sync-agents.ts
+  scripts/
+    validate.mjs
+    package-smoke.mjs
+    sync-agents.sh
 ```
 
-This pasteable prompt plus `/fitch-setup` is the bootstrap. There is no runtime bootstrap command or wizard framework.
+## Prompts
 
-## Setup behavior
+Prompt filenames are the slash-command names: `/fitch-setup`, `/precommit-review`, `/repo-audit`, `/extension-audit`, `/extract-process-improvements`, `/github-open-issues-prs`, `/debug-mode`, `/fix-issues`, `/mine-workflows`, `/optimize-skill`, `/orchestrate`, `/resolve-findings`, `/triage-first`, `/fresh-review`, `/hard-review`, and `/manual-qa`.
 
-`/fitch-setup` reads the manifest, inspects non-secret state, and offers complete core or component selection. It asks separately about WorkOS service integrations, baseline working-agreement rules, and optional WorkOS process rules. Pi's built-in xAI provider supplies Grok; all four Grok-backed profiles fall back to Sol, while `fixer` and `worker` retain Fable as a second fallback. Before applying anything the setup previews every exact package command, model mapping, path, merge, symlink, and reload requirement.
+Notes:
 
-Configuration is merged narrowly. Managed working-agreement blocks update in place without replacing unrelated `AGENTS.md` content. Malformed JSON, broken markers, conflicting files, or missing exact models stop for a user decision. The global `agent-browser@0.32.0` prerequisite and its runtime download always require separate approval. Verification uses harmless local/read-only smokes and never service writes.
+- Prompt discovery in plain `prompts/` folders is non-recursive, so this repo uses `pi.prompts: ["./prompts"]` and relies on package directory loading to pick up the nested prompt files.
+- Prompt `description:` and `argument-hint:` values improve autocomplete.
+- Optional-scope prompts use native prompt-template defaults like `${1:-...}` so blank invocations produce useful scoped instructions instead of empty placeholders. Multi-word focus must be quoted (for example `/repo-audit "auth module"`).
+- Prompt frontmatter intentionally omits `model:`, `thinking:`, and other extension-only fields so prompts stay compatible with native Pi prompt templates and inherit the active session model.
 
-## Security
+## Agents
 
-Pi packages and extensions run with the user's full permissions. Review this package and every pinned dependency before installation. Project trust is an input-loading gate, not a sandbox. Because `.pi/agent/AGENTS.md` does not itself trigger Pi's trust flow, nested instructions load only when the project already contains another Pi-recognized trust-gated resource and the effective trust decision is true.
+`agents/` stores the fourteen specialist profiles. The exact per-role model, fallback, and thinking mapping lives in each file's frontmatter and is tabulated in [docs/pi-setup.md](docs/pi-setup.md); `npm run check` fails if a profile uses a model route the manifest does not list, so the routes cannot silently drift; order and effort still live in the frontmatter alone. Most names intentionally match builtin `pi-subagents` names so the user-level versions override the builtin ones cleanly; `debugger`, `reviewer-claude`, `reviewer-gpt`, `reviewer-security`, `ui-designer`, and `writer` are added specialists.
 
-This repository must not contain or inspect authentication files, tokens, private endpoints, browser profiles, raw Pi sessions, generated model caches, or copied service responses. Each user authenticates their own providers and integrations. Consequential external actions still require explicit authorization.
+Frontmatter owns runtime policy. Each model-facing body stays focused on the role's work, evidence standard, boundaries, and output rather than explaining model or launch configuration, because narrating configuration back to the model wastes prompt budget without changing behavior.
+
+Model policy, and why:
+
+- `xai/grok-4.5` at high effort is the primary for `scout`, `context-builder`, `fixer`, and `worker`. These roles run under a smart parent that checks their output, so elapsed time matters more than the last few points of quality, and Grok matches Opus 5 high's CursorBench score at roughly a third of the cost. All four fall back first to `cursor/grok-4.5` (same model, different provider), then to Sol; `fixer` and `worker` keep `anthropic/claude-opus-5` as a final fallback because unattended implementation should degrade to a stronger model, not a cheaper one.
+- `openai-codex/gpt-5.6-sol` is the primary for `debugger`, `researcher`, `planner`, `reviewer`, `reviewer-gpt`, and `oracle`, and the quality fallback for every Grok-backed role. Every Sol-primary role keeps `openai/gpt-5.6-sol` in its fallback chain so a Codex-route failure can reach the same model through the OpenAI API instead of losing it entirely; that route needs an OpenAI API key and is optional.
+- `anthropic/claude-fable-5` is the primary for `writer` (it leads the Artificial Analysis writing benchmark), and for `reviewer-claude`, `reviewer-security`, and `ui-designer`, where the point is an independent second model family reading the same evidence. `anthropic/claude-opus-5` sits directly behind it on `writer`, `reviewer-claude`, and `ui-designer`.
+- Thinking is `high` for speed-sensitive and routine specialist work; `xhigh` is reserved for the roles where a wrong conclusion is expensive: consequential research, planning, the strict review gates, security review, UI review, and oracle decisions.
+- `reviewer` and `reviewer-gpt` fall back through `openai/gpt-5.6-sol`, then `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra`, keeping full Sol quality through two providers before dropping to Terra.
+- `oracle` is the only fork-context agent: its job is to compare a proposed direction against the parent conversation, so it needs the transcript. Its chain stays non-Anthropic because the `claude-code` provider cannot import a Pi fork transcript.
+- The Anthropic provider differs per machine: the work machine uses Pi's `anthropic` provider, the personal machine uses `claude-code`. Agent frontmatter keeps `anthropic/*` ids so both machines resolve the same overrides; only the `claude-code` route carries the fork-transcript restriction.
+- `tools:` is intentionally omitted on every profile so agents receive Pi's normal builtin/extension tool surface, and every profile is a leaf agent (`allowSubagents: false` or `maxSubagentDepth: 0`) so a focused job cannot quietly become an unbounded hierarchy.
+- Grok primaries use Pi's built-in xAI provider (`/login xai`). The `cursor/*` fallbacks require the separately installed `pi-cursor-sdk` package and a Cursor SDK API key; skipping that key only removes those fallbacks.
+
+Benchmark rationale and the Artificial Analysis plus CursorBench 3.2 source metrics are in the [PDF](docs/Model_Reference_Sheet_Artificial_Analysis_2026-07-26.pdf) / [DOCX](docs/Model_Reference_Sheet_Artificial_Analysis_2026-07-26.docx), refreshed 26 July 2026. Grok's exact CursorBench rank is discounted because Cursor disclosed training-data contamination, but its independent speed and cost evidence still supports the fast/value roles.
+
+## Subagent context policy
+
+When spawning subagents from parent prompts or code:
+
+- Pass `context: "fresh"` unless the task explicitly requires parent transcript history. Fresh context is the point: a child that inherits the parent transcript also inherits its blind spots.
+- Use `context: "fork"` only for oracle consistency checks. For fix-after-review continuity, resume the same child or use fresh context with a compact handoff.
+- Hand off with artifacts (`context.md`, `plan.md`, `review.md`, `progress.md`) instead of inherited transcript.
+- Do not mix scout/reviewer/researcher calls into the same parallel batch as worker/oracle unless each step's context policy is intentional.
+
+## Subagent output discipline
+
+Pi-subagents supports `outputMode: "file-only"` on the parent `subagent(...)` call, parallel task item, or chain step. It is not enforced by agent frontmatter, so an `output` path by itself still returns saved output inline unless the caller also sets `outputMode: "file-only"`. Relative output paths inherited from agent defaults are materialized under the run artifact directory with unique names, so defaults like `context.md` and `plan.md` do not collide in parallel runs or leave project-root files. All reviewer profiles use `output: false`; ask for an output path only when a durable review artifact is needed. For strict saved reviews, use `/hard-review`, which creates a temp artifact directory and gives each reviewer a distinct `output` path.
+
+Agents should write bulky logs, diffs, browser snapshots, JSON, and raw command output to `/tmp` or a repo-local gitignored scratch path, then summarize only decision-relevant lines.
+
+## Install
+
+For someone copying the setup, install from Git and let the setup prompt drive:
+
+```bash
+pi install git:github.com/fitchmultz/pi-fitch-kit
+# /reload, then /fitch-setup
+```
+
+For local development of the kit itself, install from the checkout path so edits become the live source of truth immediately:
+
+```bash
+pi install /path/to/pi-fitch-kit
+```
+
+Either way the package loads the prompts and the `sync-agents` extension. `scripts/sync-agents.sh` remains only as a manual fallback if Pi is not running or extension loading is disabled. If you change prompts or agent definitions while Pi is running, `/reload` or start a fresh session.
+
+## Repo-local overrides
+
+When a specific project needs custom behavior, override globally installed resources with the same filenames in `.pi/prompts/` and `.pi/agents/`. That preserves stable command names while allowing per-repo specialization.
 
 ## Validation
 
-```bash
-npm run check
-npm pack --dry-run --json >/tmp/pi-fitch-kit-pack.json
-node -e "const p=require('/tmp/pi-fitch-kit-pack.json'); if(!p[0] || p[0].error) process.exit(1)"
-```
-
-`npm run check` type-checks against Pi 0.80.10, runs the calculator check, validates resources, profiles/models, immutable pins, add-only concurrent profile linking, trusted live nested instructions, and setup/working-agreement contracts, then loads the package in an isolated Pi resource loader to prove that exactly two extensions and `/fitch-setup` are discovered.
-
-For runtime-facing edits, install the reviewed checkout in Pi and use `/reload` or a fresh session before harmless runtime verification.
-
-## License
-
-MIT
+- `npm run check` — syntax-checks the extension, exercises the symlink sync (including the non-symlink conflict guard), and verifies the manifest against the agent profiles, kit resources, package pins, and setup prompt.
+- `npm run smoke` — loads the repo as a real Pi package through the SDK in a throwaway agent dir and asserts prompts and the extension load cleanly. Requires `npm install` first.

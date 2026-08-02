@@ -15,7 +15,7 @@ You are the parent orchestrator:
 Model/delegation policy:
 - Use configured subagent defaults for delegated changes, scouting, implementation, and review.
 - Override model or thinking only when a concrete routing, provider-capability, model-diversity, or cost requirement justifies it.
-- Treat `anthropic/*` as Pi's Anthropic provider route. It cannot back forked subagent invocations, so use fresh context with a compact handoff instead.
+- Treat `anthropic/*` as this environment's subagents-only Claude Code CLI route for fresh-context UI/fallback diversity, not a global Pi provider model or fork-transcript import path; do not use it as primary or fallback routing for forked invocations. Use fresh context with a compact handoff instead.
 - Delegate bounded tasks with clear scope, target files/systems, constraints, expected output, and validation requirements.
 - The parent orchestrator must review all outputs, inspect diffs, run verification, decide what lands, and write the user-facing status.
 
@@ -69,9 +69,9 @@ Workflow:
 
 5. Review loop
    - Run strict review before merge.
-   - Use the configured `reviewer-claude` and `reviewer-gpt` defaults; override them only for a concrete routing or provider-capability requirement.
-   - Remediate every finding, including maintainability, test-contract, docs, naming, and polish findings.
-   - Repeat review/fix/review until there are no blocking findings.
+   - Use the configured `reviewer-gpt` defaults; override them only for a concrete routing or provider-capability requirement. Add `reviewer-claude` only when the change warrants cross-model coverage.
+   - Remediate every blocking finding, plus every non-blocking one whose fix is small and low risk; file the rest as follow-ups.
+   - Launch the reviewer with `async: true` and repeat review/fix/review until it reports no blocking finding.
    - Do not merge on passing tests alone if review finds unresolved structural or behavior risk.
 
 6. Verification

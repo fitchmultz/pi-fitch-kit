@@ -14,12 +14,12 @@ Merge only the user-approved managed blocks into `~/.pi/agent/AGENTS.md`. Update
 - Commit only when requested or agreed. Stop before push, merge, publish, deploy, or other external mutation unless the user explicitly authorized it.
 <!-- fitch-pi-kit:baseline:end -->
 
-<!-- fitch-pi-kit:workos:start -->
-## Optional WorkOS process
+<!-- fitch-pi-kit:process:start -->
+## Optional process
 
-- Use Linear for task tracking. Create, update, and close issues as needed.
-- For code changes in `workos/*`, prefer a dedicated git worktree and branch; preserve unrelated work in existing worktrees.
-- Before commit, push, or merge, run a fresh `reviewer-gpt` with the `thermo-nuclear-code-quality-review` skill and repeat after every later code change until it requires no changes.
-- Read and respond to every pull-request comment. Resolve a thread only after replying and only when resolved.
-- Before merging, summarize changes, decisions, validation, and risks, then wait unless merge was explicitly authorized.
-<!-- fitch-pi-kit:workos:end -->
+- Use Linear for task tracking on real work. Keep status and the PR link current, and create follow-up issues for deferred findings instead of dropping them.
+- For shared-repository code changes, use a dedicated git worktree and branch per task; preserve unrelated and in-progress work in existing worktrees.
+- Before a PR is ready, launch a fresh `reviewer-gpt` subagent on the diff and repeat after fixes until it reports no blocking findings. Add `reviewer-claude` when the change warrants a second model family.
+- Read and respond to every pull-request comment, including review bots. Resolve a thread only after the underlying issue is fixed or answered.
+- Before merging, summarize changes, decisions, validation, and remaining risk, then wait unless merge was explicitly authorized.
+<!-- fitch-pi-kit:process:end -->

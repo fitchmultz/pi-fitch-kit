@@ -2,45 +2,52 @@
 
 ## Project shape
 
-This repository is the public-core source for `@fitch/pi-kit`.
-
-Canonical sources:
-
-- `setup-manifest.json` for supported Pi/Node versions, exact models, pinned core packages, and Agent Browser's external prerequisite.
-- `package.json#pi` for the only resources Pi loads: trusted nested instructions, calculator, and `/fitch-setup`.
-- `scripts/sync-agents.mjs` for add-only, setup-time profile linking.
-- `agents/*.md` for exactly 13 reusable user-level subagent profiles and their model/thinking/context policy.
-- `templates/working-agreement.md` for independently selectable baseline and WorkOS managed blocks.
-- `prompts/fitch-setup.md` for the main-session-led setup procedure.
-
-Keep `README.md` aligned with setup, resources, profiles, release status, and security boundaries. Old workflow prompts stay tracked under their existing subdirectories but are not default package resources.
+- This repo is a local Pi package for Fitch-owned prompt templates and user-level subagent overrides.
+- Canonical sources:
+  - `prompts/**/*.md` for package slash commands, including the `/fitch-setup` entry point.
+  - `agents/*.md` for reusable user subagent overrides.
+  - `extensions/sync-agents.ts` for startup/reload symlink sync into `~/.pi/agent/agents/`.
+  - `setup-manifest.json` for exact package pins, required model routes, and kit resources; `/fitch-setup` treats it as the single source of truth.
+  - `templates/working-agreement.md` for the managed working-agreement blocks.
+  - `package.json#pi` for the resources Pi loads from this package.
+- Keep `README.md`, `setup-manifest.json`, and `docs/pi-setup.md` in sync when commands, prompt names, agent roles, models, package pins, install flow, or source-of-truth rules change. `npm run check` enforces the manifest side of this.
 
 ## Commands
 
-- Install dependencies: `npm install`
-- Validate repository: `npm run check`
-- Isolated resource smoke: `npm run smoke:package`
-- Dry-run package: `npm pack --dry-run --json >/tmp/pi-fitch-kit-pack.json`
-- Add missing agent links: `node scripts/sync-agents.mjs`
-- Install a reviewed checkout: `pi install /absolute/path/to/pi-fitch-kit`
-- Reload runtime changes: `/reload` or a fresh Pi session
-
-Use npm with Node `>=24`. TypeScript must check against exact dev dependency `@earendil-works/pi-coding-agent@0.80.10`.
+- Install deps: `npm install`
+- Validate repo: `npm run check`
+- Package load smoke: `npm run smoke`
+- Manual agent sync fallback: `bash scripts/sync-agents.sh`
+- Install/update package in Pi from this checkout: `pi install /Users/mitchfultz/Projects/pi-stuff/pi-fitch-kit`
+- After changing prompts or agents in a running Pi session, use `/reload` or start a fresh session before runtime verification.
 
 ## Editing rules
 
-- Do not edit synced files under `~/.pi/agent/agents/`; edit `agents/*.md` here.
-- Keep exactly 13 leaf profiles. Preserve the high-effort `xai/grok-4.5` primaries for `scout`, `context-builder`, `fixer`, and `worker`: all four fall back to Sol, while `fixer` and `worker` then fall back to Fable. Do not duplicate agent overrides in settings or enable nested subagents.
+- Use npm and Node `>=22.19.0`; do not introduce another package manager.
+- Do not edit synced copies under `~/.pi/agent/agents/`; edit `agents/*.md` here and let the extension or fallback script relink them.
+- Do not add duplicate subagent overrides in Pi settings. Agent model/thinking/context/tool policy lives in `agents/*.md` frontmatter.
 - Keep model-facing agent bodies focused on actionable role instructions, evidence standards, boundaries, and outputs. Agent model, effort, and context policy belongs in frontmatter; parent-launch guidance belongs in orchestration docs.
-- Keep runtime Pi imports as wildcard optional peers. Runtime third-party libraries belong in `dependencies`.
-- Do not vendor external Pi packages, add a bootstrap runtime command, or build a setup wizard. Use the manifest, pasteable bootstrap prompt, and `/fitch-setup`.
-- Keep package installs immutable. Do not replace exact versions/commits with ranges, tags, or branches.
-- Keep `private: true`. All three bootstrap examples must use the same immutable 40-character reviewed package commit. During release they may retain the explicit pre-release placeholder only until that package commit exists; replace it in a docs-only follow-up. Do not put a self-referential install pin in `setup-manifest.json`.
-- Nested project instructions must use `CONFIG_DIR_NAME`, require both `hasTrustRequiringProjectResources(cwd)` and `ctx.isProjectTrusted()`, re-read each turn, suppress duplicate context files, ignore empty/missing files, and never create trust-trigger resources.
-- Agent sync is setup-time and add-only. It must skip every existing file or foreign symlink, never replace or remove a target, remain safe when processes race to create the same missing link, and report created, unchanged, and skipped paths separately.
-- Setup must preview writes, preserve unrelated configuration, block on missing exact models or malformed/conflicting config, and never read credentials/raw sessions/browser profiles/service payloads or make service writes.
-- Working-agreement updates must use complete managed markers and never replace unrelated `AGENTS.md` content.
+- Use configured agent defaults first. Override model or thinking only when a concrete routing, provider-capability, model-diversity, or cost requirement justifies it.
+- The Anthropic route is machine-specific: this work machine uses Pi's `anthropic` provider, and the personal machine uses the `claude-code` provider. Keep `anthropic/*` ids in agent frontmatter so both machines resolve the same overrides.
+- Do not use the `claude-code` provider as primary or fallback routing for forked invocations; use fresh context with a compact handoff because Claude Code cannot import a Pi fork transcript. `oracle` is the only fork-context override, so keep its chain non-Anthropic.
+- Keep `tools:` omitted in agent overrides unless a task explicitly needs a static allowlist; Pi should provide the normal builtin/extension tool surface.
+- Keep every agent as a leaf agent; do not opt into nested subagents unless the README policy changes.
+
+## Prompt templates
+
+- Prompt filenames are slash-command names; update `README.md` lists when adding, renaming, or deleting one.
+- Prompt frontmatter should stay native and portable: use fields such as `description:` and `argument-hint:`.
+- Do not add `model:`, `thinking:`, or extension-only skill injection to prompt frontmatter.
+- Prefer Pi template defaults like `${1:-default}` for optional args; document quoted multi-word args when relevant.
+
+## Extension and Pi package work
+
+- Before changing Pi runtime/package behavior, read the installed Pi docs/types for the touched surface, especially `docs/packages.md`, `docs/prompt-templates.md`, and `docs/extensions.md` under the installed Pi root.
+- Keep `extensions/sync-agents.ts` startup work small and deterministic: create symlinks, skip non-symlink conflicts, warn through UI only when needed.
+- Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.
 
 ## Validation
 
-Run `npm run check` after changes to package metadata, lockfile, manifest, extensions, scripts, agents, prompts, templates, or docs. Run the configured pack dry-run before completion. Runtime verification must be harmless and must not authenticate, download browser runtimes, or access service payloads without the exact approval required by `/fitch-setup`.
+- Run `npm run check` after edits to `package.json`, `setup-manifest.json`, `extensions/`, `scripts/`, `agents/`, or `prompts/`; add `npm run smoke` when package resources changed.
+- For runtime-facing changes, also verify Pi loads the package through `pi install ...` plus `/reload` or a fresh Pi session when practical.
+- Keep this file short and project-specific; point to `README.md` or Pi docs instead of copying large directory maps or generic coding rules.

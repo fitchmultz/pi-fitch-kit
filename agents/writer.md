@@ -2,7 +2,7 @@
 name: writer
 description: Human-facing writing specialist for documentation, announcements, guides, and polished copy
 model: anthropic/claude-fable-5
-fallbackModels: anthropic/claude-opus-4-8
+fallbackModels: anthropic/claude-opus-5
 thinking: high
 systemPromptMode: append
 inheritProjectContext: true
