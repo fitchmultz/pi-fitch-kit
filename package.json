@@ -1,10 +1,17 @@
 {
   "name": "@fitch/pi-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fitchmultz/pi-fitch-kit.git"
+  },
+  "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "node --check extensions/sync-agents.ts && node scripts/validate.mjs"
+    "check": "node --check extensions/sync-agents.ts && node scripts/validate.mjs",
+    "smoke": "node scripts/package-smoke.mjs"
   },
   "keywords": [
     "pi-package"
@@ -22,7 +29,7 @@
   },
   "packageManager": "npm@11.16.0",
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.80.1"
+    "@earendil-works/pi-coding-agent": "^0.83.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"

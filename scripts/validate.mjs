@@ -54,7 +54,63 @@ try {
     throw new Error("Manual sync overwrote an existing non-symlink agent file");
   }
 
-  console.log(JSON.stringify({ ok: true, events, syncedAgents, notices, manualSyncConflictPreserved: true }, null, 2));
+  // Manifest consistency: the setup prompt treats setup-manifest.json as the
+  // source of truth, so drift between it, the agent profiles, and package.json
+  // must fail this check.
+  const root = resolve(__dirname, "..");
+  const manifest = JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf-8"));
+  const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
+
+  const assert = (condition, message) => {
+    if (!condition) throw new Error(message);
+  };
+
+  assert(
+    JSON.stringify(packageJson.pi.extensions) === JSON.stringify(manifest.kitResources.extensions.map((p) => `./${p}`)),
+    "package.json pi.extensions must match manifest kitResources.extensions",
+  );
+  for (const resource of [
+    ...manifest.kitResources.extensions,
+    manifest.kitResources.prompt,
+    manifest.kitResources.workingAgreementTemplate,
+  ]) {
+    assert(lstatSync(join(root, resource)).isFile(), `manifest resource missing: ${resource}`);
+  }
+
+  const profileFiles = readdirSync(join(root, "agents")).filter((name) => name.endsWith(".md"));
+  assert(
+    profileFiles.length === manifest.kitResources.agentProfiles,
+    `manifest says ${manifest.kitResources.agentProfiles} agent profiles, found ${profileFiles.length}`,
+  );
+
+  const allowedModels = new Set([...manifest.requiredModels, ...manifest.optionalModels]);
+  for (const name of profileFiles) {
+    const body = readFileSync(join(root, "agents", name), "utf-8");
+    const models = [
+      ...(body.match(/^model:\s*(.+)$/m)?.[1].split(",") ?? []),
+      ...(body.match(/^fallbackModels:\s*(.+)$/m)?.[1].split(",") ?? []),
+    ].map((model) => model.trim());
+    assert(models.length > 0, `${name} declares no model`);
+    for (const model of models) {
+      assert(allowedModels.has(model), `${name} uses ${model}, which is not in the manifest model lists`);
+    }
+  }
+
+  for (const pkg of manifest.corePackages) {
+    assert(
+      /^npm:(@?[\w./-]+)@\d+\.\d+\.\d+$/.test(pkg.source) || /^git:github\.com\/[\w-]+\/[\w-]+@[0-9a-f]{40}$/.test(pkg.source),
+      `corePackages ${pkg.id} is not pinned to an exact npm version or 40-char commit: ${pkg.source}`,
+    );
+  }
+
+  const setupPrompt = readFileSync(join(root, manifest.kitResources.prompt), "utf-8");
+  assert(setupPrompt.includes("setup-manifest.json"), "setup prompt must reference the manifest");
+  assert(
+    setupPrompt.includes(`all ${manifest.kitResources.agentProfiles} files`),
+    "setup prompt profile count drifted from the manifest",
+  );
+
+  console.log(JSON.stringify({ ok: true, events, syncedAgents, notices, manualSyncConflictPreserved: true, manifestChecked: true }, null, 2));
 } finally {
   rmSync(agentDir, { recursive: true, force: true });
 }

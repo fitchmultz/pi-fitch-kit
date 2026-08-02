@@ -4,16 +4,19 @@
 
 - This repo is a local Pi package for Fitch-owned prompt templates and user-level subagent overrides.
 - Canonical sources:
-  - `prompts/**/*.md` for package slash commands.
+  - `prompts/**/*.md` for package slash commands, including the `/fitch-setup` entry point.
   - `agents/*.md` for reusable user subagent overrides.
   - `extensions/sync-agents.ts` for startup/reload symlink sync into `~/.pi/agent/agents/`.
+  - `setup-manifest.json` for exact package pins, required model routes, and kit resources; `/fitch-setup` treats it as the single source of truth.
+  - `templates/working-agreement.md` for the managed working-agreement blocks.
   - `package.json#pi` for the resources Pi loads from this package.
-- Keep `README.md` in sync when commands, prompt names, agent roles, install flow, or source-of-truth rules change.
+- Keep `README.md`, `setup-manifest.json`, and `docs/pi-setup.md` in sync when commands, prompt names, agent roles, models, package pins, install flow, or source-of-truth rules change. `npm run check` enforces the manifest side of this.
 
 ## Commands
 
 - Install deps: `npm install`
 - Validate repo: `npm run check`
+- Package load smoke: `npm run smoke`
 - Manual agent sync fallback: `bash scripts/sync-agents.sh`
 - Install/update package in Pi from this checkout: `pi install /Users/mitchfultz/Projects/pi-stuff/pi-fitch-kit`
 - After changing prompts or agents in a running Pi session, use `/reload` or start a fresh session before runtime verification.
@@ -45,6 +48,6 @@
 
 ## Validation
 
-- Run `npm run check` after edits to `package.json`, `extensions/`, `scripts/`, `agents/`, or `prompts/`.
+- Run `npm run check` after edits to `package.json`, `setup-manifest.json`, `extensions/`, `scripts/`, `agents/`, or `prompts/`; add `npm run smoke` when package resources changed.
 - For runtime-facing changes, also verify Pi loads the package through `pi install ...` plus `/reload` or a fresh Pi session when practical.
 - Keep this file short and project-specific; point to `README.md` or Pi docs instead of copying large directory maps or generic coding rules.

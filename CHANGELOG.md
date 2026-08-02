@@ -1,5 +1,16 @@
 # Changelog
 
+## Shareable kit: pinned setup path plus current bench — 1 August 2026
+
+- Rebuilt the installer path on the live package instead of the pre-symlink layout: `setup-manifest.json` (schema 2) pins every core package to an exact npm version or commit, lists required and optional model routes, and points at the kit's own `sync-agents` extension instead of a separate sync script.
+- Rewrote `/fitch-setup` against the manifest: 14 profiles, current model mapping, `~/.agents/skills` preservation, `apply_edits` verification, explicit trust choices, and the same credential and preview boundaries as before.
+- Restored `templates/working-agreement.md` with managed markers; renamed the optional block from WorkOS process to plain process and made its worktree rule repository-neutral.
+- Model changes: `debugger` and `planner` moved to `openai-codex/gpt-5.6-sol` (Fable 5 first fallback, duplicate primary dropped from their chains); `reviewer-claude`, `ui-designer`, and the new `reviewer-security` lead with `anthropic/claude-fable-5`; `reviewer-gpt` and `ui-designer` run xhigh; `anthropic/claude-opus-5` at max is the default main-session model.
+- Added `reviewer-security`, a fresh-context security and data-safety reviewer.
+- Extended `npm run check` to fail on drift between the manifest, agent frontmatter models, kit resources, package pins, and the setup prompt; restored `npm run smoke` as an SDK package-load check on pi 0.83.0.
+- Refreshed both guides for pi 0.83.0 and the current bench, and rewrote the README around the copy-this-setup path (`pi install git:github.com/fitchmultz/pi-fitch-kit` then `/fitch-setup`).
+- Restored the MIT LICENSE and public repository metadata in `package.json`.
+
 ## Single-reviewer default gate — 26 July 2026
 
 - Made `reviewer-gpt` the default review gate. `reviewer-claude` is no longer required on every gate and joins only when a change warrants cross-model coverage.
