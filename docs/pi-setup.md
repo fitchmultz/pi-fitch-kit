@@ -102,8 +102,6 @@ My global agreement says, in plain language:
 - use independent review when I ask for it or when risk makes it worthwhile, not as a blanket commit or push gate;
 - stop before merge unless I explicitly requested it.
 
-A small nested-instruction extension also checks `<current project>/.pi/agent/AGENTS.md` on every turn. That lets a repository add pi-specific rules that take effect without restarting the session.
-
 These process rules are part of explaining my workflow, but the installer should not silently impose all of them on another engineer. It should show the rules and ask which ones they want.
 
 ### The tools on the normal path
@@ -123,7 +121,8 @@ These process rules are part of explaining my workflow, but the installer should
 | Cursor SDK | Supplies the `cursor/grok-4.5` first fallback for Grok-backed agents |
 | Todo List | Nested task list that survives context compaction on multi-step work |
 | Session Name | Names each session so past work stays searchable |
-| PR Hawk | Watches my open pull requests and reports what needs attention (private repository) |
+| Change Dir | Moves the session working directory once instead of prefixing every command with `cd` |
+| PR Hawk | Watches my open pull requests and reports what needs attention (private repository, currently disabled) |
 
 `pi-apply-edits` exposes `apply_edits` as the one active mutation tool and removes Pi's built-in `edit` and `write` tools before the first model turn. One mutation tool means one set of edit semantics to trust: exact edits, whole-file rewrites, and plan-first multi-file batches that either all apply or none do. The built-ins remain available through an explicit session opt-in and should stay enabled on platforms where existing-file replacement is unsupported.
 
@@ -140,7 +139,7 @@ The `fitchmultz` Git forks of `pi-subagents` and `pi-intercom` are intentional. 
 
 Package skills add `pi-subagents`, `pi-intercom`, `macuse`, `ponytail`, `ponytail-review`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, and `ponytail-help`. Pi keeps only skill names and descriptions in the base prompt, then loads a full `SKILL.md` when the task matches.
 
-`agent-skill-engineering`, `collaborative-coding`, `comprehensive-codebase-audit`, `crabbox-platform-testing`, `cueloop`, `gogcli`, `pdf`, `peekaboo`, `platform-validation`, `readme-great-demo`, `slides`, `weekly-review`, and `workflow-from-chats` remain installed but are excluded from normal Pi discovery. `bro` and `propose-then-ship` are explicit-only through `disable-model-invocation`. This keeps the default catalog focused without deleting occasional workflows.
+`agent-skill-engineering`, `collaborative-coding`, `comprehensive-codebase-audit`, `crabbox-platform-testing`, `cueloop`, `gogcli`, `pdf`, `peekaboo`, `platform-validation`, `propose-then-ship` (superseded by its pi port), `readme-great-demo`, `slides`, `weekly-review`, and `workflow-from-chats` remain installed but are excluded from normal Pi discovery. `bro` is explicit-only through `disable-model-invocation`. This keeps the default catalog focused without deleting occasional workflows.
 
 ### The specialist bench
 
@@ -277,8 +276,8 @@ The complete core includes:
 - the working-agreement template;
 - the full specialist bench and prompt library, which arrive with the kit itself;
 - the exact OpenAI, Anthropic, xAI, and Cursor role mappings with explicit Cursor and Sol fallbacks;
-- FFF, Agent Browser, MCP, subagents, Intercom, Apply Edits, structured questions, todo list, session naming, goal, stash, verbosity, duration, session editing, message copying, Ponytail, and the Cursor SDK route;
-- offers to build the calculator, nested-instruction, Codex priority, and custom compaction equivalents you approve;
+- FFF, Agent Browser, MCP, subagents, Intercom, Apply Edits, structured questions, todo list, session naming, working-directory switching, goal, stash, verbosity, duration, session editing, message copying, Ponytail, and the Cursor SDK route;
+- offers to build the calculator, Codex priority, and custom compaction equivalents you approve;
 - harmless validation for every installed capability.
 
 My skills live in `~/.agents/skills` and are not part of the kit; the setup preserves whatever skill library you already have instead of imposing mine.
@@ -307,11 +306,11 @@ The rules `/fitch-setup` works under:
 
 Every engineer authenticates their own providers, which is why the setup prompt treats logins as steps it asks you to do rather than things it does.
 
-The pinned dependency set covers subagents, Intercom, Apply Edits, structured questions, todo list, session naming, Ponytail, FFF, Agent Browser plus its upstream browser dependency, the MCP adapter, goal tracking, stash, verbosity, tool duration, session editing, message copying, and the Cursor SDK route. The exact pins live in the manifest, not here, so this guide cannot rot into a second package list.
+The pinned dependency set covers subagents, Intercom, Apply Edits, structured questions, todo list, session naming, working-directory switching, Ponytail, FFF, Agent Browser plus its upstream browser dependency, the MCP adapter, goal tracking, stash, verbosity, tool duration, session editing, message copying, and the Cursor SDK route. The exact pins live in the manifest, not here, so this guide cannot rot into a second package list.
 
 Macuse and PR Hawk are part of my current setup, but their repositories are private. The kit leaves them unavailable rather than copying code from my installation or silently substituting another tool.
 
-My small local extensions, the deterministic calculator, the nested-instruction loader, the Codex priority toggle, and the custom compaction route, are not in the kit yet. The setup prompt offers to build the smallest current-API equivalent of each one you approve instead of copying mine.
+My small local extensions, the deterministic calculator, the Codex priority toggle, and the custom compaction route, are not in the kit yet. The setup prompt offers to build the smallest current-API equivalent of each one you approve instead of copying mine.
 
 ## How the bootstrap works
 
