@@ -20,7 +20,7 @@
 - Validate repo: `npm run check`
 - Package load smoke: `npm run smoke`
 - Manual agent sync fallback: `bash scripts/sync-agents.sh`
-- Install/update package in Pi from this checkout: `pi install /Users/mitchfultz/Projects/pi-stuff/pi-fitch-kit`
+- Install/update package in Pi from this checkout: `pi install "$PWD"`
 - After changing prompts or agents in a running Pi session, use `/reload` or start a fresh session before runtime verification.
 
 ## Editing rules

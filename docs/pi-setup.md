@@ -169,7 +169,7 @@ My safe settings subset is checked in at [`examples/settings.json`](../examples/
 }
 ```
 
-Disabling global resize preserves original detail for image analysis. [`anthropic-image-guard.ts`](../extensions/anthropic-image-guard.ts) then enforces the stricter boundary only when the selected provider is Anthropic. This is the same pattern used elsewhere in the setup: retain capability globally, then adapt at the narrow provider boundary that needs it.
+Disabling global resize preserves original detail for image analysis. [`anthropic-image-guard.ts`](../extensions/anthropic-image-guard.ts) then enforces the stricter boundary only when the selected provider is Anthropic. Its eight-entry cache is cleared on session start and compaction, so preserving image quality does not create unbounded session memory. This is the same pattern used elsewhere in the setup: retain capability globally, then adapt at the narrow provider boundary that needs it.
 
 ## Subagent launch policy
 

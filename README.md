@@ -77,7 +77,7 @@ Pi defaults `images.autoResize` to `true`, which protects provider limits by shr
 }
 ```
 
-That exposed stricter Anthropic image limits. The bundled guard fixes the boundary instead of giving up source quality everywhere: it runs only on Anthropic requests, reuses Pi's native image resizer, caches work within the session, and substitutes a clear omission note if resizing fails. The complete safe settings subset is in [`examples/settings.json`](examples/settings.json).
+That exposed stricter Anthropic image limits. The bundled guard fixes the boundary instead of giving up source quality everywhere: it runs only on Anthropic requests, reuses Pi's native image resizer, keeps eight recent transformations, clears that cache on compaction, and substitutes a clear omission note if resizing fails. The complete safe settings subset is in [`examples/settings.json`](examples/settings.json).
 
 ## Subagent bench
 

@@ -1,9 +1,13 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { formatDimensionNote, resizeImage } from "@earendil-works/pi-coding-agent";
 
+const MAX_CACHE_ENTRIES = 8;
+
 export default function anthropicImageGuard(pi: ExtensionAPI): void {
 	const cache = new Map<string, ReturnType<typeof resizeImage>>();
-	pi.on("session_start", () => cache.clear());
+	const clearCache = () => cache.clear();
+	pi.on("session_start", clearCache);
+	pi.on("session_compact", clearCache);
 
 	pi.on("context", async (event, ctx) => {
 		if (ctx.model?.provider !== "anthropic") return;
@@ -21,9 +25,15 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 				}
 
 				let pending = cache.get(part.data);
-				if (!pending) {
+				if (pending) {
+					cache.delete(part.data);
+					cache.set(part.data, pending);
+				} else {
 					pending = resizeImage(Buffer.from(part.data, "base64"), part.mimeType).catch(() => null);
 					cache.set(part.data, pending);
+					// ponytail: Eight recent images bound memory; use a byte budget only if image-heavy sessions need more reuse.
+					const oldest = cache.keys().next().value;
+					if (cache.size > MAX_CACHE_ENTRIES && oldest !== undefined) cache.delete(oldest);
 				}
 				const resized = await pending;
 				if (!resized) {
