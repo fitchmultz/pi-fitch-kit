@@ -45,6 +45,21 @@ assert(
 );
 assert(manifest.optionalIntegrations.includes("GitHub"), "active GitHub MCP integration must be selectable");
 
+const codexContext = manifest.corePackages.find(({ id }) => id === "codex-context");
+assert(
+  codexContext?.source === "git:github.com/fitchmultz/pi-codex-context@b2c52ebd47fac2b38750168ea0d648ecd6c03a96",
+  "codex-context must retain default-off routing",
+);
+assert(codexContext?.consent?.required === true, "cross-provider compaction must require explicit consent");
+assert(codexContext?.consent?.default === "disabled", "cross-provider compaction must default off");
+assert(
+  JSON.stringify(codexContext?.consent?.destinations) ===
+    JSON.stringify(["xai/grok-4.5", "openai-codex/gpt-5.6-luna"]),
+  "compaction destinations must stay explicit",
+);
+assert(codexContext?.consent?.configPath === "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/pi-codex-context.json", "consent config path must honor the Pi agent directory");
+assert(codexContext?.consent?.config?.customCompactionEnabled === true, "consent config must be explicit");
+
 const editSession = manifest.corePackages.find(({ id }) => id === "edit-session");
 assert(editSession?.source === "npm:pi-edit-session-in-place@0.1.27", "edit-session must retain forward-open Node support");
 
@@ -60,5 +75,7 @@ assert(setupPromptPath, "manifest must include prompts/fitch-setup.md");
 const setupPrompt = readFileSync(join(root, setupPromptPath), "utf-8");
 assert(setupPrompt.includes("setup-manifest.json"), "setup prompt must reference the manifest");
 assert(setupPrompt.includes("pi-subagents"), "setup prompt must name the profile owner");
+assert(setupPrompt.includes("consent.required"), "setup prompt must honor consent-gated behavior");
+assert(!setupPrompt.includes("@latest"), "setup prompt must reject mutable npm specs without spelling one");
 
 console.log(JSON.stringify({ ok: true, manifestChecked: true, duplicateAgentSurfaceAbsent: true }, null, 2));

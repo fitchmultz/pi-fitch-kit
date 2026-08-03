@@ -46,7 +46,7 @@ These are the extensions loaded in my current setup. Every external extension li
 
 | Extension | What I use it for |
 |---|---|
-| [`pi-codex-context`](https://github.com/fitchmultz/pi-codex-context) | OpenAI fast mode plus provider-agnostic compaction safeguards |
+| [`pi-codex-context`](https://github.com/fitchmultz/pi-codex-context) | OpenAI fast mode plus explicitly consented custom compaction through xAI, then OpenAI Codex |
 | [`pi-verbosity-control`](https://github.com/ferologics/pi-verbosity-control) | Low routine answer verbosity on OpenAI routes |
 | [`pi-tool-duration`](https://github.com/fitchmultz/pi-tool-duration) | Model-visible timing on slow tool calls |
 | [`pi-edit-session-in-place`](https://github.com/fitchmultz/pi-edit-session-in-place) | Re-edit or remove an earlier user turn in the current branch |
@@ -147,7 +147,9 @@ The current setup has authenticated, read-only-discovery-verified connections fo
 | Notion | Workspace search, pages, databases, comments, and meeting notes |
 | Granola | Meeting notes, summaries, folders, and transcripts |
 
-The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session. The optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary.
+The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session. The optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary. The setup configures only integrations listed in the manifest and never persists mutable npm specs such as `@latest`.
+
+`pi-codex-context` custom compaction is also a separate data-routing choice. In my approved setup, retained compaction context, including selected messages, prior summaries, split-turn prefixes, and custom instructions, goes to `xai/grok-4.5`, then `openai-codex/gpt-5.6-luna` on fallback, regardless of the active chat provider. The package defaults this route off; `/fitch-setup` shows those destinations and writes the enabling config only after separate consent.
 
 ## How the workflow fits together
 

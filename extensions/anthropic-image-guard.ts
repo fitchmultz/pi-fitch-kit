@@ -4,6 +4,18 @@ import { formatDimensionNote, resizeImage } from "@earendil-works/pi-coding-agen
 const MAX_CACHE_ENTRIES = 8;
 const MAX_IMAGE_BASE64_CHARS = 32 * 1024 * 1024;
 const MAX_CONTEXT_IMAGE_BASE64_CHARS = 64 * 1024 * 1024;
+const ANTHROPIC_IMAGE_MIME_TYPES = new Set([
+	"image/gif",
+	"image/jpeg",
+	"image/png",
+	"image/webp",
+]);
+
+function anthropicMimeType(mimeType: string): string | undefined {
+	const normalized = mimeType.split(";", 1)[0]?.trim().toLowerCase();
+	if (normalized === "image/jpg") return "image/jpeg";
+	return normalized && ANTHROPIC_IMAGE_MIME_TYPES.has(normalized) ? normalized : undefined;
+}
 
 export default function anthropicImageGuard(pi: ExtensionAPI): void {
 	const cache = new Map<string, ReturnType<typeof resizeImage>>();
@@ -27,10 +39,19 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 					continue;
 				}
 
-				contextImageChars += part.data.length;
+				const mimeType = anthropicMimeType(part.mimeType);
+				if (!mimeType) {
+					content.push({
+						type: "text",
+						text: "[Image omitted: Anthropic does not support this image type.]",
+					});
+					messageChanged = true;
+					continue;
+				}
+
 				if (
 					part.data.length > MAX_IMAGE_BASE64_CHARS ||
-					contextImageChars > MAX_CONTEXT_IMAGE_BASE64_CHARS
+					contextImageChars + part.data.length > MAX_CONTEXT_IMAGE_BASE64_CHARS
 				) {
 					content.push({
 						type: "text",
@@ -39,13 +60,14 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 					messageChanged = true;
 					continue;
 				}
+				contextImageChars += part.data.length;
 
 				let pending = cache.get(part.data);
 				if (pending) {
 					cache.delete(part.data);
 					cache.set(part.data, pending);
 				} else {
-					pending = resizeImage(Buffer.from(part.data, "base64"), part.mimeType).catch(() => null);
+					pending = resizeImage(Buffer.from(part.data, "base64"), mimeType).catch(() => null);
 					cache.set(part.data, pending);
 					// ponytail: Eight recent images bound memory; use a byte budget only if image-heavy sessions need more reuse.
 					const oldest = cache.keys().next().value;
@@ -62,7 +84,12 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 					continue;
 				}
 				if (!resized.wasResized) {
-					content.push(part);
+					if (part.mimeType === resized.mimeType) {
+						content.push(part);
+					} else {
+						content.push({ ...part, mimeType: resized.mimeType });
+						messageChanged = true;
+					}
 					continue;
 				}
 

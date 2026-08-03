@@ -22,11 +22,12 @@ Require the manifest's Node and Pi versions and every route in `requiredModels`.
 
 Unless mode is `verify`, ask the user to choose:
 
-1. Complete core, meaning every `corePackages` entry plus the kit's bundled extension, prompts, and package-backed skills. The pinned `pi-subagents` package includes the fourteen specialist profiles and its general-purpose `delegate`. Otherwise choose a component selection from the manifest.
-2. Which `optionalIntegrations`, if any, they want to configure through the MCP adapter. Authentication is manual and per-user; do not test it by reading service payloads.
-3. Whether to adopt the baseline working-agreement block, the optional process block, both, or neither, from `<package-root>/templates/working-agreement.md`.
-4. Project-trust posture. Show `defaultProjectTrust` and the subagent `projectTrust.childRuns` options (`approve`, `inherit`, `no-approve`) with their tradeoffs. Untrusted repositories should use `no-approve`. Do not silently copy another person's trust settings.
-5. Whether to copy the safe behavioral settings from `<package-root>/examples/settings.json`. Treat each key as optional. In particular, explain that `images.autoResize: false` preserves source image detail globally while the bundled Anthropic image guard still resizes images for that provider's inline limits.
+1. Complete core, meaning every exact `corePackages` install plus the kit's bundled extension, prompts, and package-backed skills. Consent-gated behavior stays disabled unless separately selected below. The pinned `pi-subagents` package includes the fourteen specialist profiles and its general-purpose `delegate`. Otherwise choose a component selection from the manifest.
+2. Whether to enable each manifest `consent.required` behavior. For `pi-codex-context`, explain that custom compaction can send messages selected for summarization, prior summaries, split-turn prefixes, and custom instructions to `xai/grok-4.5`, then fall back to `openai-codex/gpt-5.6-luna`, regardless of the active chat provider. The package is safe to install without this consent because custom routing defaults off; only write the manifest's exact config after a separate yes.
+3. Which `optionalIntegrations`, if any, they want to configure through the MCP adapter. Authentication is manual and per-user; do not test it by reading service payloads.
+4. Whether to adopt the baseline working-agreement block, the optional process block, both, or neither, from `<package-root>/templates/working-agreement.md`.
+5. Project-trust posture. Show `defaultProjectTrust` and the subagent `projectTrust.childRuns` options (`approve`, `inherit`, `no-approve`) with their tradeoffs. Untrusted repositories should use `no-approve`. Do not silently copy another person's trust settings.
+6. Whether to copy the safe behavioral settings from `<package-root>/examples/settings.json`. Treat each key as optional. In particular, explain that `images.autoResize: false` preserves source image detail globally while the bundled Anthropic image guard still resizes images for that provider's inline limits.
 
 ## Preview and apply
 
@@ -37,10 +38,11 @@ Before any write or install, show one complete preview containing:
 - the exact model mapping from the fourteen specialist profiles in the manifest-pinned `pi-subagents/agents/` directory;
 - the selected working-agreement and settings keys;
 - package-backed skills that will load and any name collision with an existing user skill;
+- every selected consent-gated data route, its exact destinations, and the exact config path and keys that enable it;
 - the Agent Browser prerequisite sequence from the manifest, if selected: install the exact npm package, then optionally download its browser runtime;
 - which changes require `/reload` or a fresh session.
 
-Ask for confirmation of that preview. The confirmed selection is consent for only those exact install commands and file changes. Do not add repeated per-package prompts.
+Ask for confirmation of that preview. The confirmed selection is consent for only those exact install commands, file changes, and separately selected data routes. Do not treat Complete core as consent for a `consent.required` behavior, and do not add repeated prompts for ordinary packages.
 
 Preserve unrelated configuration. Use Pi package commands instead of replacing `settings.json`; merge selected JSON keys narrowly. Merge a selected working-agreement block into `~/.pi/agent/AGENTS.md` by its complete managed markers while retaining unrelated text. Never add an unselected block. Stop on malformed JSON, partial, duplicate, or nested managed markers, or semantic conflicts.
 
@@ -50,13 +52,13 @@ Installing `pi-agent-skills` loads the active public skill set from that package
 
 Agent Browser has one prerequisite outside Pi package installation. Run the manifest's exact global npm command for the wrapper's tested 0.33.0 baseline. Its optional browser runtime download remains a separate command. Preview both steps and ask before the sequence. Declining leaves Agent Browser as a manual step and does not block unrelated components.
 
-For integrations, install only the MCP adapter from the manifest and follow its current docs. Preview the exact config path and shape, then stop for user authentication or organization-specific values. Do not infer endpoints, inspect credentials, invoke service reads as a smoke, or make service writes.
+For integrations, install only the MCP adapter from the manifest and follow its current docs. Configure only selected `optionalIntegrations`; do not add unrelated presets. Preview the exact config path and shape, then stop for user authentication or organization-specific values. Never persist a mutable npm distribution tag; if a user separately requests a local stdio MCP server, resolve and preview an exact version first. Do not infer endpoints, inspect credentials, invoke service reads as a smoke, or make service writes.
 
 After resource or configuration changes, tell the user to run `/reload` or start a fresh session before in-session verification.
 
 ## Verify mode and smokes
 
-If mode is `verify`, make no changes, installs, downloads, logins, or repairs. Ask whether to verify complete core or selected components, then report drift against the manifest, including package versions, loaded subagent defaults, extensions, prompts, skills, model availability, and the Agent Browser CLI version.
+If mode is `verify`, make no changes, installs, downloads, logins, or repairs. Ask whether to verify complete core or selected components, then report drift against the manifest, including package versions, loaded subagent defaults, extensions, prompts, skills, model availability, consent-gated config state and destinations, and the Agent Browser CLI version.
 
 In either mode, verification is read-only after any required reload. Use only harmless documented smokes: version and resource-list checks, local repository search, read-only subagent and intercom checks, a todo-list read, a non-authenticated browser page only if its runtime was approved, deterministic calculator input, and tool or schema discovery for integrations. Confirm `apply_edits` is active and the built-in `edit` and `write` tools are hidden. If a capability has no harmless smoke, report it as manual verification instead of inventing one.
 

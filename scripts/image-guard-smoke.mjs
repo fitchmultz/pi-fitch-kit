@@ -7,6 +7,7 @@ const SMALL_PNG =
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
 const WIDE_PNG =
 	"iVBORw0KGgoAAAANSUhEUgAAB9EAAAABCAIAAADmXckUAAAAH0lEQVR4nO3CMREAAAwDofdvuhWRFY6uVFVVVVXV/QNsD8mZm8ZR8gAAAABJRU5ErkJggg==";
+const SMALL_BMP = "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAATCwAAEwsAAAAAAAAAAAAAAAD/AA==";
 
 const handlers = {};
 anthropicImageGuard({
@@ -47,16 +48,36 @@ const customResult = await context({ messages: custom }, { model: { provider: "a
 assert.match(customResult.messages[0].content[0].text, /original 2001x1, displayed at 2000x1/);
 assert.equal(customResult.messages[0].content[1].type, "image");
 
+const customBmp = [
+	{
+		role: "custom",
+		customType: "image-fixture",
+		content: [{ type: "image", data: SMALL_BMP, mimeType: "image/bmp" }],
+		display: false,
+		timestamp: 0,
+	},
+];
+const customBmpResult = await context({ messages: customBmp }, { model: { provider: "anthropic" } });
+assert.match(customBmpResult.messages[0].content[0].text, /does not support this image type/);
+assert.equal(customBmpResult.messages[0].content.some(({ type }) => type === "image"), false);
+
 const anthropic = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
 const result = await context({ messages: anthropic }, { model: { provider: "anthropic" } });
 assert.equal(result.messages[0].content[0].type, "text");
 assert.match(result.messages[0].content[0].text, /Image omitted/);
 
 const oversized = [
-	{ role: "user", content: [{ type: "image", data: "A".repeat(32 * 1024 * 1024 + 1), mimeType: "image/png" }] },
+	{
+		role: "user",
+		content: [
+			{ type: "image", data: "A".repeat(32 * 1024 * 1024 + 1), mimeType: "image/png" },
+			{ type: "image", data: SMALL_PNG, mimeType: "image/png" },
+		],
+	},
 ];
 const oversizedResult = await context({ messages: oversized }, { model: { provider: "anthropic" } });
 assert.match(oversizedResult.messages[0].content[0].text, /resize safety limit/);
+assert.equal(oversizedResult.messages[0].content[1].type, "image");
 
 handlers.session_compact();
 const afterCompaction = [
@@ -75,6 +96,7 @@ console.log(
 		anthropicUnchanged: "preserved",
 		anthropicResize: "resized",
 		customImage: "resized",
+		unsupportedCustomImage: "omitted",
 		anthropicResizeFailure: "omitted",
 		oversizedSource: "omitted",
 		compaction: "cleared",

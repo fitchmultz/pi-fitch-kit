@@ -105,7 +105,32 @@
     },
     {
       "id": "codex-context",
-      "source": "git:github.com/fitchmultz/pi-codex-context@7644a4c8e100da6612b5bf5d3fdad6fa13d7743a"
+      "source": "git:github.com/fitchmultz/pi-codex-context@b2c52ebd47fac2b38750168ea0d648ecd6c03a96",
+      "consent": {
+        "required": true,
+        "default": "disabled",
+        "data": "retained compaction context, including messages selected for summarization, prior summaries, split-turn prefixes, and custom instructions",
+        "destinations": [
+          "xai/grok-4.5",
+          "openai-codex/gpt-5.6-luna"
+        ],
+        "configPath": "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/pi-codex-context.json",
+        "config": {
+          "customCompactionEnabled": true,
+          "compactionModels": [
+            {
+              "provider": "xai",
+              "model": "grok-4.5",
+              "thinkingLevel": "high"
+            },
+            {
+              "provider": "openai-codex",
+              "model": "gpt-5.6-luna",
+              "thinkingLevel": "high"
+            }
+          ]
+        }
+      }
     },
     {
       "id": "calculator",

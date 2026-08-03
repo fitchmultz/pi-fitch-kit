@@ -89,6 +89,8 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - deterministic support: calculator, tool duration, verbosity, compaction, session editing, stash, and raw message copy;
 - kit boundary: Anthropic-only image resizing while `pi-subagents` owns its profile defaults.
 
+`pi-codex-context` installs safely with custom compaction disabled. Enabling its manifest-gated route is a separate choice because retained compaction context can include selected messages, prior summaries, split-turn prefixes, and custom instructions, and goes to `xai/grok-4.5`, then `openai-codex/gpt-5.6-luna` on fallback, regardless of the active chat provider. `/fitch-setup` previews the destinations and exact config before asking for that consent.
+
 Small extensions are intentionally independent. The kit composes them; none has to depend on this personal distribution.
 
 [`macuse`](https://github.com/fitchmultz/macuse) is the selective exception to the default stack. It adds native macOS app inspection and control for tasks that cannot be handled through browser DOM or CLI tools. I enable it only when needed and treat it as experimental because Codex app updates can break the integration surface.
@@ -154,7 +156,7 @@ The current connected services cover:
 - Notion knowledge;
 - Granola meetings.
 
-`pi-mcp-adapter` provides searchable tool discovery so hundreds of service tools do not have to sit in the model's prompt at once. The gateway can expose direct tools for common operations and nested catalogs for rarer ones. Its optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary.
+`pi-mcp-adapter` provides searchable tool discovery so hundreds of service tools do not have to sit in the model's prompt at once. The gateway can expose direct tools for common operations and nested catalogs for rarer ones. Its optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary. The setup uses only manifest-listed integrations and refuses mutable npm specs such as `@latest` for local stdio servers.
 
 Authentication remains user-scoped. The setup process may inspect non-secret connection status, but it does not read credential stores or service payloads merely to claim that setup worked.
 

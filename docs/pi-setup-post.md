@@ -11,7 +11,7 @@ I use [Pi](https://github.com/badlogic/pi-mono), a small terminal coding agent, 
 3. task-selected skills and working agreements;
 4. authenticated MCP access to the systems around the code.
 
-The main session remains responsible for the task. This is not an autonomous swarm.
+The main session remains responsible for the task. This is not an autonomous swarm. Cross-provider custom compaction is separately disclosed and opt-in: when enabled, retained compaction context, including selected messages, prior summaries, split-turn prefixes, and custom instructions, goes to xAI first and OpenAI Codex on fallback, regardless of the active chat provider.
 
 ## Extensions
 
