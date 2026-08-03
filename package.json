@@ -1,6 +1,6 @@
 {
   "name": "@fitch/pi-kit",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -10,7 +10,7 @@
   "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "node --check extensions/sync-agents.ts && node scripts/validate.mjs",
+    "check": "node --check extensions/sync-agents.ts && node --check extensions/anthropic-image-guard.ts && node scripts/image-guard-smoke.mjs && node scripts/validate.mjs",
     "smoke": "node scripts/package-smoke.mjs"
   },
   "keywords": [
@@ -18,10 +18,12 @@
   ],
   "pi": {
     "extensions": [
-      "./extensions/sync-agents.ts"
+      "./extensions/sync-agents.ts",
+      "./extensions/anthropic-image-guard.ts"
     ],
     "prompts": [
-      "./prompts"
+      "./prompts/fitch-setup.md",
+      "./prompts/audit/github-open-issues-prs.md"
     ]
   },
   "engines": {

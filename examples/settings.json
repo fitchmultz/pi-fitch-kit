@@ -1,0 +1,26 @@
+{
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.6-sol",
+  "defaultThinkingLevel": "max",
+  "enabledModels": [
+    "anthropic/claude-fable-5",
+    "anthropic/claude-opus-5",
+    "openai-codex/gpt-5.6-sol",
+    "xai/grok-4.5"
+  ],
+  "images": {
+    "autoResize": false
+  },
+  "terminal": {
+    "imageWidthCells": 120
+  },
+  "steeringMode": "all",
+  "retry": {
+    "enabled": true
+  },
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16834,
+    "keepRecentTokens": 40000
+  }
+}

@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const packageAgents = resolve(__dirname, "..", "agents");
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-fitch-kit-agent-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
@@ -37,7 +38,7 @@ try {
     const target = join(syncedDir, agent);
     if (!lstatSync(target).isSymbolicLink()) throw new Error(`${agent} is not a symlink`);
     const linkTarget = resolve(dirname(target), readlinkSync(target));
-    if (!linkTarget.includes("/pi-fitch-kit/agents/")) {
+    if (dirname(linkTarget) !== packageAgents) {
       throw new Error(`${agent} points outside package agents: ${linkTarget}`);
     }
   }
@@ -70,7 +71,7 @@ try {
     throw new Error("Resync replaced a dangling foreign symlink");
   }
   const repaired = resolve(dirname(danglingOwnedLink), readlinkSync(danglingOwnedLink));
-  if (!repaired.endsWith("/pi-fitch-kit/agents/scout.md")) {
+  if (repaired !== join(packageAgents, "scout.md")) {
     throw new Error(`Resync did not repair a dangling owned symlink: ${repaired}`);
   }
 
@@ -107,10 +108,15 @@ try {
     JSON.stringify(packageJson.pi.extensions) === JSON.stringify(manifest.kitResources.extensions.map((p) => `./${p}`)),
     "package.json pi.extensions must match manifest kitResources.extensions",
   );
+  assert(
+    JSON.stringify(packageJson.pi.prompts) === JSON.stringify(manifest.kitResources.prompts.map((p) => `./${p}`)),
+    "package.json pi.prompts must match manifest kitResources.prompts",
+  );
   for (const resource of [
     ...manifest.kitResources.extensions,
-    manifest.kitResources.prompt,
+    ...manifest.kitResources.prompts,
     manifest.kitResources.workingAgreementTemplate,
+    manifest.kitResources.settingsExample,
   ]) {
     assert(lstatSync(join(root, resource)).isFile(), `manifest resource missing: ${resource}`);
   }
@@ -141,7 +147,9 @@ try {
     );
   }
 
-  const setupPrompt = readFileSync(join(root, manifest.kitResources.prompt), "utf-8");
+  const setupPromptPath = manifest.kitResources.prompts.find((path) => path.endsWith("/fitch-setup.md"));
+  assert(setupPromptPath, "manifest must include prompts/fitch-setup.md");
+  const setupPrompt = readFileSync(join(root, setupPromptPath), "utf-8");
   assert(setupPrompt.includes("setup-manifest.json"), "setup prompt must reference the manifest");
   assert(
     setupPrompt.includes(`all ${manifest.kitResources.agentProfiles} files`),

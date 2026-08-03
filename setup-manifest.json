@@ -1,12 +1,12 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "runtime": {
     "pi": "0.83.0",
     "node": ">=22.19.0"
   },
   "kit": {
     "repository": "https://github.com/fitchmultz/pi-fitch-kit",
-    "installSource": "git:github.com/fitchmultz/pi-fitch-kit@v0.2.1"
+    "installSource": "git:github.com/fitchmultz/pi-fitch-kit@v0.2.2"
   },
   "requiredModels": [
     "xai/grok-4.5",
@@ -18,29 +18,34 @@
   ],
   "optionalModels": [
     "openai/gpt-5.6-sol",
-    "openai/gpt-5.6-luna",
-    "cursor/grok-4.5",
-    "cursor/gpt-5.6-sol@272k"
+    "openai/gpt-5.6-luna"
   ],
-  "optionalModelsNote": "Fallback-only routes. The openai/* routes need an OpenAI API key; the cursor/* routes need the pi-cursor-sdk package and a Cursor SDK API key. Missing them only removes those fallbacks.",
+  "optionalModelsNote": "Fallback-only routes. The openai/* routes need an OpenAI API key; missing them only removes those fallbacks.",
   "kitResources": {
-    "extensions": ["extensions/sync-agents.ts"],
-    "prompt": "prompts/fitch-setup.md",
+    "extensions": [
+      "extensions/sync-agents.ts",
+      "extensions/anthropic-image-guard.ts"
+    ],
+    "prompts": [
+      "prompts/fitch-setup.md",
+      "prompts/audit/github-open-issues-prs.md"
+    ],
     "agentProfiles": 14,
-    "workingAgreementTemplate": "templates/working-agreement.md"
+    "workingAgreementTemplate": "templates/working-agreement.md",
+    "settingsExample": "examples/settings.json"
   },
   "corePackages": [
     {
       "id": "subagents",
-      "source": "git:github.com/fitchmultz/pi-subagents@4f55ff92c92581eff2ab79810d5f9b9087a7a14a"
+      "source": "git:github.com/fitchmultz/pi-subagents@1bff3115d19af763dc39f305ba1d5ef0c9ab25ed"
     },
     {
       "id": "intercom",
-      "source": "git:github.com/fitchmultz/pi-intercom@8c3e345056c3244d3442108aaf76f3d94f934f41"
+      "source": "git:github.com/fitchmultz/pi-intercom@aa199a544c3a0daceea0d0dd853dde72ff3c3eca"
     },
     {
       "id": "apply-edits",
-      "source": "git:github.com/fitchmultz/pi-apply-edits@1668d22a66a7d43d7aa06b3964fd27efda43b909"
+      "source": "git:github.com/fitchmultz/pi-apply-edits@f30df49f5fa651a6948ae48967397d5db7d50003"
     },
     {
       "id": "ask-question",
@@ -48,7 +53,7 @@
     },
     {
       "id": "todo-list",
-      "source": "git:github.com/fitchmultz/pi-todo-list@78b7851eb06e22993c16b374255b8b362254ac2a"
+      "source": "git:github.com/fitchmultz/pi-todo-list@e309172666eb2aeb953c5a4aba55695ef7dbd2cc"
     },
     {
       "id": "session-name",
@@ -68,7 +73,7 @@
     },
     {
       "id": "agent-browser",
-      "source": "npm:pi-agent-browser-native@0.2.72",
+      "source": "git:github.com/fitchmultz/pi-agent-browser-native@14d05acbfe98a04d5614b904eb51632d48845b25",
       "externalPrerequisite": {
         "package": "agent-browser",
         "version": "0.33.1",
@@ -78,11 +83,7 @@
     },
     {
       "id": "mcp",
-      "source": "npm:pi-mcp-adapter@2.17.0"
-    },
-    {
-      "id": "goal",
-      "source": "npm:pi-codex-goal@0.1.39"
+      "source": "npm:pi-mcp-adapter@2.18.0"
     },
     {
       "id": "stash",
@@ -105,32 +106,31 @@
       "source": "npm:pi-copy-message@1.0.11"
     },
     {
-      "id": "cursor-sdk",
-      "source": "npm:pi-cursor-sdk@0.1.62",
-      "note": "Supplies the cursor/* fallback routes. Needs a Cursor SDK API key saved through /login; skipping it only removes those fallbacks."
-    }
-  ],
-  "privatePackages": [
-    {
-      "id": "macuse",
-      "reason": "Private repository. Native macOS app control stays unavailable unless the user provides an approved source."
+      "id": "codex-context",
+      "source": "git:github.com/fitchmultz/pi-codex-context@7644a4c8e100da6612b5bf5d3fdad6fa13d7743a"
     },
     {
-      "id": "pr-hawk",
-      "reason": "Private repository. Pull-request watching stays unavailable unless the user provides an approved source."
+      "id": "calculator",
+      "source": "git:github.com/fitchmultz/pi-calculator@ff39601e99a6e10c3ca12bd6208c635b49dd6d98"
+    },
+    {
+      "id": "agent-skills",
+      "source": "git:github.com/fitchmultz/pi-agent-skills@05016b00850e4a25853c7c590098ea50156486d9"
     }
   ],
   "optionalIntegrations": [
+    "Horizon",
     "Linear",
     "Slack",
-    "GitHub",
-    "Horizon",
-    "Plain",
-    "Granola",
-    "Notion",
     "Cloudflare",
     "Sentry",
-    "Datadog"
+    "Datadog",
+    "Plain",
+    "Notion",
+    "Granola"
   ],
-  "workingAgreementSections": ["baseline", "process"]
+  "workingAgreementSections": [
+    "baseline",
+    "process"
+  ]
 }

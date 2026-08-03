@@ -2,7 +2,7 @@
 name: worker
 description: End-to-end implementation specialist for bounded tasks
 model: xai/grok-4.5
-fallbackModels: cursor/grok-4.5, openai-codex/gpt-5.6-sol, openai/gpt-5.6-sol, anthropic/claude-opus-5
+fallbackModels: openai-codex/gpt-5.6-sol, openai/gpt-5.6-sol, anthropic/claude-opus-5
 thinking: high
 systemPromptMode: replace
 inheritProjectContext: true
