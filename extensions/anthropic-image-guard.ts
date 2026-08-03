@@ -17,7 +17,7 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 		let changed = false;
 		let contextImageChars = 0;
 		for (const message of event.messages) {
-			if (message.role === "assistant" || !Array.isArray(message.content)) continue;
+			if ((message.role !== "user" && message.role !== "toolResult") || !Array.isArray(message.content)) continue;
 
 			let messageChanged = false;
 			const content: typeof message.content = [];
