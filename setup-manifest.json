@@ -23,21 +23,19 @@
   "optionalModelsNote": "Fallback-only routes. The openai/* routes need an OpenAI API key; missing them only removes those fallbacks.",
   "kitResources": {
     "extensions": [
-      "extensions/sync-agents.ts",
       "extensions/anthropic-image-guard.ts"
     ],
     "prompts": [
       "prompts/fitch-setup.md",
       "prompts/audit/github-open-issues-prs.md"
     ],
-    "agentProfiles": 14,
     "workingAgreementTemplate": "templates/working-agreement.md",
     "settingsExample": "examples/settings.json"
   },
   "corePackages": [
     {
       "id": "subagents",
-      "source": "git:github.com/fitchmultz/pi-subagents@1bff3115d19af763dc39f305ba1d5ef0c9ab25ed"
+      "source": "git:github.com/fitchmultz/pi-subagents@ba80ad1ba51798d824041e2f60a0b48231d9b4d5"
     },
     {
       "id": "intercom",
@@ -115,7 +113,7 @@
     },
     {
       "id": "agent-skills",
-      "source": "git:github.com/fitchmultz/pi-agent-skills@05016b00850e4a25853c7c590098ea50156486d9"
+      "source": "git:github.com/fitchmultz/pi-agent-skills@f7df41c32f9d174aa4b552aa42266d860760b1a0"
     }
   ],
   "optionalIntegrations": [

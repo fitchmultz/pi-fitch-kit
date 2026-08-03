@@ -54,12 +54,9 @@ These are the extensions loaded in my current setup. Every external extension li
 | [`pi-copy-message`](https://github.com/fitchmultz/pi-copy-message) | Copy raw session messages without terminal formatting |
 | [`ponytail`](https://github.com/DietrichGebert/ponytail) | Persistent pressure toward reuse, deletion, native features, and the smallest root-cause fix |
 
-### Extensions bundled by this kit
+### Extension bundled by this kit
 
-| Extension | What it does |
-|---|---|
-| [`sync-agents`](extensions/sync-agents.ts) | Links the fourteen profiles in `agents/` into Pi's user agent directory without overwriting regular files or foreign links |
-| [`anthropic-image-guard`](extensions/anthropic-image-guard.ts) | Preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits |
+[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. Agent profiles now ship directly with `pi-subagents`, so this kit no longer copies or syncs them.
 
 ### Selective experimental extension
 
@@ -81,15 +78,15 @@ That exposed stricter Anthropic image limits. The bundled guard fixes the bounda
 
 ## Subagent bench
 
-[`pi-subagents`](https://github.com/fitchmultz/pi-subagents) supplies the orchestration runtime. This kit supplies the opinionated profiles and model routing.
+[`pi-subagents`](https://github.com/fitchmultz/pi-subagents) now supplies both the orchestration runtime and the opinionated defaults: fourteen specialist profiles plus its general-purpose `delegate`. This kit pins that release instead of owning duplicate copies.
 
 | Job | Profiles |
 |---|---|
-| Map and investigate | [`scout`](agents/scout.md), [`context-builder`](agents/context-builder.md), [`debugger`](agents/debugger.md), [`researcher`](agents/researcher.md) |
-| Decide and plan | [`planner`](agents/planner.md), [`oracle`](agents/oracle.md) |
-| Implement bounded work | [`worker`](agents/worker.md), [`fixer`](agents/fixer.md) |
-| Challenge the result | [`reviewer`](agents/reviewer.md), [`reviewer-gpt`](agents/reviewer-gpt.md), [`reviewer-claude`](agents/reviewer-claude.md), [`reviewer-security`](agents/reviewer-security.md), [`ui-designer`](agents/ui-designer.md) |
-| Human-facing output | [`writer`](agents/writer.md) |
+| Map and investigate | [`scout`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/scout.md), [`context-builder`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/context-builder.md), [`debugger`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/debugger.md), [`researcher`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/researcher.md) |
+| Decide and plan | [`planner`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/planner.md), [`oracle`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/oracle.md) |
+| Implement bounded work | [`worker`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/worker.md), [`fixer`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/fixer.md) |
+| Challenge the result | [`reviewer`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/reviewer.md), [`reviewer-gpt`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/reviewer-gpt.md), [`reviewer-claude`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/reviewer-claude.md), [`reviewer-security`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/reviewer-security.md), [`ui-designer`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/ui-designer.md) |
+| Human-facing output | [`writer`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/writer.md) |
 
 The parent session remains responsible for the task. Specialists return evidence; they do not become an autonomous hierarchy.
 
@@ -100,7 +97,7 @@ The routing is intentional:
 - `anthropic/claude-fable-5` supplies an independent model family for writing, UI judgment, and cross-model review, with Opus 5 behind it.
 - `oracle` alone uses forked parent context. Every other role starts fresh, and every profile is a leaf agent.
 
-The exact primary, fallback, thinking, context, tool, and output policy lives in each profile's frontmatter. See [the full setup guide](docs/pi-setup.md#model-routing) for the complete table.
+The exact primary, fallback, thinking, context, tool, and output policy lives in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents). See [the full setup guide](docs/pi-setup.md#model-routing) for the complete table.
 
 ## Active skills
 
@@ -212,14 +209,13 @@ The older prompt files remain in `prompts/` as source material, but the package 
 ## Repository map
 
 ```text
-agents/                 fourteen specialist profiles and model policy
-extensions/             agent sync and Anthropic image boundary guard
+extensions/             Anthropic image boundary guard
 examples/settings.json  safe, non-secret behavioral settings
 prompts/                 setup, one active operational prompt, and retained source material
 setup-manifest.json      exact release pins and selectable integrations
 templates/               optional working-agreement blocks
 docs/                    full technical guide and shorter overview
-scripts/                 validation, package smoke, and agent sync fallback
+scripts/                 validation and package smoke
 ```
 
 ## Validation
@@ -230,7 +226,7 @@ npm run check
 npm run smoke
 ```
 
-- `npm run check` validates extension syntax, the image guard boundary, symlink ownership behavior, exact pins, agent model routes, manifest resources, and package metadata alignment.
-- `npm run smoke` loads the checkout through Pi's real resource loader and requires exactly the two bundled extensions and two registered prompts.
+- `npm run check` validates extension syntax, the image guard boundary, exact pins, manifest resources, package metadata alignment, and the absence of the retired duplicate agent surface.
+- `npm run smoke` loads the checkout through Pi's real resource loader and requires exactly one bundled extension and two registered prompts.
 
 For the detailed workflow, model table, evidence, and security rationale, read [docs/pi-setup.md](docs/pi-setup.md). For the short version, read [docs/pi-setup-post.md](docs/pi-setup-post.md).

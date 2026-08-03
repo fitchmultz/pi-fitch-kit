@@ -23,7 +23,7 @@ The normal path includes:
 - small public tools for structured questions, persistent todos, session naming, working-directory changes, deterministic math, compaction, timing, verbosity, stash, session editing, and raw message copy;
 - [`ponytail`](https://github.com/DietrichGebert/ponytail) to keep the code path boring and small.
 
-The kit itself bundles two extensions: one links the agent profiles into Pi safely; the other handles an image-provider boundary.
+The kit itself bundles one extension for the Anthropic image-provider boundary. The profiles ship directly with `pi-subagents`, so there is no second copy or sync layer.
 
 For native macOS automation, [`macuse`](https://github.com/fitchmultz/macuse) is a selective experimental add-on. I enable it only when browser DOM and CLI tools are insufficient; Codex app updates can break its integration surface.
 
@@ -31,7 +31,7 @@ I keep `images.autoResize` off so agents can inspect original image detail. Anth
 
 ## Subagents
 
-The fourteen profiles cover scouting, context assembly, debugging, research, planning, bounded implementation, focused fixes, GPT review, Claude review, security review, UI review, oracle decisions, and writing.
+The fourteen `pi-subagents` specialist profiles cover scouting, context assembly, debugging, research, planning, bounded implementation, focused fixes, GPT review, Claude review, security review, UI review, oracle decisions, and writing. Its general-purpose `delegate` remains available beside them.
 
 Grok 4.5 handles fast bounded work. GPT-5.6 Sol handles diagnosis, research, planning, and the GPT review path. Claude Fable 5 supplies an independent model family for writing, UI judgment, and cross-model review, with Opus 5 behind it.
 

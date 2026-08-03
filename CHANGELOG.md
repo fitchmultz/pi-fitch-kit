@@ -4,6 +4,7 @@
 
 - Reorganized the public documentation around the active stack: linked extensions, the fourteen-agent bench, directly linked source-managed skills including `diagram-creation`, and authenticated MCP capabilities.
 - Reconciled the release manifest with the currently loaded public packages and removed inactive package routes from the published setup.
+- Pinned the `pi-subagents` release that owns the fourteen specialist profiles, then removed this kit's duplicate profile directory, sync extension, and fallback script.
 - Registered only `/fitch-setup` and `/github-open-issues-prs`; retained the rest of the prompt files as unloaded source material.
 - Bundled the Anthropic image guard and a safe settings example so full-resolution image handling is reproducible without sharing private configuration.
 - Kept the released Agent Browser wrapper paired with its tested 0.33.0 CLI baseline instead of holding the snapshot on an unreleased wrapper update; the CLI keeps the Node.js floor at 24.

@@ -18,7 +18,7 @@ Pi core
   └─ user-authenticated MCP services
 ```
 
-[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: agent profiles, two small extensions, a safe settings example, exact dependency pins, and a setup prompt. The underlying extensions and skill packages remain independent public repositories.
+[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: one provider-boundary extension, a safe settings example, exact dependency pins, and a setup prompt. The fourteen specialist profiles now ship with the pinned [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) release instead of being duplicated here. The underlying extensions and skill packages remain independent public repositories.
 
 ## A representative task
 
@@ -87,7 +87,7 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - repository work: `pi-fff`, `pi-apply-edits`;
 - task control: structured questions, persistent todos, session naming, and working-directory changes;
 - deterministic support: calculator, tool duration, verbosity, compaction, session editing, stash, and raw message copy;
-- kit boundaries: safe agent-profile syncing and Anthropic-only image resizing.
+- kit boundary: Anthropic-only image resizing while `pi-subagents` owns its profile defaults.
 
 Small extensions are intentionally independent. The kit composes them; none has to depend on this personal distribution.
 
@@ -114,7 +114,7 @@ The agent files are the runtime source of truth. Models, fallbacks, effort, and 
 | `ui-designer` | Fable 5 | Opus 5, Codex Sol, OpenAI Sol | xhigh | fresh |
 | `writer` | Fable 5 | Opus 5 | high | fresh |
 
-Full model identifiers are in [`agents/`](../agents/). The compact names above mean:
+Full model identifiers are in the pinned [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents) directory. The compact names above mean:
 
 - Codex Sol: `openai-codex/gpt-5.6-sol`
 - OpenAI Sol: `openai/gpt-5.6-sol`
