@@ -4,7 +4,7 @@ description: Human-facing writing specialist for documentation, announcements, g
 model: anthropic/claude-fable-5
 fallbackModels: anthropic/claude-opus-5
 thinking: high
-systemPromptMode: append
+systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh

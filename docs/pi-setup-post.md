@@ -68,14 +68,14 @@ The parent session stays responsible throughout. Child-agent summaries are evide
 My whole setup is an installable package now. Once core pi is installed and you've logged in to your providers:
 
 ```bash
-pi install git:github.com/fitchmultz/pi-fitch-kit
+pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.1
 # /reload, then:
 /fitch-setup
 ```
 
 Installing the kit already gives you its bundled pieces on reload: the prompt library and the agent bench. `/fitch-setup` then reads the kit's pinned manifest, shows you one preview of every further package it would install and every file it would touch, and asks which parts you want: the working-agreement template, the pinned tool packages, integrations, trust posture. It installs exact pinned versions, never reads or copies credentials, and stops wherever a login or a real decision is needed. `/fitch-setup verify` checks an existing install for drift without changing anything.
 
-I used to keep a giant paste-in bootstrap prompt here. The manifest replaced it, because a pasted prompt can drift from reality and a checked manifest cannot.
+I used to keep a giant paste-in bootstrap prompt here. The manifest replaced it so each tagged release has a checkable setup snapshot.
 
 The longer guide has the full model and agent mapping, active skill catalog, trust choices, security boundaries, and validation expectations.
 

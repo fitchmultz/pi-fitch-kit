@@ -4,7 +4,7 @@ description: Bounded remediation agent that applies an explicit list of fixes wi
 model: xai/grok-4.5
 fallbackModels: cursor/grok-4.5, openai-codex/gpt-5.6-sol, openai/gpt-5.6-sol, anthropic/claude-opus-5
 thinking: high
-systemPromptMode: append
+systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh

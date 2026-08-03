@@ -1,10 +1,10 @@
 ---
 name: reviewer-security
 description: Security and data-safety reviewer for changed code, dependencies, and exposed surfaces
-model: anthropic/claude-fable-5
-fallbackModels: xai/grok-4.5, openai-codex/gpt-5.6-terra
+model: openai-codex/gpt-5.6-sol
+fallbackModels: xai/grok-4.5, openai/gpt-5.6-sol
 thinking: xhigh
-systemPromptMode: append
+systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh

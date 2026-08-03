@@ -34,7 +34,7 @@ Before any write or install, show one complete preview containing:
 
 - every selected exact package source and exact `pi install <source> --no-approve` command;
 - every filesystem path that may change and whether it will be created, merged, symlinked, or left alone;
-- the exact model mapping from all 14 files in `<package-root>/agents/`, including the four `xai/grok-4.5` primaries with their Cursor-first fallbacks, the `anthropic/claude-fable-5` primaries for `reviewer-claude`, `reviewer-security`, `ui-designer`, and `writer`, and the `openai-codex/gpt-5.6-sol` primaries for the rest;
+- the exact model mapping from all 14 files in `<package-root>/agents/`, including the four `xai/grok-4.5` primaries with their Cursor-first fallbacks, the `anthropic/claude-fable-5` primaries for `reviewer-claude`, `ui-designer`, and `writer`, and the `openai-codex/gpt-5.6-sol` primaries for the rest;
 - the selected working-agreement blocks;
 - that `~/.agents/skills` is the user's canonical skill root when it exists: preserve its contents and its active and excluded selections, and do not duplicate skills under `~/.pi/agent/skills`;
 - the Agent Browser external prerequisite commands from the manifest, if that package is selected;

@@ -4,7 +4,7 @@ description: Root-cause diagnostician that reproduces failures and produces evid
 model: openai-codex/gpt-5.6-sol
 fallbackModels: anthropic/claude-fable-5, openai/gpt-5.6-sol
 thinking: high
-systemPromptMode: append
+systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: true
 defaultContext: fresh
