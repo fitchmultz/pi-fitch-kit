@@ -1,6 +1,8 @@
 # pi-fitch-kit
 
-My live Pi setup as an installable package: specialist agent profiles, reusable slash commands, a startup extension that keeps them in sync, and a pinned setup path for anyone who wants to copy the workflow.
+A versioned snapshot of my Pi setup: specialist agent profiles, reusable slash commands, a startup extension that keeps them in sync, and a pinned setup path for anyone who wants to copy the workflow.
+
+Tagged releases are known-good snapshots; my live installation and `main` may move ahead between releases.
 
 Two documents explain the setup itself:
 
@@ -13,7 +15,7 @@ If you work with me and want this setup, the intended path is:
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.83.0
 pi
 # /login for your providers, then:
-pi install git:github.com/fitchmultz/pi-fitch-kit
+pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.1
 # /reload, then:
 /fitch-setup
 ```
@@ -80,9 +82,9 @@ Frontmatter owns runtime policy. Each model-facing body stays focused on the rol
 
 Model policy, and why:
 
-- `xai/grok-4.5` at high effort is the primary for `scout`, `context-builder`, `fixer`, and `worker`. These roles run under a smart parent that checks their output, so elapsed time matters more than the last few points of quality, and Grok matches Opus 5 high's CursorBench score at roughly a third of the cost. All four fall back first to `cursor/grok-4.5` (same model, different provider), then to Sol; `fixer` and `worker` keep `anthropic/claude-opus-5` as a final fallback because unattended implementation should degrade to a stronger model, not a cheaper one.
-- `openai-codex/gpt-5.6-sol` is the primary for `debugger`, `researcher`, `planner`, `reviewer`, `reviewer-gpt`, and `oracle`, and the quality fallback for every Grok-backed role. Every Sol-primary role keeps `openai/gpt-5.6-sol` in its fallback chain so a Codex-route failure can reach the same model through the OpenAI API instead of losing it entirely; that route needs an OpenAI API key and is optional.
-- `anthropic/claude-fable-5` is the primary for `writer` (it leads the Artificial Analysis writing benchmark), and for `reviewer-claude`, `reviewer-security`, and `ui-designer`, where the point is an independent second model family reading the same evidence. `anthropic/claude-opus-5` sits directly behind it on `writer`, `reviewer-claude`, and `ui-designer`.
+- `xai/grok-4.5` at high effort is the primary for `scout`, `context-builder`, `fixer`, and `worker`. These roles run under a smart parent that checks their output, so elapsed time matters more than the last few points of quality, and Grok matches Opus 5 high's CursorBench score at roughly a third of the cost. All four fall back first to `cursor/grok-4.5` (same model, different provider); `scout` then uses Luna while the other three use Sol. `fixer` and `worker` keep `anthropic/claude-opus-5` as a final fallback because unattended implementation should degrade to a stronger model, not a cheaper one.
+- `openai-codex/gpt-5.6-sol` is the primary for `debugger`, `researcher`, `planner`, `reviewer`, `reviewer-gpt`, `reviewer-security`, and `oracle`, and the quality fallback for most Grok-backed roles. Every Sol-primary role keeps `openai/gpt-5.6-sol` in its fallback chain so a Codex-route failure can reach the same model through the OpenAI API instead of losing it entirely; that route needs an OpenAI API key and is optional.
+- `anthropic/claude-fable-5` is the primary for `writer`, `reviewer-claude`, and `ui-designer`, where the point is an independent second model family reading the same evidence. `anthropic/claude-opus-5` sits directly behind it on all three.
 - Thinking is `high` for speed-sensitive and routine specialist work; `xhigh` is reserved for the roles where a wrong conclusion is expensive: consequential research, planning, the strict review gates, security review, UI review, and oracle decisions.
 - `reviewer` and `reviewer-gpt` fall back through `openai/gpt-5.6-sol`, then `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra`, keeping full Sol quality through two providers before dropping to Terra.
 - `oracle` is the only fork-context agent: its job is to compare a proposed direction against the parent conversation, so it needs the transcript. Its chain stays non-Anthropic because the `claude-code` provider cannot import a Pi fork transcript.
@@ -112,7 +114,7 @@ Agents should write bulky logs, diffs, browser snapshots, JSON, and raw command 
 For someone copying the setup, install from Git and let the setup prompt drive:
 
 ```bash
-pi install git:github.com/fitchmultz/pi-fitch-kit
+pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.1
 # /reload, then /fitch-setup
 ```
 

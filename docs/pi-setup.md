@@ -168,7 +168,7 @@ The specialist mappings are explicit:
 
 | Profile | Primary model | Fallback | Thinking |
 |---|---|---|---|
-| `scout` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `high` |
+| `scout` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-luna`, then `openai/gpt-5.6-luna` | `high` |
 | `context-builder` | `xai/grok-4.5` | `cursor/grok-4.5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `high` |
 | `debugger` | `openai-codex/gpt-5.6-sol` | `anthropic/claude-fable-5`, then `openai/gpt-5.6-sol` | `high` |
 | `researcher` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, then `anthropic/claude-opus-5` | `xhigh` |
@@ -178,20 +178,20 @@ The specialist mappings are explicit:
 | `reviewer` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra` | `high` |
 | `reviewer-gpt` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, `cursor/gpt-5.6-sol@272k`, then `openai-codex/gpt-5.6-terra` | `xhigh` |
 | `reviewer-claude` | `anthropic/claude-fable-5` | `anthropic/claude-opus-5`, then `xai/grok-4.5` | `xhigh` |
-| `reviewer-security` | `anthropic/claude-fable-5` | `xai/grok-4.5`, then `openai-codex/gpt-5.6-terra` | `xhigh` |
+| `reviewer-security` | `openai-codex/gpt-5.6-sol` | `xai/grok-4.5`, then `openai/gpt-5.6-sol` | `xhigh` |
 | `oracle` | `openai-codex/gpt-5.6-sol` | `openai/gpt-5.6-sol`, then `cursor/gpt-5.6-sol@272k` | `xhigh` |
 | `ui-designer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-5`, `openai-codex/gpt-5.6-sol`, then `openai/gpt-5.6-sol` | `xhigh` |
 | `writer` | `anthropic/claude-fable-5` | `anthropic/claude-opus-5` | `high` |
 
-This is not model variety for its own sake. GPT-5.6 Sol carries diagnosis, planning, research, GPT review, and oracle work, and it is the quality fallback for every Grok-backed role. Every Sol-primary role keeps `openai/gpt-5.6-sol` in its fallback chain so a Codex-route failure can reach the same model through the OpenAI API. The Cursor route provides the first fallback to the same Grok 4.5 model before switching model families. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Opus 5 is the main session model, where a wrong conclusion is expensive and worth its higher per-task cost. Fable 5 leads writing, cross-model review, security review, and UI review. Xhigh is reserved for consequential research, planning, the strict review gates, UI review, and oracle decisions.
+This is not model variety for its own sake. GPT-5.6 Sol carries diagnosis, planning, research, GPT review, security review, and oracle work, and it is the quality fallback for most Grok-backed roles. Every Sol-primary role keeps `openai/gpt-5.6-sol` in its fallback chain so a Codex-route failure can reach the same model through the OpenAI API. The Cursor route provides the first fallback to the same Grok 4.5 model before switching model families. Grok 4.5 at high effort handles scouting, context building, bounded implementation, and confirmed fixes because it is dramatically faster while remaining strong enough under a smart parent agent. Opus 5 is the main session model, where a wrong conclusion is expensive and worth its higher per-task cost. Fable 5 leads writing, cross-model review, and UI review. Xhigh is reserved for consequential research, planning, the strict review gates, UI review, and oracle decisions.
 
 The profile body is what `pi-subagents` passes as the role system prompt, so it contains task instructions, evidence standards, boundaries, and output expectations. Model, effort, and context stay in frontmatter; launch guidance stays in orchestration documentation instead of being narrated back to the model.
 
 The benchmark rationale and Artificial Analysis plus CursorBench 3.2 source metrics are available as [PDF](./Model_Reference_Sheet_Artificial_Analysis_2026-07-26.pdf) and [DOCX](./Model_Reference_Sheet_Artificial_Analysis_2026-07-26.docx), refreshed from the live leaderboard on 26 July 2026. Cursor reports Grok 4.5 high at 66.7% and $1.51/task, while the independent Artificial Analysis snapshot records 88 tok/s, 16.3 seconds E2E, 54 intelligence, 45.7 agentic, and 72.4 coding. Cursor disclosed that Grok benefited from an older Cursor codebase snapshot in training, so I discount its exact CursorBench rank rather than discard the independently corroborated speed/value signal.
 
-The 26 July refresh grew CursorBench 3.2 from 42 to 50 entries by adding Claude Opus 5 at five effort levels and Gemini 3.6 Flash at three. No previously recorded value changed. Opus 5 wins on both score and cost against Fable 5 at low, high, and extra high effort, which covers every effort level these overrides use, so `anthropic/claude-opus-5` is the main session model. Opus 5 high also reaches 66.7% at $3.91, matching Grok 4.5 high's score without the contamination caveat and beating GPT-5.6 Sol extra high by 2.2 points at effectively the same cost. Fable 5 leads `writer` because it tops the separate Artificial Analysis writing benchmark at roughly 2,810 Elo, which CursorBench does not measure. It also leads `reviewer-claude`, `reviewer-security`, and `ui-designer`. Opus 5 sits directly behind it on all of those except `reviewer-security`. Claude Opus 4.8 and Sonnet 5 are now fully superseded and appear in no override. Neither Opus 5 nor Gemini 3.6 Flash has Artificial Analysis coverage, so their speed, latency, and general-capability profiles remain unverified.
+The 26 July refresh grew CursorBench 3.2 from 42 to 50 entries by adding Claude Opus 5 at five effort levels and Gemini 3.6 Flash at three. No previously recorded value changed. Opus 5 wins on both score and cost against Fable 5 at low, high, and extra high effort, which covers every effort level these overrides use, so `anthropic/claude-opus-5` is the main session model. Opus 5 high also reaches 66.7% at $3.91, matching Grok 4.5 high's score without the contamination caveat and beating GPT-5.6 Sol extra high by 2.2 points at effectively the same cost. Fable 5 leads `writer` because it tops the separate Artificial Analysis writing benchmark at roughly 2,810 Elo, which CursorBench does not measure. It also leads `reviewer-claude` and `ui-designer`. Opus 5 sits directly behind it on both. Claude Opus 4.8 and Sonnet 5 are now fully superseded and appear in no override. Neither Opus 5 nor Gemini 3.6 Flash has Artificial Analysis coverage, so their speed, latency, and general-capability profiles remain unverified.
 
-Pi exposes `xai/grok-4.5` through its built-in xAI provider. Authenticate with `/login xai` using a Grok/X subscription or xAI API key. The separately installed `pi-cursor-sdk` package and a Cursor SDK API key supply `cursor/grok-4.5`. All four Grok-backed profiles fall back first to Cursor's Grok route and then GPT-5.6 Sol; `fixer` and `worker` finally fall back to Opus 5. The same Cursor SDK key also supplies `cursor/gpt-5.6-sol@272k`, which sits behind the OpenAI API route on both GPT review gates and on `oracle`, whose fork context rules out an Anthropic route.
+Pi exposes `xai/grok-4.5` through its built-in xAI provider. Authenticate with `/login xai` using a Grok/X subscription or xAI API key. The separately installed `pi-cursor-sdk` package and a Cursor SDK API key supply `cursor/grok-4.5`. All four Grok-backed profiles fall back first to Cursor's Grok route; `scout` then uses GPT-5.6 Luna while the other three use Sol. `fixer` and `worker` finally fall back to Opus 5. The same Cursor SDK key also supplies `cursor/gpt-5.6-sol@272k`, which sits behind the OpenAI API route on both GPT review gates and on `oracle`, whose fork context rules out an Anthropic route.
 
 A faithful installer should use these exact current mappings, show them before writing configuration, and stop with a precise missing-model list if a required route is unavailable. It should not silently substitute a model that happens to look similar.
 
@@ -317,7 +317,7 @@ My small local extensions, the deterministic calculator, the Codex priority togg
 1. Install the supported Node.js and pi versions.
 2. Start pi.
 3. Authenticate ChatGPT/Codex, Claude, and xAI through `/login`. An OpenAI API key and a Cursor SDK API key are optional and only feed fallback routes.
-4. `pi install git:github.com/fitchmultz/pi-fitch-kit`, then `/reload`. Installing the kit is consent for its bundled pieces: the prompt library loads with the package and the agent bench links on reload.
+4. `pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.1`, then `/reload`. Installing the kit is consent for its bundled pieces: the prompt library loads with the package and the agent bench links on reload.
 5. Run `/fitch-setup` for everything beyond that.
 6. Choose the complete core or individual components, integrations, process rules, and trust posture.
 7. Review the single preview of every install command, file change, and model mapping.
@@ -325,7 +325,7 @@ My small local extensions, the deterministic calculator, the Codex priority togg
 
 Pi is the installer. The setup prompt reads the active installed pi documentation before changing anything, inspects existing configuration without reading credentials, and leaves every decision that belongs to you as a question rather than a default. `/fitch-setup verify` re-checks an existing install against the manifest without changing anything.
 
-One honest caveat: I have not yet watched this run end to end on a completely clean machine. The pieces are real and validated against my live setup, but treat the first fresh install as something we do together rather than a solo afternoon. That is also just the faster way to do it.
+Each tagged release is a tested snapshot. My live installation and `main` may move ahead until the next release.
 
 ## Trust and security boundaries
 

@@ -7,7 +7,7 @@
   - `prompts/**/*.md` for package slash commands, including the `/fitch-setup` entry point.
   - `agents/*.md` for reusable user subagent overrides.
   - `extensions/sync-agents.ts` for startup/reload symlink sync into `~/.pi/agent/agents/`.
-  - `setup-manifest.json` for exact package pins, required model routes, and kit resources; `/fitch-setup` treats it as the single source of truth.
+  - `setup-manifest.json` for each tagged release's exact package pins, required model routes, and kit resources; `/fitch-setup` treats that snapshot as the source of truth.
   - `templates/working-agreement.md` for the managed working-agreement blocks.
   - `package.json#pi` for the resources Pi loads from this package.
 - Keep `README.md`, `setup-manifest.json`, and `docs/pi-setup.md` in sync when commands, prompt names, agent roles, models, package pins, install flow, or source-of-truth rules change. `npm run check` enforces the manifest side of this.

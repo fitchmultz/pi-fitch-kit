@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 — 3 August 2026
+
+- Made tagged releases explicit known-good setup snapshots instead of claiming continuous parity with the live installation.
+- Reconciled the current agent profiles: replace-mode system prompts, Luna fallbacks for `scout`, and Sol routing for `reviewer-security`.
+- Pinned the documented install path to `v0.2.1`.
+
 ## Live-setup rescan — 1 August 2026
 
 - Added `pi-change-working-dir` to the manifest core packages and the guide's tool set.
