@@ -2,6 +2,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { formatDimensionNote, resizeImage } from "@earendil-works/pi-coding-agent";
 
 const MAX_CACHE_ENTRIES = 8;
+const MAX_IMAGE_BASE64_CHARS = 32 * 1024 * 1024;
+const MAX_CONTEXT_IMAGE_BASE64_CHARS = 64 * 1024 * 1024;
 
 export default function anthropicImageGuard(pi: ExtensionAPI): void {
 	const cache = new Map<string, ReturnType<typeof resizeImage>>();
@@ -13,6 +15,7 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 		if (ctx.model?.provider !== "anthropic") return;
 
 		let changed = false;
+		let contextImageChars = 0;
 		for (const message of event.messages) {
 			if (message.role === "assistant" || !Array.isArray(message.content)) continue;
 
@@ -21,6 +24,19 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 			for (const part of message.content) {
 				if (part.type !== "image") {
 					content.push(part);
+					continue;
+				}
+
+				contextImageChars += part.data.length;
+				if (
+					part.data.length > MAX_IMAGE_BASE64_CHARS ||
+					contextImageChars > MAX_CONTEXT_IMAGE_BASE64_CHARS
+				) {
+					content.push({
+						type: "text",
+						text: "[Image omitted: encoded source exceeds the Anthropic resize safety limit.]",
+					});
+					messageChanged = true;
 					continue;
 				}
 
@@ -37,6 +53,7 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 				}
 				const resized = await pending;
 				if (!resized) {
+					if (cache.get(part.data) === pending) cache.delete(part.data);
 					content.push({
 						type: "text",
 						text: "[Image omitted: could not be resized below Anthropic's inline image limits.]",

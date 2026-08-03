@@ -43,6 +43,11 @@ assert(
   subagents?.source === "git:github.com/fitchmultz/pi-subagents@3dd2c4932b8aff8a40ed25f98023aebd35685830",
   "subagents must use the merged profile-owning release",
 );
+assert(manifest.optionalIntegrations.includes("GitHub"), "active GitHub MCP integration must be selectable");
+
+const editSession = manifest.corePackages.find(({ id }) => id === "edit-session");
+assert(editSession?.source === "npm:pi-edit-session-in-place@0.1.27", "edit-session must retain forward-open Node support");
+
 const browser = manifest.corePackages.find(({ id }) => id === "agent-browser")?.externalPrerequisite;
 assert(browser?.version === "0.33.0", "Agent Browser prerequisite must match the wrapper's tested 0.33.0 baseline");
 assert(

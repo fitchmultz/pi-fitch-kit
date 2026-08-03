@@ -145,6 +145,7 @@ Pi loads a skill only when the task matches. This keeps the default prompt small
 The current connected services cover:
 
 - an internal integration gateway;
+- GitHub repositories, issues, pull requests, checks, reviews, and releases;
 - Linear planning context;
 - primary and development Slack workspaces;
 - Cloudflare infrastructure;
@@ -153,7 +154,7 @@ The current connected services cover:
 - Notion knowledge;
 - Granola meetings.
 
-`pi-mcp-adapter` provides searchable tool discovery so hundreds of service tools do not have to sit in the model's prompt at once. The gateway can expose direct tools for common operations and nested catalogs for rarer ones.
+`pi-mcp-adapter` provides searchable tool discovery so hundreds of service tools do not have to sit in the model's prompt at once. The gateway can expose direct tools for common operations and nested catalogs for rarer ones. Its optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary.
 
 Authentication remains user-scoped. The setup process may inspect non-secret connection status, but it does not read credential stores or service payloads merely to claim that setup worked.
 
@@ -171,7 +172,7 @@ My safe settings subset is checked in at [`examples/settings.json`](../examples/
 }
 ```
 
-Disabling global resize preserves original detail for image analysis. [`anthropic-image-guard.ts`](../extensions/anthropic-image-guard.ts) then enforces the stricter boundary only when the selected provider is Anthropic. Its eight-entry cache is cleared on session start and compaction, so preserving image quality does not create unbounded session memory. This is the same pattern used elsewhere in the setup: retain capability globally, then adapt at the narrow provider boundary that needs it.
+Disabling global resize preserves original detail for image analysis. [`anthropic-image-guard.ts`](../extensions/anthropic-image-guard.ts) then enforces the stricter boundary only when the selected provider is Anthropic. It caches eight recent successful transformations, clears them on session start and compaction, retries failures, and omits sources above 32 MiB of base64 or contexts above 64 MiB before native decoding. This is the same pattern used elsewhere in the setup: retain capability globally, then adapt at the narrow provider boundary that needs it.
 
 ## Subagent launch policy
 

@@ -74,7 +74,7 @@ Pi defaults `images.autoResize` to `true`, which protects provider limits by shr
 }
 ```
 
-That exposed stricter Anthropic image limits. The bundled guard fixes the boundary instead of giving up source quality everywhere: it runs only on Anthropic requests, reuses Pi's native image resizer, keeps eight recent transformations, clears that cache on compaction, and substitutes a clear omission note if resizing fails. The complete safe settings subset is in [`examples/settings.json`](examples/settings.json).
+That exposed stricter Anthropic image limits. The bundled guard fixes the boundary instead of giving up source quality everywhere: it runs only on Anthropic requests, reuses Pi's native image resizer, keeps eight recent successful transformations, clears that cache on compaction, and retries later after resize failures. It omits sources above 32 MiB of base64 or contexts above 64 MiB before native decoding. The complete safe settings subset is in [`examples/settings.json`](examples/settings.json).
 
 ## Subagent bench
 
@@ -137,6 +137,7 @@ The current setup has authenticated, read-only-discovery-verified connections fo
 | Connection | Capability |
 |---|---|
 | `horizon` | Internal integration gateway, authenticated identity, integration API calls, and nested tool catalogs |
+| GitHub | Repositories, issues, pull requests, checks, reviews, releases, and code search |
 | Linear | Issues, projects, teams, and planning context |
 | Slack, primary and development workspaces | Public and approved private conversation context, threads, users, and canvases |
 | Cloudflare | Documentation plus typed account API access |
@@ -146,7 +147,7 @@ The current setup has authenticated, read-only-discovery-verified connections fo
 | Notion | Workspace search, pages, databases, comments, and meeting notes |
 | Granola | Meeting notes, summaries, folders, and transcripts |
 
-The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session.
+The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session. The optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary.
 
 ## How the workflow fits together
 

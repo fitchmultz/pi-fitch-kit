@@ -45,7 +45,7 @@ Skills load only when the task matches. They provide a procedure without bloatin
 
 ## Connected context
 
-The current MCP layer is authenticated to an internal integration gateway, Linear, two Slack workspaces, Cloudflare, Sentry, Datadog, Plain, Notion, and Granola.
+The current MCP layer is authenticated to an internal integration gateway, GitHub, Linear, two Slack workspaces, Cloudflare, Sentry, Datadog, Plain, Notion, and Granola.
 
 That lets one session correlate repository state with planning context, conversation history, customer support, internal knowledge, meetings, and production telemetry. Each person authenticates their own access. The public kit contains no keys, private endpoints, profiles, sessions, or copied service data.
 

@@ -97,7 +97,7 @@
     },
     {
       "id": "edit-session",
-      "source": "npm:pi-edit-session-in-place@0.1.26"
+      "source": "npm:pi-edit-session-in-place@0.1.27"
     },
     {
       "id": "copy-message",
@@ -118,6 +118,7 @@
   ],
   "optionalIntegrations": [
     "Horizon",
+    "GitHub",
     "Linear",
     "Slack",
     "Cloudflare",
