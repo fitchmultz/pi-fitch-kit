@@ -34,6 +34,19 @@ assert.match(wideResult.messages[0].content[0].text, /original 2001x1, displayed
 assert.equal(wideResult.messages[0].content[1].type, "image");
 assert.notEqual(wideResult.messages[0].content[1].data, WIDE_PNG);
 
+const custom = [
+	{
+		role: "custom",
+		customType: "image-fixture",
+		content: [{ type: "image", data: WIDE_PNG, mimeType: "image/png" }],
+		display: false,
+		timestamp: 0,
+	},
+];
+const customResult = await context({ messages: custom }, { model: { provider: "anthropic" } });
+assert.match(customResult.messages[0].content[0].text, /original 2001x1, displayed at 2000x1/);
+assert.equal(customResult.messages[0].content[1].type, "image");
+
 const anthropic = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
 const result = await context({ messages: anthropic }, { model: { provider: "anthropic" } });
 assert.equal(result.messages[0].content[0].type, "text");
@@ -61,6 +74,7 @@ console.log(
 		nonAnthropic: "unchanged",
 		anthropicUnchanged: "preserved",
 		anthropicResize: "resized",
+		customImage: "resized",
 		anthropicResizeFailure: "omitted",
 		oversizedSource: "omitted",
 		compaction: "cleared",
