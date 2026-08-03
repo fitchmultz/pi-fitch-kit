@@ -134,7 +134,7 @@ Benchmark rationale and the 26 July 2026 Artificial Analysis plus CursorBench sn
 
 The public skills are source-managed rather than copied through a home directory:
 
-- [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries clarification, dogfooding, diagrams, handoffs, TDD, extension development, end-to-end shipping, completion verification, and two strict review modes.
+- [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries clarification, dogfooding, handoffs, TDD, extension development, end-to-end shipping, completion verification, and strict review modes. Its [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) skill produces editable D2 plus SVG/PNG architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with generated review images.
 - `pi-subagents`, `pi-intercom`, and `pi-mcp-adapter` ship their own usage skills beside the implementation.
 - [`ponytail`](https://github.com/DietrichGebert/ponytail) supplies the minimalism mode and its audit/review helpers.
 

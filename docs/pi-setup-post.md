@@ -39,7 +39,7 @@ Every profile is a leaf. Almost every child starts with fresh context. The paren
 
 ## Skills
 
-[`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) packages the reusable operating procedures: clarification, dogfooding, diagrams, handoffs, TDD, Pi extension development, end-to-end shipping, verification, and strict review. Subagents, Intercom, the MCP adapter, and Ponytail ship their own companion skills.
+[`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) packages the reusable operating procedures: clarification, dogfooding, handoffs, TDD, Pi extension development, end-to-end shipping, verification, and strict review. [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) adds editable D2 plus rendered SVG/PNG technical diagrams and review crops. Subagents, Intercom, the MCP adapter, and Ponytail ship their own companion skills.
 
 Skills load only when the task matches. They provide a procedure without bloating every prompt.
 

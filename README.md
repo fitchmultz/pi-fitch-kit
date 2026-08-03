@@ -104,11 +104,26 @@ The exact primary, fallback, thinking, context, tool, and output policy lives in
 
 ## Active skills
 
-Skills load task-specific operating instructions only when the work matches. The active public set is:
+Skills load task-specific operating instructions only when the work matches. [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries the active reusable workflow set:
+
+| Skill | What it adds |
+|---|---|
+| [`ask-clarifying-questions`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/ask-clarifying-questions) | Stop only for ambiguity that materially changes scope, safety, or reversibility |
+| [`bro`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/bro) | User-invoked plain-language rewrite with no jargon |
+| [`deslop`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/deslop) | Remove AI-generated diff noise without changing behavior |
+| [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) | Create editable D2 architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with rendered SVG/PNG review artifacts |
+| [`dogfood`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/dogfood) | Exploratory QA through real browser and terminal/TUI flows |
+| [`handoff`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/handoff) | Produce paste-ready continuation and bounded delegation briefs |
+| [`pi-extension-development`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/pi-extension-development) | Build, debug, validate, package, and release Pi extensions against current runtime contracts |
+| [`propose-then-ship-pi`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/propose-then-ship-pi) | Rank one repository improvement, stop for direction, then implement, review, and ship it |
+| [`tdd`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/tdd) | Red-green-refactor when test-first behavior is explicitly required |
+| [`thermo-nuclear-code-quality-review`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/thermo-nuclear-code-quality-review) | Strict maintainability review for large or structurally risky diffs |
+| [`verification-before-completion`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/verification-before-completion) | Require current evidence before completion, commit, PR, or passing-check claims |
+
+Companion skills ship beside their extensions:
 
 | Source | Skills |
 |---|---|
-| [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) | `ask-clarifying-questions`, `bro`, `deslop`, `diagram-creation`, `dogfood`, `handoff`, `pi-extension-development`, `propose-then-ship-pi`, `tdd`, `thermo-nuclear-code-quality-review`, `verification-before-completion` |
 | [`pi-subagents`](https://github.com/fitchmultz/pi-subagents/tree/main/skills/pi-subagents) | `pi-subagents` orchestration guidance |
 | [`pi-intercom`](https://github.com/fitchmultz/pi-intercom/tree/main/skills/pi-intercom) | `pi-intercom` coordination guidance |
 | [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter/tree/main/skills/mcp-scripting) | `mcp-scripting` for discovering and composing MCP calls |

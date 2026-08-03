@@ -2,7 +2,7 @@
 
 ## 0.2.2 — 3 August 2026
 
-- Reorganized the public documentation around the active stack: linked extensions, the fourteen-agent bench, source-managed skills, and authenticated MCP capabilities.
+- Reorganized the public documentation around the active stack: linked extensions, the fourteen-agent bench, directly linked source-managed skills including `diagram-creation`, and authenticated MCP capabilities.
 - Reconciled the release manifest with the currently loaded public packages and removed inactive package routes from the published setup.
 - Registered only `/fitch-setup` and `/github-open-issues-prs`; retained the rest of the prompt files as unloaded source material.
 - Bundled the Anthropic image guard and a safe settings example so full-resolution image handling is reproducible without sharing private configuration.
