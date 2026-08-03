@@ -227,7 +227,7 @@ npm run check
 npm run smoke
 ```
 
-- `npm run check` validates extension syntax, the image guard boundary, exact pins, manifest resources, package metadata alignment, and the absence of the retired duplicate agent surface.
+- `npm run check` type-checks and syntax-checks the extension, then validates the image guard boundary, exact pins, manifest resources, package metadata alignment, and the absence of the retired duplicate agent surface.
 - `npm run smoke` loads the checkout through Pi's real resource loader and requires exactly one bundled extension and two registered prompts.
 
 For the detailed workflow, model table, evidence, and security rationale, read [docs/pi-setup.md](docs/pi-setup.md). For the short version, read [docs/pi-setup-post.md](docs/pi-setup-post.md).
