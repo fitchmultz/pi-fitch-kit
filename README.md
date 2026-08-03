@@ -82,11 +82,11 @@ That exposed stricter Anthropic image limits. The bundled guard fixes the bounda
 
 | Job | Profiles |
 |---|---|
-| Map and investigate | [`scout`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/scout.md), [`context-builder`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/context-builder.md), [`debugger`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/debugger.md), [`researcher`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/researcher.md) |
-| Decide and plan | [`planner`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/planner.md), [`oracle`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/oracle.md) |
-| Implement bounded work | [`worker`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/worker.md), [`fixer`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/fixer.md) |
-| Challenge the result | [`reviewer`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/reviewer.md), [`reviewer-gpt`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/reviewer-gpt.md), [`reviewer-claude`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/reviewer-claude.md), [`reviewer-security`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/reviewer-security.md), [`ui-designer`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/ui-designer.md) |
-| Human-facing output | [`writer`](https://github.com/fitchmultz/pi-subagents/blob/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents/writer.md) |
+| Map and investigate | [`scout`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/scout.md), [`context-builder`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/context-builder.md), [`debugger`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/debugger.md), [`researcher`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/researcher.md) |
+| Decide and plan | [`planner`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/planner.md), [`oracle`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/oracle.md) |
+| Implement bounded work | [`worker`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/worker.md), [`fixer`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/fixer.md) |
+| Challenge the result | [`reviewer`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/reviewer.md), [`reviewer-gpt`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/reviewer-gpt.md), [`reviewer-claude`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/reviewer-claude.md), [`reviewer-security`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/reviewer-security.md), [`ui-designer`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/ui-designer.md) |
+| Human-facing output | [`writer`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/writer.md) |
 
 The parent session remains responsible for the task. Specialists return evidence; they do not become an autonomous hierarchy.
 
@@ -97,7 +97,7 @@ The routing is intentional:
 - `anthropic/claude-fable-5` supplies an independent model family for writing, UI judgment, and cross-model review, with Opus 5 behind it.
 - `oracle` alone uses forked parent context. Every other role starts fresh, and every profile is a leaf agent.
 
-The exact primary, fallback, thinking, context, tool, and output policy lives in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents). See [the full setup guide](docs/pi-setup.md#model-routing) for the complete table.
+The exact primary, fallback, thinking, context, tool, and output policy lives in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents). See [the full setup guide](docs/pi-setup.md#model-routing) for the complete table.
 
 ## Active skills
 

@@ -114,7 +114,7 @@ The agent files are the runtime source of truth. Models, fallbacks, effort, and 
 | `ui-designer` | Fable 5 | Opus 5, Codex Sol, OpenAI Sol | xhigh | fresh |
 | `writer` | Fable 5 | Opus 5 | high | fresh |
 
-Full model identifiers are in the pinned [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/ba80ad1ba51798d824041e2f60a0b48231d9b4d5/agents) directory. The compact names above mean:
+Full model identifiers are in the pinned [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents) directory. The compact names above mean:
 
 - Codex Sol: `openai-codex/gpt-5.6-sol`
 - OpenAI Sol: `openai/gpt-5.6-sol`

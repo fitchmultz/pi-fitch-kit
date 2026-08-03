@@ -40,7 +40,7 @@ for (const pkg of manifest.corePackages) {
 }
 const subagents = manifest.corePackages.find(({ id }) => id === "subagents");
 assert(
-  subagents?.source === "git:github.com/fitchmultz/pi-subagents@ba80ad1ba51798d824041e2f60a0b48231d9b4d5",
+  subagents?.source === "git:github.com/fitchmultz/pi-subagents@3dd2c4932b8aff8a40ed25f98023aebd35685830",
   "subagents must use the merged profile-owning release",
 );
 const browser = manifest.corePackages.find(({ id }) => id === "agent-browser")?.externalPrerequisite;
