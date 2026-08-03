@@ -117,6 +117,7 @@ try {
     ...manifest.kitResources.prompts,
     manifest.kitResources.workingAgreementTemplate,
     manifest.kitResources.settingsExample,
+    manifest.kitResources.agentBrowserVerifier,
   ]) {
     assert(lstatSync(join(root, resource)).isFile(), `manifest resource missing: ${resource}`);
   }
@@ -146,6 +147,12 @@ try {
       `corePackages ${pkg.id} is not pinned to an exact npm version or 40-char commit: ${pkg.source}`,
     );
   }
+  const browserPrerequisite = manifest.corePackages.find(({ id }) => id === "agent-browser")?.externalPrerequisite;
+  assert(browserPrerequisite?.installCommand.includes("--ignore-scripts"), "Agent Browser install must disable lifecycle scripts");
+  assert(
+    browserPrerequisite?.verifyBinaryCommand === "node <package-root>/scripts/verify-agent-browser.mjs",
+    "Agent Browser must use the kit's digest verifier",
+  );
 
   const setupPromptPath = manifest.kitResources.prompts.find((path) => path.endsWith("/fitch-setup.md"));
   assert(setupPromptPath, "manifest must include prompts/fitch-setup.md");

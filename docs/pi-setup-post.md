@@ -49,6 +49,8 @@ The current MCP layer is authenticated to an internal integration gateway, Linea
 
 That lets one session correlate repository state with planning context, conversation history, customer support, internal knowledge, meetings, and production telemetry. Each person authenticates their own access. The public kit contains no keys, private endpoints, profiles, sessions, or copied service data.
 
+My personal runtime is fully approved. The working agreement and operator direction are policy controls, not a per-tool authorization system. A multi-user product would put stronger authorization in the surrounding identity and execution plane.
+
 ## A typical larger change
 
 1. The parent retrieves the issue and relevant connected context.

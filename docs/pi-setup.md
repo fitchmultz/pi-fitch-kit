@@ -157,6 +157,8 @@ The current connected services cover:
 
 Authentication remains user-scoped. The setup process may inspect non-secret connection status, but it does not read credential stores or service payloads merely to claim that setup worked.
 
+My personal runtime uses full approvals. MCP transports tool calls; it is not the authorization boundary. The working agreement tells the model when external writes need explicit user direction, but that is policy rather than a per-tool enforcement mechanism. A multi-user product needs its authorization controls in the surrounding identity and execution plane.
+
 ## Image quality boundary
 
 My safe settings subset is checked in at [`examples/settings.json`](../examples/settings.json). The non-default image choice is intentional:
@@ -216,13 +218,13 @@ pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.2
 /fitch-setup
 ```
 
-The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only exact selected sources. It offers the safe settings keys separately, preserves unrelated configuration, stops for authentication, and verifies loaded resources after reload.
+The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only exact selected sources. Agent Browser 0.33.2's npm package includes the native assets. Setup installs it with lifecycle scripts disabled, then checks the selected platform binary against its pinned SHA-256 digest before execution. The prompt offers the safe settings keys separately, preserves unrelated configuration, stops for authentication, and verifies loaded resources after reload.
 
 `/fitch-setup verify` is read-only. It reports drift in package pins, profiles, extensions, prompts, skills, and model availability.
 
 ## Trust and security boundaries
 
-Pi extensions run with the permissions of the user who started Pi. Project trust controls whether project-local configuration loads; it is not a sandbox.
+Pi extensions run with the permissions of the user who started Pi. Project trust controls whether project-local configuration loads; it is not a sandbox. My personal setup runs fully approved, so the working agreement and operator oversight are policy controls rather than per-tool technical enforcement.
 
 A shared setup must not distribute:
 
@@ -234,6 +236,8 @@ A shared setup must not distribute:
 - copied service responses.
 
 The settings example omits trust policy intentionally. Choose `defaultProjectTrust` and subagent child trust for the environment rather than copying mine. Untrusted repositories should use `no-approve`.
+
+Top-level package sources are exact pins. Agent Browser's npm-bundled native executables have platform-specific SHA-256 pins in the release manifest and are verified before use.
 
 Consequential external writes, production actions, account changes, and merges still require explicit authorization.
 

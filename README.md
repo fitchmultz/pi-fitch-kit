@@ -134,7 +134,7 @@ The current setup has authenticated, read-only-discovery-verified connections fo
 | Notion | Workspace search, pages, databases, comments, and meeting notes |
 | Granola | Meeting notes, summaries, folders, and transcripts |
 
-The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data.
+The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session.
 
 ## How the workflow fits together
 
@@ -173,7 +173,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.2
 
 `/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every exact package install and file change, and asks which parts to apply. It never reads or copies credentials. `/fitch-setup verify` reports drift without changing anything.
 
-The manifest is the reproducible source of truth for package pins, models, bundled resources, and optional service connections. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
+The manifest is the reproducible source of truth for package pins, models, bundled resources, optional service connections, and the SHA-256 digests of Agent Browser's native binaries. Version 0.33.2 includes those binaries in its npm tarball; setup disables lifecycle scripts and verifies the installed platform binary before use. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
 
 ## Prompts
 
@@ -187,8 +187,10 @@ The older prompt files remain in `prompts/` as source material, but the package 
 ## Trust and security boundaries
 
 - Pi extensions run with the permissions of the user who started Pi. Project trust is not a sandbox.
+- My personal setup runs with full approvals and does not put a confirmation dialog in front of each MCP call. The working agreement is model policy, not a technical authorization boundary.
 - Every person authenticates their own model providers and services.
 - The kit contains no keys, OAuth state, private endpoints, browser profiles, raw sessions, generated catalogs, or copied service responses.
+- Top-level packages are pinned exactly. Agent Browser's npm-bundled native binary is also pinned and verified by SHA-256 before use.
 - The settings example deliberately omits personal paths, package filters, credentials, and the trust default. Choose project trust explicitly.
 - External writes, deployments, merges, account changes, and production actions remain user-authorized decisions.
 
@@ -202,7 +204,7 @@ prompts/                 setup, one active operational prompt, and retained sour
 setup-manifest.json      exact release pins and selectable integrations
 templates/               optional working-agreement blocks
 docs/                    full technical guide and shorter overview
-scripts/                 manifest validation, package smoke, manual agent sync fallback
+scripts/                 validation, native binary verification, package smoke, agent sync fallback
 ```
 
 ## Validation

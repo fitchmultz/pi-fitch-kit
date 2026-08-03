@@ -10,7 +10,7 @@
   "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "node --check extensions/sync-agents.ts && node --check extensions/anthropic-image-guard.ts && node scripts/image-guard-smoke.mjs && node scripts/validate.mjs",
+    "check": "node --check extensions/sync-agents.ts && node --check extensions/anthropic-image-guard.ts && node scripts/image-guard-smoke.mjs && node scripts/verify-agent-browser.mjs --check && node scripts/validate.mjs",
     "smoke": "node scripts/package-smoke.mjs"
   },
   "keywords": [

@@ -37,7 +37,7 @@ Before any write or install, show one complete preview containing:
 - the exact model mapping from all 14 files in `<package-root>/agents/`;
 - the selected working-agreement and settings keys;
 - package-backed skills that will load and any name collision with an existing user skill;
-- the Agent Browser prerequisite commands from the manifest, if selected;
+- the Agent Browser prerequisite sequence from the manifest, if selected: install the exact npm package with lifecycle scripts disabled, verify the bundled native binary against the kit's digest, then optionally download the browser runtime;
 - which changes require `/reload` or a fresh session.
 
 Ask for confirmation of that preview. The confirmed selection is consent for only those exact install commands and file changes. Do not add repeated per-package prompts.
@@ -48,7 +48,7 @@ Installing the kit is already consent for its bundled resources. Its two prompts
 
 Installing `pi-agent-skills` loads the active public skill set from that package. Preserve other user skill roots and filters. If a skill name collides, show both sources and ask which one should remain active rather than deleting either copy.
 
-Agent Browser has two actions outside Pi package installation: the manifest's global npm prerequisite and browser runtime download. Ask immediately before either command. Declining leaves Agent Browser as a manual step and does not block unrelated components.
+Agent Browser has a verified prerequisite sequence outside Pi package installation. Run the manifest's exact global npm command with `--ignore-scripts`, then run `verifyBinaryCommand` after replacing `<package-root>` with the installed kit root. Version 0.33.2 includes its platform binaries in the npm tarball; the verifier refuses to proceed unless the installed platform binary matches the manifest's SHA-256 digest. Never run the dependency's lifecycle script. The optional browser runtime download remains a separate command. Preview all three steps and ask before the sequence. Declining leaves Agent Browser as a manual step and does not block unrelated components.
 
 For integrations, install only the MCP adapter from the manifest and follow its current docs. Preview the exact config path and shape, then stop for user authentication or organization-specific values. Do not infer endpoints, inspect credentials, invoke service reads as a smoke, or make service writes.
 
