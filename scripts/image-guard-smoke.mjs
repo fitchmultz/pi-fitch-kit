@@ -25,8 +25,13 @@ assert.equal(result.messages[0].content[0].type, "text");
 assert.match(result.messages[0].content[0].text, /Image omitted/);
 
 handlers.session_compact();
-const afterCompaction = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
+const afterCompaction = [
+	{ role: "compactionSummary", summary: "Earlier context" },
+	{ role: "branchSummary", summary: "Earlier branch" },
+	{ role: "bashExecution", command: "pwd", output: "/tmp" },
+	{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] },
+];
 const afterCompactionResult = await context({ messages: afterCompaction }, { model: { provider: "anthropic" } });
-assert.equal(afterCompactionResult.messages[0].content[0].type, "text");
+assert.equal(afterCompactionResult.messages[3].content[0].type, "text");
 
 console.log(JSON.stringify({ ok: true, nonAnthropic: "unchanged", anthropicResizeFailure: "omitted", compaction: "cleared" }));

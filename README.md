@@ -4,7 +4,7 @@ My real Pi harness, packaged as a versioned, inspectable setup.
 
 This repository shows the composition layer I use every day: public extensions, model-routed subagents, reusable skills, authenticated MCP connections, and a small amount of local policy. It is also a working prototype for a model-agnostic organization harness built on top of [Pi](https://github.com/badlogic/pi-mono), without forking Pi core.
 
-Tagged releases are known-good snapshots. The current snapshot targets Pi `0.83.0`.
+Tagged releases are known-good snapshots. The current snapshot targets Pi `0.83.0` on Node.js `>=24.0.0`; Agent Browser 0.33.0 sets the Node floor.
 
 ## Start here
 
@@ -188,7 +188,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.2
 
 `/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every exact package install and file change, and asks which parts to apply. It never reads or copies credentials. `/fitch-setup verify` reports drift without changing anything.
 
-The manifest is the reproducible source of truth for package pins, models, bundled resources, optional service connections, and the SHA-256 digests of Agent Browser's native binaries. Version 0.33.2 includes those binaries in its npm tarball; setup disables lifecycle scripts and verifies the installed platform binary before use. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
+The manifest is the reproducible source of truth for package pins, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.0 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
 
 ## Prompts
 
@@ -205,7 +205,7 @@ The older prompt files remain in `prompts/` as source material, but the package 
 - My personal setup runs with full approvals and does not put a confirmation dialog in front of each MCP call. The working agreement is model policy, not a technical authorization boundary.
 - Every person authenticates their own model providers and services.
 - The kit contains no keys, OAuth state, private endpoints, browser profiles, raw sessions, generated catalogs, or copied service responses.
-- Top-level packages are pinned exactly. Agent Browser's npm-bundled native binary is also pinned and verified by SHA-256 before use.
+- Top-level packages are pinned exactly. Agent Browser stays on the stable wrapper's tested upstream version.
 - The settings example deliberately omits personal paths, package filters, credentials, and the trust default. Choose project trust explicitly.
 - External writes, deployments, merges, account changes, and production actions remain user-authorized decisions.
 
@@ -219,7 +219,7 @@ prompts/                 setup, one active operational prompt, and retained sour
 setup-manifest.json      exact release pins and selectable integrations
 templates/               optional working-agreement blocks
 docs/                    full technical guide and shorter overview
-scripts/                 validation, native binary verification, package smoke, agent sync fallback
+scripts/                 validation, package smoke, and agent sync fallback
 ```
 
 ## Validation

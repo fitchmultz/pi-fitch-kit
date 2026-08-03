@@ -9,7 +9,7 @@
   - `extensions/sync-agents.ts` for startup/reload symlink sync into `~/.pi/agent/agents/`.
   - `extensions/anthropic-image-guard.ts` for provider-specific image limit handling when global auto-resize is off.
   - `examples/settings.json` for the safe, non-secret behavioral settings subset.
-  - `setup-manifest.json` for each tagged release's exact package pins, native asset digests, required model routes, and kit resources; `/fitch-setup` treats that snapshot as the source of truth.
+  - `setup-manifest.json` for each tagged release's exact package pins, required model routes, and kit resources; `/fitch-setup` treats that snapshot as the source of truth.
   - `templates/working-agreement.md` for the managed working-agreement blocks.
   - `package.json#pi` for the resources Pi loads from this package.
 - Keep `README.md`, `setup-manifest.json`, and `docs/pi-setup.md` in sync when commands, prompt names, agent roles, models, package pins, install flow, or source-of-truth rules change. `npm run check` enforces the manifest side of this.
@@ -25,7 +25,7 @@
 
 ## Editing rules
 
-- Use npm and Node `>=22.19.0`; do not introduce another package manager.
+- Use npm and Node `>=24.0.0`; do not introduce another package manager.
 - Do not edit synced copies under `~/.pi/agent/agents/`; edit `agents/*.md` here and let the extension or fallback script relink them.
 - Do not add duplicate subagent overrides in Pi settings. Agent model/thinking/context/tool policy lives in `agents/*.md` frontmatter.
 - Keep model-facing agent bodies focused on actionable role instructions, evidence standards, boundaries, and outputs. Agent model, effort, and context policy belongs in frontmatter; parent-launch guidance belongs in orchestration docs.
@@ -47,7 +47,7 @@
 - Before changing Pi runtime/package behavior, read the installed Pi docs/types for the touched surface, especially `docs/packages.md`, `docs/prompt-templates.md`, and `docs/extensions.md` under the installed Pi root.
 - Keep `extensions/sync-agents.ts` startup work small and deterministic: create symlinks, skip non-symlink conflicts, warn through UI only when needed.
 - Keep `extensions/anthropic-image-guard.ts` provider-scoped and based on Pi's native `resizeImage`; do not reintroduce global resizing logic.
-- Keep Agent Browser native asset names and SHA-256 digests in the manifest. Installation must use `--ignore-scripts`; the verifier must fail closed on a missing or mismatched npm-bundled binary.
+- Keep the Agent Browser prerequisite version aligned with the released wrapper's tested compatibility baseline.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.
 
 ## Validation

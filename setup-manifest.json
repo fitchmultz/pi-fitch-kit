@@ -2,7 +2,7 @@
   "schemaVersion": 3,
   "runtime": {
     "pi": "0.83.0",
-    "node": ">=22.19.0"
+    "node": ">=24.0.0"
   },
   "kit": {
     "repository": "https://github.com/fitchmultz/pi-fitch-kit",
@@ -32,8 +32,7 @@
     ],
     "agentProfiles": 14,
     "workingAgreementTemplate": "templates/working-agreement.md",
-    "settingsExample": "examples/settings.json",
-    "agentBrowserVerifier": "scripts/verify-agent-browser.mjs"
+    "settingsExample": "examples/settings.json"
   },
   "corePackages": [
     {
@@ -77,40 +76,9 @@
       "source": "git:github.com/fitchmultz/pi-agent-browser-native@14d05acbfe98a04d5614b904eb51632d48845b25",
       "externalPrerequisite": {
         "package": "agent-browser",
-        "version": "0.33.2",
-        "installCommand": "npm install --global --ignore-scripts agent-browser@0.33.2",
-        "verifyBinaryCommand": "node <package-root>/scripts/verify-agent-browser.mjs",
-        "runtimeDownloadCommand": "agent-browser install",
-        "nativeAssets": {
-          "darwin-arm64": {
-            "name": "agent-browser-darwin-arm64",
-            "sha256": "cbb517902bcaa3b7a6384fd9f25dd274da3df2bb6a3ba9c3e85806d78213c26b"
-          },
-          "darwin-x64": {
-            "name": "agent-browser-darwin-x64",
-            "sha256": "a6bb1c10124f624a9b1fd0eecabf774477cdb710e3552fb843f1f7f664b8f326"
-          },
-          "linux-arm64": {
-            "name": "agent-browser-linux-arm64",
-            "sha256": "6ccaba1eb26a0e6f5c23c59d2c63e6e0237fde82713cfdb543ba506490cac9c1"
-          },
-          "linux-x64": {
-            "name": "agent-browser-linux-x64",
-            "sha256": "b7bc3dfcf0a7326c1f5a60423163259ba2349eebfa5bd2e70e111af743da4a49"
-          },
-          "linux-musl-arm64": {
-            "name": "agent-browser-linux-musl-arm64",
-            "sha256": "eec7d0a27e32b96a4f9b9fbdd0c070d058e5b4eaa1bd6be1fffe926321c5d01c"
-          },
-          "linux-musl-x64": {
-            "name": "agent-browser-linux-musl-x64",
-            "sha256": "ca7e6589158fd9276897ec66367105704a215f95b1df4c4abb193244d0260eda"
-          },
-          "win32-x64": {
-            "name": "agent-browser-win32-x64.exe",
-            "sha256": "291f0c33c2fbcbf159b5868065ab412dfd8722d6299821e010cf0715964f2cba"
-          }
-        }
+        "version": "0.33.0",
+        "installCommand": "npm install --global agent-browser@0.33.0",
+        "runtimeDownloadCommand": "agent-browser install"
       }
     },
     {
@@ -143,7 +111,7 @@
     },
     {
       "id": "calculator",
-      "source": "git:github.com/fitchmultz/pi-calculator@ff39601e99a6e10c3ca12bd6208c635b49dd6d98"
+      "source": "git:github.com/fitchmultz/pi-calculator@d6b4a6c4efff2d68ecaff79c954bb63cecd5c330"
     },
     {
       "id": "agent-skills",

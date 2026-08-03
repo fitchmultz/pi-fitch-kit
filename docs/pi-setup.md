@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Last updated 3 August 2026 for Pi 0.83.0._
+_Last updated 3 August 2026 for Pi 0.83.0 on Node.js 24 or newer._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 
@@ -218,7 +218,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.2
 /fitch-setup
 ```
 
-The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only exact selected sources. Agent Browser 0.33.2's npm package includes the native assets. Setup installs it with lifecycle scripts disabled, then checks the selected platform binary against its pinned SHA-256 digest before execution. The prompt offers the safe settings keys separately, preserves unrelated configuration, stops for authentication, and verifies loaded resources after reload.
+The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only exact selected sources. Agent Browser stays at 0.33.0 because that is the released wrapper's tested baseline; an unrelated in-progress wrapper release does not hold this snapshot. The prompt offers the safe settings keys separately, preserves unrelated configuration, stops for authentication, and verifies loaded resources after reload.
 
 `/fitch-setup verify` is read-only. It reports drift in package pins, profiles, extensions, prompts, skills, and model availability.
 
@@ -237,7 +237,7 @@ A shared setup must not distribute:
 
 The settings example omits trust policy intentionally. Choose `defaultProjectTrust` and subagent child trust for the environment rather than copying mine. Untrusted repositories should use `no-approve`.
 
-Top-level package sources are exact pins. Agent Browser's npm-bundled native executables have platform-specific SHA-256 pins in the release manifest and are verified before use.
+Top-level package sources are exact pins. The Agent Browser CLI version matches the released wrapper's tested compatibility baseline.
 
 Consequential external writes, production actions, account changes, and merges still require explicit authorization.
 
