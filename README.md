@@ -55,7 +55,7 @@ These are the extensions loaded in my current setup. Every external extension li
 
 ### Extension bundled by this kit
 
-[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. It also owns `/anthropic-fast [on|off]`, Anthropic's research-preview fast mode for Opus 5 and Opus 4.8 at double the token price. Fast mode needs preview access from Anthropic, and the extension takes over the Anthropic provider only while the toggle is on, so the default state runs stock Pi. Agent profiles now ship directly with `pi-subagents`, so this kit no longer copies or syncs them.
+[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. It also owns `/anthropic-fast [on|off]`, Anthropic's research-preview fast mode for Opus 5 and Opus 4.8 at double the token price. Fast mode needs preview access from Anthropic. Because Pi gives extensions no way to append a header at the wire without owning the provider's stream callback, the extension wraps Anthropic streaming whenever it is loaded, and classifies full-stream calls by their Anthropic-native options; requests carrying a caller-supplied `client` are left on standard speed, since the mandatory beta header cannot be attached to them. Agent profiles now ship directly with `pi-subagents`, so this kit no longer copies or syncs them.
 
 ### Selective experimental extension
 

@@ -21,7 +21,6 @@ const SMALL_BMP = "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAATCwAAEwsAA
 const handlers = {};
 const commands = {};
 const providers = new Map();
-let lastProvider;
 anthropicImageGuard({
 	on(event, handler) {
 		(handlers[event] ??= []).push(handler);
@@ -31,10 +30,6 @@ anthropicImageGuard({
 	},
 	registerProvider(name, config) {
 		providers.set(name, config);
-		lastProvider = config;
-	},
-	unregisterProvider(name) {
-		providers.delete(name);
 	},
 });
 const runHandlers = async (event, ...args) => {
@@ -43,9 +38,10 @@ const runHandlers = async (event, ...args) => {
 
 const context = handlers.context[0];
 assert.equal(typeof context, "function");
-assert.equal(handlers.session_start.length, 2, "image cache and fast provider both hook start");
+assert.equal(typeof handlers.session_start[0], "function");
 assert.equal(typeof handlers.session_compact[0], "function");
-assert.equal(providers.size, 0, "disabled fast mode must not take over the Anthropic provider");
+// Registered once and gated per request, so unregistering can never delete a peer's registration.
+assert.equal(providers.get("anthropic")?.api, "anthropic-messages");
 
 const nonAnthropic = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
 assert.equal(await context({ messages: nonAnthropic }, { model: { provider: "openai" } }), undefined);
@@ -56,7 +52,6 @@ assert.equal(await context({ messages: unchanged }, { model: { provider: "anthro
 assert.equal(unchanged[0].content[0].data, SMALL_PNG);
 
 await runHandlers("session_start");
-assert.equal(providers.size, 0, "session start with fast mode off must leave Pi stock");
 const mislabeled = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/jpeg" }] }];
 await context({ messages: mislabeled }, { model: { provider: "anthropic" } });
 const correctlyLabeled = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/png" }] }];
@@ -126,7 +121,7 @@ assert.equal(afterCompactionResult.messages[3].content[0].type, "text");
 async function fastRequest(id, beta = "pi-existing-beta", extraOptions = {}) {
 	let payload;
 	let headers = new Headers();
-	const stream = lastProvider.streamSimple(
+	const stream = providers.get("anthropic").streamSimple(
 		{
 			id,
 			api: "anthropic-messages",
@@ -154,14 +149,18 @@ async function fastRequest(id, beta = "pi-existing-beta", extraOptions = {}) {
 	for await (const _event of stream) {
 		// Drain the capture abort.
 	}
-	assert.ok(payload, "an Anthropic request must be issued");
+	// A prebuilt client never reaches the wrapped fetch, which is the point of that case.
+	if (!extraOptions.client) assert.ok(payload, "an Anthropic request must be issued");
 	return { payload, beta: (headers.get("anthropic-beta") ?? "").split(",") };
 }
 
 const notices = [];
 const fastCtx = { ui: { notify: (message) => notices.push(message) } };
+const offOpus = await fastRequest("claude-opus-5");
+assert.equal(offOpus.payload.speed, undefined);
+assert.deepEqual(offOpus.beta, ["pi-existing-beta"], "no fast beta while disabled");
+
 await commands["anthropic-fast"].handler("on", fastCtx);
-assert.equal(providers.get("anthropic")?.api, "anthropic-messages");
 assert.equal(JSON.parse(readFileSync(join(agentDir, "anthropic-fast.json"), "utf8")).enabled, true);
 assert.equal(notices.at(-1), "Anthropic fast mode ON");
 for (const id of ["claude-opus-5", "claude-opus-4-8"]) {
@@ -189,9 +188,26 @@ assert.notEqual(
 	"a full call without thinkingEnabled must not be recomputed by the simple path",
 );
 
+let clientPayload;
+const prebuilt = await fastRequest("claude-opus-5", "pi-existing-beta", {
+	client: {
+		messages: {
+			create: (params) => {
+				clientPayload = params;
+				throw new Error("prebuilt client used");
+			},
+		},
+	},
+});
+assert.equal(prebuilt.payload, undefined, "a prebuilt client bypasses the wrapped fetch");
+assert.equal(
+	clientPayload?.speed,
+	undefined,
+	"never request fast mode when the mandatory beta header cannot be attached",
+);
+
 await commands["anthropic-fast"].handler("off", fastCtx);
 assert.equal(notices.at(-1), "Anthropic fast mode OFF");
-assert.equal(providers.size, 0, "disabling must hand the provider back to Pi");
 assert.equal((await fastRequest("claude-opus-5")).payload.speed, undefined);
 
 const fullStream = await fastRequest("claude-opus-5", "pi-existing-beta", {

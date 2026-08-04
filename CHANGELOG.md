@@ -3,7 +3,7 @@
 ## 0.2.3 — 4 August 2026
 
 - Added `/anthropic-fast [on|off]` to the Anthropic extension: off by default, persisted in the Pi agent directory, and limited to Opus 5 and Opus 4.8 because fast mode is Opus-only and bills double per token. Reported cost rates double with it so session totals match Anthropic's premium billing.
-- The Anthropic provider override is registered only while fast mode is on. Pi's provider composer collapses full and simple stream calls into a single extension callback and drops the provenance, so while the override is active, full-stream callers are recognized by their Anthropic-native options; a full call using only shared options falls through to the simple path.
+- Pi's provider composer collapses full and simple stream calls into a single extension callback and drops the provenance, so the extension classifies full-stream callers by their Anthropic-native options and leaves everything else on the simple path. Requests that supply their own `client` bypass `options.fetch` in pi-ai and therefore stay at standard speed rather than risk `speed: "fast"` without its required beta header.
 
 ## 0.2.2 — 4 August 2026
 

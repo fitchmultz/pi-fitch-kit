@@ -24,8 +24,9 @@ type FastRates = { input: number; output: number; cacheRead: number; cacheWrite:
 // Anthropic-native options a simple caller cannot express. Pi's composer collapses
 // Provider.stream() and Provider.streamSimple() into one extension callback and drops the
 // provenance, and streamSimple() keeps only a fixed field list, so any of these keys means
-// the call must stay on the full API. Unknown future keys fall through to the simple path,
-// which is the pre-existing behavior rather than a new loss.
+// the call must stay on the full API. A future Anthropic-only key would not be listed here
+// and would be routed to the simple path, which loses it; that is the known cost of owning
+// this callback at all, and it is why the list must be updated when pi-ai adds options.
 const FULL_STREAM_KEYS = [
 	"thinkingEnabled",
 	"thinkingBudgetTokens",
@@ -99,7 +100,12 @@ function fastStream(
 	options?: SimpleStreamOptions,
 ) {
 	// One snapshot per request: a mid-request toggle must not split body and header.
-	const fast = fastEnabled() && FAST_MODEL_PREFIXES.some((prefix) => model.id.startsWith(prefix));
+	// A caller-supplied client bypasses options.fetch in pi-ai, so the mandatory beta header
+	// cannot be attached; never send speed without it.
+	const fast =
+		fastEnabled() &&
+		!(options !== undefined && "client" in options) &&
+		FAST_MODEL_PREFIXES.some((prefix) => model.id.startsWith(prefix));
 	const target = fast ? fastModel(model) : model;
 	const streamOptions = fast ? fastOptions(options) : options;
 	return FULL_STREAM_KEYS.some((key) => options !== undefined && key in options)
@@ -207,17 +213,9 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 		if (changed) return { messages: event.messages };
 	});
 
-	// Own the Anthropic provider only while fast mode is on, so the default state runs stock Pi.
-	const setFastProvider = (enabled: boolean) => {
-		if (enabled) {
-			pi.registerProvider("anthropic", { api: "anthropic-messages", streamSimple: fastStream });
-		} else {
-			pi.unregisterProvider("anthropic");
-		}
-	};
-	pi.on("session_start", () => {
-		if (fastEnabled()) setFastProvider(true);
-	});
+	// Registered once, gated per request. Toggling registration instead would delete any other
+	// extension's Anthropic registration, because Pi merges them into one provider-level object.
+	pi.registerProvider("anthropic", { api: "anthropic-messages", streamSimple: fastStream });
 
 	pi.registerCommand("anthropic-fast", {
 		description: "Toggle Anthropic Opus fast mode (2x token price)",
@@ -225,7 +223,6 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 			const arg = args.trim().toLowerCase();
 			if (arg === "on" || arg === "off") {
 				writeFileSync(FAST_STATE_PATH, `${JSON.stringify({ enabled: arg === "on" })}\n`);
-				setFastProvider(arg === "on");
 			}
 			ctx.ui.notify(`Anthropic fast mode ${fastEnabled() ? "ON" : "OFF"}`, "info");
 		},
