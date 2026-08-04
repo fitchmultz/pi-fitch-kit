@@ -250,7 +250,7 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 	pi.on("session_start", (_event, ctx) => {
 		footerContext = ctx;
 		updateFooterStatus(ctx);
-		if (ctx.hasUI) watchFile(FAST_STATE_PATH, { interval: 500 }, refreshFooter);
+		if (ctx.hasUI) watchFile(FAST_STATE_PATH, { interval: 5000 }, refreshFooter);
 	});
 	pi.on("session_shutdown", () => {
 		unwatchFile(FAST_STATE_PATH, refreshFooter);
