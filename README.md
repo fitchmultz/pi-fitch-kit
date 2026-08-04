@@ -55,7 +55,9 @@ These are the extensions loaded in my current setup. Every external extension li
 
 ### Extension bundled by this kit
 
-[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. It also owns `/anthropic-fast [on|off]`, Anthropic's research-preview fast mode for Opus 5 and Opus 4.8 at double the token price. Anthropic documents fast mode as a research preview requiring account access, and it is verified working on this setup's Claude subscription OAuth route: identical output ran roughly 2x faster with the toggle on. Requests carrying a caller-supplied `client` are left on standard speed, since the mandatory beta header cannot be attached to them.
+[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. It also owns `/anthropic-fast [on|off]`, Anthropic's research-preview fast mode for Opus 5 and Opus 4.8 at double the token price. Anthropic documents fast mode as a research preview requiring account access, and it is verified working on this setup's Claude subscription OAuth route: identical output ran roughly 2x faster with the toggle on. While an Opus 5 or Opus 4.8 model is selected, the footer shows `anthropic-fast:on` or `:off`, and it clears on models that ignore fast mode. Because the toggle is shared by every session, the footer follows changes made elsewhere.
+
+Requests carrying a caller-supplied `client` are left on standard speed, since the mandatory beta header cannot be attached to them.
 
 Accepted caveat: appending a mandatory header at the wire requires owning Anthropic's stream callback, because Pi exposes no wire-header hook and no full-versus-simple stream provenance. This extension therefore wraps Anthropic streaming whenever it is loaded, and classifies full-stream calls by their Anthropic-native options. Consequences worth knowing:
 

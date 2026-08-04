@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4
+
+- Added an `anthropic-fast:on|off` footer indicator, matching the one in pi-codex-context. It appears only on Opus 5 and Opus 4.8, is colored by state, and clears on every other model, so the footer never claims fast mode where it does nothing.
+- The footer watches the shared state file, so a session picks up a toggle made in another session rather than showing stale state.
+
 ## 0.2.3 — 4 August 2026
 
 - Verified against the live Claude subscription OAuth route on 4 August 2026: `speed: "fast"` and the beta header are both server-validated, the request is accepted, and identical output returned in 4.8s against 9.5s with fast mode off. Reported cost still doubles, which tracks Anthropic's metered pricing exactly for API-key routes and stands in as a premium-usage signal on subscription auth, where Pi's cost figures are notional.
