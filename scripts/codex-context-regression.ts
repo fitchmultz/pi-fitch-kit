@@ -133,6 +133,7 @@ for (const source of [
 	"git:github.com/fitchmultz/pi-codex-context",
 	"git:github.com/fitchmultz/pi-codex-context@legacy-ref",
 	"https://github.com/fitchmultz/pi-codex-context.git",
+	"https://github.com/fitchmultz/pi-codex-context.git/",
 	"git:git@github.com:fitchmultz/pi-codex-context",
 	"ssh://git@github.com/fitchmultz/pi-codex-context",
 	"git://github.com/fitchmultz/pi-codex-context.git",
@@ -206,25 +207,83 @@ for (const event of ["before_provider_request", "session_before_compact"]) {
 		`malformed settings must keep one ${event} owner`,
 	);
 }
-writeFileSync(
-	join(extensionAgentDir, "settings.json"),
-	`${JSON.stringify({ packages: [{ source: "git:github.com/fitchmultz/pi-codex-context", extensions: ["-index.ts"] }] })}\n`,
-);
-process.env.PI_CODING_AGENT_DIR = extensionAgentDir;
-const filteredLegacyLoad = await loadExtensions(
-	[fileURLToPath(new URL("../extensions/codex-context.ts", import.meta.url))],
-	process.cwd(),
-);
-if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
-else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
-assert.deepEqual(filteredLegacyLoad.errors, []);
-assert.deepEqual(
-	filteredLegacyLoad.extensions.flatMap(
-		(loaded: { commands: Map<string, unknown> }) => [...loaded.commands.keys()],
-	),
-	["codex-fast"],
-	"a filtered legacy extension must not suppress the kit",
-);
+const legacySource = "git:github.com/fitchmultz/pi-codex-context";
+for (const { label, entry, legacyLoaded } of [
+	{
+		label: "force-excluded",
+		entry: { source: legacySource, extensions: ["-index.ts"] },
+		legacyLoaded: false,
+	},
+	{
+		label: "dot-relative plain include",
+		entry: { source: legacySource, extensions: ["./index.ts"] },
+		legacyLoaded: false,
+	},
+	{
+		label: "dot-relative exclusion",
+		entry: { source: legacySource, extensions: ["!./index.ts"] },
+		legacyLoaded: true,
+	},
+	{
+		label: "autoload disabled",
+		entry: { source: legacySource, autoload: false },
+		legacyLoaded: false,
+	},
+	{
+		label: "autoload plain include",
+		entry: { source: legacySource, autoload: false, extensions: ["index.ts"] },
+		legacyLoaded: true,
+	},
+	{
+		label: "autoload force include",
+		entry: { source: legacySource, autoload: false, extensions: ["+index.ts"] },
+		legacyLoaded: true,
+	},
+	{
+		label: "autoload force exclude",
+		entry: { source: legacySource, autoload: false, extensions: ["-index.ts"] },
+		legacyLoaded: false,
+	},
+	{
+		label: "absolute include",
+		entry: { source: legacySource, extensions: [join(legacyCheckout, "index.ts")] },
+		legacyLoaded: true,
+	},
+]) {
+	writeFileSync(
+		join(extensionAgentDir, "settings.json"),
+		`${JSON.stringify({ packages: [entry] })}\n`,
+	);
+	process.env.PI_CODING_AGENT_DIR = extensionAgentDir;
+	const filteredLegacyLoad = await loadExtensions(
+		[
+			...(legacyLoaded ? [legacyFixture] : []),
+			fileURLToPath(new URL("../extensions/codex-context.ts", import.meta.url)),
+		],
+		process.cwd(),
+	);
+	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+	assert.deepEqual(filteredLegacyLoad.errors, [], label);
+	assert.deepEqual(
+		filteredLegacyLoad.extensions.flatMap(
+			(loaded: { commands: Map<string, unknown> }) => [...loaded.commands.keys()],
+		),
+		["codex-fast"],
+		`${label} must leave one command owner`,
+	);
+	for (const event of ["before_provider_request", "session_before_compact"]) {
+		assert.equal(
+			filteredLegacyLoad.extensions.reduce(
+				(total: number, loaded: { handlers: Map<string, unknown[]> }) =>
+					total + (loaded.handlers.get(event)?.length ?? 0),
+				0,
+			),
+			1,
+			`${label} must leave one ${event} owner`,
+		);
+	}
+}
 rmSync(join(extensionAgentDir, "settings.json"), { force: true });
 process.env.PI_CODING_AGENT_DIR = extensionAgentDir;
 const staleCheckoutLoad = await loadExtensions(

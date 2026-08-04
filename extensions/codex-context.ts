@@ -164,8 +164,8 @@ function isLegacyRepoPath(path: string): boolean {
 		path
 			.replace(/^\/+/, "")
 			.split(/[@#]/, 1)[0]
-			.replace(/\.git$/, "")
-			.replace(/\/$/, "") === "fitchmultz/pi-codex-context"
+			.replace(/\/+$/, "")
+			.replace(/\.git$/, "") === "fitchmultz/pi-codex-context"
 	);
 }
 
@@ -189,46 +189,58 @@ function isLegacySource(source: unknown): boolean {
 	return isLegacyRepoPath(value);
 }
 
-function legacyEntryEnabled(pkg: unknown): boolean {
+function legacyEntryEnabled(pkg: unknown, indexPath: string): boolean {
 	const entry = typeof pkg === "string" ? { source: pkg } : (pkg as {
 		source?: unknown;
 		extensions?: unknown;
+		autoload?: unknown;
 	});
 	if (!isLegacySource(entry?.source)) return false;
-	if (!Array.isArray(entry.extensions)) return true;
+	if (!Array.isArray(entry.extensions)) return entry.autoload !== false;
 	const filters = entry.extensions.filter((value): value is string => typeof value === "string");
+	const matches = (pattern: string) =>
+		matchesGlob("index.ts", pattern) || matchesGlob(indexPath, pattern);
+	const exact = (pattern: string) => {
+		const normalized = pattern.replace(/^\.\//, "");
+		return normalized === "index.ts" || normalized === indexPath;
+	};
+	if (entry.autoload === false) {
+		let enabled = false;
+		for (const pattern of filters) {
+			const prefix = /^[!+-]/.test(pattern) ? pattern[0] : "";
+			const target = prefix ? pattern.slice(1) : pattern;
+			if ((prefix === "+" || prefix === "-") ? exact(target) : matches(target)) {
+				enabled = prefix !== "!" && prefix !== "-";
+			}
+		}
+		return enabled;
+	}
 	if (filters.length === 0) return false;
-	const normalize = (pattern: string) => pattern.replace(/^\.\//, "");
-	const matches = (pattern: string) => matchesGlob("index.ts", normalize(pattern));
 	const includes = filters.filter((pattern) => !/^[!+-]/.test(pattern));
 	let enabled = includes.length === 0 || includes.some(matches);
 	if (filters.some((pattern) => pattern.startsWith("!") && matches(pattern.slice(1)))) enabled = false;
-	if (filters.some((pattern) => pattern.startsWith("+") && normalize(pattern.slice(1)) === "index.ts")) enabled = true;
-	if (filters.some((pattern) => pattern.startsWith("-") && normalize(pattern.slice(1)) === "index.ts")) enabled = false;
+	if (filters.some((pattern) => pattern.startsWith("+") && exact(pattern.slice(1)))) enabled = true;
+	if (filters.some((pattern) => pattern.startsWith("-") && exact(pattern.slice(1)))) enabled = false;
 	return enabled;
 }
 
 function legacyStandaloneInstalled(): boolean {
 	const agentDir = getAgentDir();
-	if (
-		!existsSync(
-			join(
-				agentDir,
-				"git",
-				"github.com",
-				"fitchmultz",
-				"pi-codex-context",
-				"package.json",
-			),
-		)
-	) {
-		return false;
-	}
+	const legacyRoot = join(
+		agentDir,
+		"git",
+		"github.com",
+		"fitchmultz",
+		"pi-codex-context",
+	);
+	if (!existsSync(join(legacyRoot, "package.json"))) return false;
 	const settingsPath = join(agentDir, "settings.json");
 	if (!existsSync(settingsPath)) return false;
 	try {
 		const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
-		return settings.packages?.some(legacyEntryEnabled) === true;
+		return settings.packages?.some((pkg: unknown) =>
+			legacyEntryEnabled(pkg, join(legacyRoot, "index.ts")),
+		) === true;
 	} catch {
 		// Pi can retain its last valid settings after a parse failure, so keep the old owner.
 		return true;
