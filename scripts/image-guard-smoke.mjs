@@ -20,23 +20,32 @@ const SMALL_BMP = "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAATCwAAEwsAA
 
 const handlers = {};
 const commands = {};
-const providers = [];
+const providers = new Map();
+let lastProvider;
 anthropicImageGuard({
 	on(event, handler) {
-		handlers[event] = handler;
+		(handlers[event] ??= []).push(handler);
 	},
 	registerCommand(name, config) {
 		commands[name] = config;
 	},
 	registerProvider(name, config) {
-		providers.push({ name, config });
+		providers.set(name, config);
+		lastProvider = config;
+	},
+	unregisterProvider(name) {
+		providers.delete(name);
 	},
 });
+const runHandlers = async (event, ...args) => {
+	for (const handler of handlers[event] ?? []) await handler(...args);
+};
 
-const { context } = handlers;
+const context = handlers.context[0];
 assert.equal(typeof context, "function");
-assert.equal(typeof handlers.session_start, "function");
-assert.equal(typeof handlers.session_compact, "function");
+assert.equal(handlers.session_start.length, 2, "image cache and fast provider both hook start");
+assert.equal(typeof handlers.session_compact[0], "function");
+assert.equal(providers.size, 0, "disabled fast mode must not take over the Anthropic provider");
 
 const nonAnthropic = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
 assert.equal(await context({ messages: nonAnthropic }, { model: { provider: "openai" } }), undefined);
@@ -46,7 +55,8 @@ const unchanged = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, m
 assert.equal(await context({ messages: unchanged }, { model: { provider: "anthropic" } }), undefined);
 assert.equal(unchanged[0].content[0].data, SMALL_PNG);
 
-handlers.session_start();
+await runHandlers("session_start");
+assert.equal(providers.size, 0, "session start with fast mode off must leave Pi stock");
 const mislabeled = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/jpeg" }] }];
 await context({ messages: mislabeled }, { model: { provider: "anthropic" } });
 const correctlyLabeled = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/png" }] }];
@@ -103,7 +113,7 @@ const oversizedResult = await context({ messages: oversized }, { model: { provid
 assert.match(oversizedResult.messages[0].content[0].text, /resize safety limit/);
 assert.equal(oversizedResult.messages[0].content[1].type, "image");
 
-handlers.session_compact();
+await runHandlers("session_compact");
 const afterCompaction = [
 	{ role: "compactionSummary", summary: "Earlier context" },
 	{ role: "branchSummary", summary: "Earlier branch" },
@@ -113,15 +123,10 @@ const afterCompaction = [
 const afterCompactionResult = await context({ messages: afterCompaction }, { model: { provider: "anthropic" } });
 assert.equal(afterCompactionResult.messages[3].content[0].type, "text");
 
-assert.deepEqual(
-	providers.map(({ name, config }) => [name, config.api]),
-	[["anthropic", "anthropic-messages"]],
-);
-
 async function fastRequest(id, beta = "pi-existing-beta", extraOptions = {}) {
 	let payload;
 	let headers = new Headers();
-	const stream = providers[0].config.streamSimple(
+	const stream = lastProvider.streamSimple(
 		{
 			id,
 			api: "anthropic-messages",
@@ -155,11 +160,8 @@ async function fastRequest(id, beta = "pi-existing-beta", extraOptions = {}) {
 
 const notices = [];
 const fastCtx = { ui: { notify: (message) => notices.push(message) } };
-const offOpus = await fastRequest("claude-opus-5");
-assert.equal(offOpus.payload.speed, undefined);
-assert.deepEqual(offOpus.beta, ["pi-existing-beta"], "no fast beta while disabled");
-
 await commands["anthropic-fast"].handler("on", fastCtx);
+assert.equal(providers.get("anthropic")?.api, "anthropic-messages");
 assert.equal(JSON.parse(readFileSync(join(agentDir, "anthropic-fast.json"), "utf8")).enabled, true);
 assert.equal(notices.at(-1), "Anthropic fast mode ON");
 for (const id of ["claude-opus-5", "claude-opus-4-8"]) {
@@ -177,8 +179,19 @@ const unsupported = await fastRequest("claude-fable-5");
 assert.equal(unsupported.payload.speed, undefined);
 assert.deepEqual(unsupported.beta, ["pi-existing-beta"], "no fast beta on unsupported models");
 
+const fullStreamOnly = await fastRequest("claude-opus-5", "pi-existing-beta", {
+	toolChoice: "none",
+});
+assert.equal(fullStreamOnly.payload.tool_choice?.type, "none", "full-only options must survive");
+assert.notEqual(
+	fullStreamOnly.payload.thinking?.type,
+	"disabled",
+	"a full call without thinkingEnabled must not be recomputed by the simple path",
+);
+
 await commands["anthropic-fast"].handler("off", fastCtx);
 assert.equal(notices.at(-1), "Anthropic fast mode OFF");
+assert.equal(providers.size, 0, "disabling must hand the provider back to Pi");
 assert.equal((await fastRequest("claude-opus-5")).payload.speed, undefined);
 
 const fullStream = await fastRequest("claude-opus-5", "pi-existing-beta", {

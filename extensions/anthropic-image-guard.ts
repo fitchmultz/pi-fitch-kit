@@ -21,6 +21,21 @@ const ANTHROPIC_IMAGE_MIME_TYPES = new Set([
 
 type FastRates = { input: number; output: number; cacheRead: number; cacheWrite: number };
 
+// Anthropic-native options a simple caller cannot express. Pi's composer collapses
+// Provider.stream() and Provider.streamSimple() into one extension callback and drops the
+// provenance, and streamSimple() keeps only a fixed field list, so any of these keys means
+// the call must stay on the full API. Unknown future keys fall through to the simple path,
+// which is the pre-existing behavior rather than a new loss.
+const FULL_STREAM_KEYS = [
+	"thinkingEnabled",
+	"thinkingBudgetTokens",
+	"effort",
+	"thinkingDisplay",
+	"interleavedThinking",
+	"toolChoice",
+	"client",
+];
+
 const FAST_STATE_PATH = join(getAgentDir(), "anthropic-fast.json");
 const FAST_BETA = "fast-mode-2026-02-01";
 const FAST_MODEL_PREFIXES = ["claude-opus-5", "claude-opus-4-8"];
@@ -76,6 +91,20 @@ function fastOptions(options: SimpleStreamOptions | undefined): SimpleStreamOpti
 			return { ...(body as Record<string, unknown>), speed: "fast" };
 		},
 	};
+}
+
+function fastStream(
+	model: Model<Api>,
+	context: Parameters<typeof messagesApi.streamSimple>[1],
+	options?: SimpleStreamOptions,
+) {
+	// One snapshot per request: a mid-request toggle must not split body and header.
+	const fast = fastEnabled() && FAST_MODEL_PREFIXES.some((prefix) => model.id.startsWith(prefix));
+	const target = fast ? fastModel(model) : model;
+	const streamOptions = fast ? fastOptions(options) : options;
+	return FULL_STREAM_KEYS.some((key) => options !== undefined && key in options)
+		? messagesApi.stream(target, context, streamOptions)
+		: messagesApi.streamSimple(target, context, streamOptions);
 }
 
 function anthropicMimeType(mimeType: string): string | undefined {
@@ -178,20 +207,16 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 		if (changed) return { messages: event.messages };
 	});
 
-	pi.registerProvider("anthropic", {
-		api: "anthropic-messages",
-		streamSimple(model, context, options) {
-			// One snapshot per request: a mid-request toggle must not split body and header.
-			const fast =
-				fastEnabled() && FAST_MODEL_PREFIXES.some((prefix) => model.id.startsWith(prefix));
-			const target = fast ? fastModel(model) : model;
-			const streamOptions = fast ? fastOptions(options) : options;
-			// Pi's composer routes full and simple streams through this one callback, so explicit
-			// full-stream options (thinking, budgets) must stay on the full API.
-			return "thinkingEnabled" in (options ?? {})
-				? messagesApi.stream(target, context, streamOptions as never)
-				: messagesApi.streamSimple(target, context, streamOptions);
-		},
+	// Own the Anthropic provider only while fast mode is on, so the default state runs stock Pi.
+	const setFastProvider = (enabled: boolean) => {
+		if (enabled) {
+			pi.registerProvider("anthropic", { api: "anthropic-messages", streamSimple: fastStream });
+		} else {
+			pi.unregisterProvider("anthropic");
+		}
+	};
+	pi.on("session_start", () => {
+		if (fastEnabled()) setFastProvider(true);
 	});
 
 	pi.registerCommand("anthropic-fast", {
@@ -200,6 +225,7 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 			const arg = args.trim().toLowerCase();
 			if (arg === "on" || arg === "off") {
 				writeFileSync(FAST_STATE_PATH, `${JSON.stringify({ enabled: arg === "on" })}\n`);
+				setFastProvider(arg === "on");
 			}
 			ctx.ui.notify(`Anthropic fast mode ${fastEnabled() ? "ON" : "OFF"}`, "info");
 		},
