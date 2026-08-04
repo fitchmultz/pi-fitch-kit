@@ -103,9 +103,7 @@ function fastStream(
 	// A caller-supplied client bypasses options.fetch in pi-ai, so the mandatory beta header
 	// cannot be attached; never send speed without it.
 	const fast =
-		fastEnabled() &&
-		!(options !== undefined && "client" in options) &&
-		FAST_MODEL_PREFIXES.some((prefix) => model.id.startsWith(prefix));
+		fastEnabled() && !(options !== undefined && "client" in options) && fastEligible(model);
 	const target = fast ? fastModel(model) : model;
 	const streamOptions = fast ? fastOptions(options) : options;
 	return FULL_STREAM_KEYS.some((key) => options !== undefined && key in options)
@@ -250,6 +248,9 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 	pi.on("session_start", (_event, ctx) => {
 		footerContext = ctx;
 		updateFooterStatus(ctx);
+		// Unwatch first: a repeated session_start would otherwise stack listeners, and a single
+		// shutdown would then leave one behind holding the process open.
+		unwatchFile(FAST_STATE_PATH, refreshFooter);
 		if (ctx.hasUI) watchFile(FAST_STATE_PATH, { interval: 5000 }, refreshFooter);
 	});
 	pi.on("session_shutdown", () => {

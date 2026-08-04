@@ -2,7 +2,7 @@
 
 ## 0.2.4
 
-- Added an `anthropic-fast:on|off` footer indicator, matching the one in pi-codex-context. It appears only on Opus 5 and Opus 4.8, is colored by state, and clears on every other model, so the footer never claims fast mode where it does nothing.
+- Added an `anthropic-fast:on|off` footer indicator, matching the one in pi-codex-context. It appears only on Opus 5 and Opus 4.8, is colored by state, and clears on every other model. It reports the toggle and the selected model, which is what a session can know before a request; a request that supplies its own `client` still runs at standard speed while the footer reads `on`.
 - The footer watches the shared state file every 5 seconds, so a session picks up a toggle made in another session rather than showing stale state. Toggling inside a session updates its own footer immediately, so the poll only covers cross-session changes and does not need to be fast.
 
 ## 0.2.3 — 4 August 2026

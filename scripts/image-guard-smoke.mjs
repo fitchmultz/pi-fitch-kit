@@ -249,8 +249,15 @@ assert.equal(status.get("anthropic-fast"), "accent:anthropic-fast:on");
 
 await commands["anthropic-fast"].handler("off", fastCtx);
 assert.equal(status.get("anthropic-fast"), "muted:anthropic-fast:off");
-// Also releases the state-file watcher, so this script can exit.
+// A second start must not stack watchers: one shutdown has to release everything, or the
+// process stays alive holding a listener.
+await runHandlers("session_start", {}, uiCtx("claude-opus-5"));
 await runHandlers("session_shutdown");
+assert.equal(
+	process.getActiveResourcesInfo().filter((resource) => resource === "StatWatcher").length,
+	0,
+	"repeated session starts must not leak a state-file watcher",
+);
 
 console.log(
 	JSON.stringify({
