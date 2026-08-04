@@ -13,11 +13,13 @@ const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const temp = mkdtempSync(join(tmpdir(), "pi-fitch-kit-package-"));
 const agentDir = join(temp, "agent");
 const cwd = join(temp, "project");
+const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 
 try {
 	mkdirSync(agentDir, { recursive: true });
 	mkdirSync(cwd, { recursive: true });
 	writeFileSync(join(agentDir, "settings.json"), `${JSON.stringify({ packages: [root] }, null, 2)}\n`);
+	process.env.PI_CODING_AGENT_DIR = agentDir;
 
 	const settingsManager = await SettingsManager.create(cwd, agentDir, { projectTrusted: false });
 	const loader = new DefaultResourceLoader({
@@ -41,8 +43,24 @@ try {
 	if (errors.length > 0) throw new Error(`Prompt load errors: ${JSON.stringify(errors)}`);
 	if (extensions.errors.length > 0) throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
 	if (extensions.extensions.length !== 2) throw new Error(`Expected 2 extensions, got ${extensions.extensions.length}`);
+	const commandNames = extensions.extensions
+		.flatMap(({ commands }) => [...commands.keys()])
+		.sort();
+	const expectedCommands = ["anthropic-fast", "codex-fast"];
+	if (JSON.stringify(commandNames) !== JSON.stringify(expectedCommands)) {
+		throw new Error(`Expected ${JSON.stringify(expectedCommands)}, got ${JSON.stringify(commandNames)}`);
+	}
+	for (const event of ["before_provider_request", "session_before_compact"]) {
+		const count = extensions.extensions.reduce(
+			(total, extension) => total + (extension.handlers.get(event)?.length ?? 0),
+			0,
+		);
+		if (count !== 1) throw new Error(`Expected one ${event} handler, got ${count}`);
+	}
 
-	console.log(JSON.stringify({ ok: true, prompts: promptNames, extensions: extensions.extensions.length }, null, 2));
+	console.log(JSON.stringify({ ok: true, prompts: promptNames, commands: commandNames, extensions: extensions.extensions.length }, null, 2));
 } finally {
+	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 	rmSync(temp, { recursive: true, force: true });
 }

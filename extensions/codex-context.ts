@@ -23,7 +23,6 @@ import {
 
 const FAST_STATE_PATH = join(getAgentDir(), "openai-codex-fast.json");
 const COMPACTION_CONFIG_PATH = join(getAgentDir(), "pi-codex-context.json");
-const LEGACY_SOURCE = "git:github.com/fitchmultz/pi-codex-context";
 type CompactionModel = {
 	provider: string;
 	model: string;
@@ -160,6 +159,15 @@ function fastOptions(options?: SimpleStreamOptions): SimpleStreamOptions {
 	};
 }
 
+function isLegacySource(source: unknown): boolean {
+	if (typeof source !== "string") return false;
+	let identity = source.replace(/^git:/, "");
+	identity = identity.replace(/^(?:https?:\/\/|ssh:\/\/git@|git@)/, "");
+	identity = identity.replace(/^github\.com:/, "github.com/");
+	identity = identity.split(/[@#]/, 1)[0].replace(/\.git$/, "").replace(/\/$/, "");
+	return identity === "github.com/fitchmultz/pi-codex-context";
+}
+
 function legacyStandaloneInstalled(): boolean {
 	const agentDir = getAgentDir();
 	if (
@@ -178,14 +186,11 @@ function legacyStandaloneInstalled(): boolean {
 	}
 	try {
 		const settings = JSON.parse(readFileSync(join(agentDir, "settings.json"), "utf8"));
-		return settings.packages?.some((pkg: unknown) => {
-			const source =
-				typeof pkg === "string" ? pkg : (pkg as { source?: unknown })?.source;
-			return (
-				source === LEGACY_SOURCE ||
-				(typeof source === "string" && source.startsWith(`${LEGACY_SOURCE}@`))
-			);
-		}) === true;
+		return settings.packages?.some((pkg: unknown) =>
+			isLegacySource(
+				typeof pkg === "string" ? pkg : (pkg as { source?: unknown })?.source,
+			),
+		) === true;
 	} catch {
 		return false;
 	}

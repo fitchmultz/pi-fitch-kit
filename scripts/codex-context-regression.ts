@@ -116,10 +116,6 @@ const legacyCheckout = join(
 );
 mkdirSync(legacyCheckout, { recursive: true });
 writeFileSync(join(legacyCheckout, "package.json"), "{}\n");
-writeFileSync(
-	join(extensionAgentDir, "settings.json"),
-	`${JSON.stringify({ packages: ["git:github.com/fitchmultz/pi-codex-context@legacy-ref"] })}\n`,
-);
 const legacyFixture = join(extensionAgentDir, "legacy-codex-context.ts");
 writeFileSync(
 	legacyFixture,
@@ -131,39 +127,51 @@ writeFileSync(
 		});
 	}\n`,
 );
-process.env.PI_CODING_AGENT_DIR = extensionAgentDir;
-const transitionLoad = await loadExtensions(
-	[
-		legacyFixture,
-		fileURLToPath(new URL("../extensions/codex-context.ts", import.meta.url)),
-	],
-	process.cwd(),
-);
-if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
-else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
-assert.deepEqual(transitionLoad.errors, [], "legacy transition must load cleanly");
-assert.deepEqual(
-	transitionLoad.extensions.flatMap((loaded: { commands: Map<string, unknown> }) => [
-		...loaded.commands.keys(),
-	]),
-	["codex-fast"],
-	"the legacy checkout must remain the sole command owner until removal",
-);
-for (const event of ["before_provider_request", "session_before_compact"]) {
-	const handlers = transitionLoad.extensions.flatMap(
-		(loaded: { handlers: Map<string, unknown[]> }) => loaded.handlers.get(event) ?? [],
+for (const source of [
+	"git:github.com/fitchmultz/pi-codex-context",
+	"git:github.com/fitchmultz/pi-codex-context@legacy-ref",
+	"https://github.com/fitchmultz/pi-codex-context.git",
+	"git:git@github.com:fitchmultz/pi-codex-context",
+	"ssh://git@github.com/fitchmultz/pi-codex-context",
+]) {
+	writeFileSync(
+		join(extensionAgentDir, "settings.json"),
+		`${JSON.stringify({ packages: [source] })}\n`,
 	);
-	assert.equal(handlers.length, 1, `${event} must have one transition owner`);
-	if (event === "session_before_compact") {
-		await (handlers[0] as (event: unknown, ctx: unknown) => unknown)({}, {});
+	process.env.PI_CODING_AGENT_DIR = extensionAgentDir;
+	const transitionLoad = await loadExtensions(
+		[
+			legacyFixture,
+			fileURLToPath(new URL("../extensions/codex-context.ts", import.meta.url)),
+		],
+		process.cwd(),
+	);
+	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+	assert.deepEqual(transitionLoad.errors, [], `${source} transition must load cleanly`);
+	assert.deepEqual(
+		transitionLoad.extensions.flatMap(
+			(loaded: { commands: Map<string, unknown> }) => [...loaded.commands.keys()],
+		),
+		["codex-fast"],
+		`${source} must leave the legacy checkout as sole command owner`,
+	);
+	for (const event of ["before_provider_request", "session_before_compact"]) {
+		const handlers = transitionLoad.extensions.flatMap(
+			(loaded: { handlers: Map<string, unknown[]> }) => loaded.handlers.get(event) ?? [],
+		);
+		assert.equal(handlers.length, 1, `${source} ${event} must have one owner`);
+		if (event === "session_before_compact") {
+			await (handlers[0] as (event: unknown, ctx: unknown) => unknown)({}, {});
+		}
 	}
+	assert.equal(
+		(globalThis as { __legacyCompactionCalls?: number }).__legacyCompactionCalls,
+		1,
+		`${source} compaction must invoke one summary handler`,
+	);
+	delete (globalThis as { __legacyCompactionCalls?: number }).__legacyCompactionCalls;
 }
-assert.equal(
-	(globalThis as { __legacyCompactionCalls?: number }).__legacyCompactionCalls,
-	1,
-	"a transition compaction must invoke one summary handler",
-);
-delete (globalThis as { __legacyCompactionCalls?: number }).__legacyCompactionCalls;
 rmSync(join(extensionAgentDir, "settings.json"), { force: true });
 process.env.PI_CODING_AGENT_DIR = extensionAgentDir;
 const staleCheckoutLoad = await loadExtensions(

@@ -238,6 +238,6 @@ npm run smoke
 
 - `npm run check` type-checks and syntax-checks the bundled extensions, then validates the image guard boundary, unpinned package sources, manifest resources, package metadata alignment, and the absence of retired duplicate surfaces.
 - `npm run regression:codex-context` verifies the active Pi installation's compaction patch, literal consent gate, native-stream preservation, priority payload, and watcher cleanup.
-- `npm run smoke` loads the checkout through Pi's real resource loader and requires exactly two bundled extensions and two registered prompts.
+- `npm run smoke` loads the checkout through Pi's real resource loader and requires both bundled commands, one OpenAI request hook, one custom-compaction hook, two extensions, and two prompts.
 
 For the detailed workflow, model table, evidence, and security rationale, read [docs/pi-setup.md](docs/pi-setup.md). For the short version, read [docs/pi-setup-post.md](docs/pi-setup-post.md).
