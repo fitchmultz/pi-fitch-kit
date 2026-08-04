@@ -186,7 +186,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.2
 /fitch-setup
 ```
 
-`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every exact package install and file change, and asks which parts to apply. It never reads or copies credentials. `/fitch-setup verify` reports drift without changing anything.
+`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every exact package install and file change, and asks which parts to apply. It never reads or copies credentials. Run it again after an upgrade to preview removal of legacy kit-owned profile symlinks; it never removes regular files or links from another source. `/fitch-setup verify` reports drift without changing anything.
 
 The manifest is the reproducible source of truth for package pins, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.0 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
 
@@ -214,11 +214,11 @@ The older prompt files remain in `prompts/` as source material, but the package 
 ```text
 extensions/             Anthropic image boundary guard
 examples/settings.json  safe, non-secret behavioral settings
-prompts/                 setup, one active operational prompt, and retained source material
-setup-manifest.json      exact release pins and selectable integrations
-templates/               optional working-agreement blocks
-docs/                    full technical guide and shorter overview
-scripts/                 validation and package smoke
+prompts/                setup, one active operational prompt, and retained source material
+setup-manifest.json     exact release pins and selectable integrations
+templates/              optional working-agreement blocks
+docs/                   full technical guide and shorter overview
+scripts/                validation and package smoke
 ```
 
 ## Validation

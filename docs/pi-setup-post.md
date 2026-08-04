@@ -1,6 +1,6 @@
 # My Pi harness, and why it is structured this way
 
-_Updated 3 August 2026 for Pi 0.83.0 on Node.js 24 or newer._
+_Updated 4 August 2026 for Pi 0.83.0 on Node.js 24 or newer._
 
 A few people have asked about my terminal agent setup. The public, installable version is [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit).
 
@@ -18,7 +18,7 @@ The main session remains responsible for the task. This is not an autonomous swa
 The normal path includes:
 
 - [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) and [`pi-intercom`](https://github.com/fitchmultz/pi-intercom) for delegated work and session coordination;
-- [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter) and [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) for connected context and real browser work;
+- [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/cef3ed0c9670b04519ee0eeb5bb91fc346efff89) and [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) for connected context and real browser work;
 - [`pi-fff`](https://github.com/dmtrKovalenko/fff/tree/main/packages/pi-fff) and [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) for repository search and reliable changes;
 - small public tools for structured questions, persistent todos, session naming, working-directory changes, deterministic math, compaction, timing, verbosity, stash, session editing, and raw message copy;
 - [`ponytail`](https://github.com/DietrichGebert/ponytail) to keep the code path boring and small.

@@ -14,6 +14,8 @@ Run the Fitch Pi setup in `${1:-setup}` mode. This is a main-session-led setup p
 
 ## Inspect
 
+Resolve `<Pi agent dir>` once as `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}` and use it for every user-scoped path.
+
 Inspect only non-secret state needed for the plan: `node --version`, `pi --version`, `pi list --no-approve`, `PI_OFFLINE=1 pi --list-models --no-approve`, package metadata and docs, path existence and type, and structural JSON keys. Ask before any online refresh. Do not print whole user configuration files. If JSON is malformed, managed markers conflict, or an intended path is an unrelated non-symlink, stop and ask rather than replacing it.
 
 Require the manifest's Node and Pi versions and every route in `requiredModels`. The `optionalModels` routes need the user's own API authentication; their absence removes fallbacks and must be reported, not repaired silently. Treat model listing as catalog evidence, not authentication proof. Ask the user to complete documented provider login flows. Use a documented non-secret auth-status surface when available; otherwise ask before the smallest no-session live probe. Never resolve or print credentials. If any required model is unavailable, report the exact missing list and stop rather than substituting a similar model.
@@ -44,7 +46,7 @@ Before any write or install, show one complete preview containing:
 
 Ask for confirmation of that preview. The confirmed selection is consent for only those exact install commands, file changes, and separately selected data routes. Do not treat Complete core as consent for a `consent.required` behavior, and do not add repeated prompts for ordinary packages.
 
-Preserve unrelated configuration. Use Pi package commands instead of replacing `settings.json`; merge selected JSON keys narrowly. Merge a selected working-agreement block into `~/.pi/agent/AGENTS.md` by its complete managed markers while retaining unrelated text. Never add an unselected block. Stop on malformed JSON, partial, duplicate, or nested managed markers, or semantic conflicts.
+Preserve unrelated configuration. Use Pi package commands instead of replacing `settings.json`; merge selected JSON keys narrowly. Merge a selected working-agreement block into `<Pi agent dir>/AGENTS.md` by its complete managed markers while retaining unrelated text. Never add an unselected block. Stop on malformed JSON, partial, duplicate, or nested managed markers, or semantic conflicts.
 
 Installing the kit is already consent for its bundled resources. Its two prompts and `anthropic-image-guard` load with the package. Installing the pinned `pi-subagents` package supplies the fourteen specialist defaults plus `delegate`; do not create user-level profile copies or symlinks. For upgrades from kit versions that did create profile links, inspect `<Pi agent dir>/agents/` with `lstat`: offer to unlink only a symlink whose recorded target is under `pi-fitch-kit/agents/` and whose basename now exists in the pinned `pi-subagents/agents/`. Preview every path and get confirmation; never remove a regular file or a link with different provenance. The image guard applies only to Anthropic requests and matters primarily when global image auto-resizing is disabled. After `/reload`, verify the expected package-owned resources.
 

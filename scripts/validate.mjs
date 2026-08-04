@@ -87,6 +87,8 @@ assert(setupPromptPath, "manifest must include prompts/fitch-setup.md");
 const setupPrompt = readFileSync(join(root, setupPromptPath), "utf-8");
 assert(setupPrompt.includes("setup-manifest.json"), "setup prompt must reference the manifest");
 assert(setupPrompt.includes("pi-subagents"), "setup prompt must name the profile owner");
+assert(setupPrompt.includes("${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"), "setup prompt must honor the active Pi agent directory");
+assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");
 assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
 assert(setupPrompt.includes("consent.required"), "setup prompt must honor consent-gated behavior");
 assert(!setupPrompt.includes("@latest"), "setup prompt must reject mutable npm specs without spelling one");

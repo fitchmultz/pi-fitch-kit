@@ -1,6 +1,6 @@
 # Fitch Pi working-agreement template
 
-Merge only the user-approved managed blocks into `~/.pi/agent/AGENTS.md`. Update an existing complete block in place. Never replace unrelated content. If markers are partial, duplicated, nested, or otherwise malformed, stop and ask the user how to proceed.
+Merge only the user-approved managed blocks into `<Pi agent dir>/AGENTS.md`, using the active directory resolved by `/fitch-setup`. Update an existing complete block in place. Never replace unrelated content. If markers are partial, duplicated, nested, or otherwise malformed, stop and ask the user how to proceed.
 
 <!-- fitch-pi-kit:baseline:start -->
 ## Baseline safety and evidence
