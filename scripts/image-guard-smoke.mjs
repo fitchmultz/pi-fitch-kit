@@ -29,6 +29,13 @@ const unchanged = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, m
 assert.equal(await context({ messages: unchanged }, { model: { provider: "anthropic" } }), undefined);
 assert.equal(unchanged[0].content[0].data, SMALL_PNG);
 
+handlers.session_start();
+const mislabeled = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/jpeg" }] }];
+await context({ messages: mislabeled }, { model: { provider: "anthropic" } });
+const correctlyLabeled = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/png" }] }];
+assert.equal(await context({ messages: correctlyLabeled }, { model: { provider: "anthropic" } }), undefined);
+assert.equal(correctlyLabeled[0].content[0].mimeType, "image/png");
+
 const wide = [{ role: "user", content: [{ type: "image", data: WIDE_PNG, mimeType: "image/png" }] }];
 const wideResult = await context({ messages: wide }, { model: { provider: "anthropic" } });
 assert.match(wideResult.messages[0].content[0].text, /original 2001x1, displayed at 2000x1/);
@@ -95,6 +102,7 @@ console.log(
 		nonAnthropic: "unchanged",
 		anthropicUnchanged: "preserved",
 		anthropicResize: "resized",
+		mimeAwareCache: "preserved",
 		customImage: "resized",
 		unsupportedCustomImage: "omitted",
 		anthropicResizeFailure: "omitted",

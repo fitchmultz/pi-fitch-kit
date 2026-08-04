@@ -223,7 +223,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.2
 
 The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only exact selected sources. Agent Browser stays at 0.33.0 because that is the released wrapper's tested baseline; an unrelated in-progress wrapper release does not hold this snapshot. The prompt offers the safe settings keys separately, preserves unrelated configuration, stops for authentication, and verifies loaded resources after reload.
 
-`/fitch-setup verify` is read-only. It reports drift in package pins, profiles, extensions, prompts, skills, and model availability.
+`/fitch-setup verify` is read-only. It reports drift in package pins, profiles, extensions, prompts, skills, model availability, and consent-gated route state.
 
 ## Trust and security boundaries
 

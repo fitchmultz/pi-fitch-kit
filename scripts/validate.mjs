@@ -45,6 +45,18 @@ assert(
 );
 assert(manifest.optionalIntegrations.includes("GitHub"), "active GitHub MCP integration must be selectable");
 
+const mcp = manifest.corePackages.find(({ id }) => id === "mcp");
+assert(
+  mcp?.source === "git:github.com/fitchmultz/pi-mcp-adapter@cef3ed0c9670b04519ee0eeb5bb91fc346efff89",
+  "MCP adapter must retain the reviewed UI capability isolation",
+);
+
+const agentSkills = manifest.corePackages.find(({ id }) => id === "agent-skills");
+assert(
+  agentSkills?.source === "git:github.com/fitchmultz/pi-agent-skills@c3e0e1f7da7a65a090582266326432aef8053954",
+  "agent-skills must retain the reviewed deslop guidance",
+);
+
 const codexContext = manifest.corePackages.find(({ id }) => id === "codex-context");
 assert(
   codexContext?.source === "git:github.com/fitchmultz/pi-codex-context@b2c52ebd47fac2b38750168ea0d648ecd6c03a96",
@@ -75,6 +87,7 @@ assert(setupPromptPath, "manifest must include prompts/fitch-setup.md");
 const setupPrompt = readFileSync(join(root, setupPromptPath), "utf-8");
 assert(setupPrompt.includes("setup-manifest.json"), "setup prompt must reference the manifest");
 assert(setupPrompt.includes("pi-subagents"), "setup prompt must name the profile owner");
+assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
 assert(setupPrompt.includes("consent.required"), "setup prompt must honor consent-gated behavior");
 assert(!setupPrompt.includes("@latest"), "setup prompt must reject mutable npm specs without spelling one");
 

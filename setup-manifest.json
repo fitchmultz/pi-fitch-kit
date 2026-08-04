@@ -81,7 +81,7 @@
     },
     {
       "id": "mcp",
-      "source": "npm:pi-mcp-adapter@2.18.0"
+      "source": "git:github.com/fitchmultz/pi-mcp-adapter@cef3ed0c9670b04519ee0eeb5bb91fc346efff89"
     },
     {
       "id": "stash",
@@ -138,7 +138,7 @@
     },
     {
       "id": "agent-skills",
-      "source": "git:github.com/fitchmultz/pi-agent-skills@f7df41c32f9d174aa4b552aa42266d860760b1a0"
+      "source": "git:github.com/fitchmultz/pi-agent-skills@c3e0e1f7da7a65a090582266326432aef8053954"
     }
   ],
   "optionalIntegrations": [

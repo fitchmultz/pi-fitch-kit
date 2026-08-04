@@ -27,7 +27,7 @@ These are the extensions loaded in my current setup. Every external extension li
 |---|---|
 | [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) | Fresh specialists, parallel work, chains, isolated worktrees, async review, and durable artifacts |
 | [`pi-intercom`](https://github.com/fitchmultz/pi-intercom) | Coordination between independent local Pi sessions and active child runs |
-| [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter) | One searchable gateway over configured MCP servers and their tools |
+| [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/cef3ed0c9670b04519ee0eeb5bb91fc346efff89) | One searchable gateway over configured MCP servers and their tools |
 | [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) | Live documentation, browser automation, screenshots, product QA, and authenticated web flows |
 
 ### Coding and task control
@@ -107,7 +107,7 @@ Skills load task-specific operating instructions only when the work matches. [`p
 |---|---|
 | [`ask-clarifying-questions`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/ask-clarifying-questions) | Stop only for ambiguity that materially changes scope, safety, or reversibility |
 | [`bro`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/bro) | User-invoked plain-language rewrite with no jargon |
-| [`deslop`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/deslop) | Remove AI-generated diff noise without changing behavior |
+| [`deslop`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/deslop) | Remove AI-generated diff noise and ceremonial test tables without dropping real boundary coverage |
 | [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) | Create editable D2 architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with rendered SVG/PNG review artifacts |
 | [`dogfood`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/dogfood) | Exploratory QA through real browser and terminal/TUI flows |
 | [`handoff`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/handoff) | Produce paste-ready continuation and bounded delegation briefs |
@@ -123,7 +123,7 @@ Companion skills ship beside their extensions:
 |---|---|
 | [`pi-subagents`](https://github.com/fitchmultz/pi-subagents/tree/main/skills/pi-subagents) | `pi-subagents` orchestration guidance |
 | [`pi-intercom`](https://github.com/fitchmultz/pi-intercom/tree/main/skills/pi-intercom) | `pi-intercom` coordination guidance |
-| [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter/tree/main/skills/mcp-scripting) | `mcp-scripting` for discovering and composing MCP calls |
+| [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/cef3ed0c9670b04519ee0eeb5bb91fc346efff89/skills/mcp-scripting) | `mcp-scripting` for discovering and composing MCP calls |
 | [`ponytail`](https://github.com/DietrichGebert/ponytail/tree/main/skills) | `ponytail`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help`, `ponytail-review` |
 
 `bro` is intentionally user-invoked only. The rest are selected by task fit rather than loaded into every prompt.
