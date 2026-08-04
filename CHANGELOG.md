@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 — 4 August 2026
+
+- Moved `pi-session-name` into the kit as `extensions/session-name.ts` and retired the duplicate package source from new installs. Existing Pi session names remain in their session files; removing the standalone extension does not reset them.
+- Preserved the `name_session` tool, inert context metadata, stable-name guidance, and confirmation before removing coordinator or numbered subagent identities.
+- During upgrades, the bundled extension defers when Pi's effective tools already contain `name_session`, then activates after `/fitch-setup` removes the standalone package and Pi reloads. Added a focused regression for naming behavior and both migration load orders.
+
 ## 0.3.0 — 4 August 2026
 
 - Moved `pi-codex-context` into the kit as `extensions/codex-context.ts` and retired the duplicate package source from new installs. Existing `openai-codex-fast.json` state and `pi-codex-context.json` consent config remain canonical, so migration does not reset either setting.

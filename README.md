@@ -37,7 +37,6 @@ These are the extensions loaded in my current setup. Every external extension li
 | [`pi-fff`](https://github.com/dmtrKovalenko/fff/tree/main/packages/pi-fff) | Fast fuzzy path search and repository-aware content search |
 | [`pi-ask-question`](https://github.com/fitchmultz/pi-ask-question) | Structured user decisions when ambiguity changes scope or safety |
 | [`pi-todo-list`](https://github.com/fitchmultz/pi-todo-list) | Persistent nested task state that survives long sessions and compaction |
-| [`pi-session-name`](https://github.com/fitchmultz/pi-session-name) | Searchable session names that follow the current task |
 | [`pi-change-working-dir`](https://github.com/fitchmultz/pi-change-working-dir) | Safe mid-session movement into worktrees and monorepo subprojects |
 | [`pi-calculator`](https://github.com/fitchmultz/pi-calculator) | Deterministic high-precision arithmetic instead of model estimation |
 
@@ -53,6 +52,8 @@ These are the extensions loaded in my current setup. Every external extension li
 | [`ponytail`](https://github.com/DietrichGebert/ponytail) | Persistent pressure toward reuse, deletion, native features, and the smallest root-cause fix |
 
 ### Extensions bundled by this kit
+
+[`session-name`](extensions/session-name.ts) provides the `name_session` tool and inert session-name metadata that keep `/resume` searchable without renaming sessions for every subtask. It preserves coordinator and numbered subagent identities unless the user confirms their removal. During migration, it defers to an already loaded standalone `name_session` tool until `/fitch-setup` removes that package and Pi reloads.
 
 [`codex-context`](extensions/codex-context.ts) owns `/codex-fast`, its OpenAI-only footer, and optional alternate-model compaction without replacing Pi's native OpenAI streams. It preserves the standalone extension's `openai-codex-fast.json` state and `pi-codex-context.json` consent config, so moving into the kit does not reset either setting. While the standalone extension is still active, the bundled copy sees its effective `/codex-fast` command at session start and stays inert until `/fitch-setup` removes it and Pi reloads. The [core compaction runbook](docs/pi-core-compaction.md) and its active-install regression remain beside it.
 
@@ -193,7 +194,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every package install and file change, and asks which parts to apply. It never reads or copies credentials. Run it again after an upgrade to preview removal of the archived standalone Intercom package and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. `/fitch-setup verify` reports drift without changing anything.
+`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every package install and file change, and asks which parts to apply. It never reads or copies credentials. Run it again after an upgrade to preview removal of retired standalone packages, the archived Intercom package, and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. `/fitch-setup verify` reports drift without changing anything.
 
 The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.0 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
 
@@ -219,13 +220,13 @@ The older prompt files remain in `prompts/` as source material, but the package 
 ## Repository map
 
 ```text
-extensions/             Anthropic image boundary guard and Codex context hooks
+extensions/             Anthropic image guard, Codex context hooks, and session naming
 examples/settings.json  safe, non-secret behavioral settings
 prompts/                setup, one active operational prompt, and retained source material
 setup-manifest.json     package sources and selectable integrations
 templates/              optional working-agreement blocks
 docs/                   technical guide, overview, and Pi core compaction runbook
-scripts/                validation, package smoke, and Codex context regression
+scripts/                validation, package smoke, and focused regressions
 ```
 
 ## Validation
@@ -236,8 +237,9 @@ npm run check
 npm run smoke
 ```
 
-- `npm run check` type-checks and syntax-checks the bundled extensions, then validates the image guard boundary, unpinned package sources, manifest resources, package metadata alignment, and the absence of retired duplicate surfaces.
+- `npm run check` type-checks and syntax-checks the bundled extensions, exercises session naming and the image guard boundary, then validates unpinned package sources, manifest resources, package metadata alignment, and the absence of retired duplicate surfaces.
 - `npm run regression:codex-context` verifies the active Pi installation's compaction patch, literal consent gate, native-stream preservation, priority payload, and watcher cleanup.
-- `npm run smoke` loads the checkout through Pi's real resource loader and requires both bundled commands, one OpenAI request hook, one custom-compaction hook, two extensions, and two prompts.
+- `npm run regression:session-name` verifies naming, metadata injection, protected identities, and single ownership during standalone-package migration.
+- `npm run smoke` loads the checkout through Pi's real resource loader and requires both bundled commands, `name_session`, one OpenAI request hook, one custom-compaction hook, three extensions, and two prompts.
 
 For the detailed workflow, model table, evidence, and security rationale, read [docs/pi-setup.md](docs/pi-setup.md). For the short version, read [docs/pi-setup-post.md](docs/pi-setup-post.md).
