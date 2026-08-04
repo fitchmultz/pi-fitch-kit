@@ -45,7 +45,6 @@ These are the extensions loaded in my current setup. Every external extension li
 
 | Extension | What I use it for |
 |---|---|
-| [`pi-codex-context`](https://github.com/fitchmultz/pi-codex-context) | OpenAI fast mode plus explicitly consented custom compaction through xAI, then OpenAI Codex |
 | [`pi-verbosity-control`](https://github.com/ferologics/pi-verbosity-control) | Low routine answer verbosity on OpenAI routes |
 | [`pi-tool-duration`](https://github.com/fitchmultz/pi-tool-duration) | Model-visible timing on slow tool calls |
 | [`pi-edit-session-in-place`](https://github.com/fitchmultz/pi-edit-session-in-place) | Re-edit or remove an earlier user turn in the current branch |
@@ -53,7 +52,9 @@ These are the extensions loaded in my current setup. Every external extension li
 | [`pi-copy-message`](https://github.com/fitchmultz/pi-copy-message) | Copy raw session messages without terminal formatting |
 | [`ponytail`](https://github.com/DietrichGebert/ponytail) | Persistent pressure toward reuse, deletion, native features, and the smallest root-cause fix |
 
-### Extension bundled by this kit
+### Extensions bundled by this kit
+
+[`codex-context`](extensions/codex-context.ts) owns `/codex-fast`, its OpenAI-only footer, and optional alternate-model compaction without replacing Pi's native OpenAI streams. It preserves the standalone extension's `openai-codex-fast.json` state and `pi-codex-context.json` consent config, so moving into the kit does not reset either setting. While the standalone extension is still active, the bundled copy sees its effective `/codex-fast` command at session start and stays inert until `/fitch-setup` removes it and Pi reloads. The [core compaction runbook](docs/pi-core-compaction.md) and its active-install regression remain beside it.
 
 [`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. It also owns `/anthropic-fast [on|off]`, Anthropic's research-preview fast mode for Opus 5 and Opus 4.8 at double the token price. Anthropic documents fast mode as a research preview requiring account access, and it is verified working on this setup's Claude subscription OAuth route: identical output ran roughly 2x faster with the toggle on. While an Opus 5 or Opus 4.8 model is selected, the footer shows `anthropic-fast:on` or `:off`, and it clears on models that ignore fast mode. Because the toggle is shared by every session, the footer follows changes made elsewhere.
 
@@ -155,7 +156,7 @@ The current setup has authenticated, read-only-discovery-verified connections fo
 
 The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session. The optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary. The setup configures only integrations listed in the manifest and never persists mutable npm specs such as `@latest`.
 
-`pi-codex-context` custom compaction is also a separate data-routing choice. In my approved setup, retained compaction context, including selected messages, prior summaries, split-turn prefixes, and custom instructions, goes to `xai/grok-4.5`, then `openai-codex/gpt-5.6-luna` on fallback, regardless of the active chat provider. The package defaults this route off; `/fitch-setup` shows those destinations and writes the enabling config only after separate consent.
+Bundled `codex-context` custom compaction is also a separate data-routing choice. In my approved setup, retained compaction context, including selected messages, prior summaries, split-turn prefixes, and custom instructions, goes to `xai/grok-4.5`, then `openai-codex/gpt-5.6-luna` on fallback, regardless of the active chat provider. The kit defaults this route off; `/fitch-setup` shows those destinations and writes the enabling config only after separate consent.
 
 ## How the workflow fits together
 
@@ -218,13 +219,13 @@ The older prompt files remain in `prompts/` as source material, but the package 
 ## Repository map
 
 ```text
-extensions/             Anthropic image boundary guard
+extensions/             Anthropic image boundary guard and Codex context hooks
 examples/settings.json  safe, non-secret behavioral settings
 prompts/                setup, one active operational prompt, and retained source material
 setup-manifest.json     package sources and selectable integrations
 templates/              optional working-agreement blocks
-docs/                   full technical guide and shorter overview
-scripts/                validation and package smoke
+docs/                   technical guide, overview, and Pi core compaction runbook
+scripts/                validation, package smoke, and Codex context regression
 ```
 
 ## Validation
@@ -235,7 +236,8 @@ npm run check
 npm run smoke
 ```
 
-- `npm run check` type-checks and syntax-checks the extension, then validates the image guard boundary, unpinned package sources, manifest resources, package metadata alignment, and the absence of the retired duplicate agent surface.
-- `npm run smoke` loads the checkout through Pi's real resource loader and requires exactly one bundled extension and two registered prompts.
+- `npm run check` type-checks and syntax-checks the bundled extensions, then validates the image guard boundary, unpinned package sources, manifest resources, package metadata alignment, and the absence of retired duplicate surfaces.
+- `npm run regression:codex-context` verifies the active Pi installation's compaction patch, literal consent gate, native-stream preservation, priority payload, and watcher cleanup.
+- `npm run smoke` loads the checkout through Pi's real resource loader and requires both bundled commands, one OpenAI request hook, one custom-compaction hook, two extensions, and two prompts.
 
 For the detailed workflow, model table, evidence, and security rationale, read [docs/pi-setup.md](docs/pi-setup.md). For the short version, read [docs/pi-setup-post.md](docs/pi-setup-post.md).

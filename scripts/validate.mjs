@@ -11,6 +11,7 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
+assert(manifest.schemaVersion === 4, "setup manifest schema must match the bundled-consent shape");
 assert(
   JSON.stringify(packageJson.pi.extensions) === JSON.stringify(manifest.kitResources.extensions.map((path) => `./${path}`)),
   "package.json pi.extensions must match manifest kitResources.extensions",
@@ -30,7 +31,11 @@ for (const resource of [
 
 assert(!existsSync(join(root, "agents")), "agent profiles belong to pi-subagents, not the kit");
 assert(!existsSync(join(root, "extensions", "sync-agents.ts")), "sync-agents is redundant with pi-subagents defaults");
-assert(manifest.kitResources.extensions.length === 1, "the kit should bundle only the Anthropic image guard");
+assert(
+  JSON.stringify(manifest.kitResources.extensions) ===
+    JSON.stringify(["extensions/anthropic-image-guard.ts", "extensions/codex-context.ts"]),
+  "the kit must bundle the Anthropic and Codex context extensions",
+);
 
 for (const pkg of manifest.corePackages) {
   assert(
@@ -58,11 +63,13 @@ assert(
   "agent-skills must use its public source",
 );
 
-const codexContext = manifest.corePackages.find(({ id }) => id === "codex-context");
+assert(!manifest.corePackages.some(({ id }) => id === "codex-context"), "codex-context now belongs to the kit");
 assert(
-  codexContext?.source === "git:github.com/fitchmultz/pi-codex-context",
-  "codex-context must use its public source",
+  manifest.retiredPackageSources.includes("git:github.com/fitchmultz/pi-codex-context"),
+  "upgrades must remove the retired standalone codex-context package",
 );
+const codexContext = manifest.consentBehaviors.find(({ id }) => id === "codex-context");
+assert(codexContext?.extension === "extensions/codex-context.ts", "consent must identify the bundled extension");
 assert(codexContext?.consent?.required === true, "cross-provider compaction must require explicit consent");
 assert(codexContext?.consent?.default === "disabled", "cross-provider compaction must default off");
 assert(
@@ -91,7 +98,9 @@ assert(setupPrompt.includes("pi-subagents"), "setup prompt must name the profile
 assert(setupPrompt.includes("${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"), "setup prompt must honor the active Pi agent directory");
 assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");
 assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
-assert(setupPrompt.includes("consent.required"), "setup prompt must honor consent-gated behavior");
+assert(setupPrompt.includes("consentBehaviors"), "setup prompt must honor consent-gated behavior");
+assert(setupPrompt.includes("openai-codex-fast.json"), "setup prompt must preserve Codex fast-mode state");
+assert(setupPrompt.includes("pi-codex-context.json"), "setup prompt must preserve Codex compaction consent");
 assert(!setupPrompt.includes("@latest"), "setup prompt must reject mutable npm specs without spelling one");
 
 console.log(JSON.stringify({ ok: true, manifestChecked: true, duplicateAgentSurfaceAbsent: true }, null, 2));

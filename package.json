@@ -1,6 +1,6 @@
 {
   "name": "@fitch/pi-kit",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -10,8 +10,9 @@
   "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node scripts/image-guard-smoke.mjs && node scripts/validate.mjs",
+    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node --check extensions/codex-context.ts && node --check scripts/codex-context-regression.ts && node scripts/image-guard-smoke.mjs && node scripts/validate.mjs",
     "typecheck": "tsc --noEmit",
+    "regression:codex-context": "node --experimental-strip-types scripts/codex-context-regression.ts",
     "smoke": "node scripts/package-smoke.mjs"
   },
   "keywords": [
@@ -19,7 +20,8 @@
   ],
   "pi": {
     "extensions": [
-      "./extensions/anthropic-image-guard.ts"
+      "./extensions/anthropic-image-guard.ts",
+      "./extensions/codex-context.ts"
     ],
     "prompts": [
       "./prompts/fitch-setup.md",

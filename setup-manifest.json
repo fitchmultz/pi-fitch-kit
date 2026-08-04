@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "runtime": {
     "pi": "0.83.0",
     "node": ">=24.0.0"
@@ -23,7 +23,8 @@
   "optionalModelsNote": "Fallback-only routes. The openai/* routes need an OpenAI API key; missing them only removes those fallbacks.",
   "kitResources": {
     "extensions": [
-      "extensions/anthropic-image-guard.ts"
+      "extensions/anthropic-image-guard.ts",
+      "extensions/codex-context.ts"
     ],
     "prompts": [
       "prompts/fitch-setup.md",
@@ -32,6 +33,40 @@
     "workingAgreementTemplate": "templates/working-agreement.md",
     "settingsExample": "examples/settings.json"
   },
+  "consentBehaviors": [
+    {
+      "id": "codex-context",
+      "extension": "extensions/codex-context.ts",
+      "consent": {
+        "required": true,
+        "default": "disabled",
+        "data": "retained compaction context, including messages selected for summarization, prior summaries, split-turn prefixes, and custom instructions",
+        "destinations": [
+          "xai/grok-4.5",
+          "openai-codex/gpt-5.6-luna"
+        ],
+        "configPath": "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/pi-codex-context.json",
+        "config": {
+          "customCompactionEnabled": true,
+          "compactionModels": [
+            {
+              "provider": "xai",
+              "model": "grok-4.5",
+              "thinkingLevel": "high"
+            },
+            {
+              "provider": "openai-codex",
+              "model": "gpt-5.6-luna",
+              "thinkingLevel": "high"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "retiredPackageSources": [
+    "git:github.com/fitchmultz/pi-codex-context"
+  ],
   "corePackages": [
     {
       "id": "subagents",
@@ -98,35 +133,6 @@
     {
       "id": "copy-message",
       "source": "git:github.com/fitchmultz/pi-copy-message"
-    },
-    {
-      "id": "codex-context",
-      "source": "git:github.com/fitchmultz/pi-codex-context",
-      "consent": {
-        "required": true,
-        "default": "disabled",
-        "data": "retained compaction context, including messages selected for summarization, prior summaries, split-turn prefixes, and custom instructions",
-        "destinations": [
-          "xai/grok-4.5",
-          "openai-codex/gpt-5.6-luna"
-        ],
-        "configPath": "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/pi-codex-context.json",
-        "config": {
-          "customCompactionEnabled": true,
-          "compactionModels": [
-            {
-              "provider": "xai",
-              "model": "grok-4.5",
-              "thinkingLevel": "high"
-            },
-            {
-              "provider": "openai-codex",
-              "model": "gpt-5.6-luna",
-              "thinkingLevel": "high"
-            }
-          ]
-        }
-      }
     },
     {
       "id": "calculator",
