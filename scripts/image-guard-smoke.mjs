@@ -36,6 +36,11 @@ const runHandlers = async (event, ...args) => {
 	for (const handler of handlers[event] ?? []) await handler(...args);
 };
 
+const statWatchers = () =>
+	process.getActiveResourcesInfo().filter((resource) => resource === "StatWatcher").length;
+// Baseline, so an unrelated watcher elsewhere in the process cannot fail the leak check.
+const watcherBaseline = statWatchers();
+
 const notices = [];
 const status = new Map();
 const uiCtx = (id) => ({
@@ -254,8 +259,8 @@ assert.equal(status.get("anthropic-fast"), "muted:anthropic-fast:off");
 await runHandlers("session_start", {}, uiCtx("claude-opus-5"));
 await runHandlers("session_shutdown");
 assert.equal(
-	process.getActiveResourcesInfo().filter((resource) => resource === "StatWatcher").length,
-	0,
+	statWatchers(),
+	watcherBaseline,
 	"repeated session starts must not leak a state-file watcher",
 );
 
