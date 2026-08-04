@@ -1,154 +1,97 @@
 #!/usr/bin/env node
-import { mkdtempSync, readdirSync, lstatSync, readlinkSync, rmSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const manifest = JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf-8"));
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
 
-const agentDir = mkdtempSync(join(tmpdir(), "pi-fitch-kit-agent-"));
-process.env.PI_CODING_AGENT_DIR = agentDir;
+const assert = (condition, message) => {
+  if (!condition) throw new Error(message);
+};
 
-try {
-  const extension = await import("../extensions/sync-agents.ts");
-  const events = [];
-  const notices = [];
-  let sessionStart;
-
-  extension.default({
-    on(event, handler) {
-      events.push(event);
-      if (event === "session_start") sessionStart = handler;
-    },
-  });
-
-  if (typeof sessionStart !== "function") {
-    throw new Error(`Expected session_start handler, got events: ${events.join(", ")}`);
-  }
-
-  await sessionStart({}, { hasUI: true, ui: { notify: (message, level) => notices.push({ message, level }) } });
-
-  const syncedDir = join(agentDir, "agents");
-  const syncedAgents = readdirSync(syncedDir).sort();
-  if (syncedAgents.length === 0) throw new Error("Expected synced agent symlinks");
-
-  for (const agent of syncedAgents) {
-    const target = join(syncedDir, agent);
-    if (!lstatSync(target).isSymbolicLink()) throw new Error(`${agent} is not a symlink`);
-    const linkTarget = resolve(dirname(target), readlinkSync(target));
-    if (!linkTarget.includes("/pi-fitch-kit/agents/")) {
-      throw new Error(`${agent} points outside package agents: ${linkTarget}`);
-    }
-  }
-
-  // Symlink safety cases the extension must honor on resync:
-  // a foreign symlink is preserved, a dangling foreign symlink is preserved
-  // without throwing, and a dangling owned symlink is repaired.
-  const { symlinkSync, unlinkSync } = await import("node:fs");
-  const foreignSource = join(agentDir, "foreign-reviewer.md");
-  writeFileSync(foreignSource, "user-owned reviewer\n", "utf-8");
-  const foreignLink = join(syncedDir, "reviewer.md");
-  unlinkSync(foreignLink);
-  symlinkSync(foreignSource, foreignLink);
-
-  const danglingForeignLink = join(syncedDir, "writer.md");
-  unlinkSync(danglingForeignLink);
-  symlinkSync(join(agentDir, "missing-user-file.md"), danglingForeignLink);
-
-  const danglingOwnedLink = join(syncedDir, "scout.md");
-  const ownedTarget = resolve(dirname(readlinkSync(join(syncedDir, "oracle.md"))), "renamed-away.md");
-  unlinkSync(danglingOwnedLink);
-  symlinkSync(ownedTarget, danglingOwnedLink);
-
-  await sessionStart({}, { hasUI: false, ui: { notify: () => {} } });
-
-  if (resolve(dirname(foreignLink), readlinkSync(foreignLink)) !== foreignSource) {
-    throw new Error("Resync replaced a foreign symlink it does not own");
-  }
-  if (readlinkSync(danglingForeignLink) !== join(agentDir, "missing-user-file.md")) {
-    throw new Error("Resync replaced a dangling foreign symlink");
-  }
-  const repaired = resolve(dirname(danglingOwnedLink), readlinkSync(danglingOwnedLink));
-  if (!repaired.endsWith("/pi-fitch-kit/agents/scout.md")) {
-    throw new Error(`Resync did not repair a dangling owned symlink: ${repaired}`);
-  }
-
-  const conflictPath = join(syncedDir, "worker.md");
-  rmSync(conflictPath, { force: true });
-  writeFileSync(conflictPath, "local override\n", "utf-8");
-  const bashForeignLink = join(syncedDir, "planner.md");
-  unlinkSync(bashForeignLink);
-  symlinkSync(foreignSource, bashForeignLink);
-  const sync = spawnSync("bash", [join(__dirname, "sync-agents.sh")], {
-    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir },
-    encoding: "utf-8",
-  });
-  if (sync.status !== 0) throw new Error(`Manual sync failed: ${sync.stderr || sync.stdout}`);
-  if (lstatSync(conflictPath).isSymbolicLink() || readFileSync(conflictPath, "utf-8") !== "local override\n") {
-    throw new Error("Manual sync overwrote an existing non-symlink agent file");
-  }
-  if (resolve(dirname(bashForeignLink), readlinkSync(bashForeignLink)) !== foreignSource) {
-    throw new Error("Manual sync replaced a foreign symlink it does not own");
-  }
-
-  // Manifest consistency: the setup prompt treats setup-manifest.json as the
-  // source of truth, so drift between it, the agent profiles, and package.json
-  // must fail this check.
-  const root = resolve(__dirname, "..");
-  const manifest = JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf-8"));
-  const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
-
-  const assert = (condition, message) => {
-    if (!condition) throw new Error(message);
-  };
-
-  assert(
-    JSON.stringify(packageJson.pi.extensions) === JSON.stringify(manifest.kitResources.extensions.map((p) => `./${p}`)),
-    "package.json pi.extensions must match manifest kitResources.extensions",
-  );
-  for (const resource of [
-    ...manifest.kitResources.extensions,
-    manifest.kitResources.prompt,
-    manifest.kitResources.workingAgreementTemplate,
-  ]) {
-    assert(lstatSync(join(root, resource)).isFile(), `manifest resource missing: ${resource}`);
-  }
-
-  const profileFiles = readdirSync(join(root, "agents")).filter((name) => name.endsWith(".md"));
-  assert(
-    profileFiles.length === manifest.kitResources.agentProfiles,
-    `manifest says ${manifest.kitResources.agentProfiles} agent profiles, found ${profileFiles.length}`,
-  );
-
-  const allowedModels = new Set([...manifest.requiredModels, ...manifest.optionalModels]);
-  for (const name of profileFiles) {
-    const body = readFileSync(join(root, "agents", name), "utf-8");
-    const models = [
-      ...(body.match(/^model:\s*(.+)$/m)?.[1].split(",") ?? []),
-      ...(body.match(/^fallbackModels:\s*(.+)$/m)?.[1].split(",") ?? []),
-    ].map((model) => model.trim());
-    assert(models.length > 0, `${name} declares no model`);
-    for (const model of models) {
-      assert(allowedModels.has(model), `${name} uses ${model}, which is not in the manifest model lists`);
-    }
-  }
-
-  for (const pkg of manifest.corePackages) {
-    assert(
-      /^npm:(@?[\w./-]+)@\d+\.\d+\.\d+$/.test(pkg.source) || /^git:github\.com\/[\w-]+\/[\w-]+@[0-9a-f]{40}$/.test(pkg.source),
-      `corePackages ${pkg.id} is not pinned to an exact npm version or 40-char commit: ${pkg.source}`,
-    );
-  }
-
-  const setupPrompt = readFileSync(join(root, manifest.kitResources.prompt), "utf-8");
-  assert(setupPrompt.includes("setup-manifest.json"), "setup prompt must reference the manifest");
-  assert(
-    setupPrompt.includes(`all ${manifest.kitResources.agentProfiles} files`),
-    "setup prompt profile count drifted from the manifest",
-  );
-
-  console.log(JSON.stringify({ ok: true, events, syncedAgents, notices, manualSyncConflictPreserved: true, manifestChecked: true }, null, 2));
-} finally {
-  rmSync(agentDir, { recursive: true, force: true });
+assert(
+  JSON.stringify(packageJson.pi.extensions) === JSON.stringify(manifest.kitResources.extensions.map((path) => `./${path}`)),
+  "package.json pi.extensions must match manifest kitResources.extensions",
+);
+assert(
+  JSON.stringify(packageJson.pi.prompts) === JSON.stringify(manifest.kitResources.prompts.map((path) => `./${path}`)),
+  "package.json pi.prompts must match manifest kitResources.prompts",
+);
+for (const resource of [
+  ...manifest.kitResources.extensions,
+  ...manifest.kitResources.prompts,
+  manifest.kitResources.workingAgreementTemplate,
+  manifest.kitResources.settingsExample,
+]) {
+  assert(lstatSync(join(root, resource)).isFile(), `manifest resource missing: ${resource}`);
 }
+
+assert(!existsSync(join(root, "agents")), "agent profiles belong to pi-subagents, not the kit");
+assert(!existsSync(join(root, "extensions", "sync-agents.ts")), "sync-agents is redundant with pi-subagents defaults");
+assert(manifest.kitResources.extensions.length === 1, "the kit should bundle only the Anthropic image guard");
+
+for (const pkg of manifest.corePackages) {
+  assert(
+    /^npm:(?:@[\w.-]+\/)?[\w.-]+$/.test(pkg.source) || /^git:github\.com\/[\w-]+\/[\w-]+$/.test(pkg.source),
+    `corePackages ${pkg.id} must use an unpinned npm or Git source: ${pkg.source}`,
+  );
+}
+const subagents = manifest.corePackages.find(({ id }) => id === "subagents");
+assert(
+  subagents?.source === "git:github.com/fitchmultz/pi-subagents",
+  "subagents must use the consolidated public source",
+);
+assert(!manifest.corePackages.some(({ id }) => id === "intercom"), "standalone intercom is retired into pi-subagents");
+assert(manifest.optionalIntegrations.includes("GitHub"), "active GitHub MCP integration must be selectable");
+
+const mcp = manifest.corePackages.find(({ id }) => id === "mcp");
+assert(
+  mcp?.source === "git:github.com/fitchmultz/pi-mcp-adapter",
+  "MCP adapter must use the secured public fork",
+);
+
+const agentSkills = manifest.corePackages.find(({ id }) => id === "agent-skills");
+assert(
+  agentSkills?.source === "git:github.com/fitchmultz/pi-agent-skills",
+  "agent-skills must use its public source",
+);
+
+const codexContext = manifest.corePackages.find(({ id }) => id === "codex-context");
+assert(
+  codexContext?.source === "git:github.com/fitchmultz/pi-codex-context",
+  "codex-context must use its public source",
+);
+assert(codexContext?.consent?.required === true, "cross-provider compaction must require explicit consent");
+assert(codexContext?.consent?.default === "disabled", "cross-provider compaction must default off");
+assert(
+  JSON.stringify(codexContext?.consent?.destinations) ===
+    JSON.stringify(["xai/grok-4.5", "openai-codex/gpt-5.6-luna"]),
+  "compaction destinations must stay explicit",
+);
+assert(codexContext?.consent?.configPath === "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/pi-codex-context.json", "consent config path must honor the Pi agent directory");
+assert(codexContext?.consent?.config?.customCompactionEnabled === true, "consent config must be explicit");
+
+const editSession = manifest.corePackages.find(({ id }) => id === "edit-session");
+assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");
+
+const browser = manifest.corePackages.find(({ id }) => id === "agent-browser")?.externalPrerequisite;
+assert(browser?.version === "0.33.0", "Agent Browser prerequisite must match the wrapper's tested 0.33.0 baseline");
+assert(
+  browser?.installCommand === "npm install --global agent-browser@0.33.0",
+  "Agent Browser install must use the exact tested version",
+);
+
+const setupPromptPath = manifest.kitResources.prompts.find((path) => path.endsWith("/fitch-setup.md"));
+assert(setupPromptPath, "manifest must include prompts/fitch-setup.md");
+const setupPrompt = readFileSync(join(root, setupPromptPath), "utf-8");
+assert(setupPrompt.includes("setup-manifest.json"), "setup prompt must reference the manifest");
+assert(setupPrompt.includes("pi-subagents"), "setup prompt must name the profile owner");
+assert(setupPrompt.includes("${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"), "setup prompt must honor the active Pi agent directory");
+assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");
+assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
+assert(setupPrompt.includes("consent.required"), "setup prompt must honor consent-gated behavior");
+assert(!setupPrompt.includes("@latest"), "setup prompt must reject mutable npm specs without spelling one");
+
+console.log(JSON.stringify({ ok: true, manifestChecked: true, duplicateAgentSurfaceAbsent: true }, null, 2));

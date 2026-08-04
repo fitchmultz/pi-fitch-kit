@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Loads this repo as a real Pi package in a throwaway agent dir and asserts
-// the prompts and the sync-agents extension load cleanly. Catches resource
+// its active prompts and bundled extensions load cleanly. Catches resource
 // breakage that static validation cannot see. Requires `npm install` first.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -33,8 +33,9 @@ try {
 	const prompts = loader.getPrompts();
 	const extensions = loader.getExtensions();
 	const promptNames = prompts.prompts.map(({ name }) => name).sort();
-	if (!promptNames.includes("fitch-setup")) {
-		throw new Error(`Expected fitch-setup among prompts, got ${JSON.stringify(promptNames)}`);
+	const expectedPrompts = ["fitch-setup", "github-open-issues-prs"];
+	if (JSON.stringify(promptNames) !== JSON.stringify(expectedPrompts)) {
+		throw new Error(`Expected ${JSON.stringify(expectedPrompts)}, got ${JSON.stringify(promptNames)}`);
 	}
 	const errors = prompts.diagnostics.filter(({ severity }) => severity === "error");
 	if (errors.length > 0) throw new Error(`Prompt load errors: ${JSON.stringify(errors)}`);

@@ -1,6 +1,6 @@
 {
   "name": "@fitch/pi-kit",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -10,7 +10,8 @@
   "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "node --check extensions/sync-agents.ts && node scripts/validate.mjs",
+    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node scripts/image-guard-smoke.mjs && node scripts/validate.mjs",
+    "typecheck": "tsc --noEmit",
     "smoke": "node scripts/package-smoke.mjs"
   },
   "keywords": [
@@ -18,18 +19,21 @@
   ],
   "pi": {
     "extensions": [
-      "./extensions/sync-agents.ts"
+      "./extensions/anthropic-image-guard.ts"
     ],
     "prompts": [
-      "./prompts"
+      "./prompts/fitch-setup.md",
+      "./prompts/audit/github-open-issues-prs.md"
     ]
   },
   "engines": {
-    "node": ">=22.19.0"
+    "node": ">=24.0.0"
   },
   "packageManager": "npm@11.16.0",
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.83.0"
+    "@earendil-works/pi-coding-agent": "^0.83.0",
+    "@types/node": "^24.13.3",
+    "typescript": "^6.0.3"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
