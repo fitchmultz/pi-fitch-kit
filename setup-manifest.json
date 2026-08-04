@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "runtime": {
     "pi": "0.83.0",
     "node": ">=24.0.0"

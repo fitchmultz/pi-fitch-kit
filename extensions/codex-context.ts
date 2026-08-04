@@ -1,12 +1,11 @@
 import {
-	existsSync,
 	mkdirSync,
 	readFileSync,
 	unwatchFile,
 	watchFile,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join, matchesGlob } from "node:path";
+import { dirname, join } from "node:path";
 import {
 	type Api,
 	type Context,
@@ -159,109 +158,63 @@ function fastOptions(options?: SimpleStreamOptions): SimpleStreamOptions {
 	};
 }
 
-function isLegacyRepoPath(path: string): boolean {
-	return (
-		path
-			.replace(/^\/+/, "")
-			.split(/[@#]/, 1)[0]
-			.replace(/\/+$/, "")
-			.replace(/\.git$/, "") === "fitchmultz/pi-codex-context"
-	);
-}
-
-function isLegacySource(source: unknown): boolean {
-	if (typeof source !== "string") return false;
-	let value = source.trim();
-	if (value.startsWith("git:") && !value.startsWith("git://")) {
-		value = value.slice(4).trim();
-	}
-	if (/^(?:https?|ssh|git):\/\//.test(value)) {
-		try {
-			const url = new URL(value);
-			return url.hostname === "github.com" && isLegacyRepoPath(url.pathname);
-		} catch {
-			return false;
-		}
-	}
-	for (const prefix of ["git@github.com:", "github.com/", "github.com:", "github:"]) {
-		if (value.startsWith(prefix)) return isLegacyRepoPath(value.slice(prefix.length));
-	}
-	return isLegacyRepoPath(value);
-}
-
-function legacyEntryEnabled(pkg: unknown, indexPath: string): boolean {
-	const entry = typeof pkg === "string" ? { source: pkg } : (pkg as {
-		source?: unknown;
-		extensions?: unknown;
-		autoload?: unknown;
-	});
-	if (!isLegacySource(entry?.source)) return false;
-	if (!Array.isArray(entry.extensions)) return entry.autoload !== false;
-	const filters = entry.extensions.filter((value): value is string => typeof value === "string");
-	const matches = (pattern: string) =>
-		matchesGlob("index.ts", pattern) || matchesGlob(indexPath, pattern);
-	const exact = (pattern: string) => {
-		const normalized = pattern.replace(/^\.\//, "");
-		return normalized === "index.ts" || normalized === indexPath;
-	};
-	if (entry.autoload === false) {
-		let enabled = false;
-		for (const pattern of filters) {
-			const prefix = /^[!+-]/.test(pattern) ? pattern[0] : "";
-			const target = prefix ? pattern.slice(1) : pattern;
-			if ((prefix === "+" || prefix === "-") ? exact(target) : matches(target)) {
-				enabled = prefix !== "!" && prefix !== "-";
-			}
-		}
-		return enabled;
-	}
-	if (filters.length === 0) return false;
-	const includes = filters.filter((pattern) => !/^[!+-]/.test(pattern));
-	let enabled = includes.length === 0 || includes.some(matches);
-	if (filters.some((pattern) => pattern.startsWith("!") && matches(pattern.slice(1)))) enabled = false;
-	if (filters.some((pattern) => pattern.startsWith("+") && exact(pattern.slice(1)))) enabled = true;
-	if (filters.some((pattern) => pattern.startsWith("-") && exact(pattern.slice(1)))) enabled = false;
-	return enabled;
-}
-
-function legacyStandaloneInstalled(): boolean {
-	const agentDir = getAgentDir();
-	const legacyRoot = join(
-		agentDir,
-		"git",
-		"github.com",
-		"fitchmultz",
-		"pi-codex-context",
-	);
-	if (!existsSync(join(legacyRoot, "package.json"))) return false;
-	const settingsPath = join(agentDir, "settings.json");
-	if (!existsSync(settingsPath)) return false;
-	try {
-		const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
-		return settings.packages?.some((pkg: unknown) =>
-			legacyEntryEnabled(pkg, join(legacyRoot, "index.ts")),
-		) === true;
-	} catch {
-		// Pi can retain its last valid settings after a parse failure, so keep the old owner.
-		return true;
-	}
-}
-
 export default function (pi: ExtensionAPI): void {
-	// Base releases installed this source user-wide; defer until setup removes its entry and checkout.
-	if (legacyStandaloneInstalled()) return;
-
+	let active = false;
 	let footerContext: ExtensionContext | undefined;
 	const refreshFastStatus = () => {
 		if (footerContext) updateFooterStatus(footerContext);
 	};
+	const registerFastCommand = () => {
+		pi.registerCommand("codex-fast", {
+			description: "Toggle OpenAI priority/fast mode",
+			handler: async (args, ctx) => {
+				const command = args.trim().toLowerCase();
+				const current = fastEnabled();
+				if (command === "" || command === "status") {
+					ctx.ui.notify(
+						`OpenAI fast mode is ${current ? "ON" : "OFF"}`,
+						"info",
+					);
+					updateFooterStatus(ctx);
+					return;
+				}
+				if (command === "on" || command === "off" || command === "toggle") {
+					const next = command === "toggle" ? !current : command === "on";
+					writeFastEnabled(next);
+					ctx.ui.notify(
+						`OpenAI fast mode ${next ? "enabled" : "disabled"}`,
+						"info",
+					);
+					updateFooterStatus(ctx);
+					return;
+				}
+				ctx.ui.notify("Usage: /codex-fast [on|off|toggle|status]", "warning");
+			},
+		});
+	};
 
 	pi.on("before_provider_request", (event, ctx) => {
-		if (!isOpenAI(ctx) || !fastEnabled()) return;
+		if (!active || !isOpenAI(ctx) || !fastEnabled()) return;
 		return priorityPayload(event.payload);
 	});
 
 	pi.on("session_start", (_event, ctx) => {
+		if (!active) {
+			// Resolve ownership from Pi's effective resources, not a second settings parser.
+			if (
+				pi
+					.getCommands()
+					.some(
+						(command) =>
+							command.name === "codex-fast" ||
+							command.name.startsWith("codex-fast:"),
+					)
+			) {
+				return;
+			}
+			active = true;
+			registerFastCommand();
+		}
 		footerContext = ctx;
 		updateFooterStatus(ctx);
 		// Unwatch first: repeated starts must not leave a state-file watcher behind.
@@ -273,36 +226,12 @@ export default function (pi: ExtensionAPI): void {
 		unwatchFile(FAST_STATE_PATH, refreshFastStatus);
 		footerContext = undefined;
 	});
-	pi.on("model_select", (_event, ctx) => updateFooterStatus(ctx));
-
-	pi.registerCommand("codex-fast", {
-		description: "Toggle OpenAI priority/fast mode",
-		handler: async (args, ctx) => {
-			const command = args.trim().toLowerCase();
-			const current = fastEnabled();
-			if (command === "" || command === "status") {
-				ctx.ui.notify(
-					`OpenAI fast mode is ${current ? "ON" : "OFF"}`,
-					"info",
-				);
-				updateFooterStatus(ctx);
-				return;
-			}
-			if (command === "on" || command === "off" || command === "toggle") {
-				const next = command === "toggle" ? !current : command === "on";
-				writeFastEnabled(next);
-				ctx.ui.notify(
-					`OpenAI fast mode ${next ? "enabled" : "disabled"}`,
-					"info",
-				);
-				updateFooterStatus(ctx);
-				return;
-			}
-			ctx.ui.notify("Usage: /codex-fast [on|off|toggle|status]", "warning");
-		},
+	pi.on("model_select", (_event, ctx) => {
+		if (active) updateFooterStatus(ctx);
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
+		if (!active) return;
 		const candidates = compactionModels();
 		if (!candidates) return;
 		const failures: string[] = [];

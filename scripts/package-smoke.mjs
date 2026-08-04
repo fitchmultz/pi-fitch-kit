@@ -43,6 +43,27 @@ try {
 	if (errors.length > 0) throw new Error(`Prompt load errors: ${JSON.stringify(errors)}`);
 	if (extensions.errors.length > 0) throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
 	if (extensions.extensions.length !== 2) throw new Error(`Expected 2 extensions, got ${extensions.extensions.length}`);
+	const codex = extensions.extensions.find(({ path }) => path.endsWith("/extensions/codex-context.ts"));
+	if (!codex) throw new Error("Codex context extension missing");
+	extensions.runtime.getCommands = () =>
+		extensions.extensions.flatMap(({ commands }) =>
+			[...commands.values()].map(({ name, description, sourceInfo }) => ({
+				name,
+				description,
+				source: "extension",
+				sourceInfo,
+			})),
+		);
+	const start = codex.handlers.get("session_start")?.[0];
+	if (!start) throw new Error("Codex context session_start handler missing");
+	await start({}, {
+		model: { provider: "openai-codex" },
+		hasUI: false,
+		ui: {
+			setStatus: () => {},
+			theme: { fg: (_color, text) => text },
+		},
+	});
 	const commandNames = extensions.extensions
 		.flatMap(({ commands }) => [...commands.keys()])
 		.sort();

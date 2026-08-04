@@ -11,6 +11,7 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
+assert(manifest.schemaVersion === 4, "setup manifest schema must match the bundled-consent shape");
 assert(
   JSON.stringify(packageJson.pi.extensions) === JSON.stringify(manifest.kitResources.extensions.map((path) => `./${path}`)),
   "package.json pi.extensions must match manifest kitResources.extensions",
