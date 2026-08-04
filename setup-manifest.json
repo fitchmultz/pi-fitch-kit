@@ -6,7 +6,7 @@
   },
   "kit": {
     "repository": "https://github.com/fitchmultz/pi-fitch-kit",
-    "installSource": "git:github.com/fitchmultz/pi-fitch-kit@v0.2.2"
+    "installSource": "git:github.com/fitchmultz/pi-fitch-kit"
   },
   "requiredModels": [
     "xai/grok-4.5",
@@ -35,39 +35,39 @@
   "corePackages": [
     {
       "id": "subagents",
-      "source": "git:github.com/fitchmultz/pi-subagents@7594ad5d9eb7dd703eccdc12c0005fae6e007ce8"
+      "source": "git:github.com/fitchmultz/pi-subagents"
     },
     {
       "id": "apply-edits",
-      "source": "git:github.com/fitchmultz/pi-apply-edits@f30df49f5fa651a6948ae48967397d5db7d50003"
+      "source": "git:github.com/fitchmultz/pi-apply-edits"
     },
     {
       "id": "ask-question",
-      "source": "git:github.com/fitchmultz/pi-ask-question@06fe72b3326cc178c821754a524021a4da83162d"
+      "source": "git:github.com/fitchmultz/pi-ask-question"
     },
     {
       "id": "todo-list",
-      "source": "git:github.com/fitchmultz/pi-todo-list@e309172666eb2aeb953c5a4aba55695ef7dbd2cc"
+      "source": "git:github.com/fitchmultz/pi-todo-list"
     },
     {
       "id": "session-name",
-      "source": "git:github.com/fitchmultz/pi-session-name@bd851ba19208a395b3be0fe006b2b3402cc20fbc"
+      "source": "git:github.com/fitchmultz/pi-session-name"
     },
     {
       "id": "change-working-dir",
-      "source": "git:github.com/fitchmultz/pi-change-working-dir@58437bd9f5c34bc5364aed9c6f3b91049e93f243"
+      "source": "git:github.com/fitchmultz/pi-change-working-dir"
     },
     {
       "id": "ponytail",
-      "source": "git:github.com/DietrichGebert/ponytail@16f29800fd2681bdf24f3eb4ccffe38be3baec6b"
+      "source": "git:github.com/DietrichGebert/ponytail"
     },
     {
       "id": "fff",
-      "source": "npm:@ff-labs/pi-fff@0.10.1"
+      "source": "npm:@ff-labs/pi-fff"
     },
     {
       "id": "agent-browser",
-      "source": "git:github.com/fitchmultz/pi-agent-browser-native@14d05acbfe98a04d5614b904eb51632d48845b25",
+      "source": "git:github.com/fitchmultz/pi-agent-browser-native",
       "externalPrerequisite": {
         "package": "agent-browser",
         "version": "0.33.0",
@@ -77,31 +77,31 @@
     },
     {
       "id": "mcp",
-      "source": "git:github.com/fitchmultz/pi-mcp-adapter@cef3ed0c9670b04519ee0eeb5bb91fc346efff89"
+      "source": "git:github.com/fitchmultz/pi-mcp-adapter"
     },
     {
       "id": "stash",
-      "source": "npm:@fitchmultz/pi-stash@0.1.24"
+      "source": "git:github.com/fitchmultz/pi-stash"
     },
     {
       "id": "verbosity",
-      "source": "npm:pi-verbosity-control@0.3.0"
+      "source": "npm:pi-verbosity-control"
     },
     {
       "id": "tool-duration",
-      "source": "npm:pi-tool-duration@0.1.4"
+      "source": "git:github.com/fitchmultz/pi-tool-duration"
     },
     {
       "id": "edit-session",
-      "source": "npm:pi-edit-session-in-place@0.1.27"
+      "source": "git:github.com/fitchmultz/pi-edit-session-in-place"
     },
     {
       "id": "copy-message",
-      "source": "npm:pi-copy-message@1.0.11"
+      "source": "git:github.com/fitchmultz/pi-copy-message"
     },
     {
       "id": "codex-context",
-      "source": "git:github.com/fitchmultz/pi-codex-context@b2c52ebd47fac2b38750168ea0d648ecd6c03a96",
+      "source": "git:github.com/fitchmultz/pi-codex-context",
       "consent": {
         "required": true,
         "default": "disabled",
@@ -130,11 +130,11 @@
     },
     {
       "id": "calculator",
-      "source": "git:github.com/fitchmultz/pi-calculator@d6b4a6c4efff2d68ecaff79c954bb63cecd5c330"
+      "source": "git:github.com/fitchmultz/pi-calculator"
     },
     {
       "id": "agent-skills",
-      "source": "git:github.com/fitchmultz/pi-agent-skills@c3e0e1f7da7a65a090582266326432aef8053954"
+      "source": "git:github.com/fitchmultz/pi-agent-skills"
     }
   ],
   "optionalIntegrations": [

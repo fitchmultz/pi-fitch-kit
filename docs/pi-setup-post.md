@@ -18,7 +18,7 @@ The main session remains responsible for the task. This is not an autonomous swa
 The normal path includes:
 
 - [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) for delegated work and session coordination;
-- [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/cef3ed0c9670b04519ee0eeb5bb91fc346efff89) and [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) for connected context and real browser work;
+- [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter) and [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) for connected context and real browser work;
 - [`pi-fff`](https://github.com/dmtrKovalenko/fff/tree/main/packages/pi-fff) and [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) for repository search and reliable changes;
 - small public tools for structured questions, persistent todos, session naming, working-directory changes, deterministic math, compaction, timing, verbosity, stash, session editing, and raw message copy;
 - [`ponytail`](https://github.com/DietrichGebert/ponytail) to keep the code path boring and small.
@@ -72,7 +72,7 @@ This is already a working composition layer for a model-agnostic organization ha
 - modular extensions instead of a core fork;
 - bounded agents, worktrees, review loops, and durable sessions;
 - per-user authenticated service access;
-- Git-backed policy, skills, profiles, and package pins;
+- Git-backed policy, skills, profiles, and updateable package sources;
 - browser, local terminal, and connected-system workflows in one runtime.
 
 A product layer would add centralized provisioning, policy distribution, scoped credential brokerage, audit and cost visibility, managed local/cloud execution, and multi-user controls. Those are additive control-plane concerns; the reusable substrate is already here and dogfooded.
@@ -83,11 +83,11 @@ A product layer would add centralized provisioning, policy distribution, scoped 
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.83.0
 pi
 # Complete provider login, then:
-pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.2
+pi install git:github.com/fitchmultz/pi-fitch-kit
 # /reload, then:
 /fitch-setup
 ```
 
-`/fitch-setup` reads exact package pins from [`setup-manifest.json`](../setup-manifest.json), previews every selected change, and stops for each user's own authentication. `/fitch-setup verify` reports drift without changing anything.
+`/fitch-setup` reads unpinned package sources from [`setup-manifest.json`](../setup-manifest.json), previews every selected change, and stops for each user's own authentication. `/fitch-setup verify` reports drift without changing anything.
 
 The [README](../README.md) is the navigation hub. The [full guide](./pi-setup.md) explains the model table, launch policy, evidence rules, usage sample, and security boundaries.

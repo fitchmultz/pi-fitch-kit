@@ -1,5 +1,5 @@
 ---
-description: Install or verify the pinned Fitch Pi workflow safely
+description: Install or verify the Fitch Pi workflow safely
 argument-hint: "[verify]"
 ---
 
@@ -8,7 +8,7 @@ Run the Fitch Pi setup in `${1:-setup}` mode. This is a main-session-led setup p
 ## Authority
 
 1. Locate this prompt's installed `@fitch/pi-kit` package root from Pi's package/resource information. Read `<package-root>/setup-manifest.json` as the single source of truth. Also read the installed Pi documentation for packages, prompts, extensions, settings, security, and models before changing anything.
-2. Use only sources and versions in the manifest. Run each user-scoped package install as `pi install <exact source> --no-approve` so project-local configuration cannot affect installation. Never convert a commit to a branch or tag, drop an npm version, vendor another package, or silently substitute a model or component.
+2. Use only the unpinned sources in the manifest. Run each user-scoped package install as `pi install <source> --no-approve` so project-local configuration cannot affect installation. Never append a ref or version, vendor another package, or silently substitute a model or component.
 3. Never read or copy authentication files, credential stores, browser profiles, raw sessions, private endpoints, generated service payloads, or service data. Provider and service authentication belongs to the user through documented login flows.
 4. Do not make service writes, commits, pushes, merges, deployments, production changes, account changes, or security or privacy changes.
 
@@ -24,7 +24,7 @@ Require the manifest's Node and Pi versions and every route in `requiredModels`.
 
 Unless mode is `verify`, ask the user to choose:
 
-1. Complete core, meaning every exact `corePackages` install plus the kit's bundled extension, prompts, and package-backed skills. Consent-gated behavior stays disabled unless separately selected below. The pinned `pi-subagents` package includes the fourteen specialist profiles and its general-purpose `delegate`. Otherwise choose a component selection from the manifest.
+1. Complete core, meaning every `corePackages` install plus the kit's bundled extension, prompts, and package-backed skills. Consent-gated behavior stays disabled unless separately selected below. The `pi-subagents` package includes the fourteen specialist profiles and its general-purpose `delegate`. Otherwise choose a component selection from the manifest.
 2. Whether to enable each manifest `consent.required` behavior. For `pi-codex-context`, explain that custom compaction can send messages selected for summarization, prior summaries, split-turn prefixes, and custom instructions to `xai/grok-4.5`, then fall back to `openai-codex/gpt-5.6-luna`, regardless of the active chat provider. The package is safe to install without this consent because custom routing defaults off; only write the manifest's exact config after a separate yes.
 3. Which `optionalIntegrations`, if any, they want to configure through the MCP adapter. Authentication is manual and per-user; do not test it by reading service payloads.
 4. Whether to adopt the baseline working-agreement block, the optional process block, both, or neither, from `<package-root>/templates/working-agreement.md`.
@@ -35,9 +35,9 @@ Unless mode is `verify`, ask the user to choose:
 
 Before any write or install, show one complete preview containing:
 
-- every selected exact package source and `pi install <source> --no-approve` command;
+- every selected package source and `pi install <source> --no-approve` command;
 - every filesystem path that may change and whether it will be created, merged, symlinked, or left alone;
-- the exact model mapping from the fourteen specialist profiles in the manifest-pinned `pi-subagents/agents/` directory;
+- the model mapping from the fourteen specialist profiles in the installed `pi-subagents/agents/` directory;
 - the selected working-agreement and settings keys;
 - package-backed skills that will load and any name collision with an existing user skill;
 - every selected consent-gated data route, its exact destinations, and the exact config path and keys that enable it;
@@ -48,7 +48,7 @@ Ask for confirmation of that preview. The confirmed selection is consent for onl
 
 Preserve unrelated configuration. Use Pi package commands instead of replacing `settings.json`; merge selected JSON keys narrowly. Merge a selected working-agreement block into `<Pi agent dir>/AGENTS.md` by its complete managed markers while retaining unrelated text. Never add an unselected block. Stop on malformed JSON, partial, duplicate, or nested managed markers, or semantic conflicts.
 
-Installing the kit is already consent for its bundled resources. Its two prompts and `anthropic-image-guard` load with the package. Installing the pinned `pi-subagents` package supplies the fourteen specialist defaults, `delegate`, and Intercom; do not create user-level profile copies or symlinks, or install standalone `pi-intercom`. If `pi list` shows the archived standalone package, include `pi remove <exact listed source>` and `pi update --extensions` in the preview, adding `--local` only when the listing is project-local, then require restart or reload. For upgrades from kit versions that did create profile links, inspect `<Pi agent dir>/agents/` with `lstat`: offer to unlink only a symlink whose recorded target is under `pi-fitch-kit/agents/` and whose basename now exists in the pinned `pi-subagents/agents/`. Preview every path and get confirmation; never remove a regular file or a link with different provenance. The image guard applies only to Anthropic requests and matters primarily when global image auto-resizing is disabled. After `/reload`, verify the expected package-owned resources.
+Installing the kit is already consent for its bundled resources. Its two prompts and `anthropic-image-guard` load with the package. Installing the `pi-subagents` package supplies the fourteen specialist defaults, `delegate`, and Intercom; do not create user-level profile copies or symlinks, or install standalone `pi-intercom`. If `pi list` shows the archived standalone package, include `pi remove <exact listed source>` and `pi update --extensions` in the preview, adding `--local` only when the listing is project-local, then require restart or reload. For upgrades from kit versions that did create profile links, inspect `<Pi agent dir>/agents/` with `lstat`: offer to unlink only a symlink whose recorded target is under `pi-fitch-kit/agents/` and whose basename now exists in the installed `pi-subagents/agents/`. Preview every path and get confirmation; never remove a regular file or a link with different provenance. The image guard applies only to Anthropic requests and matters primarily when global image auto-resizing is disabled. After `/reload`, verify the expected package-owned resources.
 
 Installing `pi-agent-skills` loads the active public skill set from that package. Preserve other user skill roots and filters. If a skill name collides, show both sources and ask which one should remain active rather than deleting either copy.
 
@@ -64,4 +64,4 @@ If mode is `verify`, make no changes, installs, downloads, logins, or repairs. A
 
 In either mode, verification is read-only after any required reload. Use only harmless documented smokes: version and resource-list checks, local repository search, read-only subagent and intercom checks, a todo-list read, a non-authenticated browser page only if its runtime was approved, deterministic calculator input, and tool or schema discovery for integrations. Confirm `apply_edits` is active and the built-in `edit` and `write` tools are hidden. If a capability has no harmless smoke, report it as manual verification instead of inventing one.
 
-Finish with selected components, exact installed sources, changed and skipped paths, model results, smoke results, `/reload` status, and remaining manual authentication or setup. Do not claim success for a skipped or unverified capability.
+Finish with selected components, installed sources, changed and skipped paths, model results, smoke results, `/reload` status, and remaining manual authentication or setup. Do not claim success for a skipped or unverified capability.

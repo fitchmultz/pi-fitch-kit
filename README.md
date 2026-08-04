@@ -4,7 +4,7 @@ My real Pi harness, packaged as a versioned, inspectable setup.
 
 This repository shows the composition layer I use every day: public extensions, model-routed subagents, reusable skills, authenticated MCP connections, and a small amount of local policy. It is also a working prototype for a model-agnostic organization harness built on top of [Pi](https://github.com/badlogic/pi-mono), without forking Pi core.
 
-Tagged releases are known-good snapshots. The current snapshot targets Pi `0.83.0` on Node.js `>=24.0.0`; Agent Browser 0.33.0 sets the Node floor.
+Extension installs follow their package's default channel instead of freezing refs or versions. The current kit targets Pi `0.83.0` on Node.js `>=24.0.0`; Agent Browser 0.33.0 sets the Node floor.
 
 ## Start here
 
@@ -13,7 +13,7 @@ Tagged releases are known-good snapshots. The current snapshot targets Pi `0.83.
 3. [Active skills](#active-skills)
 4. [Connected MCP services](#connected-mcp-services)
 5. [How the workflow fits together](#how-the-workflow-fits-together)
-6. [Install the snapshot](#install-the-snapshot)
+6. [Install the kit](#install-the-kit)
 
 Prompts are deliberately secondary. The daily workflow is driven by tools, agents, skills, and connected context.
 
@@ -26,7 +26,7 @@ These are the extensions loaded in my current setup. Every external extension li
 | Extension | What I use it for |
 |---|---|
 | [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) | Fresh specialists, parallel work, chains, isolated worktrees, async review, durable artifacts, and coordination between local sessions |
-| [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/cef3ed0c9670b04519ee0eeb5bb91fc346efff89) | One searchable gateway over configured MCP servers and their tools |
+| [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter) | One searchable gateway over configured MCP servers and their tools |
 | [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) | Live documentation, browser automation, screenshots, product QA, and authenticated web flows |
 
 ### Coding and task control
@@ -77,15 +77,15 @@ That exposed stricter Anthropic image limits. The bundled guard fixes the bounda
 
 ## Subagent bench
 
-[`pi-subagents`](https://github.com/fitchmultz/pi-subagents) now supplies both the orchestration runtime and the opinionated defaults: fourteen specialist profiles plus its general-purpose `delegate`. This kit pins that release instead of owning duplicate copies.
+[`pi-subagents`](https://github.com/fitchmultz/pi-subagents) now supplies both the orchestration runtime and the opinionated defaults: fourteen specialist profiles plus its general-purpose `delegate`. This kit uses that package instead of owning duplicate copies.
 
 | Job | Profiles |
 |---|---|
-| Map and investigate | [`scout`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/scout.md), [`context-builder`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/context-builder.md), [`debugger`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/debugger.md), [`researcher`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/researcher.md) |
-| Decide and plan | [`planner`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/planner.md), [`oracle`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/oracle.md) |
-| Implement bounded work | [`worker`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/worker.md), [`fixer`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/fixer.md) |
-| Challenge the result | [`reviewer`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/reviewer.md), [`reviewer-gpt`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/reviewer-gpt.md), [`reviewer-claude`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/reviewer-claude.md), [`reviewer-security`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/reviewer-security.md), [`ui-designer`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/ui-designer.md) |
-| Human-facing output | [`writer`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/writer.md) |
+| Map and investigate | [`scout`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/scout.md), [`context-builder`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/context-builder.md), [`debugger`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/debugger.md), [`researcher`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/researcher.md) |
+| Decide and plan | [`planner`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/planner.md), [`oracle`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/oracle.md) |
+| Implement bounded work | [`worker`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/worker.md), [`fixer`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/fixer.md) |
+| Challenge the result | [`reviewer`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer.md), [`reviewer-gpt`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer-gpt.md), [`reviewer-claude`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer-claude.md), [`reviewer-security`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer-security.md), [`ui-designer`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/ui-designer.md) |
+| Human-facing output | [`writer`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/writer.md) |
 
 The parent session remains responsible for the task. Specialists return evidence; they do not become an autonomous hierarchy.
 
@@ -96,7 +96,7 @@ The routing is intentional:
 - `anthropic/claude-fable-5` supplies an independent model family for writing, UI judgment, and cross-model review, with Opus 5 behind it.
 - `oracle` alone uses forked parent context. Every other role starts fresh, and every profile is a leaf agent.
 
-The exact primary, fallback, thinking, context, tool, and output policy lives in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents). See [the full setup guide](docs/pi-setup.md#model-routing) for the complete table.
+The exact primary, fallback, thinking, context, tool, and output policy lives in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/main/agents). See [the full setup guide](docs/pi-setup.md#model-routing) for the complete table.
 
 ## Active skills
 
@@ -120,8 +120,8 @@ Companion skills ship beside their extensions:
 
 | Source | Skills |
 |---|---|
-| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents/tree/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/skills) | `pi-subagents` orchestration and `pi-intercom` coordination guidance |
-| [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/cef3ed0c9670b04519ee0eeb5bb91fc346efff89/skills/mcp-scripting) | `mcp-scripting` for discovering and composing MCP calls |
+| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents/tree/main/skills) | `pi-subagents` orchestration and `pi-intercom` coordination guidance |
+| [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/main/skills/mcp-scripting) | `mcp-scripting` for discovering and composing MCP calls |
 | [`ponytail`](https://github.com/DietrichGebert/ponytail/tree/main/skills) | `ponytail`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help`, `ponytail-review` |
 
 `bro` is intentionally user-invoked only. The rest are selected by task fit rather than loaded into every prompt.
@@ -173,26 +173,26 @@ Pi core
 
 This is already the working composition layer for a broader organization harness. Productizing it would add centralized provisioning, policy distribution, scoped credential brokerage, audit and cost visibility, managed local/cloud execution, and multi-user controls. It would not require turning the extensions into a monolith or locking the harness to one model provider.
 
-## Install the snapshot
+## Install the kit
 
 ```bash
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.83.0
 pi
 # Complete provider login in Pi, then:
-pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.2
+pi install git:github.com/fitchmultz/pi-fitch-kit
 # /reload, then:
 /fitch-setup
 ```
 
-`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every exact package install and file change, and asks which parts to apply. It never reads or copies credentials. Run it again after an upgrade to preview removal of the archived standalone Intercom package and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. `/fitch-setup verify` reports drift without changing anything.
+`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every package install and file change, and asks which parts to apply. It never reads or copies credentials. Run it again after an upgrade to preview removal of the archived standalone Intercom package and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. `/fitch-setup verify` reports drift without changing anything.
 
-The manifest is the reproducible source of truth for package pins, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.0 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
+The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.0 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
 
 ## Prompts
 
 The package registers only two prompts:
 
-- `/fitch-setup` for installing or verifying the snapshot.
+- `/fitch-setup` for installing or verifying the kit.
 - `/github-open-issues-prs` for the one prompt-backed operational flow still on my normal path.
 
 The older prompt files remain in `prompts/` as source material, but the package does not load them. Nothing is deleted; they simply no longer dominate autocomplete or the README.
@@ -203,7 +203,7 @@ The older prompt files remain in `prompts/` as source material, but the package 
 - My personal setup runs with full approvals and does not put a confirmation dialog in front of each MCP call. The working agreement is model policy, not a technical authorization boundary.
 - Every person authenticates their own model providers and services.
 - The kit contains no keys, OAuth state, private endpoints, browser profiles, raw sessions, generated catalogs, or copied service responses.
-- Top-level packages are pinned exactly. Agent Browser stays on the stable wrapper's tested upstream version.
+- Extension packages use bare Git or npm sources. Agent Browser's separate CLI prerequisite stays on the wrapper's tested upstream version.
 - The settings example deliberately omits personal paths, package filters, credentials, and the trust default. Choose project trust explicitly.
 - External writes, deployments, merges, account changes, and production actions remain user-authorized decisions.
 
@@ -213,7 +213,7 @@ The older prompt files remain in `prompts/` as source material, but the package 
 extensions/             Anthropic image boundary guard
 examples/settings.json  safe, non-secret behavioral settings
 prompts/                setup, one active operational prompt, and retained source material
-setup-manifest.json     exact release pins and selectable integrations
+setup-manifest.json     package sources and selectable integrations
 templates/              optional working-agreement blocks
 docs/                   full technical guide and shorter overview
 scripts/                validation and package smoke
@@ -227,7 +227,7 @@ npm run check
 npm run smoke
 ```
 
-- `npm run check` type-checks and syntax-checks the extension, then validates the image guard boundary, exact pins, manifest resources, package metadata alignment, and the absence of the retired duplicate agent surface.
+- `npm run check` type-checks and syntax-checks the extension, then validates the image guard boundary, unpinned package sources, manifest resources, package metadata alignment, and the absence of the retired duplicate agent surface.
 - `npm run smoke` loads the checkout through Pi's real resource loader and requires exactly one bundled extension and two registered prompts.
 
 For the detailed workflow, model table, evidence, and security rationale, read [docs/pi-setup.md](docs/pi-setup.md). For the short version, read [docs/pi-setup-post.md](docs/pi-setup-post.md).

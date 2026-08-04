@@ -18,7 +18,7 @@ Pi core
   └─ user-authenticated MCP services
 ```
 
-[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: one provider-boundary extension, a safe settings example, exact dependency pins, and a setup prompt. The fourteen specialist profiles now ship with the pinned [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) release instead of being duplicated here. The underlying extensions and skill packages remain independent public repositories.
+[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: one provider-boundary extension, a safe settings example, unpinned package sources, and a setup prompt. The fourteen specialist profiles now ship with [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) instead of being duplicated here. The underlying extensions and skill packages remain independent public repositories.
 
 ## A representative task
 
@@ -116,7 +116,7 @@ The agent files are the runtime source of truth. Models, fallbacks, effort, and 
 | `ui-designer` | Fable 5 | Opus 5, Codex Sol, OpenAI Sol | xhigh | fresh |
 | `writer` | Fable 5 | Opus 5 | high | fresh |
 
-Full model identifiers are in the pinned [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents) directory. The compact names above mean:
+Full model identifiers are in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/main/agents) directory. The compact names above mean:
 
 - Codex Sol: `openai-codex/gpt-5.6-sol`
 - OpenAI Sol: `openai/gpt-5.6-sol`
@@ -216,14 +216,14 @@ The contrast is the point: the main session usually implements, while specialist
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.83.0
 pi
 # Complete provider login, then:
-pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.2
+pi install git:github.com/fitchmultz/pi-fitch-kit
 # /reload, then:
 /fitch-setup
 ```
 
-The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only exact selected sources. Agent Browser stays at 0.33.0 because that is the released wrapper's tested baseline; an unrelated in-progress wrapper release does not hold this snapshot. The prompt offers the safe settings keys separately, preserves unrelated configuration, stops for authentication, and verifies loaded resources after reload.
+The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only the selected unpinned sources. Agent Browser stays at 0.33.0 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys separately, preserves unrelated configuration, stops for authentication, and verifies loaded resources after reload.
 
-`/fitch-setup verify` is read-only. It reports drift in package pins, profiles, extensions, prompts, skills, model availability, and consent-gated route state.
+`/fitch-setup verify` is read-only. It reports drift in package sources, profiles, extensions, prompts, skills, model availability, and consent-gated route state.
 
 ## Trust and security boundaries
 
@@ -240,7 +240,7 @@ A shared setup must not distribute:
 
 The settings example omits trust policy intentionally. Choose `defaultProjectTrust` and subagent child trust for the environment rather than copying mine. Untrusted repositories should use `no-approve`.
 
-Top-level package sources are exact pins. The Agent Browser CLI version matches the released wrapper's tested compatibility baseline.
+Extension packages use bare Git or npm sources. The separate Agent Browser CLI version matches the wrapper's tested compatibility baseline.
 
 Consequential external writes, production actions, account changes, and merges still require explicit authorization.
 
@@ -252,7 +252,7 @@ The current stack already proves the reusable substrate:
 - independent extension packages rather than a core fork;
 - bounded multi-agent execution, worktrees, review loops, and local session coordination;
 - authenticated access to planning, conversation, support, knowledge, and observability systems;
-- Git-backed policy, skills, profiles, and reproducible package pins;
+- Git-backed policy, skills, profiles, and updateable package sources;
 - durable local sessions, browser automation, and a clear permission boundary.
 
 A product layer would add central provisioning, SSO, policy distribution, scoped credential brokerage, audit and cost visibility, managed local/cloud execution, and multi-user controls. Those concerns belong above the reusable Pi primitives, not inside every extension.

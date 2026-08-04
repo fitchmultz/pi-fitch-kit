@@ -34,34 +34,34 @@ assert(manifest.kitResources.extensions.length === 1, "the kit should bundle onl
 
 for (const pkg of manifest.corePackages) {
   assert(
-    /^npm:(@?[\w./-]+)@\d+\.\d+\.\d+$/.test(pkg.source) || /^git:github\.com\/[\w-]+\/[\w-]+@[0-9a-f]{40}$/.test(pkg.source),
-    `corePackages ${pkg.id} is not pinned to an exact npm version or 40-char commit: ${pkg.source}`,
+    /^npm:(?:@[\w.-]+\/)?[\w.-]+$/.test(pkg.source) || /^git:github\.com\/[\w-]+\/[\w-]+$/.test(pkg.source),
+    `corePackages ${pkg.id} must use an unpinned npm or Git source: ${pkg.source}`,
   );
 }
 const subagents = manifest.corePackages.find(({ id }) => id === "subagents");
 assert(
-  subagents?.source === "git:github.com/fitchmultz/pi-subagents@7594ad5d9eb7dd703eccdc12c0005fae6e007ce8",
-  "subagents must use the consolidated profiles-and-intercom release",
+  subagents?.source === "git:github.com/fitchmultz/pi-subagents",
+  "subagents must use the consolidated public source",
 );
 assert(!manifest.corePackages.some(({ id }) => id === "intercom"), "standalone intercom is retired into pi-subagents");
 assert(manifest.optionalIntegrations.includes("GitHub"), "active GitHub MCP integration must be selectable");
 
 const mcp = manifest.corePackages.find(({ id }) => id === "mcp");
 assert(
-  mcp?.source === "git:github.com/fitchmultz/pi-mcp-adapter@cef3ed0c9670b04519ee0eeb5bb91fc346efff89",
-  "MCP adapter must retain the reviewed UI capability isolation",
+  mcp?.source === "git:github.com/fitchmultz/pi-mcp-adapter",
+  "MCP adapter must use the secured public fork",
 );
 
 const agentSkills = manifest.corePackages.find(({ id }) => id === "agent-skills");
 assert(
-  agentSkills?.source === "git:github.com/fitchmultz/pi-agent-skills@c3e0e1f7da7a65a090582266326432aef8053954",
-  "agent-skills must retain the reviewed deslop guidance",
+  agentSkills?.source === "git:github.com/fitchmultz/pi-agent-skills",
+  "agent-skills must use its public source",
 );
 
 const codexContext = manifest.corePackages.find(({ id }) => id === "codex-context");
 assert(
-  codexContext?.source === "git:github.com/fitchmultz/pi-codex-context@b2c52ebd47fac2b38750168ea0d648ecd6c03a96",
-  "codex-context must retain default-off routing",
+  codexContext?.source === "git:github.com/fitchmultz/pi-codex-context",
+  "codex-context must use its public source",
 );
 assert(codexContext?.consent?.required === true, "cross-provider compaction must require explicit consent");
 assert(codexContext?.consent?.default === "disabled", "cross-provider compaction must default off");
@@ -74,7 +74,7 @@ assert(codexContext?.consent?.configPath === "${PI_CODING_AGENT_DIR:-$HOME/.pi/a
 assert(codexContext?.consent?.config?.customCompactionEnabled === true, "consent config must be explicit");
 
 const editSession = manifest.corePackages.find(({ id }) => id === "edit-session");
-assert(editSession?.source === "npm:pi-edit-session-in-place@0.1.27", "edit-session must retain forward-open Node support");
+assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");
 
 const browser = manifest.corePackages.find(({ id }) => id === "agent-browser")?.externalPrerequisite;
 assert(browser?.version === "0.33.0", "Agent Browser prerequisite must match the wrapper's tested 0.33.0 baseline");

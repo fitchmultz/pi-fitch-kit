@@ -7,10 +7,10 @@
   - `prompts/fitch-setup.md` and `prompts/audit/github-open-issues-prs.md` for the two registered slash commands; other prompt files are retained source material.
   - `extensions/anthropic-image-guard.ts` for provider-specific image handling when global auto-resize is off.
   - `examples/settings.json` for the safe, non-secret behavioral settings subset.
-  - `setup-manifest.json` for exact package pins, required model routes, and kit resources.
+  - `setup-manifest.json` for unpinned package sources, required model routes, and kit resources.
   - `templates/working-agreement.md` for the optional managed working-agreement blocks.
   - `package.json#pi` for the resources Pi loads from this package.
-- The pinned `pi-subagents` package owns the fourteen specialist profiles and model routing. Do not copy them back into this kit or restore agent-sync code.
+- The `pi-subagents` package owns the fourteen specialist profiles and model routing. Do not copy them back into this kit or restore agent-sync code.
 - Keep `README.md`, `setup-manifest.json`, and `docs/pi-setup.md` aligned when prompts, packages, models, install flow, or source-of-truth rules change.
 
 ## Commands
@@ -26,7 +26,7 @@
 - Use npm and Node `>=24.0.0`; do not introduce another package manager.
 - Keep this package a composition layer. Public extensions and skill packages must not depend on it.
 - Keep only active public resources registered in `package.json#pi` and `setup-manifest.json`.
-- Do not add duplicate subagent or skill copies. Point to the public owning package and pin its exact release commit.
+- Do not add duplicate subagent or skill copies. Point to the public owning package without pinning extension installs to a ref or version.
 
 ## Prompt templates
 
