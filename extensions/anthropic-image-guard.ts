@@ -19,6 +19,8 @@ const ANTHROPIC_IMAGE_MIME_TYPES = new Set([
 	"image/webp",
 ]);
 
+type FastRates = { input: number; output: number; cacheRead: number; cacheWrite: number };
+
 const FAST_STATE_PATH = join(getAgentDir(), "anthropic-fast.json");
 const FAST_BETA = "fast-mode-2026-02-01";
 const FAST_MODEL_PREFIXES = ["claude-opus-5", "claude-opus-4-8"];
@@ -32,23 +34,46 @@ function fastEnabled(): boolean {
 	}
 }
 
-function fastOptions(model: Model<Api>, options?: SimpleStreamOptions): SimpleStreamOptions {
+/** Fast mode bills double, so reported usage has to double with it. */
+export function fastRates<T extends FastRates>(rates: T): T {
+	return {
+		...rates,
+		input: rates.input * 2,
+		output: rates.output * 2,
+		cacheRead: rates.cacheRead * 2,
+		cacheWrite: rates.cacheWrite * 2,
+	};
+}
+
+function fastModel(model: Model<Api>): Model<Api> {
+	return {
+		...model,
+		cost: { ...fastRates(model.cost), tiers: model.cost.tiers?.map(fastRates) },
+	};
+}
+
+function fastOptions(options: SimpleStreamOptions | undefined): SimpleStreamOptions {
 	const baseFetch = options?.fetch ?? globalThis.fetch;
-	const fast = () =>
-		fastEnabled() && FAST_MODEL_PREFIXES.some((prefix) => model.id.startsWith(prefix));
 	return {
 		...options,
 		// ponytail: append at fetch time because Pi builds anthropic-beta (including OAuth markers) after option headers, so setting it earlier would drop them.
 		fetch: (input, init) => {
-			if (!fast()) return baseFetch(input, init);
 			const headers = new Headers(init?.headers);
-			const betas = headers.get("anthropic-beta");
-			headers.set("anthropic-beta", betas ? `${betas},${FAST_BETA}` : FAST_BETA);
+			const betas =
+				headers
+					.get("anthropic-beta")
+					?.split(",")
+					.map((beta) => beta.trim())
+					.filter(Boolean) ?? [];
+			if (!betas.includes(FAST_BETA)) {
+				headers.set("anthropic-beta", [...betas, FAST_BETA].join(","));
+			}
 			return baseFetch(input, { ...init, headers });
 		},
 		onPayload: async (payload, requestModel) => {
-			const body = (await options?.onPayload?.(payload, requestModel)) ?? payload;
-			return fast() ? { ...(body as Record<string, unknown>), speed: "fast" } : body;
+			const replaced = await options?.onPayload?.(payload, requestModel);
+			const body = replaced === undefined ? payload : replaced;
+			return { ...(body as Record<string, unknown>), speed: "fast" };
 		},
 	};
 }
@@ -156,7 +181,16 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 	pi.registerProvider("anthropic", {
 		api: "anthropic-messages",
 		streamSimple(model, context, options) {
-			return messagesApi.streamSimple(model, context, fastOptions(model, options) as never);
+			// One snapshot per request: a mid-request toggle must not split body and header.
+			const fast =
+				fastEnabled() && FAST_MODEL_PREFIXES.some((prefix) => model.id.startsWith(prefix));
+			const target = fast ? fastModel(model) : model;
+			const streamOptions = fast ? fastOptions(options) : options;
+			// Pi's composer routes full and simple streams through this one callback, so explicit
+			// full-stream options (thinking, budgets) must stay on the full API.
+			return "thinkingEnabled" in (options ?? {})
+				? messagesApi.stream(target, context, streamOptions as never)
+				: messagesApi.streamSimple(target, context, streamOptions);
 		},
 	});
 

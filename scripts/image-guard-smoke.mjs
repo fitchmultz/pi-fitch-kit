@@ -8,7 +8,9 @@ const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-anthropic-"));
 process.on("exit", () => rmSync(agentDir, { recursive: true, force: true }));
 process.env.PI_CODING_AGENT_DIR = agentDir;
 
-const { default: anthropicImageGuard } = await import("../extensions/anthropic-image-guard.ts");
+const { default: anthropicImageGuard, fastRates } = await import(
+	"../extensions/anthropic-image-guard.ts"
+);
 
 const SMALL_PNG =
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
@@ -116,7 +118,7 @@ assert.deepEqual(
 	[["anthropic", "anthropic-messages"]],
 );
 
-async function fastRequest(id) {
+async function fastRequest(id, beta = "pi-existing-beta", extraOptions = {}) {
 	let payload;
 	let headers = new Headers();
 	const stream = providers[0].config.streamSimple(
@@ -125,8 +127,8 @@ async function fastRequest(id) {
 			api: "anthropic-messages",
 			provider: "anthropic",
 			baseUrl: "https://example.invalid",
-			headers: { "anthropic-beta": "pi-existing-beta" },
-			reasoning: false,
+			headers: { "anthropic-beta": beta },
+			reasoning: true,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: 300_000,
@@ -136,6 +138,7 @@ async function fastRequest(id) {
 		{
 			apiKey: "test",
 			maxRetries: 0,
+			...extraOptions,
 			fetch: async (_input, init = {}) => {
 				headers = new Headers(init.headers);
 				payload = JSON.parse(String(init.body));
@@ -152,19 +155,47 @@ async function fastRequest(id) {
 
 const notices = [];
 const fastCtx = { ui: { notify: (message) => notices.push(message) } };
-assert.equal((await fastRequest("claude-opus-5")).payload.speed, undefined);
+const offOpus = await fastRequest("claude-opus-5");
+assert.equal(offOpus.payload.speed, undefined);
+assert.deepEqual(offOpus.beta, ["pi-existing-beta"], "no fast beta while disabled");
 
-commands["anthropic-fast"].handler("on", fastCtx);
+await commands["anthropic-fast"].handler("on", fastCtx);
 assert.equal(JSON.parse(readFileSync(join(agentDir, "anthropic-fast.json"), "utf8")).enabled, true);
 assert.equal(notices.at(-1), "Anthropic fast mode ON");
-const fastOpus = await fastRequest("claude-opus-5");
-assert.equal(fastOpus.payload.speed, "fast");
-assert.deepEqual(fastOpus.beta, ["pi-existing-beta", "fast-mode-2026-02-01"]);
-assert.equal((await fastRequest("claude-fable-5")).payload.speed, undefined);
+for (const id of ["claude-opus-5", "claude-opus-4-8"]) {
+	const enabled = await fastRequest(id);
+	assert.equal(enabled.payload.speed, "fast", `${id} must request fast mode`);
+	assert.deepEqual(
+		enabled.beta,
+		["pi-existing-beta", "fast-mode-2026-02-01"],
+		`${id} must append the beta without dropping Pi's own`,
+	);
+}
+const preBeta = await fastRequest("claude-opus-5", "pi-existing-beta,fast-mode-2026-02-01");
+assert.deepEqual(preBeta.beta, ["pi-existing-beta", "fast-mode-2026-02-01"], "no duplicate beta");
+const unsupported = await fastRequest("claude-fable-5");
+assert.equal(unsupported.payload.speed, undefined);
+assert.deepEqual(unsupported.beta, ["pi-existing-beta"], "no fast beta on unsupported models");
 
-commands["anthropic-fast"].handler("off", fastCtx);
+await commands["anthropic-fast"].handler("off", fastCtx);
 assert.equal(notices.at(-1), "Anthropic fast mode OFF");
 assert.equal((await fastRequest("claude-opus-5")).payload.speed, undefined);
+
+const fullStream = await fastRequest("claude-opus-5", "pi-existing-beta", {
+	thinkingEnabled: true,
+	thinkingBudgetTokens: 2048,
+});
+assert.equal(
+	fullStream.payload.thinking?.type,
+	"enabled",
+	"explicit full-stream options must stay on the full API instead of being recomputed",
+);
+
+assert.deepEqual(
+	fastRates({ input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25, inputTokensAbove: 200_000 }),
+	{ input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5, inputTokensAbove: 200_000 },
+	"fast mode bills double, so reported rates double and tier thresholds survive",
+);
 
 console.log(
 	JSON.stringify({
