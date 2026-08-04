@@ -20,10 +20,10 @@ The normal path includes:
 - [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) for delegated work and session coordination;
 - [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter) and [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) for connected context and real browser work;
 - [`pi-fff`](https://github.com/dmtrKovalenko/fff/tree/main/packages/pi-fff) and [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) for repository search and reliable changes;
-- small public tools for structured questions, persistent todos, session naming, working-directory changes, deterministic math, compaction, timing, verbosity, stash, session editing, and raw message copy;
+- small public tools for structured questions, persistent todos, session naming, working-directory changes, deterministic math, timing, verbosity, stash, session editing, and raw message copy;
 - [`ponytail`](https://github.com/DietrichGebert/ponytail) to keep the code path boring and small.
 
-The kit itself bundles one extension for the Anthropic image-provider boundary. The profiles ship directly with `pi-subagents`, so there is no second copy or sync layer.
+The kit itself bundles the Anthropic image-provider boundary plus OpenAI fast mode and opt-in alternate-model compaction. The profiles ship directly with `pi-subagents`, so there is no second copy or sync layer.
 
 For native macOS automation, [`macuse`](https://github.com/fitchmultz/macuse) is a selective experimental add-on. I enable it only when browser DOM and CLI tools are insufficient; Codex app updates can break its integration surface.
 

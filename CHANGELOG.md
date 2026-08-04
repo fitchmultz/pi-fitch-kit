@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 — 4 August 2026
+
+- Moved `pi-codex-context` into the kit as `extensions/codex-context.ts` and retired the duplicate package source from new installs. Existing `openai-codex-fast.json` state and `pi-codex-context.json` consent config remain canonical, so migration does not reset either setting.
+- Preserved hook-only OpenAI priority routing, literal opt-in alternate-model compaction, the active-install regression, and the Pi core restoration runbook. Repeated session starts now unwatch before watching the shared fast-mode state file, matching the kit's leak-free Anthropic footer.
+
 ## 0.2.4
 
 - Added an `anthropic-fast:on|off` footer indicator, matching the one in pi-codex-context. It appears only on Opus 5 and Opus 4.8, is colored by state, and clears on every other model. It reports the toggle and the selected model, which is what a session can know before a request; a request that supplies its own `client` still runs at standard speed while the footer reads `on`.

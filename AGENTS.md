@@ -6,6 +6,7 @@
 - Canonical sources:
   - `prompts/fitch-setup.md` and `prompts/audit/github-open-issues-prs.md` for the two registered slash commands; other prompt files are retained source material.
   - `extensions/anthropic-image-guard.ts` for provider-specific image handling when global auto-resize is off.
+  - `extensions/codex-context.ts` for OpenAI fast mode and explicitly consented alternate-model compaction.
   - `examples/settings.json` for the safe, non-secret behavioral settings subset.
   - `setup-manifest.json` for unpinned package sources, required model routes, and kit resources.
   - `templates/working-agreement.md` for the optional managed working-agreement blocks.
@@ -24,7 +25,7 @@
 ## Editing rules
 
 - Use npm and Node `>=24.0.0`; do not introduce another package manager.
-- Keep this package a composition layer. Public extensions and skill packages must not depend on it.
+- Keep this package an opinionated composition layer. Independent extensions and skill packages must not depend on it.
 - Keep only active public resources registered in `package.json#pi` and `setup-manifest.json`.
 - Do not add duplicate subagent or skill copies. Point to the public owning package without pinning extension installs to a ref or version.
 
@@ -39,6 +40,7 @@
 
 - Before changing Pi runtime/package behavior, read the installed Pi docs/types for the touched surface, especially `docs/packages.md`, `docs/prompt-templates.md`, and `docs/extensions.md` under the installed Pi root.
 - Keep `extensions/anthropic-image-guard.ts` provider-scoped and based on Pi's native `resizeImage`; preserve its pre-decode source limits and do not reintroduce global resizing logic.
+- Keep `extensions/codex-context.ts` hook-only for native OpenAI requests. Preserve the literal opt-in gate, existing state filenames, and xAI-then-Codex routing disclosure; do not register replacement OpenAI providers.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's tested compatibility baseline.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.
 
