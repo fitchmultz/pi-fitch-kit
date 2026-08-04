@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3 — 4 August 2026
+
+- Verified against the live Claude subscription OAuth route on 4 August 2026: `speed: "fast"` and the beta header are both server-validated, the request is accepted, and identical output returned in 4.8s against 9.5s with fast mode off. Reported cost still doubles, which tracks Anthropic's metered pricing exactly for API-key routes and stands in as a premium-usage signal on subscription auth, where Pi's cost figures are notional.
+- Added `/anthropic-fast [on|off]` to the Anthropic extension: off by default, persisted in the Pi agent directory, and limited to Opus 5 and Opus 4.8 because fast mode is Opus-only and bills double per token. Reported cost rates double with it so session totals match Anthropic's premium billing.
+- Documented the accepted caveat: this override owns Anthropic streaming while loaded, so it should not be combined with another Anthropic provider override unreviewed, Pi should be restarted rather than reloaded after disabling or removing it, and it should be revalidated on each Pi upgrade.
+- Pi's provider composer collapses full and simple stream calls into a single extension callback and drops the provenance, so the extension classifies full-stream callers by their Anthropic-native options and leaves everything else on the simple path. Requests that supply their own `client` bypass `options.fetch` in pi-ai and therefore stay at standard speed rather than risk `speed: "fast"` without its required beta header.
+
 ## 0.2.2 — 4 August 2026
 
 - Reorganized the public documentation around the active stack: linked extensions, the fourteen-agent bench, directly linked source-managed skills including `diagram-creation`, and authenticated MCP capabilities.

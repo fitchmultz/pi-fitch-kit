@@ -1,7 +1,16 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import anthropicImageGuard from "../extensions/anthropic-image-guard.ts";
+const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-anthropic-"));
+process.on("exit", () => rmSync(agentDir, { recursive: true, force: true }));
+process.env.PI_CODING_AGENT_DIR = agentDir;
+
+const { default: anthropicImageGuard, fastRates } = await import(
+	"../extensions/anthropic-image-guard.ts"
+);
 
 const SMALL_PNG =
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
@@ -10,16 +19,29 @@ const WIDE_PNG =
 const SMALL_BMP = "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAATCwAAEwsAAAAAAAAAAAAAAAD/AA==";
 
 const handlers = {};
+const commands = {};
+const providers = new Map();
 anthropicImageGuard({
 	on(event, handler) {
-		handlers[event] = handler;
+		(handlers[event] ??= []).push(handler);
+	},
+	registerCommand(name, config) {
+		commands[name] = config;
+	},
+	registerProvider(name, config) {
+		providers.set(name, config);
 	},
 });
+const runHandlers = async (event, ...args) => {
+	for (const handler of handlers[event] ?? []) await handler(...args);
+};
 
-const { context } = handlers;
+const context = handlers.context[0];
 assert.equal(typeof context, "function");
-assert.equal(typeof handlers.session_start, "function");
-assert.equal(typeof handlers.session_compact, "function");
+assert.equal(typeof handlers.session_start[0], "function");
+assert.equal(typeof handlers.session_compact[0], "function");
+// Registered once and gated per request, so unregistering can never delete a peer's registration.
+assert.equal(providers.get("anthropic")?.api, "anthropic-messages");
 
 const nonAnthropic = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
 assert.equal(await context({ messages: nonAnthropic }, { model: { provider: "openai" } }), undefined);
@@ -29,7 +51,7 @@ const unchanged = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, m
 assert.equal(await context({ messages: unchanged }, { model: { provider: "anthropic" } }), undefined);
 assert.equal(unchanged[0].content[0].data, SMALL_PNG);
 
-handlers.session_start();
+await runHandlers("session_start");
 const mislabeled = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/jpeg" }] }];
 await context({ messages: mislabeled }, { model: { provider: "anthropic" } });
 const correctlyLabeled = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/png" }] }];
@@ -86,7 +108,7 @@ const oversizedResult = await context({ messages: oversized }, { model: { provid
 assert.match(oversizedResult.messages[0].content[0].text, /resize safety limit/);
 assert.equal(oversizedResult.messages[0].content[1].type, "image");
 
-handlers.session_compact();
+await runHandlers("session_compact");
 const afterCompaction = [
 	{ role: "compactionSummary", summary: "Earlier context" },
 	{ role: "branchSummary", summary: "Earlier branch" },
@@ -95,6 +117,114 @@ const afterCompaction = [
 ];
 const afterCompactionResult = await context({ messages: afterCompaction }, { model: { provider: "anthropic" } });
 assert.equal(afterCompactionResult.messages[3].content[0].type, "text");
+
+async function fastRequest(id, beta = "pi-existing-beta", extraOptions = {}) {
+	let payload;
+	let headers = new Headers();
+	const stream = providers.get("anthropic").streamSimple(
+		{
+			id,
+			api: "anthropic-messages",
+			provider: "anthropic",
+			baseUrl: "https://example.invalid",
+			headers: { "anthropic-beta": beta },
+			reasoning: true,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 300_000,
+			maxTokens: 4096,
+		},
+		{ messages: [{ role: "user", content: "test", timestamp: 0 }] },
+		{
+			apiKey: "test",
+			maxRetries: 0,
+			...extraOptions,
+			fetch: async (_input, init = {}) => {
+				headers = new Headers(init.headers);
+				payload = JSON.parse(String(init.body));
+				throw new Error("payload captured");
+			},
+		},
+	);
+	for await (const _event of stream) {
+		// Drain the capture abort.
+	}
+	// A prebuilt client never reaches the wrapped fetch, which is the point of that case.
+	if (!extraOptions.client) assert.ok(payload, "an Anthropic request must be issued");
+	return { payload, beta: (headers.get("anthropic-beta") ?? "").split(",") };
+}
+
+const notices = [];
+const fastCtx = { ui: { notify: (message) => notices.push(message) } };
+const offOpus = await fastRequest("claude-opus-5");
+assert.equal(offOpus.payload.speed, undefined);
+assert.deepEqual(offOpus.beta, ["pi-existing-beta"], "no fast beta while disabled");
+
+await commands["anthropic-fast"].handler("on", fastCtx);
+assert.equal(JSON.parse(readFileSync(join(agentDir, "anthropic-fast.json"), "utf8")).enabled, true);
+assert.equal(notices.at(-1), "Anthropic fast mode ON");
+for (const id of ["claude-opus-5", "claude-opus-4-8"]) {
+	const enabled = await fastRequest(id);
+	assert.equal(enabled.payload.speed, "fast", `${id} must request fast mode`);
+	assert.deepEqual(
+		enabled.beta,
+		["pi-existing-beta", "fast-mode-2026-02-01"],
+		`${id} must append the beta without dropping Pi's own`,
+	);
+}
+const preBeta = await fastRequest("claude-opus-5", "pi-existing-beta,fast-mode-2026-02-01");
+assert.deepEqual(preBeta.beta, ["pi-existing-beta", "fast-mode-2026-02-01"], "no duplicate beta");
+const unsupported = await fastRequest("claude-fable-5");
+assert.equal(unsupported.payload.speed, undefined);
+assert.deepEqual(unsupported.beta, ["pi-existing-beta"], "no fast beta on unsupported models");
+
+const fullStreamOnly = await fastRequest("claude-opus-5", "pi-existing-beta", {
+	toolChoice: "none",
+});
+assert.equal(fullStreamOnly.payload.tool_choice?.type, "none", "full-only options must survive");
+assert.notEqual(
+	fullStreamOnly.payload.thinking?.type,
+	"disabled",
+	"a full call without thinkingEnabled must not be recomputed by the simple path",
+);
+
+let clientPayload;
+const prebuilt = await fastRequest("claude-opus-5", "pi-existing-beta", {
+	client: {
+		messages: {
+			create: (params) => {
+				clientPayload = params;
+				throw new Error("prebuilt client used");
+			},
+		},
+	},
+});
+assert.equal(prebuilt.payload, undefined, "a prebuilt client bypasses the wrapped fetch");
+assert.equal(
+	clientPayload?.speed,
+	undefined,
+	"never request fast mode when the mandatory beta header cannot be attached",
+);
+
+await commands["anthropic-fast"].handler("off", fastCtx);
+assert.equal(notices.at(-1), "Anthropic fast mode OFF");
+assert.equal((await fastRequest("claude-opus-5")).payload.speed, undefined);
+
+const fullStream = await fastRequest("claude-opus-5", "pi-existing-beta", {
+	thinkingEnabled: true,
+	thinkingBudgetTokens: 2048,
+});
+assert.equal(
+	fullStream.payload.thinking?.type,
+	"enabled",
+	"explicit full-stream options must stay on the full API instead of being recomputed",
+);
+
+assert.deepEqual(
+	fastRates({ input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25, inputTokensAbove: 200_000 }),
+	{ input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5, inputTokensAbove: 200_000 },
+	"fast mode bills double, so reported rates double and tier thresholds survive",
+);
 
 console.log(
 	JSON.stringify({
@@ -108,5 +238,6 @@ console.log(
 		anthropicResizeFailure: "omitted",
 		oversizedSource: "omitted",
 		compaction: "cleared",
+		fastMode: "opus-only",
 	}),
 );
