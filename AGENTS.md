@@ -6,6 +6,7 @@
 - Canonical sources:
   - `prompts/fitch-setup.md` and `prompts/audit/github-open-issues-prs.md` for the two registered slash commands; other prompt files are retained source material.
   - `extensions/anthropic-image-guard.ts` for provider-specific image handling when global auto-resize is off.
+  - `extensions/clean-footer.ts` for a compact footer without cumulative token, cache, or cost counters.
   - `extensions/codex-context.ts` for OpenAI fast mode and explicitly consented alternate-model compaction.
   - `extensions/session-name.ts` for stable, searchable session naming and protected role identifiers.
   - `examples/settings.json` for the safe, non-secret behavioral settings subset.
@@ -41,6 +42,7 @@
 
 - Before changing Pi runtime/package behavior, read the installed Pi docs/types for the touched surface, especially `docs/packages.md`, `docs/prompt-templates.md`, and `docs/extensions.md` under the installed Pi root.
 - Keep `extensions/anthropic-image-guard.ts` provider-scoped and based on Pi's native `resizeImage`; preserve its pre-decode source limits and do not reintroduce global resizing logic.
+- Keep `extensions/clean-footer.ts` free of cumulative token, cache, and cost counters; preserve context usage, model details, extension statuses, and wrapping without truncation.
 - Keep `extensions/codex-context.ts` hook-only for native OpenAI requests. Preserve the literal opt-in gate, existing state filenames, and xAI-then-Codex routing disclosure; do not register replacement OpenAI providers.
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's tested compatibility baseline.

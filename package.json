@@ -1,6 +1,6 @@
 {
   "name": "@fitch/pi-kit",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -10,7 +10,7 @@
   "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node --check extensions/codex-context.ts && node --check extensions/session-name.ts && node --check scripts/codex-context-regression.ts && node --check scripts/session-name-regression.ts && node scripts/image-guard-smoke.mjs && npm run regression:session-name && node scripts/validate.mjs",
+    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node --check extensions/clean-footer.ts && node --check extensions/codex-context.ts && node --check extensions/session-name.ts && node --check scripts/codex-context-regression.ts && node --check scripts/session-name-regression.ts && node scripts/image-guard-smoke.mjs && npm run regression:session-name && node scripts/validate.mjs",
     "typecheck": "tsc --noEmit",
     "regression:codex-context": "node --experimental-strip-types scripts/codex-context-regression.ts",
     "regression:session-name": "node --experimental-strip-types scripts/session-name-regression.ts",
@@ -22,6 +22,7 @@
   "pi": {
     "extensions": [
       "./extensions/anthropic-image-guard.ts",
+      "./extensions/clean-footer.ts",
       "./extensions/codex-context.ts",
       "./extensions/session-name.ts"
     ],
@@ -37,18 +38,23 @@
   "devDependencies": {
     "@earendil-works/pi-ai": "^0.83.0",
     "@earendil-works/pi-coding-agent": "^0.83.0",
+    "@earendil-works/pi-tui": "^0.83.0",
     "@types/node": "^24.13.3",
     "typescript": "^6.0.3"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*"
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
   },
   "peerDependenciesMeta": {
     "@earendil-works/pi-ai": {
       "optional": true
     },
     "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "@earendil-works/pi-tui": {
       "optional": true
     }
   }
