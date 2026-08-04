@@ -23,6 +23,7 @@ import {
 
 const FAST_STATE_PATH = join(getAgentDir(), "openai-codex-fast.json");
 const COMPACTION_CONFIG_PATH = join(getAgentDir(), "pi-codex-context.json");
+const LEGACY_SOURCE = "git:github.com/fitchmultz/pi-codex-context";
 type CompactionModel = {
 	provider: string;
 	model: string;
@@ -160,15 +161,38 @@ function fastOptions(options?: SimpleStreamOptions): SimpleStreamOptions {
 }
 
 function legacyStandaloneInstalled(): boolean {
-	const packagePath = ["git", "github.com", "fitchmultz", "pi-codex-context", "package.json"];
-	return (
-		existsSync(join(getAgentDir(), ...packagePath)) ||
-		existsSync(join(process.cwd(), ".pi", ...packagePath))
-	);
+	const agentDir = getAgentDir();
+	if (
+		!existsSync(
+			join(
+				agentDir,
+				"git",
+				"github.com",
+				"fitchmultz",
+				"pi-codex-context",
+				"package.json",
+			),
+		)
+	) {
+		return false;
+	}
+	try {
+		const settings = JSON.parse(readFileSync(join(agentDir, "settings.json"), "utf8"));
+		return settings.packages?.some((pkg: unknown) => {
+			const source =
+				typeof pkg === "string" ? pkg : (pkg as { source?: unknown })?.source;
+			return (
+				source === LEGACY_SOURCE ||
+				(typeof source === "string" && source.startsWith(`${LEGACY_SOURCE}@`))
+			);
+		}) === true;
+	} catch {
+		return false;
+	}
 }
 
 export default function (pi: ExtensionAPI): void {
-	// Defer to the old package until setup removes it, so upgrades never double-send compaction.
+	// Base releases installed this source user-wide; defer until setup removes its entry and checkout.
 	if (legacyStandaloneInstalled()) return;
 
 	let footerContext: ExtensionContext | undefined;

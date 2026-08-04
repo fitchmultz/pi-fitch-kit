@@ -116,6 +116,10 @@ const legacyCheckout = join(
 );
 mkdirSync(legacyCheckout, { recursive: true });
 writeFileSync(join(legacyCheckout, "package.json"), "{}\n");
+writeFileSync(
+	join(extensionAgentDir, "settings.json"),
+	`${JSON.stringify({ packages: ["git:github.com/fitchmultz/pi-codex-context@legacy-ref"] })}\n`,
+);
 const legacyFixture = join(extensionAgentDir, "legacy-codex-context.ts");
 writeFileSync(
 	legacyFixture,
@@ -160,8 +164,59 @@ assert.equal(
 	"a transition compaction must invoke one summary handler",
 );
 delete (globalThis as { __legacyCompactionCalls?: number }).__legacyCompactionCalls;
+rmSync(join(extensionAgentDir, "settings.json"), { force: true });
+process.env.PI_CODING_AGENT_DIR = extensionAgentDir;
+const staleCheckoutLoad = await loadExtensions(
+	[fileURLToPath(new URL("../extensions/codex-context.ts", import.meta.url))],
+	process.cwd(),
+);
+if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+assert.deepEqual(staleCheckoutLoad.errors, []);
+assert.deepEqual(
+	staleCheckoutLoad.extensions.flatMap(
+		(loaded: { commands: Map<string, unknown> }) => [...loaded.commands.keys()],
+	),
+	["codex-fast"],
+	"a stale checkout without a configured package source must not suppress the kit",
+);
 rmSync(legacyCheckout, { recursive: true, force: true });
 rmSync(legacyFixture, { force: true });
+
+const projectDir = mkdtempSync(join(tmpdir(), "pi-codex-project-"));
+const projectLegacyCheckout = join(
+	projectDir,
+	".pi",
+	"git",
+	"github.com",
+	"fitchmultz",
+	"pi-codex-context",
+);
+mkdirSync(projectLegacyCheckout, { recursive: true });
+writeFileSync(join(projectLegacyCheckout, "package.json"), "{}\n");
+const previousCwd = process.cwd();
+let untrustedProjectLoad;
+try {
+	process.chdir(projectDir);
+	process.env.PI_CODING_AGENT_DIR = extensionAgentDir;
+	untrustedProjectLoad = await loadExtensions(
+		[fileURLToPath(new URL("../extensions/codex-context.ts", import.meta.url))],
+		projectDir,
+	);
+} finally {
+	process.chdir(previousCwd);
+	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+}
+assert.deepEqual(untrustedProjectLoad.errors, []);
+assert.deepEqual(
+	untrustedProjectLoad.extensions.flatMap(
+		(loaded: { commands: Map<string, unknown> }) => [...loaded.commands.keys()],
+	),
+	["codex-fast"],
+	"an excluded project-local checkout must not suppress the user-scoped kit",
+);
+rmSync(projectDir, { recursive: true, force: true });
 
 const fastCommand = extension.commands.get("codex-fast");
 assert.ok(fastCommand, "pi-codex-context must own the /codex-fast command");
