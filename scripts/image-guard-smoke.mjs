@@ -36,6 +36,23 @@ const runHandlers = async (event, ...args) => {
 	for (const handler of handlers[event] ?? []) await handler(...args);
 };
 
+const statWatchers = () =>
+	process.getActiveResourcesInfo().filter((resource) => resource === "StatWatcher").length;
+// Baseline, so an unrelated watcher elsewhere in the process cannot fail the leak check.
+const watcherBaseline = statWatchers();
+
+const notices = [];
+const status = new Map();
+const uiCtx = (id) => ({
+	hasUI: true,
+	model: id === undefined ? undefined : { provider: "anthropic", id },
+	ui: {
+		notify: (message) => notices.push(message),
+		setStatus: (key, value) => status.set(key, value),
+		theme: { fg: (color, text) => `${color}:${text}` },
+	},
+});
+
 const context = handlers.context[0];
 assert.equal(typeof context, "function");
 assert.equal(typeof handlers.session_start[0], "function");
@@ -51,7 +68,7 @@ const unchanged = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, m
 assert.equal(await context({ messages: unchanged }, { model: { provider: "anthropic" } }), undefined);
 assert.equal(unchanged[0].content[0].data, SMALL_PNG);
 
-await runHandlers("session_start");
+await runHandlers("session_start", {}, uiCtx("claude-opus-5"));
 const mislabeled = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/jpeg" }] }];
 await context({ messages: mislabeled }, { model: { provider: "anthropic" } });
 const correctlyLabeled = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/png" }] }];
@@ -154,8 +171,7 @@ async function fastRequest(id, beta = "pi-existing-beta", extraOptions = {}) {
 	return { payload, beta: (headers.get("anthropic-beta") ?? "").split(",") };
 }
 
-const notices = [];
-const fastCtx = { ui: { notify: (message) => notices.push(message) } };
+const fastCtx = uiCtx("claude-opus-5");
 const offOpus = await fastRequest("claude-opus-5");
 assert.equal(offOpus.payload.speed, undefined);
 assert.deepEqual(offOpus.beta, ["pi-existing-beta"], "no fast beta while disabled");
@@ -226,9 +242,32 @@ assert.deepEqual(
 	"fast mode bills double, so reported rates double and tier thresholds survive",
 );
 
+// Footer: only on fast-capable models, colored by state, and cleared elsewhere.
+assert.equal(status.get("anthropic-fast"), "muted:anthropic-fast:off");
+await commands["anthropic-fast"].handler("on", fastCtx);
+assert.equal(status.get("anthropic-fast"), "accent:anthropic-fast:on");
+
+await runHandlers("model_select", {}, uiCtx("claude-fable-5"));
+assert.equal(status.get("anthropic-fast"), undefined, "no footer on models fast mode ignores");
+await runHandlers("model_select", {}, uiCtx("claude-opus-4-8"));
+assert.equal(status.get("anthropic-fast"), "accent:anthropic-fast:on");
+
+await commands["anthropic-fast"].handler("off", fastCtx);
+assert.equal(status.get("anthropic-fast"), "muted:anthropic-fast:off");
+// A second start must not stack watchers: one shutdown has to release everything, or the
+// process stays alive holding a listener.
+await runHandlers("session_start", {}, uiCtx("claude-opus-5"));
+await runHandlers("session_shutdown");
+assert.equal(
+	statWatchers(),
+	watcherBaseline,
+	"repeated session starts must not leak a state-file watcher",
+);
+
 console.log(
 	JSON.stringify({
 		ok: true,
+		footer: "opus-only",
 		nonAnthropic: "unchanged",
 		anthropicUnchanged: "preserved",
 		anthropicResize: "resized",

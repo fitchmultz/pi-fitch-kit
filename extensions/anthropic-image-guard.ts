@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, unwatchFile, watchFile, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
 	type Api,
@@ -6,7 +6,7 @@ import {
 	type Model,
 	type SimpleStreamOptions,
 } from "@earendil-works/pi-ai/compat";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { formatDimensionNote, getAgentDir, resizeImage } from "@earendil-works/pi-coding-agent";
 
 const MAX_CACHE_ENTRIES = 8;
@@ -103,14 +103,37 @@ function fastStream(
 	// A caller-supplied client bypasses options.fetch in pi-ai, so the mandatory beta header
 	// cannot be attached; never send speed without it.
 	const fast =
-		fastEnabled() &&
-		!(options !== undefined && "client" in options) &&
-		FAST_MODEL_PREFIXES.some((prefix) => model.id.startsWith(prefix));
+		fastEnabled() && !(options !== undefined && "client" in options) && fastEligible(model);
 	const target = fast ? fastModel(model) : model;
 	const streamOptions = fast ? fastOptions(options) : options;
 	return FULL_STREAM_KEYS.some((key) => options !== undefined && key in options)
 		? messagesApi.stream(target, context, streamOptions)
 		: messagesApi.streamSimple(target, context, streamOptions);
+}
+
+function fastEligible(model: { id?: string; provider?: string } | undefined): boolean {
+	return (
+		model?.provider === "anthropic" &&
+		FAST_MODEL_PREFIXES.some((prefix) => model.id?.startsWith(prefix) === true)
+	);
+}
+
+// Mirrors the per-request gate, so the footer never claims fast mode on a model that ignores it.
+function updateFooterStatus(ctx: ExtensionContext): void {
+	try {
+		if (!fastEligible(ctx.model)) {
+			ctx.ui.setStatus("anthropic-fast", undefined);
+			return;
+		}
+		const fast = fastEnabled();
+		const label = `anthropic-fast:${fast ? "on" : "off"}`;
+		ctx.ui.setStatus(
+			"anthropic-fast",
+			ctx.hasUI ? ctx.ui.theme.fg(fast ? "accent" : "muted", label) : label,
+		);
+	} catch {
+		// Headless hosts do not expose a footer.
+	}
 }
 
 function anthropicMimeType(mimeType: string): string | undefined {
@@ -217,6 +240,25 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 	// extension's Anthropic registration, because Pi merges them into one provider-level object.
 	pi.registerProvider("anthropic", { api: "anthropic-messages", streamSimple: fastStream });
 
+	// The state file is shared by every session, so watch it rather than only redrawing locally.
+	let footerContext: ExtensionContext | undefined;
+	const refreshFooter = () => {
+		if (footerContext) updateFooterStatus(footerContext);
+	};
+	pi.on("session_start", (_event, ctx) => {
+		footerContext = ctx;
+		updateFooterStatus(ctx);
+		// Unwatch first: a repeated session_start would otherwise stack listeners, and a single
+		// shutdown would then leave one behind holding the process open.
+		unwatchFile(FAST_STATE_PATH, refreshFooter);
+		if (ctx.hasUI) watchFile(FAST_STATE_PATH, { interval: 5000 }, refreshFooter);
+	});
+	pi.on("session_shutdown", () => {
+		unwatchFile(FAST_STATE_PATH, refreshFooter);
+		footerContext = undefined;
+	});
+	pi.on("model_select", (_event, ctx) => updateFooterStatus(ctx));
+
 	pi.registerCommand("anthropic-fast", {
 		description: "Toggle Anthropic Opus fast mode (2x token price)",
 		handler: async (args, ctx) => {
@@ -224,6 +266,7 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 			if (arg === "on" || arg === "off") {
 				writeFileSync(FAST_STATE_PATH, `${JSON.stringify({ enabled: arg === "on" })}\n`);
 			}
+			updateFooterStatus(ctx);
 			ctx.ui.notify(`Anthropic fast mode ${fastEnabled() ? "ON" : "OFF"}`, "info");
 		},
 	});
