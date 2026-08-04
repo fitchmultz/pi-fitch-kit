@@ -7,6 +7,7 @@
   - `prompts/fitch-setup.md` and `prompts/audit/github-open-issues-prs.md` for the two registered slash commands; other prompt files are retained source material.
   - `extensions/anthropic-image-guard.ts` for provider-specific image handling when global auto-resize is off.
   - `extensions/codex-context.ts` for OpenAI fast mode and explicitly consented alternate-model compaction.
+  - `extensions/session-name.ts` for stable, searchable session naming and protected role identifiers.
   - `examples/settings.json` for the safe, non-secret behavioral settings subset.
   - `setup-manifest.json` for unpinned package sources, required model routes, and kit resources.
   - `templates/working-agreement.md` for the optional managed working-agreement blocks.
@@ -41,6 +42,7 @@
 - Before changing Pi runtime/package behavior, read the installed Pi docs/types for the touched surface, especially `docs/packages.md`, `docs/prompt-templates.md`, and `docs/extensions.md` under the installed Pi root.
 - Keep `extensions/anthropic-image-guard.ts` provider-scoped and based on Pi's native `resizeImage`; preserve its pre-decode source limits and do not reintroduce global resizing logic.
 - Keep `extensions/codex-context.ts` hook-only for native OpenAI requests. Preserve the literal opt-in gate, existing state filenames, and xAI-then-Codex routing disclosure; do not register replacement OpenAI providers.
+- Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's tested compatibility baseline.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.
 
@@ -48,5 +50,6 @@
 
 - Run `npm run check` after edits to `package.json`, `setup-manifest.json`, `extensions/`, `scripts/`, or registered prompts; add `npm run smoke` when package resources changed.
 - Run `npm run regression:codex-context` after changing Codex fast mode, alternate-model compaction, its state/config migration, or the Pi core runbook.
+- Run `npm run regression:session-name` after changing naming guidance, metadata injection, protected identities, or its migration gate.
 - For runtime-facing changes, also verify Pi loads the package through `pi install ...` plus `/reload` or a fresh Pi session when practical.
 - Keep this file short and project-specific; point to `README.md` or Pi docs instead of copying generic coding rules.

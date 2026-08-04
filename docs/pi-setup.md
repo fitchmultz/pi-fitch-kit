@@ -18,7 +18,7 @@ Pi core
   └─ user-authenticated MCP services
 ```
 
-[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: two bundled extensions, a safe settings example, unpinned package sources, and a setup prompt. The fourteen specialist profiles now ship with [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) instead of being duplicated here. Reusable extensions and skill packages remain independent public repositories; the kit directly owns only its harness-coupled runtime.
+[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: three bundled extensions, a safe settings example, unpinned package sources, and a setup prompt. The fourteen specialist profiles now ship with [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) instead of being duplicated here. Most reusable extensions and all skill packages remain independent public repositories; the kit directly owns only its harness-coupled runtime.
 
 ## A representative task
 
@@ -87,11 +87,11 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - repository work: `pi-fff`, `pi-apply-edits`;
 - task control: structured questions, persistent todos, session naming, and working-directory changes;
 - deterministic support: calculator, tool duration, verbosity, session editing, stash, and raw message copy;
-- kit boundary: Anthropic-only image resizing plus OpenAI fast mode and consented alternate-model compaction, while `pi-subagents` owns its profile defaults.
+- kit boundary: stable session naming, Anthropic-only image resizing, and OpenAI fast mode plus consented alternate-model compaction, while `pi-subagents` owns its profile defaults.
 
 Bundled `codex-context` loads safely with custom compaction disabled. Enabling its manifest-gated route is a separate choice because retained compaction context can include selected messages, prior summaries, split-turn prefixes, and custom instructions, and goes to `xai/grok-4.5`, then `openai-codex/gpt-5.6-luna` on fallback, regardless of the active chat provider. `/fitch-setup` previews the destinations and exact config before asking for that consent.
 
-Reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
+Most reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
 
 [`macuse`](https://github.com/fitchmultz/macuse) is the selective exception to the default stack. It adds native macOS app inspection and control for tasks that cannot be handled through browser DOM or CLI tools. I enable it only when needed and treat it as experimental because Codex app updates can break the integration surface.
 

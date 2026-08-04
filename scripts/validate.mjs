@@ -33,8 +33,12 @@ assert(!existsSync(join(root, "agents")), "agent profiles belong to pi-subagents
 assert(!existsSync(join(root, "extensions", "sync-agents.ts")), "sync-agents is redundant with pi-subagents defaults");
 assert(
   JSON.stringify(manifest.kitResources.extensions) ===
-    JSON.stringify(["extensions/anthropic-image-guard.ts", "extensions/codex-context.ts"]),
-  "the kit must bundle the Anthropic and Codex context extensions",
+    JSON.stringify([
+      "extensions/anthropic-image-guard.ts",
+      "extensions/codex-context.ts",
+      "extensions/session-name.ts",
+    ]),
+  "the kit must bundle the Anthropic, Codex context, and session-name extensions",
 );
 
 for (const pkg of manifest.corePackages) {
@@ -64,10 +68,16 @@ assert(
 );
 
 assert(!manifest.corePackages.some(({ id }) => id === "codex-context"), "codex-context now belongs to the kit");
-assert(
-  manifest.retiredPackageSources.includes("git:github.com/fitchmultz/pi-codex-context"),
-  "upgrades must remove the retired standalone codex-context package",
-);
+assert(!manifest.corePackages.some(({ id }) => id === "session-name"), "session-name now belongs to the kit");
+for (const source of [
+  "git:github.com/fitchmultz/pi-codex-context",
+  "git:github.com/fitchmultz/pi-session-name",
+]) {
+  assert(
+    manifest.retiredPackageSources.includes(source),
+    `upgrades must remove the retired standalone package: ${source}`,
+  );
+}
 const codexContext = manifest.consentBehaviors.find(({ id }) => id === "codex-context");
 assert(codexContext?.extension === "extensions/codex-context.ts", "consent must identify the bundled extension");
 assert(codexContext?.consent?.required === true, "cross-provider compaction must require explicit consent");

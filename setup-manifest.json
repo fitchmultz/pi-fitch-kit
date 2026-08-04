@@ -24,7 +24,8 @@
   "kitResources": {
     "extensions": [
       "extensions/anthropic-image-guard.ts",
-      "extensions/codex-context.ts"
+      "extensions/codex-context.ts",
+      "extensions/session-name.ts"
     ],
     "prompts": [
       "prompts/fitch-setup.md",
@@ -65,7 +66,8 @@
     }
   ],
   "retiredPackageSources": [
-    "git:github.com/fitchmultz/pi-codex-context"
+    "git:github.com/fitchmultz/pi-codex-context",
+    "git:github.com/fitchmultz/pi-session-name"
   ],
   "corePackages": [
     {
@@ -83,10 +85,6 @@
     {
       "id": "todo-list",
       "source": "git:github.com/fitchmultz/pi-todo-list"
-    },
-    {
-      "id": "session-name",
-      "source": "git:github.com/fitchmultz/pi-session-name"
     },
     {
       "id": "change-working-dir",
