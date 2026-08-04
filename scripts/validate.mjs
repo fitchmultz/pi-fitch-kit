@@ -40,9 +40,10 @@ for (const pkg of manifest.corePackages) {
 }
 const subagents = manifest.corePackages.find(({ id }) => id === "subagents");
 assert(
-  subagents?.source === "git:github.com/fitchmultz/pi-subagents@3dd2c4932b8aff8a40ed25f98023aebd35685830",
-  "subagents must use the merged profile-owning release",
+  subagents?.source === "git:github.com/fitchmultz/pi-subagents@7594ad5d9eb7dd703eccdc12c0005fae6e007ce8",
+  "subagents must use the consolidated profiles-and-intercom release",
 );
+assert(!manifest.corePackages.some(({ id }) => id === "intercom"), "standalone intercom is retired into pi-subagents");
 assert(manifest.optionalIntegrations.includes("GitHub"), "active GitHub MCP integration must be selectable");
 
 const mcp = manifest.corePackages.find(({ id }) => id === "mcp");

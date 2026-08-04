@@ -25,8 +25,7 @@ These are the extensions loaded in my current setup. Every external extension li
 
 | Extension | What I use it for |
 |---|---|
-| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) | Fresh specialists, parallel work, chains, isolated worktrees, async review, and durable artifacts |
-| [`pi-intercom`](https://github.com/fitchmultz/pi-intercom) | Coordination between independent local Pi sessions and active child runs |
+| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) | Fresh specialists, parallel work, chains, isolated worktrees, async review, durable artifacts, and coordination between local sessions |
 | [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/cef3ed0c9670b04519ee0eeb5bb91fc346efff89) | One searchable gateway over configured MCP servers and their tools |
 | [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) | Live documentation, browser automation, screenshots, product QA, and authenticated web flows |
 
@@ -82,11 +81,11 @@ That exposed stricter Anthropic image limits. The bundled guard fixes the bounda
 
 | Job | Profiles |
 |---|---|
-| Map and investigate | [`scout`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/scout.md), [`context-builder`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/context-builder.md), [`debugger`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/debugger.md), [`researcher`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/researcher.md) |
-| Decide and plan | [`planner`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/planner.md), [`oracle`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/oracle.md) |
-| Implement bounded work | [`worker`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/worker.md), [`fixer`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/fixer.md) |
-| Challenge the result | [`reviewer`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/reviewer.md), [`reviewer-gpt`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/reviewer-gpt.md), [`reviewer-claude`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/reviewer-claude.md), [`reviewer-security`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/reviewer-security.md), [`ui-designer`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/ui-designer.md) |
-| Human-facing output | [`writer`](https://github.com/fitchmultz/pi-subagents/blob/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents/writer.md) |
+| Map and investigate | [`scout`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/scout.md), [`context-builder`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/context-builder.md), [`debugger`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/debugger.md), [`researcher`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/researcher.md) |
+| Decide and plan | [`planner`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/planner.md), [`oracle`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/oracle.md) |
+| Implement bounded work | [`worker`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/worker.md), [`fixer`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/fixer.md) |
+| Challenge the result | [`reviewer`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/reviewer.md), [`reviewer-gpt`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/reviewer-gpt.md), [`reviewer-claude`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/reviewer-claude.md), [`reviewer-security`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/reviewer-security.md), [`ui-designer`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/ui-designer.md) |
+| Human-facing output | [`writer`](https://github.com/fitchmultz/pi-subagents/blob/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents/writer.md) |
 
 The parent session remains responsible for the task. Specialists return evidence; they do not become an autonomous hierarchy.
 
@@ -97,7 +96,7 @@ The routing is intentional:
 - `anthropic/claude-fable-5` supplies an independent model family for writing, UI judgment, and cross-model review, with Opus 5 behind it.
 - `oracle` alone uses forked parent context. Every other role starts fresh, and every profile is a leaf agent.
 
-The exact primary, fallback, thinking, context, tool, and output policy lives in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents). See [the full setup guide](docs/pi-setup.md#model-routing) for the complete table.
+The exact primary, fallback, thinking, context, tool, and output policy lives in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents). See [the full setup guide](docs/pi-setup.md#model-routing) for the complete table.
 
 ## Active skills
 
@@ -121,8 +120,7 @@ Companion skills ship beside their extensions:
 
 | Source | Skills |
 |---|---|
-| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents/tree/main/skills/pi-subagents) | `pi-subagents` orchestration guidance |
-| [`pi-intercom`](https://github.com/fitchmultz/pi-intercom/tree/main/skills/pi-intercom) | `pi-intercom` coordination guidance |
+| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents/tree/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/skills) | `pi-subagents` orchestration and `pi-intercom` coordination guidance |
 | [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/cef3ed0c9670b04519ee0eeb5bb91fc346efff89/skills/mcp-scripting) | `mcp-scripting` for discovering and composing MCP calls |
 | [`ponytail`](https://github.com/DietrichGebert/ponytail/tree/main/skills) | `ponytail`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help`, `ponytail-review` |
 
@@ -186,7 +184,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit@v0.2.2
 /fitch-setup
 ```
 
-`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every exact package install and file change, and asks which parts to apply. It never reads or copies credentials. Run it again after an upgrade to preview removal of legacy kit-owned profile symlinks; it never removes regular files or links from another source. `/fitch-setup verify` reports drift without changing anything.
+`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every exact package install and file change, and asks which parts to apply. It never reads or copies credentials. Run it again after an upgrade to preview removal of the archived standalone Intercom package and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. `/fitch-setup verify` reports drift without changing anything.
 
 The manifest is the reproducible source of truth for package pins, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.0 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
 

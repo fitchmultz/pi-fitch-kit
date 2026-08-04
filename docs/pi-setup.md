@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Last updated 3 August 2026 for Pi 0.83.0 on Node.js 24 or newer._
+_Updated 4 August 2026 for Pi 0.83.0 on Node.js 24 or newer._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 
@@ -82,7 +82,7 @@ That is the recurring shape: connected evidence, focused help, parent ownership,
 
 The [README extension index](../README.md#enabled-extensions) links every loaded public extension to its repository. The main groups are:
 
-- orchestration and communication: `pi-subagents`, `pi-intercom`;
+- orchestration and communication: `pi-subagents`, including its bundled Intercom runtime;
 - connected work: `pi-mcp-adapter`, `pi-agent-browser-native`;
 - repository work: `pi-fff`, `pi-apply-edits`;
 - task control: structured questions, persistent todos, session naming, and working-directory changes;
@@ -116,7 +116,7 @@ The agent files are the runtime source of truth. Models, fallbacks, effort, and 
 | `ui-designer` | Fable 5 | Opus 5, Codex Sol, OpenAI Sol | xhigh | fresh |
 | `writer` | Fable 5 | Opus 5 | high | fresh |
 
-Full model identifiers are in the pinned [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/3dd2c4932b8aff8a40ed25f98023aebd35685830/agents) directory. The compact names above mean:
+Full model identifiers are in the pinned [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/7594ad5d9eb7dd703eccdc12c0005fae6e007ce8/agents) directory. The compact names above mean:
 
 - Codex Sol: `openai-codex/gpt-5.6-sol`
 - OpenAI Sol: `openai/gpt-5.6-sol`
@@ -137,7 +137,7 @@ Benchmark rationale and the 26 July 2026 Artificial Analysis plus CursorBench sn
 The public skills are source-managed rather than copied through a home directory:
 
 - [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries clarification, dogfooding, handoffs, TDD, extension development, end-to-end shipping, completion verification, and strict review modes. Its [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) skill produces editable D2 plus SVG/PNG architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with generated review images.
-- `pi-subagents`, `pi-intercom`, and `pi-mcp-adapter` ship their own usage skills beside the implementation.
+- `pi-subagents` ships both orchestration and Intercom usage skills; `pi-mcp-adapter` ships its scripting skill.
 - [`ponytail`](https://github.com/DietrichGebert/ponytail) supplies the minimalism mode and its audit/review helpers.
 
 Pi loads a skill only when the task matches. This keeps the default prompt small while giving specialized work an explicit procedure.

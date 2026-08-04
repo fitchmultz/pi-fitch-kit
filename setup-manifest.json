@@ -35,11 +35,7 @@
   "corePackages": [
     {
       "id": "subagents",
-      "source": "git:github.com/fitchmultz/pi-subagents@3dd2c4932b8aff8a40ed25f98023aebd35685830"
-    },
-    {
-      "id": "intercom",
-      "source": "git:github.com/fitchmultz/pi-intercom@aa199a544c3a0daceea0d0dd853dde72ff3c3eca"
+      "source": "git:github.com/fitchmultz/pi-subagents@7594ad5d9eb7dd703eccdc12c0005fae6e007ce8"
     },
     {
       "id": "apply-edits",

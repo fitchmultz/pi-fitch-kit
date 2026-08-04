@@ -17,7 +17,7 @@ The main session remains responsible for the task. This is not an autonomous swa
 
 The normal path includes:
 
-- [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) and [`pi-intercom`](https://github.com/fitchmultz/pi-intercom) for delegated work and session coordination;
+- [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) for delegated work and session coordination;
 - [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/cef3ed0c9670b04519ee0eeb5bb91fc346efff89) and [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) for connected context and real browser work;
 - [`pi-fff`](https://github.com/dmtrKovalenko/fff/tree/main/packages/pi-fff) and [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) for repository search and reliable changes;
 - small public tools for structured questions, persistent todos, session naming, working-directory changes, deterministic math, compaction, timing, verbosity, stash, session editing, and raw message copy;
