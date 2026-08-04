@@ -35,10 +35,11 @@ assert(
   JSON.stringify(manifest.kitResources.extensions) ===
     JSON.stringify([
       "extensions/anthropic-image-guard.ts",
+      "extensions/clean-footer.ts",
       "extensions/codex-context.ts",
       "extensions/session-name.ts",
     ]),
-  "the kit must bundle the Anthropic, Codex context, and session-name extensions",
+  "the kit must bundle the Anthropic, clean-footer, Codex context, and session-name extensions",
 );
 
 for (const pkg of manifest.corePackages) {

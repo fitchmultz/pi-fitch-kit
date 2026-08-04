@@ -42,7 +42,9 @@ try {
 	const errors = prompts.diagnostics.filter(({ severity }) => severity === "error");
 	if (errors.length > 0) throw new Error(`Prompt load errors: ${JSON.stringify(errors)}`);
 	if (extensions.errors.length > 0) throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
-	if (extensions.extensions.length !== 3) throw new Error(`Expected 3 extensions, got ${extensions.extensions.length}`);
+	if (extensions.extensions.length !== 4) throw new Error(`Expected 4 extensions, got ${extensions.extensions.length}`);
+	const cleanFooter = extensions.extensions.find(({ path }) => path.endsWith("/extensions/clean-footer.ts"));
+	if (!cleanFooter) throw new Error("Clean-footer extension missing");
 	const codex = extensions.extensions.find(({ path }) => path.endsWith("/extensions/codex-context.ts"));
 	if (!codex) throw new Error("Codex context extension missing");
 	const sessionName = extensions.extensions.find(({ path }) => path.endsWith("/extensions/session-name.ts"));
@@ -90,10 +92,77 @@ try {
 	if (!String(contextResult?.messages?.[0]?.content).includes('"currentName":null')) {
 		throw new Error("Session-name context metadata missing");
 	}
+	const cleanFooterStart = cleanFooter.handlers.get("session_start")?.[0];
+	if (!cleanFooterStart) throw new Error("Clean-footer session_start handler missing");
+	let footerFactory;
+	let footerNotice;
+	const footerContext = {
+		mode: "tui",
+		ui: {
+			setFooter: (factory) => {
+				footerFactory = factory;
+			},
+			notify: (message) => {
+				footerNotice = message;
+			},
+		},
+		sessionManager: {
+			getCwd: () => join(process.env.HOME ?? temp, "Projects", "demo"),
+			getSessionName: () => "footer-smoke",
+		},
+		getContextUsage: () => ({ percent: 74, contextWindow: 280_000 }),
+		model: { id: "grok-4.5", provider: "xai", contextWindow: 280_000, reasoning: true },
+		thinkingLevel: "high",
+	};
+	await cleanFooterStart({}, footerContext);
+	if (typeof footerFactory !== "function") throw new Error("Clean footer was not installed in TUI mode");
+	const footer = footerFactory(
+		{ requestRender: () => {} },
+		{ fg: (_color, text) => text },
+		{
+			getGitBranch: () => "main",
+			getAvailableProviderCount: () => 2,
+			getExtensionStatuses: () => new Map([
+				["mcp", "MCP: 13 servers enabled (2 connected)"],
+				["todo", "todo 0 active · 1 pending"],
+			]),
+			onBranchChange: () => () => {},
+		},
+	);
+	const wideFooter = footer.render(170);
+	if (wideFooter.length !== 2) throw new Error(`Expected two wide footer lines, got ${JSON.stringify(wideFooter)}`);
+	const narrowFooter = footer.render(45);
+	const narrowText = narrowFooter.join("\n");
+	const normalizedNarrowText = narrowText.replace(/\s+/g, " ");
+	if (narrowText.includes("...")) throw new Error(`Clean footer truncated content: ${narrowText}`);
+	for (const hidden of ["↑", "↓", "CH", "$"]) {
+		if (narrowText.includes(hidden)) throw new Error(`Clean footer leaked cumulative counter ${hidden}`);
+	}
+	for (const expected of [
+		"footer-smoke",
+		"(xai) grok-4.5 • high",
+		"74.0%/280k",
+		"MCP: 13 servers enabled (2 connected)",
+		"todo 0 active · 1 pending",
+	]) {
+		if (!normalizedNarrowText.includes(expected)) throw new Error(`Clean footer lost ${expected}: ${narrowText}`);
+	}
+	footer.dispose?.();
+	const cleanFooterCommand = cleanFooter.commands.get("clean-footer");
+	if (!cleanFooterCommand) throw new Error("Clean-footer command missing");
+	await cleanFooterCommand.handler("", footerContext);
+	if (footerFactory !== undefined || footerNotice !== "Clean footer disabled") {
+		throw new Error("Clean-footer command did not restore the built-in footer");
+	}
+	await cleanFooterCommand.handler("", footerContext);
+	if (typeof footerFactory !== "function" || footerNotice !== "Clean footer enabled") {
+		throw new Error("Clean-footer command did not restore the compact footer");
+	}
+
 	const commandNames = extensions.extensions
 		.flatMap(({ commands }) => [...commands.keys()])
 		.sort();
-	const expectedCommands = ["anthropic-fast", "codex-fast"];
+	const expectedCommands = ["anthropic-fast", "clean-footer", "codex-fast"];
 	if (JSON.stringify(commandNames) !== JSON.stringify(expectedCommands)) {
 		throw new Error(`Expected ${JSON.stringify(expectedCommands)}, got ${JSON.stringify(commandNames)}`);
 	}

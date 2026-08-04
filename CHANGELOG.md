@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2 — 4 August 2026
+
+- Added a compact footer that removes cumulative input, output, cache, cache-hit, and cost counters while preserving the working directory, session name, context usage, model, thinking level, and extension statuses.
+- Footer content wraps instead of truncating at narrow terminal widths. `/clean-footer` toggles between the compact and built-in footers for comparison.
+
 ## 0.3.1 — 4 August 2026
 
 - Moved `pi-session-name` into the kit as `extensions/session-name.ts` and retired the duplicate package source from new installs. Existing Pi session names remain in their session files; removing the standalone extension does not reset them.
