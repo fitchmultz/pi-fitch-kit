@@ -133,6 +133,14 @@ const bindCommands = (load: typeof extensionLoad) => {
 		);
 };
 
+writeFileSync(
+	join(extensionAgentDir, "openai-codex-fast.json"),
+	`${JSON.stringify({ enabled: true })}\n`,
+);
+writeFileSync(
+	join(extensionAgentDir, "pi-codex-context.json"),
+	`${JSON.stringify({ customCompactionEnabled: true })}\n`,
+);
 const legacyFixture = join(extensionAgentDir, "legacy-codex-context.ts");
 writeFileSync(
 	legacyFixture,
@@ -174,14 +182,17 @@ for (const paths of [
 		["before_provider_request", "__legacyRequestCalls"],
 		["session_before_compact", "__legacyCompactionCalls"],
 	] as const) {
+		let bundledEffects = 0;
 		for (const handler of transitionLoad.extensions.flatMap(
 			(loaded: { handlers: Map<string, unknown[]> }) => loaded.handlers.get(event) ?? [],
 		)) {
-			await (handler as (event: unknown, ctx: unknown) => unknown)(
+			const result = await (handler as (event: unknown, ctx: unknown) => unknown)(
 				{ payload: {}, signal: new AbortController().signal },
 				commandContext,
 			);
+			if (result !== undefined) bundledEffects++;
 		}
+		assert.equal(bundledEffects, 0, `bundled ${event} must stay inert`);
 		assert.equal(
 			(globalThis as Record<string, unknown>)[marker],
 			1,
@@ -191,6 +202,8 @@ for (const paths of [
 	}
 }
 rmSync(legacyFixture, { force: true });
+rmSync(join(extensionAgentDir, "openai-codex-fast.json"), { force: true });
+rmSync(join(extensionAgentDir, "pi-codex-context.json"), { force: true });
 
 bindCommands(extensionLoad);
 const activate = extension.handlers.get("session_start")?.[0];
