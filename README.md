@@ -55,7 +55,7 @@ These are the extensions loaded in my current setup. Every external extension li
 
 ### Extension bundled by this kit
 
-[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. Agent profiles now ship directly with `pi-subagents`, so this kit no longer copies or syncs them.
+[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. It also owns `/anthropic-fast [on|off]`, Anthropic's research-preview fast mode for Opus 5 and Opus 4.8 at double the token price. Agent profiles now ship directly with `pi-subagents`, so this kit no longer copies or syncs them.
 
 ### Selective experimental extension
 

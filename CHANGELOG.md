@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3 — 4 August 2026
+
+- Added `/anthropic-fast [on|off]` to the Anthropic extension: off by default, persisted in the Pi agent directory, and limited to Opus 5 and Opus 4.8 because fast mode is Opus-only and bills double per token.
+
 ## 0.2.2 — 4 August 2026
 
 - Reorganized the public documentation around the active stack: linked extensions, the fourteen-agent bench, directly linked source-managed skills including `diagram-creation`, and authenticated MCP capabilities.

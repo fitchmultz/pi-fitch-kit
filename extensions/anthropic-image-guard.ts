@@ -1,5 +1,13 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+	type Api,
+	anthropicMessagesApi,
+	type Model,
+	type SimpleStreamOptions,
+} from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { formatDimensionNote, resizeImage } from "@earendil-works/pi-coding-agent";
+import { formatDimensionNote, getAgentDir, resizeImage } from "@earendil-works/pi-coding-agent";
 
 const MAX_CACHE_ENTRIES = 8;
 const MAX_IMAGE_BASE64_CHARS = 32 * 1024 * 1024;
@@ -10,6 +18,40 @@ const ANTHROPIC_IMAGE_MIME_TYPES = new Set([
 	"image/png",
 	"image/webp",
 ]);
+
+const FAST_STATE_PATH = join(getAgentDir(), "anthropic-fast.json");
+const FAST_BETA = "fast-mode-2026-02-01";
+const FAST_MODEL_PREFIXES = ["claude-opus-5", "claude-opus-4-8"];
+const messagesApi = anthropicMessagesApi();
+
+function fastEnabled(): boolean {
+	try {
+		return JSON.parse(readFileSync(FAST_STATE_PATH, "utf8")).enabled === true;
+	} catch {
+		return false;
+	}
+}
+
+function fastOptions(model: Model<Api>, options?: SimpleStreamOptions): SimpleStreamOptions {
+	const baseFetch = options?.fetch ?? globalThis.fetch;
+	const fast = () =>
+		fastEnabled() && FAST_MODEL_PREFIXES.some((prefix) => model.id.startsWith(prefix));
+	return {
+		...options,
+		// ponytail: append at fetch time because Pi builds anthropic-beta (including OAuth markers) after option headers, so setting it earlier would drop them.
+		fetch: (input, init) => {
+			if (!fast()) return baseFetch(input, init);
+			const headers = new Headers(init?.headers);
+			const betas = headers.get("anthropic-beta");
+			headers.set("anthropic-beta", betas ? `${betas},${FAST_BETA}` : FAST_BETA);
+			return baseFetch(input, { ...init, headers });
+		},
+		onPayload: async (payload, requestModel) => {
+			const body = (await options?.onPayload?.(payload, requestModel)) ?? payload;
+			return fast() ? { ...(body as Record<string, unknown>), speed: "fast" } : body;
+		},
+	};
+}
 
 function anthropicMimeType(mimeType: string): string | undefined {
 	const normalized = mimeType.split(";", 1)[0]?.trim().toLowerCase();
@@ -109,5 +151,23 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 		}
 
 		if (changed) return { messages: event.messages };
+	});
+
+	pi.registerProvider("anthropic", {
+		api: "anthropic-messages",
+		streamSimple(model, context, options) {
+			return messagesApi.streamSimple(model, context, fastOptions(model, options) as never);
+		},
+	});
+
+	pi.registerCommand("anthropic-fast", {
+		description: "Toggle Anthropic Opus fast mode (2x token price)",
+		handler: async (args, ctx) => {
+			const arg = args.trim().toLowerCase();
+			if (arg === "on" || arg === "off") {
+				writeFileSync(FAST_STATE_PATH, `${JSON.stringify({ enabled: arg === "on" })}\n`);
+			}
+			ctx.ui.notify(`Anthropic fast mode ${fastEnabled() ? "ON" : "OFF"}`, "info");
+		},
 	});
 }
