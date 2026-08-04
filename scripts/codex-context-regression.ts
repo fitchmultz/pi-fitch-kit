@@ -128,11 +128,15 @@ writeFileSync(
 	}\n`,
 );
 for (const source of [
+	"git:fitchmultz/pi-codex-context",
+	"git:github:fitchmultz/pi-codex-context",
 	"git:github.com/fitchmultz/pi-codex-context",
 	"git:github.com/fitchmultz/pi-codex-context@legacy-ref",
 	"https://github.com/fitchmultz/pi-codex-context.git",
 	"git:git@github.com:fitchmultz/pi-codex-context",
 	"ssh://git@github.com/fitchmultz/pi-codex-context",
+	"git://github.com/fitchmultz/pi-codex-context.git",
+	"git:git://github.com/fitchmultz/pi-codex-context.git",
 ]) {
 	writeFileSync(
 		join(extensionAgentDir, "settings.json"),
@@ -172,6 +176,55 @@ for (const source of [
 	);
 	delete (globalThis as { __legacyCompactionCalls?: number }).__legacyCompactionCalls;
 }
+writeFileSync(join(extensionAgentDir, "settings.json"), "{malformed\n");
+process.env.PI_CODING_AGENT_DIR = extensionAgentDir;
+const malformedSettingsLoad = await loadExtensions(
+	[
+		legacyFixture,
+		fileURLToPath(new URL("../extensions/codex-context.ts", import.meta.url)),
+	],
+	process.cwd(),
+);
+if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+assert.deepEqual(malformedSettingsLoad.errors, []);
+assert.deepEqual(
+	malformedSettingsLoad.extensions.flatMap(
+		(loaded: { commands: Map<string, unknown> }) => [...loaded.commands.keys()],
+	),
+	["codex-fast"],
+	"malformed settings must keep the previous legacy owner single",
+);
+for (const event of ["before_provider_request", "session_before_compact"]) {
+	assert.equal(
+		malformedSettingsLoad.extensions.reduce(
+			(total: number, loaded: { handlers: Map<string, unknown[]> }) =>
+				total + (loaded.handlers.get(event)?.length ?? 0),
+			0,
+		),
+		1,
+		`malformed settings must keep one ${event} owner`,
+	);
+}
+writeFileSync(
+	join(extensionAgentDir, "settings.json"),
+	`${JSON.stringify({ packages: [{ source: "git:github.com/fitchmultz/pi-codex-context", extensions: ["-index.ts"] }] })}\n`,
+);
+process.env.PI_CODING_AGENT_DIR = extensionAgentDir;
+const filteredLegacyLoad = await loadExtensions(
+	[fileURLToPath(new URL("../extensions/codex-context.ts", import.meta.url))],
+	process.cwd(),
+);
+if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+assert.deepEqual(filteredLegacyLoad.errors, []);
+assert.deepEqual(
+	filteredLegacyLoad.extensions.flatMap(
+		(loaded: { commands: Map<string, unknown> }) => [...loaded.commands.keys()],
+	),
+	["codex-fast"],
+	"a filtered legacy extension must not suppress the kit",
+);
 rmSync(join(extensionAgentDir, "settings.json"), { force: true });
 process.env.PI_CODING_AGENT_DIR = extensionAgentDir;
 const staleCheckoutLoad = await loadExtensions(

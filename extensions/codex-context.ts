@@ -6,7 +6,7 @@ import {
 	watchFile,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, matchesGlob } from "node:path";
 import {
 	type Api,
 	type Context,
@@ -159,13 +159,53 @@ function fastOptions(options?: SimpleStreamOptions): SimpleStreamOptions {
 	};
 }
 
+function isLegacyRepoPath(path: string): boolean {
+	return (
+		path
+			.replace(/^\/+/, "")
+			.split(/[@#]/, 1)[0]
+			.replace(/\.git$/, "")
+			.replace(/\/$/, "") === "fitchmultz/pi-codex-context"
+	);
+}
+
 function isLegacySource(source: unknown): boolean {
 	if (typeof source !== "string") return false;
-	let identity = source.replace(/^git:/, "");
-	identity = identity.replace(/^(?:https?:\/\/|ssh:\/\/git@|git@)/, "");
-	identity = identity.replace(/^github\.com:/, "github.com/");
-	identity = identity.split(/[@#]/, 1)[0].replace(/\.git$/, "").replace(/\/$/, "");
-	return identity === "github.com/fitchmultz/pi-codex-context";
+	let value = source.trim();
+	if (value.startsWith("git:") && !value.startsWith("git://")) {
+		value = value.slice(4).trim();
+	}
+	if (/^(?:https?|ssh|git):\/\//.test(value)) {
+		try {
+			const url = new URL(value);
+			return url.hostname === "github.com" && isLegacyRepoPath(url.pathname);
+		} catch {
+			return false;
+		}
+	}
+	for (const prefix of ["git@github.com:", "github.com/", "github.com:", "github:"]) {
+		if (value.startsWith(prefix)) return isLegacyRepoPath(value.slice(prefix.length));
+	}
+	return isLegacyRepoPath(value);
+}
+
+function legacyEntryEnabled(pkg: unknown): boolean {
+	const entry = typeof pkg === "string" ? { source: pkg } : (pkg as {
+		source?: unknown;
+		extensions?: unknown;
+	});
+	if (!isLegacySource(entry?.source)) return false;
+	if (!Array.isArray(entry.extensions)) return true;
+	const filters = entry.extensions.filter((value): value is string => typeof value === "string");
+	if (filters.length === 0) return false;
+	const normalize = (pattern: string) => pattern.replace(/^\.\//, "");
+	const matches = (pattern: string) => matchesGlob("index.ts", normalize(pattern));
+	const includes = filters.filter((pattern) => !/^[!+-]/.test(pattern));
+	let enabled = includes.length === 0 || includes.some(matches);
+	if (filters.some((pattern) => pattern.startsWith("!") && matches(pattern.slice(1)))) enabled = false;
+	if (filters.some((pattern) => pattern.startsWith("+") && normalize(pattern.slice(1)) === "index.ts")) enabled = true;
+	if (filters.some((pattern) => pattern.startsWith("-") && normalize(pattern.slice(1)) === "index.ts")) enabled = false;
+	return enabled;
 }
 
 function legacyStandaloneInstalled(): boolean {
@@ -184,15 +224,14 @@ function legacyStandaloneInstalled(): boolean {
 	) {
 		return false;
 	}
+	const settingsPath = join(agentDir, "settings.json");
+	if (!existsSync(settingsPath)) return false;
 	try {
-		const settings = JSON.parse(readFileSync(join(agentDir, "settings.json"), "utf8"));
-		return settings.packages?.some((pkg: unknown) =>
-			isLegacySource(
-				typeof pkg === "string" ? pkg : (pkg as { source?: unknown })?.source,
-			),
-		) === true;
+		const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+		return settings.packages?.some(legacyEntryEnabled) === true;
 	} catch {
-		return false;
+		// Pi can retain its last valid settings after a parse failure, so keep the old owner.
+		return true;
 	}
 }
 
