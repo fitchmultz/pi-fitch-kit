@@ -110,7 +110,7 @@ These ownership rules close both races: `/compact` or extension-owned `ctx.compa
 
 `pi-codex-goal@0.1.38` removed that proactive trigger and makes Pi the sole compaction owner. It retains `session_before_compact` and `session_compact` handling for goal accounting, persistence, recovery, and continuation. Require 0.1.38 or newer when validating this patch with active goals; older versions can still compact early even though the core ownership correction prevents the destructive race.
 
-The intended integration is single-owner: patched Pi performs request-boundary compaction from active `settingsManager` values; the goal extension only observes compaction lifecycle events. Merely changing an extension-owned reserve to 16,834 would leave two callers at the same boundary and would not solve ownership.
+The intended integration is single-owner: patched Pi performs request-boundary compaction from active `settingsManager` values; the goal extension only observes compaction lifecycle events. Merely changing an extension-owned reserve to 16,384 would leave two callers at the same boundary and would not solve ownership.
 
 ## Required cut-point correction
 

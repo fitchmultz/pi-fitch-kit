@@ -1,4 +1,5 @@
 import {
+	existsSync,
 	mkdirSync,
 	readFileSync,
 	unwatchFile,
@@ -158,7 +159,18 @@ function fastOptions(options?: SimpleStreamOptions): SimpleStreamOptions {
 	};
 }
 
+function legacyStandaloneInstalled(): boolean {
+	const packagePath = ["git", "github.com", "fitchmultz", "pi-codex-context", "package.json"];
+	return (
+		existsSync(join(getAgentDir(), ...packagePath)) ||
+		existsSync(join(process.cwd(), ".pi", ...packagePath))
+	);
+}
+
 export default function (pi: ExtensionAPI): void {
+	// Defer to the old package until setup removes it, so upgrades never double-send compaction.
+	if (legacyStandaloneInstalled()) return;
+
 	let footerContext: ExtensionContext | undefined;
 	const refreshFastStatus = () => {
 		if (footerContext) updateFooterStatus(footerContext);

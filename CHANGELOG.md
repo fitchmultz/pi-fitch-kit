@@ -4,6 +4,7 @@
 
 - Moved `pi-codex-context` into the kit as `extensions/codex-context.ts` and retired the duplicate package source from new installs. Existing `openai-codex-fast.json` state and `pi-codex-context.json` consent config remain canonical, so migration does not reset either setting.
 - Preserved hook-only OpenAI priority routing, literal opt-in alternate-model compaction, the active-install regression, and the Pi core restoration runbook. Repeated session starts now unwatch before watching the shared fast-mode state file, matching the kit's leak-free Anthropic footer.
+- During upgrades, the bundled extension defers to an installed legacy checkout until `/fitch-setup` removes it and Pi restarts or reloads. This keeps `/codex-fast`, request rewriting, and custom compaction single-owner throughout the transition.
 
 ## 0.2.4
 

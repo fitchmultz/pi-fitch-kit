@@ -10,7 +10,7 @@
   "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node --check extensions/codex-context.ts && node scripts/image-guard-smoke.mjs && node scripts/validate.mjs",
+    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node --check extensions/codex-context.ts && node --check scripts/codex-context-regression.ts && node scripts/image-guard-smoke.mjs && node scripts/validate.mjs",
     "typecheck": "tsc --noEmit",
     "regression:codex-context": "node --experimental-strip-types scripts/codex-context-regression.ts",
     "smoke": "node scripts/package-smoke.mjs"

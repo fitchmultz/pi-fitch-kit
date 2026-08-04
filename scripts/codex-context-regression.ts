@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
+	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	realpathSync,
@@ -8,7 +9,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { delimiter, dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -21,6 +22,11 @@ const piExecutable = execFileSync("which", ["pi"], {
 	env: { ...process.env, PATH: activePath },
 }).trim();
 const piPackageRoot = dirname(dirname(realpathSync(piExecutable)));
+assert.equal(
+	piPackageRoot === packageRoot || piPackageRoot.startsWith(`${packageRoot}${sep}`),
+	false,
+	"regression must target the active Pi installation, not the kit's dev dependency",
+);
 const interactiveModeSource = readFileSync(
 	join(piPackageRoot, "dist/modes/interactive/interactive-mode.js"),
 	"utf8",
@@ -100,6 +106,63 @@ const extension = extensionLoad.extensions[0] as {
 	>;
 	handlers: Map<string, unknown[]>;
 };
+
+const legacyCheckout = join(
+	extensionAgentDir,
+	"git",
+	"github.com",
+	"fitchmultz",
+	"pi-codex-context",
+);
+mkdirSync(legacyCheckout, { recursive: true });
+writeFileSync(join(legacyCheckout, "package.json"), "{}\n");
+const legacyFixture = join(extensionAgentDir, "legacy-codex-context.ts");
+writeFileSync(
+	legacyFixture,
+	`export default function (pi) {
+		pi.registerCommand("codex-fast", { handler: async () => {} });
+		pi.on("before_provider_request", () => {});
+		pi.on("session_before_compact", () => {
+			globalThis.__legacyCompactionCalls = (globalThis.__legacyCompactionCalls ?? 0) + 1;
+		});
+	}\n`,
+);
+process.env.PI_CODING_AGENT_DIR = extensionAgentDir;
+const transitionLoad = await loadExtensions(
+	[
+		legacyFixture,
+		fileURLToPath(new URL("../extensions/codex-context.ts", import.meta.url)),
+	],
+	process.cwd(),
+);
+if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+assert.deepEqual(transitionLoad.errors, [], "legacy transition must load cleanly");
+assert.deepEqual(
+	transitionLoad.extensions.flatMap((loaded: { commands: Map<string, unknown> }) => [
+		...loaded.commands.keys(),
+	]),
+	["codex-fast"],
+	"the legacy checkout must remain the sole command owner until removal",
+);
+for (const event of ["before_provider_request", "session_before_compact"]) {
+	const handlers = transitionLoad.extensions.flatMap(
+		(loaded: { handlers: Map<string, unknown[]> }) => loaded.handlers.get(event) ?? [],
+	);
+	assert.equal(handlers.length, 1, `${event} must have one transition owner`);
+	if (event === "session_before_compact") {
+		await (handlers[0] as (event: unknown, ctx: unknown) => unknown)({}, {});
+	}
+}
+assert.equal(
+	(globalThis as { __legacyCompactionCalls?: number }).__legacyCompactionCalls,
+	1,
+	"a transition compaction must invoke one summary handler",
+);
+delete (globalThis as { __legacyCompactionCalls?: number }).__legacyCompactionCalls;
+rmSync(legacyCheckout, { recursive: true, force: true });
+rmSync(legacyFixture, { force: true });
+
 const fastCommand = extension.commands.get("codex-fast");
 assert.ok(fastCommand, "pi-codex-context must own the /codex-fast command");
 const notifications: string[] = [];
