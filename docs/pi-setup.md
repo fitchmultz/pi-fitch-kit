@@ -87,7 +87,7 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - repository work: `pi-fff`, `pi-apply-edits`;
 - task control: structured questions, persistent todos, session naming, and working-directory changes;
 - deterministic support: calculator, tool duration, verbosity, session editing, stash, and raw message copy;
-- kit boundary: stable session naming, Anthropic-only image resizing, and OpenAI fast mode plus consented alternate-model compaction, while `pi-subagents` owns its profile defaults.
+- kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, and OpenAI fast mode plus consented alternate-model compaction, while `pi-subagents` owns its profile defaults.
 
 Bundled `codex-context` loads safely with custom compaction disabled. Enabling its manifest-gated route is a separate choice because retained compaction context can include selected messages, prior summaries, split-turn prefixes, and custom instructions, and goes to `xai/grok-4.5`, then `openai-codex/gpt-5.6-luna` on fallback, regardless of the active chat provider. `/fitch-setup` previews the destinations and exact config before asking for that consent.
 

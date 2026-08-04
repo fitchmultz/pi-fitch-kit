@@ -222,7 +222,7 @@ The older prompt files remain in `prompts/` as source material, but the package 
 ## Repository map
 
 ```text
-extensions/             Anthropic image guard, Codex context hooks, and session naming
+extensions/             compact footer, Anthropic image guard, Codex context hooks, and session naming
 examples/settings.json  safe, non-secret behavioral settings
 prompts/                setup, one active operational prompt, and retained source material
 setup-manifest.json     package sources and selectable integrations
@@ -239,9 +239,9 @@ npm run check
 npm run smoke
 ```
 
-- `npm run check` type-checks and syntax-checks the bundled extensions, exercises the compact footer, session naming, and the image guard boundary, then validates unpinned package sources, manifest resources, package metadata alignment, and the absence of retired duplicate surfaces.
+- `npm run check` type-checks and syntax-checks the bundled extensions, exercises session naming and the image guard boundary, then validates unpinned package sources, manifest resources, package metadata alignment, and the absence of retired duplicate surfaces.
 - `npm run regression:codex-context` verifies the active Pi installation's compaction patch, literal consent gate, native-stream preservation, priority payload, and watcher cleanup.
 - `npm run regression:session-name` verifies naming, metadata injection, protected identities, and single ownership during standalone-package migration.
-- `npm run smoke` loads the checkout through Pi's real resource loader and requires the three bundled commands, `name_session`, one OpenAI request hook, one custom-compaction hook, four extensions, and two prompts.
+- `npm run smoke` loads the checkout through Pi's real resource loader, renders the compact footer at wide and narrow widths, checks its toggle, and requires the three bundled commands, `name_session`, one OpenAI request hook, one custom-compaction hook, four extensions, and two prompts.
 
 For the detailed workflow, model table, evidence, and security rationale, read [docs/pi-setup.md](docs/pi-setup.md). For the short version, read [docs/pi-setup-post.md](docs/pi-setup-post.md).
