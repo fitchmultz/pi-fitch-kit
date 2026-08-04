@@ -121,16 +121,25 @@ const commandContext = {
 		theme: { fg: (_color: string, text: string) => text },
 	},
 };
-const bindCommands = (load: typeof extensionLoad) => {
-	load.runtime.getCommands = () =>
-		load.extensions.flatMap((loaded: { commands: Map<string, { name: string }> }) =>
+const bindCommands = (
+	load: typeof extensionLoad,
+	extra: Array<{ name: string; source: "prompt" }> = [],
+) => {
+	load.runtime.getCommands = () => [
+		...load.extensions.flatMap((loaded: { commands: Map<string, { name: string }> }) =>
 			[...loaded.commands.values()].map((command) => ({
 				name: command.name,
 				description: undefined,
 				source: "extension" as const,
 				sourceInfo: undefined,
 			})),
-		);
+		),
+		...extra.map((command) => ({
+			...command,
+			description: undefined,
+			sourceInfo: undefined,
+		})),
+	];
 };
 
 writeFileSync(
@@ -205,7 +214,7 @@ rmSync(legacyFixture, { force: true });
 rmSync(join(extensionAgentDir, "openai-codex-fast.json"), { force: true });
 rmSync(join(extensionAgentDir, "pi-codex-context.json"), { force: true });
 
-bindCommands(extensionLoad);
+bindCommands(extensionLoad, [{ name: "codex-fast", source: "prompt" }]);
 const activate = extension.handlers.get("session_start")?.[0];
 assert.ok(activate, "bundled Codex must activate at session_start");
 await (activate as (event: unknown, ctx: unknown) => unknown)({}, commandContext);

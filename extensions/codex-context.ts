@@ -206,8 +206,9 @@ export default function (pi: ExtensionAPI): void {
 					.getCommands()
 					.some(
 						(command) =>
-							command.name === "codex-fast" ||
-							command.name.startsWith("codex-fast:"),
+							command.source === "extension" &&
+							(command.name === "codex-fast" ||
+								command.name.startsWith("codex-fast:")),
 					)
 			) {
 				return;
