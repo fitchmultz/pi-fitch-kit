@@ -55,7 +55,13 @@ These are the extensions loaded in my current setup. Every external extension li
 
 ### Extension bundled by this kit
 
-[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. It also owns `/anthropic-fast [on|off]`, Anthropic's research-preview fast mode for Opus 5 and Opus 4.8 at double the token price. Anthropic documents fast mode as a research preview requiring account access, and it is verified working on this setup's Claude subscription OAuth route: identical output ran roughly 2x faster with the toggle on. Because Pi gives extensions no way to append a header at the wire without owning the provider's stream callback, the extension wraps Anthropic streaming whenever it is loaded, and classifies full-stream calls by their Anthropic-native options; requests carrying a caller-supplied `client` are left on standard speed, since the mandatory beta header cannot be attached to them. Agent profiles now ship directly with `pi-subagents`, so this kit no longer copies or syncs them.
+[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. It also owns `/anthropic-fast [on|off]`, Anthropic's research-preview fast mode for Opus 5 and Opus 4.8 at double the token price. Anthropic documents fast mode as a research preview requiring account access, and it is verified working on this setup's Claude subscription OAuth route: identical output ran roughly 2x faster with the toggle on. Requests carrying a caller-supplied `client` are left on standard speed, since the mandatory beta header cannot be attached to them.
+
+Accepted caveat: appending a mandatory header at the wire requires owning Anthropic's stream callback, because Pi exposes no wire-header hook and no full-versus-simple stream provenance. This extension therefore wraps Anthropic streaming whenever it is loaded, and classifies full-stream calls by their Anthropic-native options. Consequences worth knowing:
+
+- Do not combine it with another Anthropic provider override without reviewing both, since Pi merges registrations last-write-wins.
+- Restart Pi rather than `/reload` after disabling or removing it, because the registration can persist for the session.
+- Revalidate it when upgrading Pi, since it depends on Pi's provider composition and header-merge behavior. Agent profiles now ship directly with `pi-subagents`, so this kit no longer copies or syncs them.
 
 ### Selective experimental extension
 
