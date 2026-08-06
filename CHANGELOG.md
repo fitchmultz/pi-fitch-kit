@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 — 6 August 2026
+
+- Raised the minimum supported Pi version to 0.84.0 and pinned development validation to the exact 0.84.0 Pi packages.
+- Routed alternate-model compaction through Pi 0.84's composed providers while preserving provider header deletion markers, credential-resolved base URLs, and environment overrides.
+- Revalidated the bundled extensions, package loader, and tool-loop compaction patch against the released Pi 0.84.0 implementation and types. Updated the restoration runbook for the remaining stock-core gaps.
+
 ## 0.3.2 — 4 August 2026
 
 - Added a compact footer that removes cumulative input, output, cache, cache-hit, and cost counters while preserving the working directory, session name, context usage, model, thinking level, and extension statuses.

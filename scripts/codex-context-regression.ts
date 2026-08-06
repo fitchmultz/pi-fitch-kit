@@ -12,15 +12,21 @@ import { delimiter, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const activePath = (process.env.PATH ?? "")
-	.split(delimiter)
-	.filter((entry) => resolve(entry) !== join(packageRoot, "node_modules/.bin"))
-	.join(delimiter);
+const activePath =
+	process.env.PI_REGRESSION_PATH ??
+	(process.env.PATH ?? "")
+		.split(delimiter)
+		.filter((entry) => resolve(entry) !== join(packageRoot, "node_modules/.bin"))
+		.join(delimiter);
 const piExecutable = execFileSync("which", ["pi"], {
 	encoding: "utf8",
 	env: { ...process.env, PATH: activePath },
 }).trim();
 const piPackageRoot = dirname(dirname(realpathSync(piExecutable)));
+const activePiVersion = JSON.parse(
+	readFileSync(join(piPackageRoot, "package.json"), "utf8"),
+).version;
+assert.equal(activePiVersion, "0.84.0", "regression must target the released Pi 0.84.0 runtime");
 assert.equal(
 	piPackageRoot === packageRoot || piPackageRoot.startsWith(`${packageRoot}${sep}`),
 	false,
@@ -464,7 +470,6 @@ function harness(
 
 function unavailableManualCompactionHarness(autoCompacting = false) {
 	let aborts = 0;
-	let disconnects = 0;
 	const events: unknown[] = [];
 	const session = Object.create(AgentSession.prototype);
 	session._autoCompactionAbortController = autoCompacting
@@ -482,8 +487,6 @@ function unavailableManualCompactionHarness(autoCompacting = false) {
 	session.settingsManager = {
 		getCompactionSettings: () => compactionSettings,
 	};
-	session._disconnectFromAgent = () => disconnects++;
-	session._reconnectToAgent = () => undefined;
 	session.abort = async () => {
 		aborts++;
 	};
@@ -491,21 +494,14 @@ function unavailableManualCompactionHarness(autoCompacting = false) {
 	return {
 		session,
 		aborts: () => aborts,
-		disconnects: () => disconnects,
 		events,
 	};
 }
 
 {
-	const { session, aborts, disconnects, events } =
-		unavailableManualCompactionHarness();
+	const { session, aborts, events } = unavailableManualCompactionHarness();
 	await assert.rejects(session.compact(), /Already compacted/);
 	assert.equal(aborts(), 0, "an unavailable manual compaction must not abort");
-	assert.equal(
-		disconnects(),
-		0,
-		"an unavailable manual compaction must not disconnect",
-	);
 	assert.equal(
 		events.some(
 			(event: { type?: string; errorMessage?: string }) =>
@@ -518,15 +514,9 @@ function unavailableManualCompactionHarness(autoCompacting = false) {
 }
 
 {
-	const { session, aborts, disconnects } =
-		unavailableManualCompactionHarness(true);
+	const { session, aborts } = unavailableManualCompactionHarness(true);
 	await assert.rejects(session.compact(), /Compaction already in progress/);
 	assert.equal(aborts(), 0, "a concurrent manual compaction must not abort");
-	assert.equal(
-		disconnects(),
-		0,
-		"a concurrent manual compaction must not disconnect",
-	);
 }
 
 {
@@ -780,7 +770,6 @@ for (const toolResultChars of [
 {
 	const branch = compactionEntries([compactionSettings.keepRecentTokens * 4]);
 	let resolveAbort: (() => void) | undefined;
-	let disconnects = 0;
 	let aborts = 0;
 	const session = Object.create(AgentSession.prototype);
 	session.agent = {
@@ -793,8 +782,6 @@ for (const toolResultChars of [
 	};
 	session.sessionManager = { getBranch: () => branch };
 	session._emit = () => undefined;
-	session._disconnectFromAgent = () => disconnects++;
-	session._reconnectToAgent = () => undefined;
 	session.abort = async () => {
 		aborts++;
 		await new Promise<void>((resolve) => {
@@ -812,11 +799,6 @@ for (const toolResultChars of [
 		"manual compaction must claim ownership before awaiting abort",
 	);
 	await assert.rejects(session.compact(), /Compaction already in progress/);
-	assert.equal(
-		disconnects,
-		1,
-		"only the owning manual compaction may disconnect",
-	);
 	assert.equal(aborts, 1, "only the owning manual compaction may abort");
 	resolveAbort?.();
 	await assert.rejects(manualCompaction, /manual test complete/);
@@ -825,7 +807,6 @@ for (const toolResultChars of [
 {
 	const branch = compactionEntries([compactionSettings.keepRecentTokens * 4]);
 	const events: Array<{ type?: string; errorMessage?: string }> = [];
-	let reconnects = 0;
 	const session = Object.create(AgentSession.prototype);
 	session.settingsManager = {
 		getCompactionSettings: () => compactionSettings,
@@ -833,15 +814,12 @@ for (const toolResultChars of [
 	session.sessionManager = { getBranch: () => branch };
 	session._emit = (event: { type?: string; errorMessage?: string }) =>
 		events.push(event);
-	session._disconnectFromAgent = () => undefined;
-	session._reconnectToAgent = () => reconnects++;
 	session.abort = async () => {
 		throw new Error("abort failed");
 	};
 
 	await assert.rejects(session.compact(), /abort failed/);
 	assert.equal(session._compactionAbortController, undefined);
-	assert.equal(reconnects, 1, "failed abort must reconnect the agent");
 	assert.deepEqual(
 		events.map((event) => [event.type, event.errorMessage]),
 		[
@@ -855,9 +833,7 @@ for (const toolResultChars of [
 {
 	const branch = compactionEntries([compactionSettings.keepRecentTokens * 4]);
 	const events: Array<{ type?: string; errorMessage?: string }> = [];
-	let disconnects = 0;
 	let aborts = 0;
-	let reconnects = 0;
 	const session = Object.create(AgentSession.prototype);
 	session.settingsManager = {
 		getCompactionSettings: () => compactionSettings,
@@ -873,17 +849,13 @@ for (const toolResultChars of [
 			throw new Error("start listener failed");
 		}
 	};
-	session._disconnectFromAgent = () => disconnects++;
-	session._reconnectToAgent = () => reconnects++;
 	session.abort = async () => {
 		aborts++;
 	};
 
 	await assert.rejects(session.compact(), /start listener failed/);
 	assert.equal(session._compactionAbortController, undefined);
-	assert.equal(disconnects, 0);
 	assert.equal(aborts, 0);
-	assert.equal(reconnects, 1, "failed start event must restore the connection");
 	assert.deepEqual(
 		events.map((event) => [event.type, event.errorMessage]),
 		[
@@ -939,7 +911,6 @@ for (const toolResultChars of [
 {
 	const branch = compactionEntries([compactionSettings.keepRecentTokens * 4]);
 	let resolveAuth: ((auth: unknown) => void) | undefined;
-	let disconnects = 0;
 	let aborts = 0;
 	const session = Object.create(AgentSession.prototype);
 	session.agent = {
@@ -1003,8 +974,6 @@ for (const toolResultChars of [
 				: undefined,
 	};
 	session._emit = () => undefined;
-	session._disconnectFromAgent = () => disconnects++;
-	session._reconnectToAgent = () => undefined;
 	session.abort = async () => {
 		aborts++;
 	};
@@ -1016,11 +985,6 @@ for (const toolResultChars of [
 		"automatic compaction must claim ownership before awaiting auth",
 	);
 	await assert.rejects(session.compact(), /Compaction already in progress/);
-	assert.equal(
-		disconnects,
-		0,
-		"concurrent manual compaction must not disconnect",
-	);
 	assert.equal(aborts, 0, "concurrent manual compaction must not abort");
 	resolveAuth?.({ apiKey: "test" });
 	await autoCompaction;
@@ -1073,11 +1037,12 @@ async function runCustomCompaction(
 	const finds: string[] = [];
 	const requestOptions: Array<{
 		cacheRetention?: string;
-		headers?: Record<string, string>;
+		headers?: Record<string, string | null>;
 		onPayload?: (payload: unknown, model: unknown) => unknown | Promise<unknown>;
 		sessionId?: string;
 	}> = [];
 	const requestPayloads: unknown[] = [];
+	const requestBaseUrls: string[] = [];
 	const payloadPromises: Promise<void>[] = [];
 	const models = new Map(
 		availableModels.map(
@@ -1097,21 +1062,24 @@ async function runCustomCompaction(
 				finds.push(`${provider}/${model}`);
 				return models.get(`${provider}/${model}`);
 			},
-			getRegisteredProviderConfig: (provider: string) => ({
-				streamSimple: (
-					model: { provider: string; id: string },
+			getProvider: (provider: string) => ({
+				id: provider,
+				streamSimple(
+					model: { provider: string; id: string; baseUrl: string },
 					_context: unknown,
 					options: {
 						cacheRetention?: string;
-						headers?: Record<string, string>;
+						headers?: Record<string, string | null>;
 						onPayload?: (payload: unknown, model: unknown) => unknown | Promise<unknown>;
 						reasoning?: string;
 						sessionId?: string;
 					},
-				) => {
+				) {
+					assert.equal(this.id, provider, "composed provider stream must remain bound");
 					const key = `${model.provider}/${model.id}`;
 					calls.push(`${key}:${options.reasoning}`);
 					requestOptions.push(options);
+					requestBaseUrls.push(model.baseUrl);
 					const outcome = outcomes[key];
 					if (outcome instanceof Error) throw outcome;
 					const initialPayload = { provider };
@@ -1133,9 +1101,10 @@ async function runCustomCompaction(
 			getApiKeyAndHeaders: async (model: { provider: string; id: string }) => {
 				const key = `${model.provider}/${model.id}`;
 				if (authFailures[key]) return { ok: false, error: authFailures[key] };
+				const baseUrl = `https://resolved.invalid/${model.provider}`;
 				return headerOnlyProviders.has(key)
-					? { ok: true, headers: { Authorization: "Bearer test" } }
-					: { ok: true, apiKey: "test" };
+					? { ok: true, headers: { Authorization: null, "x-route": "test" }, baseUrl }
+					: { ok: true, apiKey: "test", baseUrl };
 			},
 		},
 	};
@@ -1171,6 +1140,7 @@ async function runCustomCompaction(
 		notifications,
 		requestOptions,
 		requestPayloads,
+		requestBaseUrls,
 	};
 }
 
@@ -1205,7 +1175,7 @@ for (const [label, setup] of [
 writeCompactionConfig({ customCompactionEnabled: true });
 
 {
-	const { result, calls, requestOptions } = await runCustomCompaction({
+	const { result, calls, requestOptions, requestBaseUrls } = await runCustomCompaction({
 		"xai/grok-4.5": "xAI summary",
 	});
 	const secondRun = await runCustomCompaction({
@@ -1215,6 +1185,7 @@ writeCompactionConfig({ customCompactionEnabled: true });
 	assert.deepEqual(calls, ["xai/grok-4.5:high"]);
 	assert.equal(result?.compaction?.usage?.totalTokens, 1);
 	assert.equal(requestOptions[0]?.cacheRetention, "none");
+	assert.equal(requestBaseUrls[0], "https://resolved.invalid/xai");
 	assert.equal(secondRun.requestOptions[0]?.cacheRetention, "none");
 	assert.match(requestOptions[0]?.sessionId ?? "", /^[0-9a-f-]{36}$/);
 	assert.notEqual(
@@ -1313,7 +1284,8 @@ writeCompactionConfig({ customCompactionEnabled: true });
 	);
 	assert.match(result?.compaction?.summary ?? "", /header-only summary/);
 	assert.deepEqual(calls, ["xai/grok-4.5:high"]);
-	assert.equal(requestOptions[0]?.headers?.Authorization, "Bearer test");
+	assert.equal(requestOptions[0]?.headers?.Authorization, null);
+	assert.equal(requestOptions[0]?.headers?.["x-route"], "test");
 }
 
 {
