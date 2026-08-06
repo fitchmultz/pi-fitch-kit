@@ -41,18 +41,21 @@ function parseArgs() {
     fail("Usage: reapply-pi-core-compaction.mjs <apply|restore|status> [--pi-root <path>]");
   }
   let explicitRoot;
+  let hasExplicitRoot = false;
   while (args.length > 0) {
     const flag = args.shift();
-    if (flag !== "--pi-root" || args.length === 0 || explicitRoot) {
+    if (flag !== "--pi-root" || args.length === 0 || hasExplicitRoot) {
       fail("Usage: reapply-pi-core-compaction.mjs <apply|restore|status> [--pi-root <path>]");
     }
     explicitRoot = args.shift();
+    hasExplicitRoot = true;
+    if (explicitRoot.trim() === "") fail("--pi-root must not be empty");
   }
   return { action, explicitRoot };
 }
 
 function resolvePiRoot(explicitRoot) {
-  if (explicitRoot) return realpathSync(resolve(explicitRoot));
+  if (explicitRoot !== undefined) return realpathSync(resolve(explicitRoot));
   const executable = execFileSync("which", ["pi"], { encoding: "utf8" }).trim();
   const realExecutable = realpathSync(executable);
   const root = dirname(dirname(realExecutable));
@@ -122,7 +125,7 @@ function backupStock(root) {
 }
 
 function runPatch(root, reverse, dryRun) {
-  const args = ["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root];
+  const args = ["--batch", "--forward", "--no-backup-if-mismatch", "--reject-file=-", "-p1", "-d", root];
   if (reverse) args.unshift("--reverse");
   if (dryRun) args.unshift("--dry-run");
   const result = spawnSync("patch", args, { encoding: "utf8", input: readFileSync(patchPath) });
@@ -134,6 +137,33 @@ function runPatch(root, reverse, dryRun) {
 function checkSyntax(root) {
   for (const relativePath of Object.keys(files)) {
     execFileSync(process.execPath, ["--check", join(root, relativePath)], { stdio: "pipe" });
+  }
+}
+
+function mutateAndVerify(root, action, beforeName) {
+  const snapshots = Object.fromEntries(
+    Object.keys(files).map((relativePath) => [relativePath, readFileSync(join(root, relativePath))]),
+  );
+  try {
+    runPatch(root, action === "restore", false);
+    const expected = action === "apply" ? "patched" : "stock";
+    const after = state(root);
+    if (after.name !== expected) fail(`Expected ${expected} state after ${action}, found ${after.name}`);
+    checkSyntax(root);
+    return after;
+  } catch (error) {
+    try {
+      for (const [relativePath, contents] of Object.entries(snapshots)) {
+        writeFileSync(join(root, relativePath), contents);
+      }
+      const restored = state(root);
+      if (restored.name !== beforeName) fail(`Rollback restored ${restored.name}, expected ${beforeName}`);
+      checkSyntax(root);
+    } catch (rollbackError) {
+      throw new AggregateError([error, rollbackError], `Pi core ${action} failed and rollback could not be verified`);
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Pi core ${action} failed; restored and verified the ${beforeName} pre-operation state.\n${message}`, { cause: error });
   }
 }
 
@@ -158,9 +188,5 @@ if (action === "restore" && before.name === "stock") {
 
 runPatch(root, action === "restore", true);
 if (action === "apply") backupStock(root);
-runPatch(root, action === "restore", false);
-const expected = action === "apply" ? "patched" : "stock";
-const after = state(root);
-if (after.name !== expected) fail(`Expected ${expected} state after ${action}, found ${after.name}`);
-checkSyntax(root);
+const after = mutateAndVerify(root, action, before.name);
 console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: PI_VERSION, state: after.name, changed: true }, null, 2));

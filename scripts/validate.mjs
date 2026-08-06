@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifest = JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf-8"));
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
-const packageLock = readFileSync(join(root, "package-lock.json"), "utf-8");
+const packageLock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf-8"));
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -14,7 +14,15 @@ const assert = (condition, message) => {
 
 assert(manifest.schemaVersion === 4, "setup manifest schema must match the bundled-consent shape");
 assert(manifest.runtime.pi === "0.84.0", "the kit must require Pi 0.84.0 or later");
-assert(!packageLock.includes("socket-firewall.workos.dev"), "the public lockfile must not require a private registry");
+const resolvedOrigins = Object.values(packageLock.packages)
+  .map((entry) => entry.resolved)
+  .filter(Boolean)
+  .map((resolved) => new URL(resolved).origin);
+assert(resolvedOrigins.length > 0, "the lockfile must contain resolved package origins");
+assert(
+  resolvedOrigins.every((origin) => origin === "https://registry.npmjs.org"),
+  `the public lockfile must use only the npm registry; found ${[...new Set(resolvedOrigins)].join(", ")}`,
+);
 assert(
   packageJson.scripts["reapply:pi-core-compaction"] === "node scripts/reapply-pi-core-compaction.mjs apply" &&
     packageJson.scripts["restore:pi-core-compaction"] === "node scripts/reapply-pi-core-compaction.mjs restore",
