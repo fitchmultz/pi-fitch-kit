@@ -228,7 +228,8 @@ prompts/                setup, one active operational prompt, and retained sourc
 setup-manifest.json     package sources and selectable integrations
 templates/              optional working-agreement blocks
 docs/                   technical guide, overview, and Pi core compaction runbook
-scripts/                validation, package smoke, and focused regressions
+patches/                exact-version, reviewed Pi core patch artifacts
+scripts/                validation, package smoke, guarded core reapply, and focused regressions
 ```
 
 ## Validation

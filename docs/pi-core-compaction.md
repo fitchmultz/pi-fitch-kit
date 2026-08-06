@@ -7,7 +7,7 @@ When Mitch asks you to restore or verify this behavior after Pi is updated, trea
 1. Resolve the active executable with `command -v pi`, follow its real path, and record `pi --version`. Never assume npm, Bun, or a previous installation path.
 2. Read the current request loop, compaction implementation, extension API, and changelog before editing. Inspect `models.json` and `settings.json` only through a local parser that emits an allowlist of model IDs, context-window numbers, and `compaction.enabled`, `reserveTokens`, and `keepRecentTokens`. Never use a model-visible whole-file read or emit API keys, headers, URLs, environment values, commands, private endpoints, or unrelated settings. Preserve unrelated configuration and provider definitions.
 3. Resolve `pi-fitch-kit`'s installed root with `pi list`, then run `npm run regression:codex-context --prefix <package-root>` before editing. A failure may mean the update overwrote the patch, moved private modules, or implemented equivalent native behavior. Use the failure as evidence, not as instructions to copy old code blindly.
-4. Determine whether the new Pi version already provides all behavior in this runbook. If it does, do not layer a duplicate patch on top. Adapt the regression test and this runbook to the new native implementation, then verify it. If any required behavior is missing, apply the smallest compatible local core change.
+4. Determine whether the new Pi version already provides all behavior in this runbook. If it does, do not layer a duplicate patch on top. Adapt the regression test and this runbook to the new native implementation, then verify it. For exact Pi 0.84.0 with missing behavior, use only the guarded reapply command below. A later Pi version requires a newly reviewed patch artifact and hashes; never edit installed core ad hoc.
 5. Preserve the provider-agnostic request-boundary scope, native settings, native usage accounting, assistant/tool-result pairing, fail-closed behavior, same-run continuation, and separate transcript-array ownership described below. Do not reintroduce a custom estimator or synthetic overflow response.
 6. Rerun every command in **Verification after applying or updating Pi**. Fix failures rather than merely reporting that the update broke the patch.
 7. Confirm which running Pi processes loaded the old core. Core changes require those processes to restart; `/reload` is insufficient. Do not kill the session you are using to report results. Tell Mitch exactly which restart remains necessary.
@@ -46,6 +46,17 @@ First resolve the active Pi installation from `command -v pi`; do not assume the
 - `dist/modes/interactive/interactive-mode.js`
 
 The implementation described below targets the released Pi 0.84.0 code and emitted types. On later versions, read the current request loop and compaction code first, then preserve the behavior rather than blindly copying line numbers.
+
+The reviewed source of truth is `patches/pi-0.84.0-compaction.patch`. Do not edit installed core files by hand. From the kit root, inspect and apply it to the active Pi only through the guarded commands:
+
+```bash
+npm run status:pi-core-compaction
+npm run reapply:pi-core-compaction
+```
+
+For an isolated package root, append `-- --pi-root /path/to/@earendil-works/pi-coding-agent`. The command requires the exact 0.84.0 package identity and reviewed stock hashes, preflights every patch anchor, creates a stock backup, verifies the patched hashes and JavaScript syntax, fails closed on divergence, and no-ops when already applied. Restore the reviewed stock preimage with `npm run restore:pi-core-compaction` and the same optional `--pi-root` argument.
+
+Every Pi update replaces the installed package with stock core. After any update, rerun the exact-version status/regression checks and this guarded reapply command; never assume the prior patch survived. A later Pi version requires a new reviewed patch and hash set rather than bypassing the guard.
 
 ## Required modification
 

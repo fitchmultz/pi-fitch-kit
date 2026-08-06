@@ -1037,6 +1037,7 @@ async function runCustomCompaction(
 	const finds: string[] = [];
 	const requestOptions: Array<{
 		cacheRetention?: string;
+		env?: Record<string, string>;
 		headers?: Record<string, string | null>;
 		onPayload?: (payload: unknown, model: unknown) => unknown | Promise<unknown>;
 		sessionId?: string;
@@ -1069,6 +1070,7 @@ async function runCustomCompaction(
 					_context: unknown,
 					options: {
 						cacheRetention?: string;
+						env?: Record<string, string>;
 						headers?: Record<string, string | null>;
 						onPayload?: (payload: unknown, model: unknown) => unknown | Promise<unknown>;
 						reasoning?: string;
@@ -1102,9 +1104,10 @@ async function runCustomCompaction(
 				const key = `${model.provider}/${model.id}`;
 				if (authFailures[key]) return { ok: false, error: authFailures[key] };
 				const baseUrl = `https://resolved.invalid/${model.provider}`;
+				const env = { PI_COMPACTION_ROUTE: model.provider };
 				return headerOnlyProviders.has(key)
-					? { ok: true, headers: { Authorization: null, "x-route": "test" }, baseUrl }
-					: { ok: true, apiKey: "test", baseUrl };
+					? { ok: true, headers: { Authorization: null, "x-route": "test" }, baseUrl, env }
+					: { ok: true, apiKey: "test", baseUrl, env };
 			},
 		},
 	};
@@ -1186,6 +1189,7 @@ writeCompactionConfig({ customCompactionEnabled: true });
 	assert.equal(result?.compaction?.usage?.totalTokens, 1);
 	assert.equal(requestOptions[0]?.cacheRetention, "none");
 	assert.equal(requestBaseUrls[0], "https://resolved.invalid/xai");
+	assert.deepEqual(requestOptions[0]?.env, { PI_COMPACTION_ROUTE: "xai" });
 	assert.equal(secondRun.requestOptions[0]?.cacheRetention, "none");
 	assert.match(requestOptions[0]?.sessionId ?? "", /^[0-9a-f-]{36}$/);
 	assert.notEqual(

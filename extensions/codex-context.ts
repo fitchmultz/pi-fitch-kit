@@ -11,7 +11,7 @@ import {
 	type Context,
 	type Model,
 	type SimpleStreamOptions,
-} from "@earendil-works/pi-ai/compat";
+} from "@earendil-works/pi-ai";
 import {
 	compact,
 	type ExtensionAPI,

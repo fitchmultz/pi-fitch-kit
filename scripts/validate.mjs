@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifest = JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf-8"));
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
+const packageLock = readFileSync(join(root, "package-lock.json"), "utf-8");
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -13,6 +14,15 @@ const assert = (condition, message) => {
 
 assert(manifest.schemaVersion === 4, "setup manifest schema must match the bundled-consent shape");
 assert(manifest.runtime.pi === "0.84.0", "the kit must require Pi 0.84.0 or later");
+assert(!packageLock.includes("socket-firewall.workos.dev"), "the public lockfile must not require a private registry");
+assert(
+  packageJson.scripts["reapply:pi-core-compaction"] === "node scripts/reapply-pi-core-compaction.mjs apply" &&
+    packageJson.scripts["restore:pi-core-compaction"] === "node scripts/reapply-pi-core-compaction.mjs restore",
+  "Pi core apply and restore commands must remain tracked package scripts",
+);
+for (const path of ["patches/pi-0.84.0-compaction.patch", "scripts/reapply-pi-core-compaction.mjs"]) {
+  assert(lstatSync(join(root, path)).isFile(), `Pi core restoration resource missing: ${path}`);
+}
 for (const dependency of [
   "@earendil-works/pi-ai",
   "@earendil-works/pi-coding-agent",
