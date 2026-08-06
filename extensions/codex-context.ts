@@ -11,8 +11,7 @@ import {
 	type Context,
 	type Model,
 	type SimpleStreamOptions,
-	streamSimple,
-} from "@earendil-works/pi-ai/compat";
+} from "@earendil-works/pi-ai";
 import {
 	compact,
 	type ExtensionAPI,
@@ -239,26 +238,20 @@ export default function (pi: ExtensionAPI): void {
 		for (const candidate of candidates) {
 			if (event.signal.aborted) return { cancel: true };
 			const model = ctx.modelRegistry.find(candidate.provider, candidate.model);
-			const registeredStream = ctx.modelRegistry.getRegisteredProviderConfig(
-				candidate.provider,
-			)?.streamSimple;
+			const provider = ctx.modelRegistry.getProvider(candidate.provider);
+			if (!model || !provider) {
+				failures.push(`${candidate.provider}/${candidate.model} unavailable`);
+				continue;
+			}
+			const providerStream = provider.streamSimple.bind(provider);
 			const streamFn =
 				candidate.provider === "openai" || candidate.provider === "openai-codex"
 					? (
 							model: Model<Api>,
 							context: Context,
 							options?: SimpleStreamOptions,
-						) =>
-							(registeredStream ?? streamSimple)(
-								model,
-								context,
-								fastOptions(options),
-							)
-					: registeredStream;
-			if (!model) {
-				failures.push(`${candidate.provider}/${candidate.model} unavailable`);
-				continue;
-			}
+						) => providerStream(model, context, fastOptions(options))
+					: providerStream;
 
 			try {
 				const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
@@ -268,11 +261,14 @@ export default function (pi: ExtensionAPI): void {
 					);
 					continue;
 				}
+				const requestModel = auth.baseUrl ? { ...model, baseUrl: auth.baseUrl } : model;
 				const result = await compact(
 					event.preparation,
-					model,
+					requestModel,
 					auth.apiKey,
-					auth.headers,
+					// Pi 0.84's runtime forwards ProviderHeaders unchanged, but compact()'s
+					// emitted type still predates null header-deletion markers.
+					auth.headers as Parameters<typeof compact>[3],
 					event.customInstructions,
 					event.signal,
 					candidate.thinkingLevel,

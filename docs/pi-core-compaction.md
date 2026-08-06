@@ -1,4 +1,4 @@
-# Reapply the tool-loop compaction fix
+# Reapply the Pi 0.84.0 tool-loop compaction fixes
 
 ## Instructions for the Pi agent handling an update
 
@@ -7,7 +7,7 @@ When Mitch asks you to restore or verify this behavior after Pi is updated, trea
 1. Resolve the active executable with `command -v pi`, follow its real path, and record `pi --version`. Never assume npm, Bun, or a previous installation path.
 2. Read the current request loop, compaction implementation, extension API, and changelog before editing. Inspect `models.json` and `settings.json` only through a local parser that emits an allowlist of model IDs, context-window numbers, and `compaction.enabled`, `reserveTokens`, and `keepRecentTokens`. Never use a model-visible whole-file read or emit API keys, headers, URLs, environment values, commands, private endpoints, or unrelated settings. Preserve unrelated configuration and provider definitions.
 3. Resolve `pi-fitch-kit`'s installed root with `pi list`, then run `npm run regression:codex-context --prefix <package-root>` before editing. A failure may mean the update overwrote the patch, moved private modules, or implemented equivalent native behavior. Use the failure as evidence, not as instructions to copy old code blindly.
-4. Determine whether the new Pi version already provides all behavior in this runbook. If it does, do not layer a duplicate patch on top. Adapt the regression test and this runbook to the new native implementation, then verify it. If any required behavior is missing, apply the smallest compatible local core change.
+4. Determine whether the new Pi version already provides all behavior in this runbook. If it does, do not layer a duplicate patch on top. Adapt the regression test and this runbook to the new native implementation, then verify it. For exact Pi 0.84.0 with missing behavior, use only the guarded reapply command below. A later Pi version requires a newly reviewed patch artifact and hashes; never edit installed core ad hoc.
 5. Preserve the provider-agnostic request-boundary scope, native settings, native usage accounting, assistant/tool-result pairing, fail-closed behavior, same-run continuation, and separate transcript-array ownership described below. Do not reintroduce a custom estimator or synthetic overflow response.
 6. Rerun every command in **Verification after applying or updating Pi**. Fix failures rather than merely reporting that the update broke the patch.
 7. Confirm which running Pi processes loaded the old core. Core changes require those processes to restart; `/reload` is insufficient. Do not kill the session you are using to report results. Tell Mitch exactly which restart remains necessary.
@@ -19,9 +19,9 @@ The expected user request can be as short as: `Find pi-fitch-kit with pi list, r
 
 The request-boundary policy applies to every selected provider and model whose context window can accommodate the configured reserve and retained context. Each model's active `contextWindow` metadata is authoritative, including overrides in `~/.pi/agent/models.json`; preserve those values rather than restoring a number from this runbook. Pi's normal global compaction settings in `~/.pi/agent/settings.json` are also authoritative.
 
-At this 0.83.0 restoration, the six OpenAI GPT-5.6 routes are 270,000 and `xai/grok-4.5` is 280,000. With the current `reserveTokens: 16384`, Pi's existing `shouldCompact()` rule compacts those routes only above 253,616 and 263,616 tokens respectively. The regression test derives boundaries independently from active model metadata and settings. Do not hardcode context windows, reserve, retention, or derived thresholds in Pi's code.
+For Pi 0.84.0, derive every boundary independently from active model metadata and settings. Direct OpenAI GPT-5.6 routes default to a 272,000-token context window, but local model overrides remain authoritative. Do not hardcode context windows, reserve, retention, or derived thresholds in Pi's code.
 
-Summary generation can be routed separately by this package's `extensions/codex-context.ts`, but cross-provider routing is off by default. The handler reads `<Pi agent dir>/pi-codex-context.json` at compaction time and must return control to Pi's active-model compaction unless `customCompactionEnabled` is the literal boolean `true`. With that explicit opt-in and no `compactionModels` override, it tries `xai/grok-4.5` at high effort, then `openai-codex/gpt-5.6-luna` at high effort, then returns control to Pi's active-model fallback. A valid non-empty override replaces that order; an invalid list fails closed to the active model. The handler must call Pi's native `compact()` with the existing `CompactionPreparation`. xAI uses Pi's built-in provider stream; Codex Luna uses the registered `openai-codex` stream when available. The handler must not replace cut-point selection, retention, cancellation, file tracking, persistence, or compaction ownership.
+Summary generation can be routed separately by this package's `extensions/codex-context.ts`, but cross-provider routing is off by default. The handler reads `<Pi agent dir>/pi-codex-context.json` at compaction time and must return control to Pi's active-model compaction unless `customCompactionEnabled` is the literal boolean `true`. With that explicit opt-in and no `compactionModels` override, it tries `xai/grok-4.5` at high effort, then `openai-codex/gpt-5.6-luna` at high effort, then returns control to Pi's active-model fallback. A valid non-empty override replaces that order; an invalid list fails closed to the active model. The handler must call Pi's native `compact()` with the existing `CompactionPreparation` and dispatch each candidate through Pi 0.84's composed provider stream. OpenAI candidates wrap that stream only to apply the fast-mode payload option. The handler must not replace cut-point selection, retention, cancellation, file tracking, persistence, or compaction ownership.
 
 ## Why a Pi core change is needed
 
@@ -29,13 +29,13 @@ Pi checks normal threshold compaction after an agent run ends and before a later
 
 The fix adds the same threshold check at Pi's existing `transformContext` request boundary. That hook runs after initial, tool-result, steering, and follow-up messages have been injected and immediately before every provider request. It must reuse Pi's own token accounting and compaction implementation. Do not add a character-count tokenizer, serialize the whole context, or synthesize a context-overflow response.
 
-Pi 0.80.10 and stock 0.81.x, 0.82.x, and 0.83.0 also need a cut-point correction. If the trailing tool-result block itself reaches `keepRecentTokens`, the stock algorithm finds no valid cut point after those results, falls back to the oldest entry, and produces no compaction preparation. The corrected algorithm keeps the preceding assistant message with its tool results so compaction can proceed.
+Stock Pi 0.84.0 still needs a cut-point correction. If the trailing tool-result block itself reaches `keepRecentTokens`, the stock algorithm finds no valid cut point after those results, falls back to the oldest entry, and produces no compaction preparation. The corrected algorithm keeps the preceding assistant message with its tool results so compaction can proceed.
 
-Manual compaction must not interrupt automatic request-boundary compaction or an active continuation. Pi 0.80.10 and stock 0.81.x, 0.82.x, and 0.83.0 disconnect from and abort the agent before checking whether compaction is already running or possible. Any `ctx.compact()` caller can therefore kill the continuation and then fail with `Already compacted`; the July 19 incident was automatically triggered by `pi-codex-goal@0.1.37`, not by a user-entered `/compact` command. Reject concurrent manual compaction before disconnecting, and preflight unavailable manual compaction before aborting the agent.
+Manual compaction must not interrupt automatic request-boundary compaction or an active continuation. Although the Pi 0.84.0 changelog reports a manual-versus-threshold compaction race fix, the released implementation still aborts the agent before checking whether compaction is already running or possible. Any `ctx.compact()` caller can therefore kill the continuation and then fail with `Already compacted`; the July 19 incident was automatically triggered by `pi-codex-goal@0.1.37`, not by a user-entered `/compact` command. Reject concurrent manual compaction and preflight unavailable manual compaction before aborting the agent.
 
 The interactive compaction UI must render one summary card. `buildContextEntries()` already includes the newly persisted compaction entry, so rebuilding the chat and then appending another summary renders the same compaction twice.
 
-Pi 0.81+ natively persists compaction and branch-summary usage and resumes messages queued during compaction. Pi 0.81.1+ also retries native summarization using the configured retry policy and emits retry lifecycle events. Pi 0.82.0+ gives each summary call a fresh routing session ID and disables prompt-cache writes where supported. Pi 0.82.1+ also accepts compaction authentication resolved entirely through request headers. Preserve those upstream behaviors, the `compact(..., settingsManager.getRetrySettings(), _summarizationRetryCallbacks(...))` arguments, and `completeSummarization()` request options while restoring the local request-boundary and safety fixes.
+Pi 0.84.0 natively persists compaction and branch-summary usage, resumes messages queued during compaction, retries native summarization with lifecycle events, uses fresh routing session IDs, disables one-off prompt-cache writes where supported, and accepts header-only compaction authentication. Preserve those native behaviors, the `compact(..., settingsManager.getRetrySettings(), _summarizationRetryCallbacks(...))` arguments, and `completeSummarization()` request options while restoring the local request-boundary and safety fixes.
 
 ## Where to make the change
 
@@ -45,7 +45,18 @@ First resolve the active Pi installation from `command -v pi`; do not assume the
 - `dist/core/compaction/compaction.js`
 - `dist/modes/interactive/interactive-mode.js`
 
-The implementation described below was applied to Pi 0.80.10 and restored through Pi 0.83.0. On later versions, read the current request loop and compaction code first, then preserve the behavior rather than blindly copying line numbers.
+The implementation described below targets the released Pi 0.84.0 code and emitted types. On later versions, read the current request loop and compaction code first, then preserve the behavior rather than blindly copying line numbers.
+
+The reviewed source of truth is `patches/pi-0.84.0-compaction.patch`. Do not edit installed core files by hand. From the kit root, inspect and apply it to the active Pi only through the guarded commands:
+
+```bash
+npm run status:pi-core-compaction
+npm run reapply:pi-core-compaction
+```
+
+The default command ignores npm-injected local `node_modules/.bin` entries when resolving the active `pi`, so the kit's validation dependency cannot be mistaken for the system installation. For an isolated package root, append `-- --pi-root /path/to/@earendil-works/pi-coding-agent`. The command requires the exact 0.84.0 package identity and reviewed stock hashes, preflights every patch anchor, creates a stock backup, verifies the patched hashes and JavaScript syntax, rolls back and verifies the complete pre-operation state after any mutation failure, fails closed on divergence, and no-ops when already applied. Restore the reviewed stock preimage with `npm run restore:pi-core-compaction` and the same optional `--pi-root` argument.
+
+Every Pi update replaces the installed package with stock core. After any update, rerun the exact-version status/regression checks and this guarded reapply command; never assume the prior patch survived. A later Pi version requires a new reviewed patch and hash set rather than bypassing the guard.
 
 ## Required modification
 
@@ -67,7 +78,7 @@ The helper must:
 10. If no new compaction entry was created, throw a clear error that blocks the provider request. Never proceed with a request known to be over the configured threshold.
 11. Return true only when a new compaction entry was created.
 
-Use the existing imports from `./compaction/index.js` and `./session-manager.js`. Pi 0.80.10 through 0.83.0 already import `estimateContextTokens`, `shouldCompact`, and `getLatestCompactionEntry`; avoid adding duplicate implementations.
+Use the existing imports from `./compaction/index.js` and `./session-manager.js`. Pi 0.84.0 already imports `estimateContextTokens`, `shouldCompact`, and `getLatestCompactionEntry`; avoid adding duplicate implementations.
 
 Install the helper at one request boundary:
 
@@ -84,10 +95,10 @@ Do not add separate checks to `_runAgentPrompt()` or `_installAgentNextTurnRefre
 
 In `AgentSession.compact()`:
 
-1. If either manual or automatic compaction is already active, reject the new manual request with `Compaction already in progress` before disconnecting from or aborting the agent.
-2. Read the current branch and prepare manual compaction before disconnecting from or aborting the agent.
-3. If preparation is unavailable, emit the normal manual `compaction_start` and failed `compaction_end` events and throw `Already compacted` or `Nothing to compact (session too small)` as appropriate. Do not disconnect or abort the current agent run.
-4. Once preflight succeeds, create and store a local manual compaction controller synchronously before disconnecting or awaiting agent abort. Use that local controller throughout the operation and clear the shared field in `finally` only when it still owns the field.
+1. If either manual or automatic compaction is already active, reject the new manual request with `Compaction already in progress` before aborting the agent.
+2. Read the current branch and prepare manual compaction before aborting the agent.
+3. If preparation is unavailable, emit the normal manual `compaction_start` and failed `compaction_end` events and throw `Already compacted` or `Nothing to compact (session too small)` as appropriate. Do not abort the current agent run.
+4. Once preflight succeeds, create and store a local manual compaction controller synchronously before awaiting agent abort. Use that local controller throughout the operation and clear the shared field in `finally` only when it still owns the field.
 5. Retain Pi's remaining manual compaction behavior.
 
 In the interactive `/compact` handler, show `Compaction already in progress` as a warning. Other manual failures are already displayed through compaction events.
@@ -145,13 +156,15 @@ These constraints are required:
 
 This package's `extensions/codex-context.ts` owns summary-model routing through `session_before_compact`, the `/codex-fast` command and footer, and a `before_provider_request` handler that applies the globally persisted priority-service toggle without replacing native provider streams. Explicitly routed OpenAI compaction uses the same payload transform around Pi's native simple stream. Fast mode remains limited to `openai` and `openai-codex`; the installed-core request-boundary safeguard applies to every provider and model. The extension must reuse Pi's native `compact()` and provider dispatch. It must not own compaction triggers, thresholds, token estimation, cut points, persistence, or synthetic overflow handling.
 
+Pi 0.84.0 request authentication can resolve a provider-specific base URL and `ProviderHeaders` values containing `null` deletion markers. Alternate-model compaction must apply the resolved base URL to its request model and pass the header object through unchanged; never filter or stringify deletion markers before forwarding.
+
 `<Pi agent dir>/pi-codex-context.json` owns the explicit routing consent and ordered custom summary-model candidates. Missing, malformed, false, non-boolean, or empty configuration must not query or send retained context to alternate models. Only literal `customCompactionEnabled: true` activates routing. An omitted model list uses the documented xAI-then-Codex default; a valid non-empty list overrides it; an invalid or empty list fails closed to Pi's native active-model compaction. Unauthenticated, unavailable, or failed enabled candidates fall through in order; if all enabled candidates fail, returning no extension result preserves the active-model fallback.
 
 There must be no separate `codex-fast` or standalone `pi-codex-context` package. This kit must be the only loaded owner of the command, footer, compaction handler, and OpenAI priority payload handler.
 
 ## Verification after applying or updating Pi
 
-Run all of the following against the active installation:
+Run all of the following against the active Pi 0.84.0 installation:
 
 1. `pi --version` and confirm the installation path resolved from `command -v pi`.
 2. Run `pi --list-models 'openai/gpt-5.6'` and `pi --list-models 'openai-codex/gpt-5.6'`, then use the allowlisted local structural parser from step 2 to confirm Sol, Terra, and Luna match the active context-window overrides in `models.json` under both providers.
@@ -160,11 +173,13 @@ Run all of the following against the active installation:
 5. If `pi-codex-goal` is installed, require version 0.1.38 or newer and confirm its runtime has no proactive `ctx.compact()` trigger.
 6. Resolve `pi-fitch-kit`'s installed root with `pi list`, then run:
 
-   `npm run regression:codex-context --prefix <package-root>`
+   `PI_REGRESSION_PATH=/path/to/pi-0.84.0/node_modules/.bin:$PATH npm run regression:codex-context --prefix <package-root>`
+
+   Omit `PI_REGRESSION_PATH` only when the normal active `pi` is the isolated 0.84.0 installation.
 
 7. Confirm Pi loads one bundled `codex-context` extension, one `session_before_compact` handler, one `before_provider_request` handler, zero replacement provider registrations, and one `/codex-fast` command.
 
-The regression check must prove at least these cases:
+The regression check must first assert that it is running against Pi 0.84.0, then prove at least these cases:
 
 - A 148,861-token valid usage plus a small trailing tool result does not compact, even if the assistant message contains more than one million characters of provider-only signature metadata.
 - Each tested viable route uses its own active context window. Usage at that route's derived threshold does not compact, while usage strictly above it does. Coverage includes all six OpenAI GPT-5.6 routes, a different OpenAI model ID, and a non-OpenAI provider.
@@ -174,11 +189,11 @@ The regression check must prove at least these cases:
 - A queued steering or follow-up message that crosses the threshold is included before the pre-request check runs.
 - A single trailing tool result at `keepRecentTokens`, and several trailing tool results that cumulatively reach it, produce a valid compaction preparation that keeps the assistant/tool-result group together.
 - If threshold compaction creates no new compaction entry, the request boundary throws and the provider request remains blocked.
-- A concurrent or unavailable manual compaction does not disconnect from or abort the active agent run.
-- Deferred-auth automatic compaction owns the operation before awaiting authentication, rejects concurrent manual compaction without disconnecting or aborting, and persists exactly once.
+- A concurrent or unavailable manual compaction does not abort the active agent run.
+- Deferred-auth automatic compaction owns the operation before awaiting authentication, rejects concurrent manual compaction without aborting, and persists exactly once.
 - Manual compaction owns the operation before awaiting agent abort, so a second compaction cannot enter its destructive path.
 - Successful compaction rebuilds the interactive transcript without appending a duplicate summary card.
-- Custom summary routing makes no alternate-model lookup or request for missing, malformed, false, truthy non-boolean, empty, or invalid configuration. Literal opt-in uses native xAI Grok 4.5 first at high effort by default, falls back to Luna high on provider or authentication failure, honors a valid override, preserves native summary usage, fresh routing session IDs, disabled one-off prompt-cache writes, header-only authentication, and OpenAI priority mode, honors cancellation, and returns control to Pi's active-model fallback when every configured candidate fails.
+- Custom summary routing makes no alternate-model lookup or request for missing, malformed, false, truthy non-boolean, empty, or invalid configuration. Literal opt-in uses native xAI Grok 4.5 first at high effort by default, falls back to Luna high on provider or authentication failure, honors a valid override, preserves native summary usage, fresh routing session IDs, disabled one-off prompt-cache writes, credential-resolved base URLs, header-only authentication including `null` deletion markers, and OpenAI priority mode, honors cancellation, and returns control to Pi's active-model fallback when every configured candidate fails.
 - Native file-operation details remain cumulative across consecutive extension-routed compactions, including a prior entry marked `fromHook: true`.
 
 After core changes, start a new Pi process or restart each existing affected process; `/reload` only reloads extensions and is insufficient for core changes.

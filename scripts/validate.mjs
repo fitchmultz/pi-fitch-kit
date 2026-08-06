@@ -6,12 +6,40 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifest = JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf-8"));
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
+const packageLock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf-8"));
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
 assert(manifest.schemaVersion === 4, "setup manifest schema must match the bundled-consent shape");
+assert(manifest.runtime.pi === "0.84.0", "the kit must require Pi 0.84.0 or later");
+const resolvedOrigins = Object.values(packageLock.packages)
+  .map((entry) => entry.resolved)
+  .filter(Boolean)
+  .map((resolved) => new URL(resolved).origin);
+assert(resolvedOrigins.length > 0, "the lockfile must contain resolved package origins");
+assert(
+  resolvedOrigins.every((origin) => origin === "https://registry.npmjs.org"),
+  `the public lockfile must use only the npm registry; found ${[...new Set(resolvedOrigins)].join(", ")}`,
+);
+assert(
+  packageJson.scripts["reapply:pi-core-compaction"] === "node scripts/reapply-pi-core-compaction.mjs apply" &&
+    packageJson.scripts["restore:pi-core-compaction"] === "node scripts/reapply-pi-core-compaction.mjs restore",
+  "Pi core apply and restore commands must remain tracked package scripts",
+);
+for (const path of ["patches/pi-0.84.0-compaction.patch", "scripts/reapply-pi-core-compaction.mjs"]) {
+  assert(lstatSync(join(root, path)).isFile(), `Pi core restoration resource missing: ${path}`);
+}
+for (const dependency of [
+  "@earendil-works/pi-ai",
+  "@earendil-works/pi-coding-agent",
+  "@earendil-works/pi-tui",
+]) {
+  assert(packageJson.devDependencies[dependency] === manifest.runtime.pi, `${dependency} must pin the exact validated Pi version`);
+  assert(packageJson.peerDependencies[dependency] === "*", `${dependency} must remain an unversioned Pi peer`);
+  assert(packageJson.peerDependenciesMeta[dependency]?.optional === true, `${dependency} must remain an optional Pi peer`);
+}
 assert(
   JSON.stringify(packageJson.pi.extensions) === JSON.stringify(manifest.kitResources.extensions.map((path) => `./${path}`)),
   "package.json pi.extensions must match manifest kitResources.extensions",
