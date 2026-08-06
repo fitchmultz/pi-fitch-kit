@@ -3,7 +3,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PI_PACKAGE = "@earendil-works/pi-coding-agent";
@@ -56,7 +56,14 @@ function parseArgs() {
 
 function resolvePiRoot(explicitRoot) {
   if (explicitRoot !== undefined) return realpathSync(resolve(explicitRoot));
-  const executable = execFileSync("which", ["pi"], { encoding: "utf8" }).trim();
+  const activePath = (process.env.PATH ?? "")
+    .split(delimiter)
+    .filter((entry) => !resolve(entry).endsWith(`${sep}node_modules${sep}.bin`))
+    .join(delimiter);
+  const executable = execFileSync("which", ["pi"], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: activePath },
+  }).trim();
   const realExecutable = realpathSync(executable);
   const root = dirname(dirname(realExecutable));
   if (realExecutable !== realpathSync(join(root, "dist/cli.js"))) {

@@ -54,7 +54,7 @@ npm run status:pi-core-compaction
 npm run reapply:pi-core-compaction
 ```
 
-For an isolated package root, append `-- --pi-root /path/to/@earendil-works/pi-coding-agent`. The command requires the exact 0.84.0 package identity and reviewed stock hashes, preflights every patch anchor, creates a stock backup, verifies the patched hashes and JavaScript syntax, rolls back and verifies the complete pre-operation state after any mutation failure, fails closed on divergence, and no-ops when already applied. Restore the reviewed stock preimage with `npm run restore:pi-core-compaction` and the same optional `--pi-root` argument.
+The default command ignores npm-injected local `node_modules/.bin` entries when resolving the active `pi`, so the kit's validation dependency cannot be mistaken for the system installation. For an isolated package root, append `-- --pi-root /path/to/@earendil-works/pi-coding-agent`. The command requires the exact 0.84.0 package identity and reviewed stock hashes, preflights every patch anchor, creates a stock backup, verifies the patched hashes and JavaScript syntax, rolls back and verifies the complete pre-operation state after any mutation failure, fails closed on divergence, and no-ops when already applied. Restore the reviewed stock preimage with `npm run restore:pi-core-compaction` and the same optional `--pi-root` argument.
 
 Every Pi update replaces the installed package with stock core. After any update, rerun the exact-version status/regression checks and this guarded reapply command; never assume the prior patch survived. A later Pi version requires a new reviewed patch and hash set rather than bypassing the guard.
 
