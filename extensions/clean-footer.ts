@@ -1,10 +1,10 @@
 import { readFile, unwatchFile, watchFile } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
-const VERBOSITY_PATH = join(getAgentDir(), "verbosity.json");
+const VERBOSITY_PATH = join(homedir(), ".pi", "agent", "verbosity.json");
 const VERBOSITY_APIS = new Set(["openai-responses", "openai-codex-responses", "azure-openai-responses"]);
 type Verbosity = "low" | "medium" | "high";
 type VerbosityConfig = { showIndicator: boolean; models: Record<string, Verbosity> };

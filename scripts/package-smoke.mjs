@@ -11,9 +11,10 @@ import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-codin
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const temp = mkdtempSync(join(tmpdir(), "pi-fitch-kit-package-"));
-const agentDir = join(temp, "agent");
+const agentDir = join(temp, ".pi", "agent");
 const cwd = join(temp, "project");
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+const previousHome = process.env.HOME;
 
 try {
 	mkdirSync(agentDir, { recursive: true });
@@ -23,6 +24,7 @@ try {
 		join(agentDir, "verbosity.json"),
 		`${JSON.stringify({ showIndicator: true, models: { "openai-codex/gpt-5.6-sol": "medium" } }, null, 2)}\n`,
 	);
+	process.env.HOME = temp;
 	process.env.PI_CODING_AGENT_DIR = agentDir;
 
 	const settingsManager = await SettingsManager.create(cwd, agentDir, { projectTrusted: false });
@@ -194,5 +196,7 @@ try {
 } finally {
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+	if (previousHome === undefined) delete process.env.HOME;
+	else process.env.HOME = previousHome;
 	rmSync(temp, { recursive: true, force: true });
 }
