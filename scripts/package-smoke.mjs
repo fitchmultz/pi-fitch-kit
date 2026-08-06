@@ -19,6 +19,10 @@ try {
 	mkdirSync(agentDir, { recursive: true });
 	mkdirSync(cwd, { recursive: true });
 	writeFileSync(join(agentDir, "settings.json"), `${JSON.stringify({ packages: [root] }, null, 2)}\n`);
+	writeFileSync(
+		join(agentDir, "verbosity.json"),
+		`${JSON.stringify({ showIndicator: true, models: { "openai-codex/gpt-5.6-sol": "medium" } }, null, 2)}\n`,
+	);
 	process.env.PI_CODING_AGENT_DIR = agentDir;
 
 	const settingsManager = await SettingsManager.create(cwd, agentDir, { projectTrusted: false });
@@ -110,8 +114,14 @@ try {
 			getCwd: () => join(process.env.HOME ?? temp, "Projects", "demo"),
 			getSessionName: () => "footer-smoke",
 		},
-		getContextUsage: () => ({ percent: 74, contextWindow: 280_000 }),
-		model: { id: "grok-4.5", provider: "xai", contextWindow: 280_000, reasoning: true },
+		getContextUsage: () => ({ percent: 74, contextWindow: 272_000 }),
+		model: {
+			id: "gpt-5.6-sol",
+			provider: "openai-codex",
+			api: "openai-codex-responses",
+			contextWindow: 272_000,
+			reasoning: true,
+		},
 		thinkingLevel: "high",
 	};
 	await cleanFooterStart({}, footerContext);
@@ -131,6 +141,9 @@ try {
 	);
 	const wideFooter = footer.render(170);
 	if (wideFooter.length !== 2) throw new Error(`Expected two wide footer lines, got ${JSON.stringify(wideFooter)}`);
+	if (!wideFooter.join("\n").includes("🗣  medium")) {
+		throw new Error(`Clean footer lost the configured verbosity indicator: ${wideFooter.join("\n")}`);
+	}
 	const narrowFooter = footer.render(45);
 	const narrowText = narrowFooter.join("\n");
 	const normalizedNarrowText = narrowText.replace(/\s+/g, " ");
@@ -140,8 +153,8 @@ try {
 	}
 	for (const expected of [
 		"footer-smoke",
-		"(xai) grok-4.5 • high",
-		"74.0%/280k",
+		"(openai-codex) gpt-5.6-sol • high • 🗣 medium",
+		"74.0%/272k",
 		"MCP: 13 servers enabled (2 connected)",
 		"todo 0 active · 1 pending",
 	]) {
@@ -158,6 +171,9 @@ try {
 	if (typeof footerFactory !== "function" || footerNotice !== "Clean footer enabled") {
 		throw new Error("Clean-footer command did not restore the compact footer");
 	}
+	const cleanFooterShutdown = cleanFooter.handlers.get("session_shutdown")?.[0];
+	if (!cleanFooterShutdown) throw new Error("Clean-footer session_shutdown handler missing");
+	await cleanFooterShutdown({}, footerContext);
 
 	const commandNames = extensions.extensions
 		.flatMap(({ commands }) => [...commands.keys()])

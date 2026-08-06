@@ -82,10 +82,10 @@ function state(root) {
     Object.keys(files).map((relativePath) => [relativePath, sha256(join(root, relativePath))]),
   );
   if (Object.entries(files).every(([path, expected]) => hashes[path] === expected.stock)) {
-    return { name: "stock", hashes };
+    return { name: "stock" };
   }
   if (Object.entries(files).every(([path, expected]) => hashes[path] === expected.patched)) {
-    return { name: "patched", hashes };
+    return { name: "patched" };
   }
   const detail = Object.entries(hashes).map(([path, hash]) => `${path}: ${hash}`).join("\n");
   fail(`Pi core diverges from both reviewed stock and patched states; refusing mutation:\n${detail}`);
@@ -156,8 +156,8 @@ if (action === "restore" && before.name === "stock") {
   process.exit(0);
 }
 
-if (action === "apply") backupStock(root);
 runPatch(root, action === "restore", true);
+if (action === "apply") backupStock(root);
 runPatch(root, action === "restore", false);
 const expected = action === "apply" ? "patched" : "stock";
 const after = state(root);

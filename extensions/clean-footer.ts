@@ -1,7 +1,42 @@
+import { readFile, unwatchFile, watchFile } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, relative, resolve, sep } from "node:path";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+
+const VERBOSITY_PATH = join(getAgentDir(), "verbosity.json");
+const VERBOSITY_APIS = new Set(["openai-responses", "openai-codex-responses", "azure-openai-responses"]);
+type Verbosity = "low" | "medium" | "high";
+type VerbosityConfig = { showIndicator: boolean; models: Record<string, Verbosity> };
+const NO_VERBOSITY: VerbosityConfig = { showIndicator: false, models: {} };
+
+async function loadVerbosity(): Promise<VerbosityConfig> {
+	return new Promise((resolve) => {
+		readFile(VERBOSITY_PATH, "utf8", (error, data) => {
+			if (error) return resolve(NO_VERBOSITY);
+			try {
+				const value = JSON.parse(data) as { showIndicator?: unknown; models?: unknown };
+				const models = value.models && typeof value.models === "object" && !Array.isArray(value.models)
+					? Object.fromEntries(
+							Object.entries(value.models).filter(
+								(entry): entry is [string, Verbosity] => ["low", "medium", "high"].includes(entry[1] as string),
+							),
+						)
+					: {};
+				resolve({ showIndicator: value.showIndicator === true, models });
+			} catch {
+				resolve(NO_VERBOSITY);
+			}
+		});
+	});
+}
+
+function verbosityText(ctx: ExtensionContext, config: VerbosityConfig): string {
+	const model = ctx.model;
+	if (!config.showIndicator || !model || !VERBOSITY_APIS.has(model.api)) return "";
+	const verbosity = config.models[`${model.provider}/${model.id}`] ?? config.models[model.id];
+	return verbosity ? ` • 🗣  ${verbosity}` : "";
+}
 
 function formatCount(count: number): string {
 	if (count < 1_000) return String(count);
@@ -20,7 +55,7 @@ function sanitize(text: string): string {
 	return text.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
 }
 
-function installFooter(ctx: ExtensionContext): void {
+function installFooter(ctx: ExtensionContext, verbosity: VerbosityConfig): void {
 	ctx.ui.setFooter((tui, theme, footerData) => {
 		const unsubscribe = footerData.onBranchChange(() => tui.requestRender());
 
@@ -47,7 +82,7 @@ function installFooter(ctx: ExtensionContext): void {
 				const model = ctx.model?.id ?? "no-model";
 				const thinking = ctx.model?.reasoning ? ` • ${ctx.thinkingLevel ?? "off"}` : "";
 				const provider = footerData.getAvailableProviderCount() > 1 && ctx.model ? `(${ctx.model.provider}) ` : "";
-				const rightText = `${provider}${model}${thinking}`;
+				const rightText = `${provider}${model}${thinking}${verbosityText(ctx, verbosity)}`;
 				const topLines = visibleWidth(location) + visibleWidth(rightText) + 2 <= width
 					? [theme.fg("dim", location + " ".repeat(width - visibleWidth(location) - visibleWidth(rightText)) + rightText)]
 					: [
@@ -79,9 +114,23 @@ function installFooter(ctx: ExtensionContext): void {
 
 export default function (pi: ExtensionAPI) {
 	let enabled = true;
+	let verbosity = NO_VERBOSITY;
+	let footerContext: ExtensionContext | undefined;
+	const refreshVerbosity = async () => {
+		verbosity = await loadVerbosity();
+		if (enabled && footerContext?.mode === "tui") installFooter(footerContext, verbosity);
+	};
 
-	pi.on("session_start", (_event, ctx) => {
-		if (enabled && ctx.mode === "tui") installFooter(ctx);
+	pi.on("session_start", async (_event, ctx) => {
+		footerContext = ctx;
+		verbosity = await loadVerbosity();
+		if (enabled && ctx.mode === "tui") installFooter(ctx, verbosity);
+		unwatchFile(VERBOSITY_PATH, refreshVerbosity);
+		if (ctx.hasUI) watchFile(VERBOSITY_PATH, { interval: 500 }, refreshVerbosity);
+	});
+	pi.on("session_shutdown", () => {
+		unwatchFile(VERBOSITY_PATH, refreshVerbosity);
+		footerContext = undefined;
 	});
 
 	pi.registerCommand("clean-footer", {
@@ -89,7 +138,7 @@ export default function (pi: ExtensionAPI) {
 		handler: async (_args, ctx) => {
 			if (ctx.mode !== "tui") return;
 			enabled = !enabled;
-			if (enabled) installFooter(ctx);
+			if (enabled) installFooter(ctx, verbosity);
 			else ctx.ui.setFooter(undefined);
 			ctx.ui.notify(`Clean footer ${enabled ? "enabled" : "disabled"}`, "info");
 		},

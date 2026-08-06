@@ -5,6 +5,7 @@
 - Raised the minimum supported Pi version to 0.84.0 and pinned development validation to the exact 0.84.0 Pi packages.
 - Routed alternate-model compaction through Pi 0.84's composed providers while preserving provider header deletion markers, credential-resolved base URLs, and environment overrides.
 - Added a checksum-guarded, idempotent Pi 0.84.0 core reapply/restore command with a reviewed patch artifact and stock backup. Revalidated the bundled extensions, package loader, and tool-loop compaction patch against the released implementation and types.
+- Restored `pi-verbosity-control`'s configured `🗣 low`, `🗣 medium`, or `🗣 high` indicator beside model thinking details in the compact footer.
 
 ## 0.3.2 — 4 August 2026
 
