@@ -22,7 +22,7 @@ try {
 	writeFileSync(join(agentDir, "settings.json"), `${JSON.stringify({ packages: [root] }, null, 2)}\n`);
 	writeFileSync(
 		join(agentDir, "verbosity.json"),
-		`${JSON.stringify({ showIndicator: true, models: { "openai-codex/gpt-5.6-sol": "medium" } }, null, 2)}\n`,
+		`${JSON.stringify({ showIndicator: true, models: { " openai-codex/gpt-5.6-sol ": " MEDIUM " } }, null, 2)}\n`,
 	);
 	process.env.HOME = temp;
 	process.env.PI_CODING_AGENT_DIR = agentDir;
@@ -102,11 +102,17 @@ try {
 	if (!cleanFooterStart) throw new Error("Clean-footer session_start handler missing");
 	let footerFactory;
 	let footerNotice;
+	let footerInstallCount = 0;
+	let resolveFooterRefresh;
 	const footerContext = {
 		mode: "tui",
+		hasUI: true,
 		ui: {
 			setFooter: (factory) => {
 				footerFactory = factory;
+				footerInstallCount++;
+				resolveFooterRefresh?.();
+				resolveFooterRefresh = undefined;
 			},
 			notify: (message) => {
 				footerNotice = message;
@@ -128,7 +134,7 @@ try {
 	};
 	await cleanFooterStart({}, footerContext);
 	if (typeof footerFactory !== "function") throw new Error("Clean footer was not installed in TUI mode");
-	const footer = footerFactory(
+	const createFooter = () => footerFactory(
 		{ requestRender: () => {} },
 		{ fg: (_color, text) => text },
 		{
@@ -141,6 +147,7 @@ try {
 			onBranchChange: () => () => {},
 		},
 	);
+	const footer = createFooter();
 	const wideFooter = footer.render(170);
 	if (wideFooter.length !== 2) throw new Error(`Expected two wide footer lines, got ${JSON.stringify(wideFooter)}`);
 	if (!wideFooter.join("\n").includes("🗣  medium")) {
@@ -163,6 +170,24 @@ try {
 		if (!normalizedNarrowText.includes(expected)) throw new Error(`Clean footer lost ${expected}: ${narrowText}`);
 	}
 	footer.dispose?.();
+
+	await new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => reject(new Error("Clean footer did not refresh after verbosity config changed")), 3_000);
+		resolveFooterRefresh = () => {
+			clearTimeout(timeout);
+			resolve();
+		};
+		writeFileSync(
+			join(agentDir, "verbosity.json"),
+			`${JSON.stringify({ showIndicator: true, models: { "openai-codex/gpt-5.6-sol": "high" } }, null, 2)}\n`,
+		);
+	});
+	const refreshedFooter = createFooter();
+	if (!refreshedFooter.render(170).join("\n").includes("🗣  high")) {
+		throw new Error("Clean footer did not render the refreshed verbosity indicator");
+	}
+	refreshedFooter.dispose?.();
+
 	const cleanFooterCommand = cleanFooter.commands.get("clean-footer");
 	if (!cleanFooterCommand) throw new Error("Clean-footer command missing");
 	await cleanFooterCommand.handler("", footerContext);
@@ -176,6 +201,13 @@ try {
 	const cleanFooterShutdown = cleanFooter.handlers.get("session_shutdown")?.[0];
 	if (!cleanFooterShutdown) throw new Error("Clean-footer session_shutdown handler missing");
 	await cleanFooterShutdown({}, footerContext);
+	const installsAtShutdown = footerInstallCount;
+	writeFileSync(
+		join(agentDir, "verbosity.json"),
+		`${JSON.stringify({ showIndicator: true, models: { "openai-codex/gpt-5.6-sol": "low" } }, null, 2)}\n`,
+	);
+	await new Promise((resolve) => setTimeout(resolve, 650));
+	if (footerInstallCount !== installsAtShutdown) throw new Error("Clean-footer verbosity watcher survived shutdown");
 
 	const commandNames = extensions.extensions
 		.flatMap(({ commands }) => [...commands.keys()])

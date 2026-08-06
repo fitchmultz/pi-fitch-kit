@@ -16,13 +16,16 @@ async function loadVerbosity(): Promise<VerbosityConfig> {
 			if (error) return resolve(NO_VERBOSITY);
 			try {
 				const value = JSON.parse(data) as { showIndicator?: unknown; models?: unknown };
-				const models = value.models && typeof value.models === "object" && !Array.isArray(value.models)
-					? Object.fromEntries(
-							Object.entries(value.models).filter(
-								(entry): entry is [string, Verbosity] => ["low", "medium", "high"].includes(entry[1] as string),
-							),
-						)
-					: {};
+				const models: Record<string, Verbosity> = {};
+				if (value.models && typeof value.models === "object" && !Array.isArray(value.models)) {
+					for (const [rawKey, rawValue] of Object.entries(value.models)) {
+						const key = rawKey.trim();
+						const normalized = typeof rawValue === "string" ? rawValue.trim().toLowerCase() : "";
+						if (key && (normalized === "low" || normalized === "medium" || normalized === "high")) {
+							models[key] = normalized;
+						}
+					}
+				}
 				resolve({ showIndicator: value.showIndicator === true, models });
 			} catch {
 				resolve(NO_VERBOSITY);
