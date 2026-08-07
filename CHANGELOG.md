@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 — 7 August 2026
+
+- Raised the validated Pi baseline to 0.84.1 and re-reviewed the guarded tool-loop compaction patch against that release.
+
 ## 0.4.0 — 6 August 2026
 
 - Raised the minimum supported Pi version to 0.84.0 and pinned development validation to the exact 0.84.0 Pi packages.

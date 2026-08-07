@@ -7,9 +7,9 @@ import { delimiter, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PI_PACKAGE = "@earendil-works/pi-coding-agent";
-const PI_VERSION = "0.84.0";
+const PI_VERSION = "0.84.1";
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const patchPath = join(projectRoot, "patches/pi-0.84.0-compaction.patch");
+const patchPath = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
 const patchSha256 = "5f68de3bb9689ad983168a683bd2cc43426e19325071b75d6fd36425ac191b24";
 const files = {
   "dist/core/agent-session.js": {
@@ -21,8 +21,8 @@ const files = {
     patched: "476b9cd8329f3b6ea94a7aeca663b1bd3992319b04f088ffd6025ce7959cec2e",
   },
   "dist/modes/interactive/interactive-mode.js": {
-    stock: "1efe4f58c10593e0d283b3e6d5bf4fd342d8e5d681f1fbc9dfbb7cc03fe4b266",
-    patched: "702beb350dcb588bd52e0f061e9d9d72ef62ed85a061ed7b9fc650e9daa607e3",
+    stock: "da01f077caca6e7c440ea05e7226a64dffdfd96e8e53a1ffaca4bd7d6e186261",
+    patched: "28c7d6d73fbf0fd69beb750cb622251732113bb55d1903644bb4fe93bbd6516f",
   },
 };
 

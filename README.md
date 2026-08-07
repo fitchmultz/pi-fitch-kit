@@ -4,7 +4,7 @@ My real Pi harness, packaged as a versioned, inspectable setup.
 
 This repository shows the composition layer I use every day: public extensions, model-routed subagents, reusable skills, authenticated MCP connections, and a small amount of local policy. It is also a working prototype for a model-agnostic organization harness built on top of [Pi](https://github.com/badlogic/pi-mono), without forking Pi core.
 
-Extension installs follow their package's default channel instead of freezing refs or versions. The current kit requires Pi `0.84.0` or later on Node.js `>=24.0.0`; Agent Browser 0.33.0 sets the Node floor.
+Extension installs follow their package's default channel instead of freezing refs or versions. The current kit requires Pi `0.84.1` or later on Node.js `>=24.0.0`; Agent Browser 0.33.0 sets the Node floor.
 
 ## Start here
 
@@ -188,7 +188,7 @@ This is already the working composition layer for a broader organization harness
 ## Install the kit
 
 ```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.0
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.1
 pi
 # Complete provider login in Pi, then:
 pi install git:github.com/fitchmultz/pi-fitch-kit

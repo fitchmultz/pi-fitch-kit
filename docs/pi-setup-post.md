@@ -1,6 +1,6 @@
 # My Pi harness, and why it is structured this way
 
-_Updated 6 August 2026 for Pi 0.84.0 or later on Node.js 24 or newer._
+_Updated 7 August 2026 for Pi 0.84.1 or later on Node.js 24 or newer._
 
 A few people have asked about my terminal agent setup. The public, installable version is [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit).
 
@@ -80,7 +80,7 @@ A product layer would add centralized provisioning, policy distribution, scoped 
 ## Install it
 
 ```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.0
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.1
 pi
 # Complete provider login, then:
 pi install git:github.com/fitchmultz/pi-fitch-kit

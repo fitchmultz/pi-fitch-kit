@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Updated 6 August 2026 for Pi 0.84.0 or later on Node.js 24 or newer._
+_Updated 7 August 2026 for Pi 0.84.1 or later on Node.js 24 or newer._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 
@@ -213,7 +213,7 @@ The contrast is the point: the main session usually implements, while specialist
 ## Install and verify
 
 ```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.0
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.1
 pi
 # Complete provider login, then:
 pi install git:github.com/fitchmultz/pi-fitch-kit

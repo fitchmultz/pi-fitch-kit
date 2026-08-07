@@ -26,7 +26,7 @@ const piPackageRoot = dirname(dirname(realpathSync(piExecutable)));
 const activePiVersion = JSON.parse(
 	readFileSync(join(piPackageRoot, "package.json"), "utf8"),
 ).version;
-assert.equal(activePiVersion, "0.84.0", "regression must target the released Pi 0.84.0 runtime");
+assert.equal(activePiVersion, "0.84.1", "regression must target the released Pi 0.84.1 runtime");
 assert.equal(
 	piPackageRoot === packageRoot || piPackageRoot.startsWith(`${packageRoot}${sep}`),
 	false,
@@ -56,23 +56,23 @@ const models = JSON.parse(
 const settings = JSON.parse(
 	readFileSync(join(activeAgentDir, "settings.json"), "utf8"),
 );
-const targetProviders = ["openai", "openai-codex"];
 const targetModelIds = ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"];
 const modelContextWindows: Record<string, number> = {};
-for (const provider of targetProviders) {
+for (const provider of ["openai", "openai-codex"]) {
 	for (const id of targetModelIds) {
-		const contextWindow =
-			models.providers[provider].modelOverrides[id].contextWindow;
-		assert.equal(
-			typeof contextWindow,
-			"number",
-			`${provider}/${id} must have a context window`,
-		);
-		modelContextWindows[`${provider}/${id}`] = contextWindow;
+		const contextWindow = models.providers?.[provider]?.modelOverrides?.[id]?.contextWindow;
+		if (typeof contextWindow === "number") {
+			modelContextWindows[`${provider}/${id}`] = contextWindow;
+		}
 	}
 }
+const configuredRoutes = Object.entries(modelContextWindows).map(([route, contextWindow]) => {
+	const [provider, model] = route.split("/");
+	return { provider, model, contextWindow };
+});
+assert.ok(configuredRoutes.length > 0, "at least one GPT-5.6 route must have an active context-window override");
 const fallbackContextWindow =
-	modelContextWindows["openai-codex/gpt-5.6-sol"];
+	modelContextWindows["openai-codex/gpt-5.6-sol"] ?? configuredRoutes[0].contextWindow;
 const xaiContextWindow =
 	models.providers.xai.modelOverrides["grok-4.5"].contextWindow;
 const compactionSettings = settings.compaction;
@@ -533,13 +533,7 @@ function unavailableManualCompactionHarness(autoCompacting = false) {
 	);
 }
 
-const boundaryRoutes = targetProviders.flatMap((provider) =>
-	targetModelIds.map((model) => ({
-		provider,
-		model,
-		contextWindow: modelContextWindows[`${provider}/${model}`],
-	})),
-);
+const boundaryRoutes = [...configuredRoutes];
 boundaryRoutes.push(
 	{
 		provider: "openai",

@@ -13,7 +13,7 @@ const assert = (condition, message) => {
 };
 
 assert(manifest.schemaVersion === 4, "setup manifest schema must match the bundled-consent shape");
-assert(manifest.runtime.pi === "0.84.0", "the kit must require Pi 0.84.0 or later");
+assert(manifest.runtime.pi === "0.84.1", "the kit must require Pi 0.84.1 or later");
 const resolvedOrigins = Object.values(packageLock.packages)
   .map((entry) => entry.resolved)
   .filter(Boolean)
@@ -28,7 +28,7 @@ assert(
     packageJson.scripts["restore:pi-core-compaction"] === "node scripts/reapply-pi-core-compaction.mjs restore",
   "Pi core apply and restore commands must remain tracked package scripts",
 );
-for (const path of ["patches/pi-0.84.0-compaction.patch", "scripts/reapply-pi-core-compaction.mjs"]) {
+for (const path of ["patches/pi-0.84.1-compaction.patch", "scripts/reapply-pi-core-compaction.mjs"]) {
   assert(lstatSync(join(root, path)).isFile(), `Pi core restoration resource missing: ${path}`);
 }
 for (const dependency of [
