@@ -26,7 +26,7 @@ const piPackageRoot = dirname(dirname(realpathSync(piExecutable)));
 const activePiVersion = JSON.parse(
 	readFileSync(join(piPackageRoot, "package.json"), "utf8"),
 ).version;
-assert.equal(activePiVersion, "0.84.0", "regression must target the released Pi 0.84.0 runtime");
+assert.equal(activePiVersion, "0.84.1", "regression must target the released Pi 0.84.1 runtime");
 assert.equal(
 	piPackageRoot === packageRoot || piPackageRoot.startsWith(`${packageRoot}${sep}`),
 	false,
