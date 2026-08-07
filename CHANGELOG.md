@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1 — 7 August 2026
+
+- Added guarded Pi 0.84.1 tool-loop compaction restoration while retaining Pi 0.84.0 validation support.
+- Made the active-install regression cover each configured GPT-5.6 context-window override without requiring inactive providers.
+
 ## 0.4.0 — 6 August 2026
 
 - Raised the minimum supported Pi version to 0.84.0 and pinned development validation to the exact 0.84.0 Pi packages.

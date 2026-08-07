@@ -167,7 +167,7 @@ There must be no separate `codex-fast` or standalone `pi-codex-context` package.
 Run all of the following against the active Pi 0.84.1 installation:
 
 1. `pi --version` and confirm the installation path resolved from `command -v pi`.
-2. Run `pi --list-models 'openai/gpt-5.6'` and `pi --list-models 'openai-codex/gpt-5.6'`, then use the allowlisted local structural parser from step 2 to confirm Sol, Terra, and Luna match the active context-window overrides in `models.json` under both providers.
+2. Run `pi --list-models 'openai/gpt-5.6'` and `pi --list-models 'openai-codex/gpt-5.6'`, then use the allowlisted local structural parser from step 2 to confirm Sol, Terra, and Luna match every active context-window override in `models.json`.
 3. Using the allowlisted local structural parser from step 2, confirm global settings still have compaction enabled with the intended reserve and keep-recent values. Use the same local allowlist for only the structural routing keys in the optional `<Pi agent dir>/pi-codex-context.json`: absent or non-literal consent must keep custom routing off; if `customCompactionEnabled` is `true`, confirm the user approved the exact listed destinations. An omitted model list means xAI Grok 4.5 high before Codex Luna high; a valid override replaces that order.
 4. Run `node --check` on all three modified Pi JavaScript files.
 5. If `pi-codex-goal` is installed, require version 0.1.38 or newer and confirm its runtime has no proactive `ctx.compact()` trigger.
@@ -182,7 +182,7 @@ Run all of the following against the active Pi 0.84.1 installation:
 The regression check must first assert that it is running against Pi 0.84.1, then prove at least these cases:
 
 - A 148,861-token valid usage plus a small trailing tool result does not compact, even if the assistant message contains more than one million characters of provider-only signature metadata.
-- Each tested viable route uses its own active context window. Usage at that route's derived threshold does not compact, while usage strictly above it does. Coverage includes all six OpenAI GPT-5.6 routes, a different OpenAI model ID, and a non-OpenAI provider.
+- Each tested viable route uses its own active context window. Usage at that route's derived threshold does not compact, while usage strictly above it does. Coverage includes every configured OpenAI GPT-5.6 override, a different OpenAI model ID, and a non-OpenAI provider.
 - Representative 8K and 32K models, plus a model exactly at `reserveTokens + keepRecentTokens`, skip the pre-request check instead of entering a fail-closed compaction loop.
 - Stale pre-compaction usage does not trigger another compaction.
 - Mid-run compaction keeps the agent-state and loop transcript arrays separate, so finalized assistant and tool-result messages are not duplicated.
