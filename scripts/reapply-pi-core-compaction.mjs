@@ -7,11 +7,10 @@ import { delimiter, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PI_PACKAGE = "@earendil-works/pi-coding-agent";
-const PI_VERSION = "0.84.0";
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const patchPath = join(projectRoot, "patches/pi-0.84.0-compaction.patch");
+const patchPath = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
 const patchSha256 = "5f68de3bb9689ad983168a683bd2cc43426e19325071b75d6fd36425ac191b24";
-const files = {
+const commonFiles = {
   "dist/core/agent-session.js": {
     stock: "91e72d5497f665e731cbd79da6a6e826d8cae7d2ce156a7dee39f8ca205e32c8",
     patched: "cd1f9b9a0b6ad10239394568be5961c5a7d8fc117830e1a09650eb5ade176c6a",
@@ -20,11 +19,19 @@ const files = {
     stock: "fcb12f1eb4d38578978e1a8e3e382a3fccfd5e0ccf87bc86979a9a8d9c145c7b",
     patched: "476b9cd8329f3b6ea94a7aeca663b1bd3992319b04f088ffd6025ce7959cec2e",
   },
-  "dist/modes/interactive/interactive-mode.js": {
+};
+const interactiveModeHashes = {
+  "0.84.0": {
     stock: "1efe4f58c10593e0d283b3e6d5bf4fd342d8e5d681f1fbc9dfbb7cc03fe4b266",
     patched: "702beb350dcb588bd52e0f061e9d9d72ef62ed85a061ed7b9fc650e9daa607e3",
   },
+  "0.84.1": {
+    stock: "da01f077caca6e7c440ea05e7226a64dffdfd96e8e53a1ffaca4bd7d6e186261",
+    patched: "28c7d6d73fbf0fd69beb750cb622251732113bb55d1903644bb4fe93bbd6516f",
+  },
 };
+let piVersion;
+let files;
 
 function fail(message) {
   throw new Error(message);
@@ -76,9 +83,15 @@ function verifyInstallation(root) {
   const packageJsonPath = join(root, "package.json");
   if (!existsSync(packageJsonPath)) fail(`Not a Pi package root: ${root}`);
   const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
-  if (packageJson.name !== PI_PACKAGE || packageJson.version !== PI_VERSION) {
-    fail(`Refusing ${packageJson.name ?? "unknown package"}@${packageJson.version ?? "unknown version"} at ${root}; expected ${PI_PACKAGE}@${PI_VERSION}`);
+  const interactiveMode = interactiveModeHashes[packageJson.version];
+  if (packageJson.name !== PI_PACKAGE || !interactiveMode) {
+    fail(`Refusing ${packageJson.name ?? "unknown package"}@${packageJson.version ?? "unknown version"} at ${root}; expected ${PI_PACKAGE}@${Object.keys(interactiveModeHashes).join(" or ")}`);
   }
+  piVersion = packageJson.version;
+  files = {
+    ...commonFiles,
+    "dist/modes/interactive/interactive-mode.js": interactiveMode,
+  };
   const cli = realpathSync(join(root, "dist/cli.js"));
   if (!cli.startsWith(`${root}/`)) fail(`Refusing Pi CLI outside package root: ${cli}`);
 }
@@ -102,11 +115,11 @@ function state(root) {
 }
 
 function backupStock(root) {
-  const backupRoot = join(root, ".pi-fitch-kit-backup", `pi-${PI_VERSION}-compaction`);
+  const backupRoot = join(root, ".pi-fitch-kit-backup", `pi-${piVersion}-compaction`);
   const manifestPath = join(backupRoot, "manifest.json");
   if (existsSync(manifestPath)) {
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-    if (manifest.packageRoot !== root || manifest.version !== PI_VERSION) {
+    if (manifest.packageRoot !== root || manifest.version !== piVersion) {
       fail(`Backup belongs to an unexpected installation: ${manifestPath}`);
     }
     for (const [relativePath, expected] of Object.entries(files)) {
@@ -126,7 +139,7 @@ function backupStock(root) {
   }
   writeFileSync(
     manifestPath,
-    `${JSON.stringify({ packageRoot: root, package: PI_PACKAGE, version: PI_VERSION, patchSha256, files }, null, 2)}\n`,
+    `${JSON.stringify({ packageRoot: root, package: PI_PACKAGE, version: piVersion, patchSha256, files }, null, 2)}\n`,
     "utf8",
   );
 }
@@ -181,19 +194,19 @@ verifyPatch();
 const before = state(root);
 
 if (action === "status") {
-  console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: PI_VERSION, state: before.name }, null, 2));
+  console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: before.name }, null, 2));
   process.exit(0);
 }
 if (action === "apply" && before.name === "patched") {
-  console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: PI_VERSION, state: "already-patched", changed: false }, null, 2));
+  console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: "already-patched", changed: false }, null, 2));
   process.exit(0);
 }
 if (action === "restore" && before.name === "stock") {
-  console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: PI_VERSION, state: "already-stock", changed: false }, null, 2));
+  console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: "already-stock", changed: false }, null, 2));
   process.exit(0);
 }
 
 runPatch(root, action === "restore", true);
 if (action === "apply") backupStock(root);
 const after = mutateAndVerify(root, action, before.name);
-console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: PI_VERSION, state: after.name, changed: true }, null, 2));
+console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: after.name, changed: true }, null, 2));
