@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2 — 7 August 2026
+
+- Footer model names render as the last path segment of router-style ids, so `(fireworks) accounts/fireworks/routers/kimi-k3-fast` becomes `(fireworks) kimi-k3-fast`.
+- Anthropic and Codex fast-mode indicators both read `fast:on|off`. Each appears only for its own provider, so the shared label stays unambiguous.
+- Inside a git repository the footer location shows the repo name in a stable per-repo color hashed from the repo root into a low-chroma 256-color palette. Under the `worktrees/<repo>/<slug>` convention it shows `repo/slug` with the color keyed on the repo. Non-repo directories and a home-dir dotfiles repo fall back to the last-two-segments path, and the branch renders only alongside a real project repo.
+- Added the bundled `calm` theme: event-horizon's neutrals with accents collapsed to a single steel-blue family, a gray-to-blue thinking ramp in place of the hot-pink top end, and muted labels and syntax colors.
+
 ## 0.4.1 — 7 August 2026
 
 - Added guarded Pi 0.84.1 tool-loop compaction restoration while retaining Pi 0.84.0 validation support.

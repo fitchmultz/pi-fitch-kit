@@ -55,8 +55,8 @@ function formatCwd(cwd: string): string {
 	return resolved.split(sep).filter(Boolean).slice(-2).join(sep);
 }
 
-// Bright xterm-256 hues distinct from the footer semantics (error/warning/accent).
-const REPO_COLORS = [39, 45, 51, 84, 117, 141, 147, 180, 207, 215, 220, 229];
+// Low-chroma xterm-256 tones: identity without neon; stays quiet next to a single-hue theme.
+const REPO_COLORS = [66, 72, 96, 102, 108, 132, 138, 144, 151, 174, 180, 187];
 
 function repoColor(key: string): number {
 	let hash = 5381;

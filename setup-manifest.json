@@ -32,6 +32,9 @@
       "prompts/fitch-setup.md",
       "prompts/audit/github-open-issues-prs.md"
     ],
+    "themes": [
+      "themes/calm.json"
+    ],
     "workingAgreementTemplate": "templates/working-agreement.md",
     "settingsExample": "examples/settings.json"
   },

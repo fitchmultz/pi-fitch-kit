@@ -225,6 +225,7 @@ The older prompt files remain in `prompts/` as source material, but the package 
 extensions/             compact footer, Anthropic image guard, Codex context hooks, and session naming
 examples/settings.json  safe, non-secret behavioral settings
 prompts/                setup, one active operational prompt, and retained source material
+themes/                 calm theme: event-horizon neutrals, single steel-blue accent family
 setup-manifest.json     package sources and selectable integrations
 templates/              optional working-agreement blocks
 docs/                   technical guide, overview, and Pi core compaction runbook
