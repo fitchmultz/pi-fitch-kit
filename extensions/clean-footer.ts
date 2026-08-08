@@ -1,6 +1,6 @@
-import { readFile, unwatchFile, watchFile } from "node:fs";
+import { existsSync, readFile, unwatchFile, watchFile } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
@@ -49,9 +49,39 @@ function formatCount(count: number): string {
 }
 
 function formatCwd(cwd: string): string {
+	const resolved = resolve(cwd);
+	if (resolved === homedir()) return "~";
+	// ponytail: last two segments are the disambiguator (repo, or repo/slug for worktrees); full path if ever needed
+	return resolved.split(sep).filter(Boolean).slice(-2).join(sep);
+}
+
+// Bright xterm-256 hues distinct from the footer semantics (error/warning/accent).
+const REPO_COLORS = [39, 45, 51, 84, 117, 141, 147, 180, 207, 215, 220, 229];
+
+function repoColor(key: string): number {
+	let hash = 5381;
+	for (const char of key) hash = ((hash << 5) + hash + char.charCodeAt(0)) >>> 0;
+	return REPO_COLORS[hash % REPO_COLORS.length]!;
+}
+
+function findRepoRoot(cwd: string): string | undefined {
 	const home = homedir();
-	const path = relative(resolve(home), resolve(cwd));
-	return path === "" ? "~" : path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path) ? `~${sep}${path}` : cwd;
+	let dir = resolve(cwd);
+	while (true) {
+		// A home-dir dotfiles repo is not a project; show the path instead.
+		if (existsSync(join(dir, ".git"))) return dir === home ? undefined : dir;
+		if (dir === home) return undefined;
+		const parent = dirname(dir);
+		if (parent === dir) return undefined;
+		dir = parent;
+	}
+}
+
+// worktrees/<repo>/<slug>: color keys on the repo, slug stays for disambiguation.
+function repoName(root: string): { text: string; key: string } {
+	return basename(dirname(dirname(root))) === "worktrees"
+		? { text: `${basename(dirname(root))}/${basename(root)}`, key: dirname(root) }
+		: { text: basename(root), key: root };
 }
 
 function sanitize(text: string): string {
@@ -61,16 +91,25 @@ function sanitize(text: string): string {
 function installFooter(ctx: ExtensionContext, verbosity: VerbosityConfig): void {
 	ctx.ui.setFooter((tui, theme, footerData) => {
 		const unsubscribe = footerData.onBranchChange(() => tui.requestRender());
+		let repoCache: { cwd: string; name?: { text: string; key: string } } | undefined;
 
 		return {
 			dispose: unsubscribe,
 			invalidate() {},
 			render(width: number): string[] {
-				let location = formatCwd(ctx.sessionManager.getCwd());
+				const cwd = ctx.sessionManager.getCwd();
+				if (repoCache?.cwd !== cwd) {
+					const root = findRepoRoot(cwd);
+					repoCache = { cwd, name: root ? repoName(root) : undefined };
+				}
+				let location = repoCache.name
+					? `\x1b[38;5;${repoColor(repoCache.name.key)}m${repoCache.name.text}\x1b[39m`
+					: theme.fg("dim", formatCwd(cwd));
+				// getGitBranch crawls into the home dotfiles repo; only show a branch for a real project repo.
 				const branch = footerData.getGitBranch();
-				if (branch) location += ` (${branch})`;
+				if (branch && repoCache.name) location += theme.fg("dim", ` (${branch})`);
 				const sessionName = ctx.sessionManager.getSessionName();
-				if (sessionName) location += ` • ${sessionName}`;
+				if (sessionName) location += theme.fg("dim", ` • ${sessionName}`);
 
 				const usage = ctx.getContextUsage();
 				const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
@@ -87,9 +126,9 @@ function installFooter(ctx: ExtensionContext, verbosity: VerbosityConfig): void 
 				const provider = footerData.getAvailableProviderCount() > 1 && ctx.model ? `(${ctx.model.provider}) ` : "";
 				const rightText = `${provider}${model}${thinking}${verbosityText(ctx, verbosity)}`;
 				const topLines = visibleWidth(location) + visibleWidth(rightText) + 2 <= width
-					? [theme.fg("dim", location + " ".repeat(width - visibleWidth(location) - visibleWidth(rightText)) + rightText)]
+					? [location + " ".repeat(width - visibleWidth(location) - visibleWidth(rightText)) + theme.fg("dim", rightText)]
 					: [
-							...wrapTextWithAnsi(theme.fg("dim", location), Math.max(1, width)),
+							...wrapTextWithAnsi(location, Math.max(1, width)),
 							...wrapTextWithAnsi(theme.fg("dim", rightText), Math.max(1, width)).map(
 								(line) => " ".repeat(Math.max(0, width - visibleWidth(line))) + line,
 							),
