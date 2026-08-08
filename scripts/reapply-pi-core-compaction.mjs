@@ -9,11 +9,14 @@ import { fileURLToPath } from "node:url";
 const PI_PACKAGE = "@earendil-works/pi-coding-agent";
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const patchPath = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
-const patchSha256 = "5f68de3bb9689ad983168a683bd2cc43426e19325071b75d6fd36425ac191b24";
+const patchSha256 = "9350641094f70ac3a98fd3b02a236861fbbbc13503855637a1dc2ff53971dd08";
+const legacyPatchPath = join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.4.2.patch");
+const legacyPatchSha256 = "5f68de3bb9689ad983168a683bd2cc43426e19325071b75d6fd36425ac191b24";
+const legacyAgentSessionPatched = "cd1f9b9a0b6ad10239394568be5961c5a7d8fc117830e1a09650eb5ade176c6a";
 const commonFiles = {
   "dist/core/agent-session.js": {
     stock: "91e72d5497f665e731cbd79da6a6e826d8cae7d2ce156a7dee39f8ca205e32c8",
-    patched: "cd1f9b9a0b6ad10239394568be5961c5a7d8fc117830e1a09650eb5ade176c6a",
+    patched: "e55bf39d43ab95468a8949dd72c541adc1e54421c8666f9d06e06e4b9efa7227",
   },
   "dist/core/compaction/compaction.js": {
     stock: "fcb12f1eb4d38578978e1a8e3e382a3fccfd5e0ccf87bc86979a9a8d9c145c7b",
@@ -96,8 +99,8 @@ function verifyInstallation(root) {
   if (!cli.startsWith(`${root}/`)) fail(`Refusing Pi CLI outside package root: ${cli}`);
 }
 
-function verifyPatch() {
-  if (sha256(patchPath) !== patchSha256) fail(`Patch checksum mismatch: ${patchPath}`);
+function verifyPatch(path, expected) {
+  if (sha256(path) !== expected) fail(`Patch checksum mismatch: ${path}`);
 }
 
 function state(root) {
@@ -109,6 +112,14 @@ function state(root) {
   }
   if (Object.entries(files).every(([path, expected]) => hashes[path] === expected.patched)) {
     return { name: "patched" };
+  }
+  if (
+    hashes["dist/core/agent-session.js"] === legacyAgentSessionPatched &&
+    Object.entries(files).every(
+      ([path, expected]) => path === "dist/core/agent-session.js" || hashes[path] === expected.patched,
+    )
+  ) {
+    return { name: "legacy-patched" };
   }
   const detail = Object.entries(hashes).map(([path, hash]) => `${path}: ${hash}`).join("\n");
   fail(`Pi core diverges from both reviewed stock and patched states; refusing mutation:\n${detail}`);
@@ -144,11 +155,11 @@ function backupStock(root) {
   );
 }
 
-function runPatch(root, reverse, dryRun) {
+function runPatch(root, reverse, dryRun, source = patchPath) {
   const args = ["--batch", "--forward", "--no-backup-if-mismatch", "--reject-file=-", "-p1", "-d", root];
   if (reverse) args.unshift("--reverse");
   if (dryRun) args.unshift("--dry-run");
-  const result = spawnSync("patch", args, { encoding: "utf8", input: readFileSync(patchPath) });
+  const result = spawnSync("patch", args, { encoding: "utf8", input: readFileSync(source) });
   if (result.status !== 0) {
     fail(`Patch ${dryRun ? "preflight" : "mutation"} failed:\n${result.stdout}${result.stderr}`);
   }
@@ -160,12 +171,34 @@ function checkSyntax(root) {
   }
 }
 
-function mutateAndVerify(root, action, beforeName) {
+function planSteps(action, beforeName) {
+  if (action === "restore") {
+    return [{ reverse: true, source: beforeName === "legacy-patched" ? legacyPatchPath : patchPath }];
+  }
+  if (beforeName === "legacy-patched") {
+    // One-step migration: reverse the superseded reviewed patch, verify the
+    // exact stock intermediate, ensure the stock backup exists, then apply the
+    // current patch. Failures roll back to the legacy-patched pre-state.
+    return [
+      { reverse: true, source: legacyPatchPath, verify: "stock", backup: true },
+      { reverse: false, source: patchPath },
+    ];
+  }
+  return [{ reverse: false, source: patchPath }];
+}
+
+function mutateAndVerify(root, action, beforeName, steps) {
   const snapshots = Object.fromEntries(
     Object.keys(files).map((relativePath) => [relativePath, readFileSync(join(root, relativePath))]),
   );
   try {
-    runPatch(root, action === "restore", false);
+    for (const step of steps) {
+      runPatch(root, step.reverse, false, step.source);
+      if (step.verify && state(root).name !== step.verify) {
+        fail(`Expected ${step.verify} state mid-${action}, found a divergent intermediate`);
+      }
+      if (step.backup) backupStock(root);
+    }
     const expected = action === "apply" ? "patched" : "stock";
     const after = state(root);
     if (after.name !== expected) fail(`Expected ${expected} state after ${action}, found ${after.name}`);
@@ -190,8 +223,11 @@ function mutateAndVerify(root, action, beforeName) {
 const { action, explicitRoot } = parseArgs();
 const root = resolvePiRoot(explicitRoot);
 verifyInstallation(root);
-verifyPatch();
+verifyPatch(patchPath, patchSha256);
 const before = state(root);
+if (before.name === "legacy-patched" && action !== "status") {
+  verifyPatch(legacyPatchPath, legacyPatchSha256);
+}
 
 if (action === "status") {
   console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: before.name }, null, 2));
@@ -206,7 +242,22 @@ if (action === "restore" && before.name === "stock") {
   process.exit(0);
 }
 
-runPatch(root, action === "restore", true);
-if (action === "apply") backupStock(root);
-const after = mutateAndVerify(root, action, before.name);
-console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: after.name, changed: true }, null, 2));
+const steps = planSteps(action, before.name);
+runPatch(root, steps[0].reverse, true, steps[0].source);
+if (action === "apply" && before.name === "stock") backupStock(root);
+const after = mutateAndVerify(root, action, before.name, steps);
+console.log(
+  JSON.stringify(
+    {
+      ok: true,
+      action,
+      packageRoot: root,
+      version: piVersion,
+      state: after.name,
+      changed: true,
+      ...(before.name === "legacy-patched" ? { migratedFrom: "legacy-patched" } : {}),
+    },
+    null,
+    2,
+  ),
+);

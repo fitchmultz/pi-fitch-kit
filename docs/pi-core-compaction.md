@@ -27,7 +27,9 @@ Summary generation can be routed separately by this package's `extensions/codex-
 
 Pi checks normal threshold compaction after an agent run ends and before a later user prompt. A single agent run can make several provider requests while executing tools. Large tool results can therefore take a continuation past the configured threshold before Pi reaches its existing end-of-run check.
 
-The fix adds the same threshold check at Pi's existing `transformContext` request boundary. That hook runs after initial, tool-result, steering, and follow-up messages have been injected and immediately before every provider request. It must reuse Pi's own token accounting and compaction implementation. Do not add a character-count tokenizer, serialize the whole context, or synthesize a context-overflow response.
+The fix adds the same threshold check at two existing Pi hooks that together cover every in-run provider request. The primary site is Pi's `prepareNextTurnWithContext` turn boundary, which runs after tool results are appended and before the loop drains queued steering and follow-up messages. Compacting there keeps two properties the request-time site cannot provide: messages already enqueued on the agent when the boundary drain runs ride the immediate next provider request instead of arriving one request late, and the hook receives the run's `AbortSignal`, so aborting the run cancels an in-flight compaction promptly. Interactive input typed during a compaction is enqueued by a fire-and-forget flush, so its inclusion in the very next request is best effort; when the flush loses that race the message arrives one request later, which matches the pre-fix behavior. The secondary site is Pi's `transformContext` request boundary, which runs after steering and follow-up messages have been injected and immediately before every provider request. It remains the fail-closed backstop for contexts pushed over the threshold by injected messages and for the first request of continuation runs. Both sites must reuse Pi's own token accounting and compaction implementation. Do not add a character-count tokenizer, serialize the whole context, or synthesize a context-overflow response.
+
+Both sites thread their hook signal into automatic compaction. Without that, `session.abort()` hangs until an in-flight boundary summarization finishes and then appends a compaction entry the user already abandoned. Exits whose combined signal is aborted must surface as one clean `aborted` compaction event; an `AbortError` thrown while the combined signal is still live is a real failure and must keep its error message. A blocked provider request must not retrigger post-run auto-compaction; otherwise pressing Escape during a boundary compaction silently restarts the work it just cancelled.
 
 Stock Pi 0.84.1 still needs a cut-point correction. If the trailing tool-result block itself reaches `keepRecentTokens`, the stock algorithm finds no valid cut point after those results, falls back to the oldest entry, and produces no compaction preparation. The corrected algorithm keeps the preceding assistant message with its tool results so compaction can proceed.
 
@@ -56,6 +58,8 @@ npm run reapply:pi-core-compaction
 
 The default command ignores npm-injected local `node_modules/.bin` entries when resolving the active `pi`, so the kit's validation dependency cannot be mistaken for the system installation. For an isolated package root, append `-- --pi-root /path/to/@earendil-works/pi-coding-agent`. The command supports only the reviewed Pi 0.84.0 and 0.84.1 package identities and their exact stock hashes, preflights every patch anchor, creates a stock backup, verifies the patched hashes and JavaScript syntax, rolls back and verifies the complete pre-operation state after any mutation failure, fails closed on divergence, and no-ops when already applied. Restore the reviewed stock preimage with `npm run restore:pi-core-compaction` and the same optional `--pi-root` argument.
 
+An install patched by kit 0.4.1 or 0.4.2 is recognized as the sha-pinned `legacy-patched` state. `apply` migrates it in one guarded run: it reverses the archived superseded patch (`patches/archive/pi-0.84.1-compaction-v0.4.2.patch`, checksum-pinned), verifies the exact stock intermediate, ensures the stock backup exists, then applies the current patch; any failure rolls back to the verified legacy pre-state. `restore` reverses the archived patch directly to stock. Any other divergence still fails closed.
+
 Every Pi update replaces the installed package with stock core. After any update, rerun the exact-version status/regression checks and this guarded reapply command; never assume the prior patch survived. A later Pi version requires a new reviewed patch and hash set rather than bypassing the guard.
 
 ## Required modification
@@ -80,16 +84,21 @@ The helper must:
 
 Use the existing imports from `./compaction/index.js` and `./session-manager.js`. Pi 0.84.1 already imports `estimateContextTokens`, `shouldCompact`, and `getLatestCompactionEntry`; avoid adding duplicate implementations.
 
-Install the helper at one request boundary:
+The helper accepts the hook's `AbortSignal` as a second parameter and passes it to `_runAutoCompaction("threshold", false, signal)` so run cancellation reaches the summarization request.
 
-1. Add an `_installAgentRequestCompaction()` method next to the existing agent-hook installation methods.
-2. Capture any existing `agent.transformContext` function before replacing it.
-3. The replacement `transformContext` must await the helper with the request's current messages.
-4. When compaction succeeds, replace the contents of the loop-owned messages array with the contents of `agent.state.messages`. Mutate the loop-owned array with `splice` or an equivalent copy operation. **Never assign or return `agent.state.messages` itself.** Agent state and the agent loop must retain separate top-level arrays because both append lifecycle messages independently.
-5. After the compaction check, invoke the previously installed transform with the updated loop-owned array, or return that array when there was no previous transform.
-6. Call `_installAgentRequestCompaction()` once from the `AgentSession` constructor alongside the existing tool and next-turn hook installers.
+Install the helper at both boundaries inside one `_installAgentRequestCompaction()` method, called once from the `AgentSession` constructor after the existing tool and next-turn hook installers:
 
-Do not add separate checks to `_runAgentPrompt()` or `_installAgentNextTurnRefresh()`. Those sites either run before queued messages are injected or do not run at the true provider-request boundary. The transform wrapper must be awaited; do not run compaction in the background.
+1. Capture the previously installed `agent.prepareNextTurnWithContext` and replace it with a wrapper that first awaits the captured hook with the turn and signal, preserving every field of the returned snapshot. Chaining after the existing next-turn refresh hook keeps its context, model, and thinking refresh authoritative.
+2. The wrapper must skip the check when the hook signal is already aborted, and when the turn produced no tool results and no messages are queued. Stock post-run `_checkCompaction` owns end-of-run and post-abort compaction semantics: its aborted-skip, `willRetry` coordination, and overflow-recovery latch must not be duplicated inside the run. The tool-result predicate is deliberately approximate: the loop keeps its continuation decision private, so a turn whose tool calls all terminated the batch still compacts at the boundary, one step earlier than the post-run check would have. That early compaction is the same work on the same state and is an accepted tradeoff below.
+3. When the run continues, await the helper with the messages of the previous snapshot's context when present, otherwise the turn's context, and the hook signal. On success, return the previous snapshot spread with a context whose `messages` is a fresh copy of `agent.state.messages`; leave every other snapshot and context field unchanged. On no-op, return the previous snapshot unchanged.
+4. Capture any existing `agent.transformContext` function before replacing it.
+5. The replacement `transformContext` must await the helper with the request's current messages and the hook signal.
+6. When compaction succeeds, replace the contents of the loop-owned messages array with the contents of `agent.state.messages`. Mutate the loop-owned array with `splice` or an equivalent copy operation. **Never assign or return `agent.state.messages` itself.** Agent state and the agent loop must retain separate top-level arrays because both append lifecycle messages independently.
+7. After the compaction check, invoke the previously installed transform with the updated loop-owned array, or return that array when there was no previous transform.
+
+After a successful turn-boundary compaction, the transform-gate check is naturally dormant for the same request: the rebuilt context starts with a summary message newer than the retained assistant usage, so the stale-usage guards skip it. Do not add a third check site, and do not run compaction in the background; both wrappers must be awaited.
+
+In `_checkCompaction`, return false for an assistant message whose `stopReason` is `error` and whose error message contains `Provider request blocked.`. The blocked request already surfaced its pre-request compaction failure or cancellation; re-running compaction from the post-run path would restart work the user may have just cancelled with Escape.
 
 ## Required manual-compaction safety
 
@@ -105,13 +114,14 @@ In the interactive `/compact` handler, show `Compaction already in progress` as 
 
 ## Required compaction ownership
 
-Automatic compaction must claim ownership before its first asynchronous operation:
+Automatic compaction must claim ownership before its first asynchronous operation and honor both cancellation sources:
 
 1. Return without starting when a manual or automatic compaction controller already exists.
 2. After confirming a model is selected, create and store a local automatic compaction controller before awaiting authentication.
-3. Emit `compaction_start` before authentication so `isCompacting`, queued input, cancellation, and the eventual `compaction_end` remain balanced on every path.
-4. Use the local controller's signal throughout preparation, extension hooks, and summary generation. Early authentication or preparation failures must still emit a failed `compaction_end` through the existing catch path.
-5. In `finally`, clear the shared field only when it still references that local controller.
+3. `_runAutoCompaction(reason, willRetry, requestSignal)` accepts an optional request signal. When present, combine it with the local controller through `AbortSignal.any` and use the combined signal everywhere the local controller's signal was used: the pre-auth early-exit check, the `session_before_compact` extension event, native `compact()`, and the post-generation aborted check. `session.abort()` and `agent.abort()` then cancel an in-flight boundary compaction promptly, while `abortCompaction()` keeps cancelling only the compaction.
+4. Emit `compaction_start` before authentication so `isCompacting`, queued input, cancellation, and the eventual `compaction_end` remain balanced on every path. Immediately after the start event, exit with an `aborted: true` end event when the combined signal is already aborted, before requesting authentication.
+5. In the catch path, classify an exit as a clean cancellation only when the combined signal is aborted: emit `compaction_end` with `aborted: true` and no failure `errorMessage`, and return false. An `AbortError` thrown while the combined signal is still live, and any other authentication or preparation failure, must still emit a failed `compaction_end` with its error message through the existing catch path.
+6. In `finally`, clear the shared field only when it still references that local controller.
 
 These ownership rules close both races: `/compact` or extension-owned `ctx.compact()` cannot enter while automatic authentication is pending, and a second automatic or manual compaction cannot enter while manual compaction is waiting for the active agent to abort.
 
@@ -136,6 +146,18 @@ Pi marks any `session_before_compact` result as hook-generated, including this e
 ## Required interactive rendering correction
 
 A successful manual or automatic compaction is persisted before `compaction_end`. The interactive handler must rebuild the chat from `sessionManager.buildContextEntries()` and must not append a second `createCompactionSummaryMessage()` afterward. Rebuilding already renders the persisted summary in the correct transcript position.
+
+## Accepted provider-recovery tradeoffs
+
+The following verified deltas are intentional. Each is bounded by stock Pi recovery, and closing it locally would require re-forking machinery this kit deliberately retired: a custom token estimator, a `_prepareProviderRequest` agent-core hook, post-compaction fit fingerprints, or double-running extension context transforms. Do not "fix" these without new evidence that stock recovery fails.
+
+- **First request with no prior usage.** A context that has never produced assistant usage skips the boundary check (step 3 of the helper) and can reach the provider oversized. `prompt()` runs Pi's stock pre-prompt compaction check, and stock overflow recovery (`_checkCompaction` with its `_overflowRecoveryAttempted` latch) removes the failed message, compacts, and retries once for the rest.
+- **Raw pre-transform estimate.** The helper estimates the loop-owned messages before extension `context` transforms and `convertToLlm` filtering, so it counts `excludeFromContext` messages the provider never sees and misses extension deltas. The estimate anchors on the last provider-reported usage, which is post-transform ground truth; only the trailing slice is raw. Excluded raw messages make the estimate high, compacting slightly early; extension transform growth makes it low, compacting late and falling to stock overflow recovery. Estimating post-transform would require running extension transforms twice per request, which is unsafe for non-idempotent transforms.
+- **System prompt and tool-schema growth.** Mid-turn additions to the system prompt or tool schemas are not in the trailing estimate. They are included in the next provider-reported usage, and the reserve absorbs the transient delta; genuine overflow lands in stock overflow recovery.
+- **No post-compaction fit recheck.** After a successful boundary compaction the request proceeds without re-verifying the rebuilt context fits. The new-entry requirement plus the stale-usage dormancy prevent compaction loops, and a context that still exceeds the window ends in the same stock overflow recovery and terminal error as stock Pi.
+- **Mid-turn model switch.** The helper reads the currently selected model, while the in-flight request may still use the model captured at the last turn boundary. Stock `setModel` has no active-run guard; the divergence self-heals at the next turn boundary, and overflow recovery backstops the one affected request.
+- **Steering injected past the transform gate.** A steering or follow-up message that itself pushes the context over the threshold compacts at the transform gate, after the drain, so a further message typed during that compaction still waits one request. Only the dominant tool-loop path gets the immediate-next-request guarantee.
+- **Terminating tool batches compact one step early.** When every tool call in a turn terminates the batch, the loop stops without another provider request, but its continuation decision is private to the loop and the tool-result messages it hands the boundary hook do not carry the terminate flag. The boundary check therefore compacts in-run where stock would have compacted moments later in the post-run check. It is the same compaction on the same state; the stale-usage dormancy keeps the post-run check from repeating it.
 
 ## False-positive safeguards
 
@@ -187,6 +209,15 @@ The regression check must first assert that it is running against Pi 0.84.1, the
 - Stale pre-compaction usage does not trigger another compaction.
 - Mid-run compaction keeps the agent-state and loop transcript arrays separate, so finalized assistant and tool-result messages are not duplicated.
 - A queued steering or follow-up message that crosses the threshold is included before the pre-request check runs.
+- A steering message queued while a turn-boundary compaction is running is present in the immediate next provider request together with the compacted context, without an extra round-trip.
+- A run whose final turn produced no tool results and has no queued messages does not compact in-run; end-of-run compaction stays owned by the stock post-run check.
+- A terminating over-threshold tool batch compacts once at the boundary and the run still completes cleanly on its tool result with no further provider request.
+- The boundary wrapper chains a previously installed next-turn hook with the loop's exact turn and signal, preserves every snapshot and context field it returns, replaces only the messages with a fresh copy of agent state, and passes the prior snapshot through unchanged on a no-op boundary.
+- The run's abort signal reaches an in-flight boundary compaction end to end: aborting the run settles it promptly as `aborted`, appends no compaction entry, issues no further provider request, and emits one `compaction_end` with `aborted: true` and no failure message.
+- An `AbortError` thrown while the combined signal is still live surfaces as a failed `compaction_end` that keeps its error message.
+- The reapply script recognizes the sha-pinned legacy-patched state on an isolated fixture root, migrates it to the current patch in one guarded apply, restores both patched and legacy-patched fixtures to reviewed stock, and refuses a corrupted install with the divergence report.
+- A pre-aborted request signal exits automatic compaction after `compaction_start` with a clean aborted `compaction_end`, before requesting summarization authentication.
+- An assistant error whose message contains `Provider request blocked.` does not retrigger post-run auto-compaction, while other error messages keep the stock threshold path.
 - A single trailing tool result at `keepRecentTokens`, and several trailing tool results that cumulatively reach it, produce a valid compaction preparation that keeps the assistant/tool-result group together.
 - If threshold compaction creates no new compaction entry, the request boundary throws and the provider request remains blocked.
 - A concurrent or unavailable manual compaction does not abort the active agent run.

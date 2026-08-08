@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.3 — 8 August 2026
+
+- The tool-loop compaction patch now also compacts at the turn boundary, after tool results and before queued steering drains, so messages queued during an in-run compaction ride the immediate next provider request instead of arriving one request late; interactive input enqueued by the fire-and-forget compaction flush is included on a best-effort basis. The request-boundary check remains as a fail-closed backstop for messages injected after the turn boundary.
+- Boundary compaction now threads the run's `AbortSignal` into auto-compaction, so `session.abort()` and `agent.abort()` cancel an in-flight pre-request summarization promptly instead of hanging until it completes and appending a post-abort compaction entry.
+- Auto-compaction classifies an exit as a clean `aborted` compaction event only when its combined signal is aborted; an `AbortError` with a live signal stays a failure with its message. A blocked provider request no longer retriggers post-run auto-compaction, and the boundary hook skips already-aborted runs entirely, so cancelling a pre-request compaction with Escape surfaces once instead of silently restarting.
+- The guarded reapply command now recognizes installs patched by kit 0.4.1/0.4.2 as a sha-pinned `legacy-patched` state and migrates them in one run — reverse the archived superseded patch, verify the stock intermediate, apply the current patch — with the same fail-closed rollback; `restore` returns them directly to reviewed stock.
+- Documented the verified provider-recovery tradeoffs the patch intentionally leaves to stock Pi: no-usage first requests, system-prompt and tool-schema estimate deltas, post-transform final-fit, mid-turn model switches, and terminating tool batches compacting one step early because the loop keeps its continuation decision private.
+- Aligned development validation, the setup manifest, and install instructions with Pi 0.84.1 while retaining the reviewed Pi 0.84.0 reapply identity.
+
 ## 0.4.2 — 7 August 2026
 
 - Footer model names render as the last path segment of router-style ids, so `(fireworks) accounts/fireworks/routers/kimi-k3-fast` becomes `(fireworks) kimi-k3-fast`.

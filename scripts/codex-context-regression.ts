@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
+	appendFileSync,
+	copyFileSync,
+	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	realpathSync,
@@ -1314,6 +1317,7 @@ writeCompactionConfig({ customCompactionEnabled: true });
 function integrationHarness(
 	streamFn: (...args: unknown[]) => unknown,
 	createCompaction = true,
+	priorPrepareNextTurn?: (turn: unknown, signal?: AbortSignal) => unknown,
 ) {
 	const branch: unknown[] = [];
 	let compactions = 0;
@@ -1347,18 +1351,44 @@ function integrationHarness(
 						details: {},
 					}),
 				},
+				{
+					name: "finish",
+					label: "Finish",
+					description: "Stop the loop",
+					parameters: {
+						type: "object",
+						properties: {},
+						additionalProperties: false,
+					},
+					execute: async () => ({
+						content: [{ type: "text", text: "x".repeat(1_000) }],
+						details: {},
+						terminate: true,
+					}),
+				},
 			],
 		},
 		streamFn,
 	});
 	const session = Object.create(AgentSession.prototype);
 	session.agent = agent;
+	if (priorPrepareNextTurn) {
+		agent.prepareNextTurnWithContext = priorPrepareNextTurn;
+	}
 	session.settingsManager = {
 		getCompactionSettings: () => compactionSettings,
 	};
 	session.sessionManager = { getBranch: () => branch };
-	session._runAutoCompaction = async () => {
+	session._runAutoCompaction = async (
+		_reason: string,
+		_willRetry: boolean,
+		requestSignal?: AbortSignal,
+	) => {
 		compactions++;
+		assert.ok(
+			requestSignal instanceof AbortSignal,
+			"boundary compaction must receive the run's abort signal",
+		);
 		if (createCompaction) {
 			const timestamp = Date.now() + 1_000;
 			branch.push({
@@ -1377,7 +1407,7 @@ function integrationHarness(
 		}
 	};
 	session._installAgentRequestCompaction();
-	return { agent, compactions: () => compactions };
+	return { agent, session, compactions: () => compactions };
 }
 
 function streamedAssistant(
@@ -1505,6 +1535,50 @@ function streamedAssistant(
 }
 
 {
+	// A terminating tool batch still reaches the boundary hook because the loop
+	// keeps its continuation decision private. Pin the accepted tradeoff: it
+	// compacts one step early and the run still completes cleanly.
+	let requests = 0;
+	const { agent, compactions } = integrationHarness(() => {
+		requests++;
+		return responseStream(
+			streamedAssistant(
+				[
+					{
+						type: "toolCall",
+						id: "final-call",
+						name: "finish",
+						arguments: {},
+					},
+				],
+				boundaryUsageTokens,
+				"toolUse",
+				1,
+			),
+		);
+	});
+	await agent.prompt("start terminal flow");
+	assert.equal(
+		requests,
+		1,
+		"a terminating tool batch must not trigger another provider request",
+	);
+	assert.equal(
+		compactions(),
+		1,
+		"a terminating over-threshold batch compacts one step early at the boundary",
+	);
+	const lastMessage = agent.state.messages[
+		agent.state.messages.length - 1
+	] as { role?: string };
+	assert.equal(
+		lastMessage.role,
+		"toolResult",
+		"the terminal run must end cleanly on its tool result",
+	);
+}
+
+{
 	let request = 0;
 	const secondRequestContexts: unknown[][] = [];
 	const { agent, compactions } = integrationHarness(
@@ -1553,6 +1627,574 @@ function streamedAssistant(
 		true,
 		"queued messages must be present when the request-boundary check runs",
 	);
+}
+
+{
+	// Steering queued while a turn-boundary compaction runs must ride the
+	// immediate next provider request, not arrive one request late.
+	let request = 0;
+	const requestContexts: unknown[][] = [];
+	const { agent, session, compactions } = integrationHarness(
+		(_model: unknown, context: { messages: unknown[] }) => {
+			request++;
+			requestContexts.push(context.messages);
+			return responseStream(
+				request === 1
+					? streamedAssistant(
+							[
+								{
+									type: "toolCall",
+									id: "steer-call",
+									name: "grow",
+									arguments: { chars: 1_000 },
+								},
+							],
+							boundaryUsageTokens,
+							"toolUse",
+							1,
+						)
+					: streamedAssistant(
+							[{ type: "text", text: "steer-flow-done" }],
+							100,
+							"stop",
+							2,
+						),
+			);
+		},
+	);
+	const defaultCompaction = session._runAutoCompaction.bind(session);
+	session._runAutoCompaction = async (
+		reason: string,
+		willRetry: boolean,
+		requestSignal?: AbortSignal,
+	) => {
+		// The steer arrives while the boundary compaction is still running.
+		agent.steer({
+			role: "user",
+			content: "steer-during-compaction-marker",
+			timestamp: Date.now() + 5,
+		});
+		await defaultCompaction(reason, willRetry, requestSignal);
+	};
+	await agent.prompt("start steering flow");
+	assert.equal(compactions(), 1, "the steering flow must compact once");
+	assert.equal(
+		request,
+		2,
+		"steering queued during boundary compaction must not need an extra request",
+	);
+	assert.equal(
+		JSON.stringify(requestContexts[1]).includes(
+			"steer-during-compaction-marker",
+		),
+		true,
+		"steering queued during boundary compaction must ride the immediate next request",
+	);
+	assert.equal(
+		JSON.stringify(requestContexts[1]).includes(
+			"history before this point was compacted",
+		),
+		true,
+		"the immediate next request must also carry the compacted context",
+	);
+}
+
+{
+	// A run that is about to stop must leave end-of-run compaction to the stock
+	// post-run path instead of compacting inside the run.
+	let request = 0;
+	const { agent, compactions } = integrationHarness(() => {
+		request++;
+		return responseStream(
+			streamedAssistant(
+				[{ type: "text", text: "final-answer" }],
+				boundaryUsageTokens,
+				"stop",
+				1,
+			),
+		);
+	});
+	await agent.prompt("start ending flow");
+	assert.equal(request, 1);
+	assert.equal(
+		compactions(),
+		0,
+		"a run without tool results or queued messages must not compact in-run",
+	);
+}
+
+{
+	// End to end: the run's abort signal must reach an in-flight boundary
+	// compaction, cancel it promptly, and settle the run as aborted without
+	// appending a compaction entry.
+	const branch = compactionEntries([compactionSettings.keepRecentTokens * 4]);
+	const events: Array<{
+		type?: string;
+		aborted?: boolean;
+		errorMessage?: string;
+	}> = [];
+	let providerRequests = 0;
+	let appended = 0;
+	const agent = new Agent({
+		initialState: {
+			model: {
+				id: "gpt-5.6-sol",
+				name: "GPT-5.6 Sol",
+				api: "openai-codex-responses",
+				provider: "openai-codex",
+				baseUrl: "https://example.invalid",
+				reasoning: true,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: fallbackContextWindow,
+				maxTokens: 128_000,
+			},
+			tools: [
+				{
+					name: "grow",
+					label: "Grow",
+					description: "Return text",
+					parameters: {
+						type: "object",
+						properties: { chars: { type: "number" } },
+						required: ["chars"],
+						additionalProperties: false,
+					},
+					execute: async (_id: string, args: { chars: number }) => ({
+						content: [{ type: "text", text: "x".repeat(args.chars) }],
+						details: {},
+					}),
+				},
+			],
+		},
+		streamFn: () => {
+			providerRequests++;
+			return responseStream(
+				streamedAssistant(
+					[
+						{
+							type: "toolCall",
+							id: "abort-call",
+							name: "grow",
+							arguments: { chars: 1_000 },
+						},
+					],
+					boundaryUsageTokens,
+					"toolUse",
+					1,
+				),
+			);
+		},
+	});
+	const session = Object.create(AgentSession.prototype);
+	session.agent = agent;
+	session.settingsManager = {
+		getCompactionSettings: () => compactionSettings,
+	};
+	session.sessionManager = {
+		getBranch: () => branch,
+		appendCompaction: () => {
+			appended++;
+		},
+	};
+	session._getSummarizationRequestAuth = async () => ({
+		model: agent.state.model,
+		apiKey: "test",
+	});
+	session._emit = (event: {
+		type?: string;
+		aborted?: boolean;
+		errorMessage?: string;
+	}) => {
+		events.push(event);
+	};
+	session._extensionRunner = {
+		hasHandlers: (type: string) => type === "session_before_compact",
+		emit: (event: { type: string; signal?: AbortSignal }) => {
+			if (event.type !== "session_before_compact") {
+				return undefined;
+			}
+			assert.ok(
+				event.signal instanceof AbortSignal,
+				"boundary compaction must hand extensions an abort signal",
+			);
+			queueMicrotask(() => agent.abort());
+			return new Promise((_resolve, reject) => {
+				const abortError = Object.assign(new Error("summarization aborted"), {
+					name: "AbortError",
+				});
+				if (event.signal?.aborted) {
+					reject(abortError);
+					return;
+				}
+				event.signal?.addEventListener("abort", () => reject(abortError), {
+					once: true,
+				});
+			});
+		},
+	};
+	session._installAgentRequestCompaction();
+	let watchdog: ReturnType<typeof setTimeout> | undefined;
+	try {
+		await Promise.race([
+			agent.prompt("start abort flow"),
+			new Promise((_resolve, reject) => {
+				watchdog = setTimeout(
+					() =>
+						reject(
+							new Error(
+								"aborting the run must cancel the boundary compaction promptly",
+							),
+						),
+					10_000,
+				);
+			}),
+		]);
+	} finally {
+		clearTimeout(watchdog);
+	}
+	assert.equal(providerRequests, 1, "the aborted run must not issue another provider request");
+	assert.equal(appended, 0, "an aborted boundary compaction must not append a compaction entry");
+	const compactionEnds = events.filter(
+		(event) => event.type === "compaction_end",
+	);
+	assert.equal(
+		compactionEnds.length,
+		1,
+		"an aborted boundary compaction must emit exactly one compaction_end",
+	);
+	assert.deepEqual(
+		[compactionEnds[0]?.aborted, compactionEnds[0]?.errorMessage],
+		[true, undefined],
+		"an aborted boundary compaction must emit one clean aborted compaction_end",
+	);
+	const lastAssistant = [...agent.state.messages]
+		.reverse()
+		.find(
+			(message: { role: string; stopReason?: string }) =>
+				message.role === "assistant",
+		) as { stopReason?: string } | undefined;
+	assert.equal(
+		lastAssistant?.stopReason,
+		"aborted",
+		"the run must settle as aborted after cancelling boundary compaction",
+	);
+}
+
+{
+	// The boundary wrapper must chain the previously installed next-turn hook,
+	// hand it the exact turn and signal, and preserve every snapshot field it
+	// returns while replacing only the context's messages.
+	const priorCalls: Array<{ turn: unknown; signal: unknown }> = [];
+	const priorSnapshots: Array<Record<string, unknown>> = [];
+	const sentinelModel = { id: "sentinel-model" };
+	const priorHook = async (
+		turn: { context: Record<string, unknown> },
+		signal?: AbortSignal,
+	) => {
+		priorCalls.push({ turn, signal });
+		const snapshot = {
+			context: { ...turn.context, systemPrompt: "prior-system-prompt" },
+			model: sentinelModel,
+			thinkingLevel: "high",
+			sentinelField: "sentinel-extra",
+		};
+		priorSnapshots.push(snapshot);
+		return snapshot;
+	};
+	const { agent, compactions } = integrationHarness(
+		() => responseStream(streamedAssistant([], 100, "stop", 1)),
+		true,
+		priorHook,
+	);
+	const controller = new AbortController();
+	const overThresholdTurn = {
+		message: assistant(boundaryUsageTokens),
+		toolResults: [toolResult(1_000)],
+		context: {
+			systemPrompt: "turn-system-prompt",
+			tools: [],
+			messages: [assistant(boundaryUsageTokens), toolResult(1_000)],
+		},
+		newMessages: [],
+	};
+	const snapshot = (await agent.prepareNextTurnWithContext(
+		overThresholdTurn,
+		controller.signal,
+	)) as {
+		context: { systemPrompt?: string; messages: unknown[] };
+		model?: unknown;
+		thinkingLevel?: string;
+		sentinelField?: string;
+	};
+	assert.equal(compactions(), 1, "the sentinel turn must compact once");
+	assert.equal(priorCalls.length, 1, "the prior next-turn hook must be chained");
+	assert.equal(
+		priorCalls[0].turn,
+		overThresholdTurn,
+		"the prior hook must receive the loop's turn object",
+	);
+	assert.equal(
+		priorCalls[0].signal,
+		controller.signal,
+		"the prior hook must receive the run signal",
+	);
+	assert.equal(
+		snapshot.model,
+		sentinelModel,
+		"the wrapper must preserve the prior snapshot's model",
+	);
+	assert.equal(
+		snapshot.thinkingLevel,
+		"high",
+		"the wrapper must preserve the prior snapshot's thinking level",
+	);
+	assert.equal(
+		snapshot.sentinelField,
+		"sentinel-extra",
+		"the wrapper must preserve arbitrary prior snapshot fields",
+	);
+	assert.equal(
+		snapshot.context.systemPrompt,
+		"prior-system-prompt",
+		"the wrapper must build on the prior snapshot's context, not the turn's",
+	);
+	assert.notEqual(
+		snapshot.context.messages,
+		agent.state.messages,
+		"the wrapper must return a fresh copy, not agent state itself",
+	);
+	assert.deepEqual(
+		snapshot.context.messages,
+		agent.state.messages,
+		"the wrapper must return the compacted agent-state messages",
+	);
+	const underThresholdTurn = {
+		message: assistant(100),
+		toolResults: [toolResult(10)],
+		context: { messages: [assistant(100, 20_000), toolResult(10, 21_000)] },
+		newMessages: [],
+	};
+	const passthrough = await agent.prepareNextTurnWithContext(
+		underThresholdTurn,
+		controller.signal,
+	);
+	assert.equal(
+		passthrough,
+		priorSnapshots[1],
+		"a no-op boundary must return the prior snapshot object itself",
+	);
+	assert.equal(compactions(), 1, "a no-op boundary must not compact again");
+}
+
+{
+	// A pre-aborted request signal must exit before summarization auth.
+	const branch = compactionEntries([compactionSettings.keepRecentTokens * 4]);
+	const events: Array<{ type?: string; aborted?: boolean; errorMessage?: string }> = [];
+	let authRequests = 0;
+	const session = Object.create(AgentSession.prototype);
+	session.agent = {
+		state: { model: { provider: "openai-codex", id: "gpt-5.6-sol" } },
+	};
+	session.settingsManager = {
+		getCompactionSettings: () => compactionSettings,
+	};
+	session.sessionManager = { getBranch: () => branch };
+	session._getSummarizationRequestAuth = async () => {
+		authRequests++;
+		return { apiKey: "test" };
+	};
+	session._emit = (event: { type?: string; aborted?: boolean; errorMessage?: string }) => {
+		events.push(event);
+	};
+	assert.equal(
+		await session._runAutoCompaction("threshold", false, AbortSignal.abort()),
+		false,
+	);
+	assert.equal(authRequests, 0, "a pre-aborted compaction must not request auth");
+	assert.deepEqual(
+		events.map((event) => [event.type, event.aborted, event.errorMessage]),
+		[
+			["compaction_start", undefined, undefined],
+			["compaction_end", true, undefined],
+		],
+		"a pre-aborted compaction must emit balanced start and aborted end events",
+	);
+	assert.equal(session._autoCompactionAbortController, undefined);
+}
+
+{
+	// An AbortError thrown while the combined signal is still live is a real
+	// failure and must keep its message, not masquerade as a cancellation.
+	const branch = compactionEntries([compactionSettings.keepRecentTokens * 4]);
+	const events: Array<{ type?: string; aborted?: boolean; errorMessage?: string }> = [];
+	const session = Object.create(AgentSession.prototype);
+	session.agent = {
+		state: { model: { provider: "openai-codex", id: "gpt-5.6-sol" } },
+	};
+	session.settingsManager = {
+		getCompactionSettings: () => compactionSettings,
+	};
+	session.sessionManager = { getBranch: () => branch };
+	session._getSummarizationRequestAuth = async () => ({ apiKey: "test" });
+	session._emit = (event: { type?: string; aborted?: boolean; errorMessage?: string }) => {
+		events.push(event);
+	};
+	session._extensionRunner = {
+		hasHandlers: (type: string) => type === "session_before_compact",
+		emit: async () => {
+			throw Object.assign(new Error("transport dropped mid-stream"), {
+				name: "AbortError",
+			});
+		},
+	};
+	const liveController = new AbortController();
+	assert.equal(
+		await session._runAutoCompaction("threshold", false, liveController.signal),
+		false,
+	);
+	assert.deepEqual(
+		events.map((event) => [event.type, event.aborted, event.errorMessage]),
+		[
+			["compaction_start", undefined, undefined],
+			[
+				"compaction_end",
+				false,
+				"Auto-compaction failed: transport dropped mid-stream",
+			],
+		],
+		"an AbortError with a live combined signal must surface as a failure",
+	);
+	assert.equal(session._autoCompactionAbortController, undefined);
+}
+
+{
+	// A blocked provider request must not retrigger post-run auto-compaction;
+	// other error messages must keep the stock threshold path.
+	const { session, compactions } = harness();
+	session.agent.state.messages = [assistant(1_000_000, 5_000)];
+	assert.equal(
+		await session._checkCompaction({
+			...assistant(0, 6_000),
+			stopReason: "error",
+			errorMessage:
+				"Pre-request compaction was required at 999999 tokens but did not complete. Provider request blocked.",
+		}),
+		false,
+		"a blocked provider request must not restart auto-compaction",
+	);
+	assert.equal(
+		compactions(),
+		0,
+		"a blocked provider request must not attempt compaction",
+	);
+	await session._checkCompaction({
+		...assistant(0, 6_000),
+		stopReason: "error",
+		errorMessage: "upstream boom",
+	});
+	assert.equal(
+		compactions(),
+		1,
+		"other errors must keep the stock threshold compaction path",
+	);
+}
+
+{
+	// The reapply script must migrate a legacy-patched install (kit <= 0.4.2) to
+	// the current patch in one guarded step, restore it to stock, and stay
+	// fail-closed on corruption.
+	const stockPiRoot = join(
+		packageRoot,
+		"node_modules/@earendil-works/pi-coding-agent",
+	);
+	const fixtureRoot = mkdtempSync(join(tmpdir(), "pi-fitch-kit-legacy-"));
+	const reapplyScript = join(
+		packageRoot,
+		"scripts/reapply-pi-core-compaction.mjs",
+	);
+	const legacyPatch = join(
+		packageRoot,
+		"patches/archive/pi-0.84.1-compaction-v0.4.2.patch",
+	);
+	const fixtureFiles = [
+		"package.json",
+		"dist/cli.js",
+		"dist/core/agent-session.js",
+		"dist/core/compaction/compaction.js",
+		"dist/modes/interactive/interactive-mode.js",
+	];
+	const applyLegacyPatch = () =>
+		execFileSync(
+			"patch",
+			["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", fixtureRoot],
+			{ input: readFileSync(legacyPatch), stdio: ["pipe", "pipe", "pipe"] },
+		);
+	const runReapply = (action: string) =>
+		JSON.parse(
+			execFileSync(
+				process.execPath,
+				[reapplyScript, action, "--pi-root", fixtureRoot],
+				{ encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
+			),
+		);
+	try {
+		for (const relativePath of fixtureFiles) {
+			const destination = join(fixtureRoot, relativePath);
+			mkdirSync(dirname(destination), { recursive: true });
+			copyFileSync(join(stockPiRoot, relativePath), destination);
+		}
+		assert.equal(
+			runReapply("status").state,
+			"stock",
+			"the fixture must start from the reviewed stock identity",
+		);
+		applyLegacyPatch();
+		assert.equal(
+			runReapply("status").state,
+			"legacy-patched",
+			"the superseded reviewed patch must be recognized as legacy-patched",
+		);
+		const migrated = runReapply("apply");
+		assert.deepEqual(
+			[migrated.state, migrated.changed, migrated.migratedFrom],
+			["patched", true, "legacy-patched"],
+			"apply must migrate a legacy-patched install to the current patch",
+		);
+		assert.equal(runReapply("status").state, "patched");
+		const restored = runReapply("restore");
+		assert.equal(
+			restored.state,
+			"stock",
+			"restore must return a migrated install to reviewed stock",
+		);
+		applyLegacyPatch();
+		const legacyRestore = runReapply("restore");
+		assert.equal(
+			legacyRestore.state,
+			"stock",
+			"restore must return a legacy-patched install to reviewed stock",
+		);
+		applyLegacyPatch();
+		appendFileSync(
+			join(fixtureRoot, "dist/core/agent-session.js"),
+			"\n// drift\n",
+		);
+		let refused = false;
+		try {
+			runReapply("apply");
+		} catch (error) {
+			refused = true;
+			assert.match(
+				String((error as { stderr?: string }).stderr),
+				/diverges/,
+				"a corrupted install must be refused with the divergence report",
+			);
+		}
+		assert.ok(refused, "a corrupted legacy install must refuse mutation");
+	} finally {
+		rmSync(fixtureRoot, { recursive: true, force: true });
+	}
 }
 
 console.log("kit codex-context core and custom compaction checks passed");
