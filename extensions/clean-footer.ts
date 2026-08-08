@@ -82,7 +82,7 @@ function installFooter(ctx: ExtensionContext, verbosity: VerbosityConfig): void 
 						? theme.fg("warning", contextText)
 						: theme.fg("dim", contextText);
 
-				const model = ctx.model?.id ?? "no-model";
+				const model = ctx.model?.id.split("/").pop() ?? "no-model";
 				const thinking = ctx.model?.reasoning ? ` • ${ctx.thinkingLevel ?? "off"}` : "";
 				const provider = footerData.getAvailableProviderCount() > 1 && ctx.model ? `(${ctx.model.provider}) ` : "";
 				const rightText = `${provider}${model}${thinking}${verbosityText(ctx, verbosity)}`;

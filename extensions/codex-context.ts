@@ -132,7 +132,7 @@ function updateFooterStatus(ctx: ExtensionContext): void {
 	}
 
 	const fast = fastEnabled();
-	const label = `codex-fast:${fast ? "on" : "off"}`;
+	const label = `fast:${fast ? "on" : "off"}`;
 	try {
 		ctx.ui.setStatus("codex-fast", colorize(ctx, fast, label));
 	} catch {

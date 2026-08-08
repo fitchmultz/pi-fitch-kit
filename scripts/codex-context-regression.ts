@@ -265,7 +265,7 @@ assert.equal(
 	).enabled,
 	true,
 );
-assert.equal(statuses.at(-1), "codex-fast:on");
+assert.equal(statuses.at(-1), "fast:on");
 await fastCommand.handler("off", commandContext);
 assert.equal(
 	JSON.parse(
@@ -273,14 +273,14 @@ assert.equal(
 	).enabled,
 	false,
 );
-assert.equal(statuses.at(-1), "codex-fast:off");
+assert.equal(statuses.at(-1), "fast:off");
 assert.deepEqual(notifications, [
 	"OpenAI fast mode enabled",
 	"OpenAI fast mode disabled",
 ]);
 commandContext.model.provider = "openai";
 await fastCommand.handler("status", commandContext);
-assert.equal(statuses.at(-1), "codex-fast:off");
+assert.equal(statuses.at(-1), "fast:off");
 assert.equal(notifications.at(-1), "OpenAI fast mode is OFF");
 assert.deepEqual(
 	extensionLoad.runtime.pendingProviderRegistrations,

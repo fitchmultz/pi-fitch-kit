@@ -243,17 +243,17 @@ assert.deepEqual(
 );
 
 // Footer: only on fast-capable models, colored by state, and cleared elsewhere.
-assert.equal(status.get("anthropic-fast"), "muted:anthropic-fast:off");
+assert.equal(status.get("anthropic-fast"), "muted:fast:off");
 await commands["anthropic-fast"].handler("on", fastCtx);
-assert.equal(status.get("anthropic-fast"), "accent:anthropic-fast:on");
+assert.equal(status.get("anthropic-fast"), "accent:fast:on");
 
 await runHandlers("model_select", {}, uiCtx("claude-fable-5"));
 assert.equal(status.get("anthropic-fast"), undefined, "no footer on models fast mode ignores");
 await runHandlers("model_select", {}, uiCtx("claude-opus-4-8"));
-assert.equal(status.get("anthropic-fast"), "accent:anthropic-fast:on");
+assert.equal(status.get("anthropic-fast"), "accent:fast:on");
 
 await commands["anthropic-fast"].handler("off", fastCtx);
-assert.equal(status.get("anthropic-fast"), "muted:anthropic-fast:off");
+assert.equal(status.get("anthropic-fast"), "muted:fast:off");
 // A second start must not stack watchers: one shutdown has to release everything, or the
 // process stays alive holding a listener.
 await runHandlers("session_start", {}, uiCtx("claude-opus-5"));

@@ -126,7 +126,7 @@ function updateFooterStatus(ctx: ExtensionContext): void {
 			return;
 		}
 		const fast = fastEnabled();
-		const label = `anthropic-fast:${fast ? "on" : "off"}`;
+		const label = `fast:${fast ? "on" : "off"}`;
 		ctx.ui.setStatus(
 			"anthropic-fast",
 			ctx.hasUI ? ctx.ui.theme.fg(fast ? "accent" : "muted", label) : label,
