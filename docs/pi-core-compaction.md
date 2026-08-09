@@ -77,14 +77,15 @@ The helper must:
    - If the session branch has a latest compaction entry, the assistant usage timestamp must be newer than that compaction entry.
 6. Call Pi's existing `shouldCompact(estimate.tokens, model.contextWindow, settings)` with the settings read in step 1.
 7. If it returns false, do nothing.
-8. If it returns true, await `_runAutoCompaction("threshold", false)`.
-9. Compare the latest compaction entry ID before and after the call.
-10. If no new compaction entry was created, throw a clear error that blocks the provider request. Never proceed with a request known to be over the configured threshold.
-11. Return true only when a new compaction entry was created.
+8. Before starting automatic compaction, call Pi's existing `prepareCompaction()` on the current branch. If it returns undefined, leave the check advisory and proceed without emitting compaction events. Usage can remain above the threshold while the retained transcript has nothing Pi can summarize; blocking every later request would permanently wedge that valid session.
+9. Otherwise await `_runAutoCompaction("threshold", false)`.
+10. Compare the latest compaction entry ID before and after the call.
+11. If no new compaction entry was created, throw the exact static error `Pre-request compaction was required but did not complete. Provider request blocked.`. Keep it free of interpolated token counts or other digits: Pi's retry classifier treats status-code substrings such as `500` and `429` as transient and could restart a compaction the user just cancelled.
+12. Return true only when a new compaction entry was created.
 
 Use the existing imports from `./compaction/index.js` and `./session-manager.js`. Pi 0.84.1 already imports `estimateContextTokens`, `shouldCompact`, and `getLatestCompactionEntry`; avoid adding duplicate implementations.
 
-The helper accepts the hook's `AbortSignal` as a second parameter and passes it to `_runAutoCompaction("threshold", false, signal)` so run cancellation reaches the summarization request.
+The helper accepts the hook's `AbortSignal` as a second parameter. Return before all other work when it is already aborted, and otherwise pass it to `_runAutoCompaction("threshold", false, signal)` so run cancellation reaches the summarization request.
 
 Install the helper at both boundaries inside one `_installAgentRequestCompaction()` method, called once from the `AgentSession` constructor after the existing tool and next-turn hook installers:
 
@@ -108,7 +109,9 @@ In `AgentSession.compact()`:
 2. Read the current branch and prepare manual compaction before aborting the agent.
 3. If preparation is unavailable, emit the normal manual `compaction_start` and failed `compaction_end` events and throw `Already compacted` or `Nothing to compact (session too small)` as appropriate. Do not abort the current agent run.
 4. Once preflight succeeds, create and store a local manual compaction controller synchronously before awaiting agent abort. Use that local controller throughout the operation and clear the shared field in `finally` only when it still owns the field.
-5. Retain Pi's remaining manual compaction behavior.
+5. After agent abort settles, read the branch and prepare compaction again. Agent abort can append aborted assistant or tool entries; the preparation and `branchEntries` handed to `session_before_compact` must describe that settled branch, not the pre-abort snapshot.
+6. Add the host retry policy and `_summarizationRetryCallbacks(...)` to the `session_before_compact` event so extension-owned native compaction can preserve the same retry behavior and lifecycle reporting as active-model compaction.
+7. Retain Pi's remaining manual compaction behavior.
 
 In the interactive `/compact` handler, show `Compaction already in progress` as a warning. Other manual failures are already displayed through compaction events.
 
@@ -117,11 +120,13 @@ In the interactive `/compact` handler, show `Compaction already in progress` as 
 Automatic compaction must claim ownership before its first asynchronous operation and honor both cancellation sources:
 
 1. Return without starting when a manual or automatic compaction controller already exists.
-2. After confirming a model is selected, create and store a local automatic compaction controller before awaiting authentication.
+2. After confirming a model is selected, prepare compaction from one current branch snapshot. If preparation is unavailable, return false without a start or failure event. Otherwise create and store a local automatic compaction controller before awaiting authentication, and reuse that branch snapshot for `branchEntries`.
 3. `_runAutoCompaction(reason, willRetry, requestSignal)` accepts an optional request signal. When present, combine it with the local controller through `AbortSignal.any` and use the combined signal everywhere the local controller's signal was used: the pre-auth early-exit check, the `session_before_compact` extension event, native `compact()`, and the post-generation aborted check. `session.abort()` and `agent.abort()` then cancel an in-flight boundary compaction promptly, while `abortCompaction()` keeps cancelling only the compaction.
 4. Emit `compaction_start` before authentication so `isCompacting`, queued input, cancellation, and the eventual `compaction_end` remain balanced on every path. Immediately after the start event, exit with an `aborted: true` end event when the combined signal is already aborted, before requesting authentication.
-5. In the catch path, classify an exit as a clean cancellation only when the combined signal is aborted: emit `compaction_end` with `aborted: true` and no failure `errorMessage`, and return false. An `AbortError` thrown while the combined signal is still live, and any other authentication or preparation failure, must still emit a failed `compaction_end` with its error message through the existing catch path.
-6. In `finally`, clear the shared field only when it still references that local controller.
+5. Add the host retry policy and `_summarizationRetryCallbacks(...)` to the automatic `session_before_compact` event.
+6. In the catch path, classify an exit as a clean cancellation only when the combined signal is aborted: emit `compaction_end` with `aborted: true` and no failure `errorMessage`, and return false. An `AbortError` thrown while the combined signal is still live, and any other authentication failure, must still emit a failed `compaction_end` with its error message through the existing catch path.
+7. After rebuilding agent state from the compaction entry, do not resurrect a trailing `error` or `length` assistant that retry preparation or the request gate already removed. Provider continuation requires the payload not to end in that assistant response.
+8. In `finally`, clear the shared field only when it still references that local controller.
 
 These ownership rules close both races: `/compact` or extension-owned `ctx.compact()` cannot enter while automatic authentication is pending, and a second automatic or manual compaction cannot enter while manual compaction is waiting for the active agent to abort.
 
@@ -180,7 +185,7 @@ This package's `extensions/codex-context.ts` owns summary-model routing through 
 
 Pi 0.84.1 request authentication can resolve a provider-specific base URL and `ProviderHeaders` values containing `null` deletion markers. Alternate-model compaction must apply the resolved base URL to its request model and pass the header object through unchanged; never filter or stringify deletion markers before forwarding.
 
-`<Pi agent dir>/pi-codex-context.json` owns the explicit routing consent and ordered custom summary-model candidates. Missing, malformed, false, non-boolean, or empty configuration must not query or send retained context to alternate models. Only literal `customCompactionEnabled: true` activates routing. An omitted model list uses the documented xAI-then-Codex default; a valid non-empty list overrides it; an invalid or empty list fails closed to Pi's native active-model compaction. Unauthenticated, unavailable, or failed enabled candidates fall through in order; if all enabled candidates fail, returning no extension result preserves the active-model fallback.
+`<Pi agent dir>/pi-codex-context.json` owns the explicit routing consent and ordered custom summary-model candidates. Missing, malformed, false, non-boolean, or empty configuration must not query or send retained context to alternate models. Only literal `customCompactionEnabled: true` activates routing. An omitted model list uses the documented xAI-then-Codex default; a valid non-empty list overrides it; an invalid or empty list fails closed to Pi's native active-model compaction. Unauthenticated, unavailable, or failed enabled candidates fall through in order; if all enabled candidates fail, returning no extension result preserves the active-model fallback. When the patched host includes `retry` and `retryCallbacks` on `session_before_compact`, forward both to native `compact()` so a transient failure retries the same candidate before failover and native retry lifecycle events remain intact.
 
 There must be no separate `codex-fast` or standalone `pi-codex-context` package. This kit must be the only loaded owner of the command, footer, compaction handler, and OpenAI priority payload handler.
 
@@ -216,10 +221,15 @@ The regression check must first assert that it is running against Pi 0.84.1, the
 - The run's abort signal reaches an in-flight boundary compaction end to end: aborting the run settles it promptly as `aborted`, appends no compaction entry, issues no further provider request, and emits one `compaction_end` with `aborted: true` and no failure message.
 - An `AbortError` thrown while the combined signal is still live surfaces as a failed `compaction_end` that keeps its error message.
 - The reapply script recognizes the sha-pinned legacy-patched state on an isolated fixture root, migrates it to the current patch in one guarded apply, restores both patched and legacy-patched fixtures to reviewed stock, and refuses a corrupted install with the divergence report.
-- A pre-aborted request signal exits automatic compaction after `compaction_start` with a clean aborted `compaction_end`, before requesting summarization authentication.
+- A request-boundary signal already aborted before the check starts skips the gate entirely; a signal aborted after automatic ownership begins exits after `compaction_start` with one clean aborted `compaction_end`, before requesting summarization authentication.
+- An over-threshold but unpreparable transcript remains advisory, emits no compaction failure, and keeps serving later provider requests.
+- A failed or cancelled preparable request uses the static digit-free blocked-request error, which does not match retry status-code substrings or restart Escape-cancelled compaction.
 - An assistant error whose message contains `Provider request blocked.` does not retrigger post-run auto-compaction, while other error messages keep the stock threshold path.
+- Rebuilding after compaction does not resurrect a trailing error assistant already removed from agent state.
+- Manual compaction recomputes its preparation and extension `branchEntries` after abort settles.
+- Extension-routed compaction receives the host retry policy and callbacks, retries the same candidate on a transient provider error, and emits the native retry lifecycle.
 - A single trailing tool result at `keepRecentTokens`, and several trailing tool results that cumulatively reach it, produce a valid compaction preparation that keeps the assistant/tool-result group together.
-- If threshold compaction creates no new compaction entry, the request boundary throws and the provider request remains blocked.
+- If a preparable threshold compaction creates no new compaction entry, the request boundary throws and the provider request remains blocked.
 - A concurrent or unavailable manual compaction does not abort the active agent run.
 - Deferred-auth automatic compaction owns the operation before awaiting authentication, rejects concurrent manual compaction without aborting, and persists exactly once.
 - Manual compaction owns the operation before awaiting agent abort, so a second compaction cannot enter its destructive path.

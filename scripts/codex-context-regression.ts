@@ -50,6 +50,10 @@ const { Agent } = await importFromPi(
 	"node_modules/@earendil-works/pi-agent-core/dist/agent.js",
 );
 const { loadExtensions } = await importFromPi("dist/core/extensions/loader.js");
+const { createAgentSession } = await importFromPi("dist/core/sdk.js");
+const { SessionManager } = await importFromPi("dist/core/session-manager.js");
+const { SettingsManager } = await importFromPi("dist/core/settings-manager.js");
+const { DefaultResourceLoader } = await importFromPi("dist/core/resource-loader.js");
 
 const activeAgentDir =
 	process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi/agent");
@@ -553,7 +557,7 @@ for (const { provider, model, contextWindow } of boundaryRoutes) {
 		contextWindow,
 	);
 	const { session, compactions } = harness(
-		[],
+		compactionEntries([compactionSettings.keepRecentTokens * 4]),
 		true,
 		provider,
 		model,
@@ -622,15 +626,68 @@ for (const [model, contextWindow] of [
 }
 
 {
-	const { session, compactions } = harness([], false);
+	const { session, compactions } = harness(
+		compactionEntries([compactionSettings.keepRecentTokens * 4]),
+		false,
+	);
 	await assert.rejects(
 		session._compactBeforeProviderRequest([
 			assistant(boundaryUsageTokens),
 			toolResult(1_000),
 		]),
-		/Provider request blocked/,
+		(error: Error) => {
+			assert.equal(
+				error.message,
+				"Pre-request compaction was required but did not complete. Provider request blocked.",
+				"the blocked-request error must be the reviewed static message",
+			);
+			assert.doesNotMatch(
+				error.message,
+				/\d/,
+				"interpolated digits can collide with retry classifier status substrings",
+			);
+			return true;
+		},
 	);
 	assert.equal(compactions(), 1, "failed compaction must be attempted once");
+}
+
+{
+	// An unpreparable transcript (usage over threshold, nothing summarizable)
+	// must stay advisory instead of blocking the request.
+	const { session, compactions } = harness([], false);
+	assert.equal(
+		await session._compactBeforeProviderRequest([
+			assistant(boundaryUsageTokens),
+			toolResult(1_000),
+		]),
+		false,
+		"an unpreparable over-threshold request must proceed uncompacted",
+	);
+	assert.equal(
+		compactions(),
+		0,
+		"an unpreparable transcript must not attempt compaction",
+	);
+}
+
+{
+	// An already-aborted request signal must skip the gate entirely.
+	const { session, compactions } = harness(
+		compactionEntries([compactionSettings.keepRecentTokens * 4]),
+	);
+	assert.equal(
+		await session._compactBeforeProviderRequest(
+			[assistant(boundaryUsageTokens), toolResult(1_000)],
+			AbortSignal.abort(),
+		),
+		false,
+	);
+	assert.equal(
+		compactions(),
+		0,
+		"an aborted request signal must skip the pre-request gate",
+	);
 }
 
 {
@@ -921,7 +978,9 @@ for (const toolResultChars of [
 	};
 	session.settingsManager = {
 		getCompactionSettings: () => compactionSettings,
+		getRetrySettings: () => ({ enabled: false }),
 	};
+	session._summarizationRetryCallbacks = () => ({});
 	session.sessionManager = {
 		getBranch: () => branch,
 		getEntries: () => branch,
@@ -1022,13 +1081,17 @@ function customCompactionModel(provider: string, id: string) {
 	};
 }
 
+type CompactionOutcomeStep = string | Error | { stopReason: string; errorMessage: string };
+
 async function runCustomCompaction(
-	outcomes: Record<string, string | Error>,
+	outcomes: Record<string, CompactionOutcomeStep | CompactionOutcomeStep[]>,
 	authFailures: Record<string, string> = {},
 	signal = new AbortController().signal,
 	headerOnlyProviders = new Set<string>(),
 	availableModels = contextConfig.compactionModels,
+	eventExtras: Record<string, unknown> = {},
 ) {
+	const outcomeCursor: Record<string, number> = {};
 	const calls: string[] = [];
 	const notifications: string[] = [];
 	const finds: string[] = [];
@@ -1079,7 +1142,12 @@ async function runCustomCompaction(
 					calls.push(`${key}:${options.reasoning}`);
 					requestOptions.push(options);
 					requestBaseUrls.push(model.baseUrl);
-					const outcome = outcomes[key];
+					const sequence = outcomes[key];
+					const cursor = outcomeCursor[key] ?? 0;
+					outcomeCursor[key] = cursor + 1;
+					const outcome = Array.isArray(sequence)
+						? sequence[Math.min(cursor, sequence.length - 1)]
+						: sequence;
 					if (outcome instanceof Error) throw outcome;
 					const initialPayload = { provider };
 					payloadPromises.push(
@@ -1091,6 +1159,13 @@ async function runCustomCompaction(
 							},
 						),
 					);
+					if (outcome !== undefined && typeof outcome === "object") {
+						return responseStream({
+							...assistant(1),
+							content: [],
+							...outcome,
+						});
+					}
 					return responseStream({
 						...assistant(1),
 						content: [{ type: "text", text: outcome ?? `${provider} summary` }],
@@ -1129,6 +1204,7 @@ async function runCustomCompaction(
 			reason: "threshold",
 			willRetry: false,
 			signal,
+			...eventExtras,
 		},
 		ctx,
 	);
@@ -1314,12 +1390,64 @@ writeCompactionConfig({ customCompactionEnabled: true });
 	assert.deepEqual(calls, []);
 }
 
+{
+	// Retry parity: the host's retry policy and summarization retry lifecycle
+	// (added to session_before_compact by the kit's core patch) must reach the
+	// routed compaction request instead of failing over on the first transient
+	// provider error.
+	writeCompactionConfig({ customCompactionEnabled: true });
+	const retryEvents: string[] = [];
+	const { result, calls } = await runCustomCompaction(
+		{
+			"xai/grok-4.5": [
+				{ stopReason: "error", errorMessage: "HTTP 500 transient upstream" },
+				"retried xAI summary",
+			],
+		},
+		{},
+		new AbortController().signal,
+		new Set(),
+		contextConfig.compactionModels,
+		{
+			retry: { enabled: true, maxRetries: 1, baseDelayMs: 1 },
+			retryCallbacks: {
+				onRetryScheduled: (attempt: number) => {
+					retryEvents.push(`scheduled:${attempt}`);
+				},
+				onRetryAttemptStart: () => {
+					retryEvents.push("attempt");
+				},
+				onRetryFinished: (success: boolean) => {
+					retryEvents.push(`finished:${success}`);
+				},
+			},
+		},
+	);
+	assert.match(
+		result?.compaction?.summary ?? "",
+		/retried xAI summary/,
+		"the transient failure must be retried to completion",
+	);
+	assert.deepEqual(
+		calls,
+		["xai/grok-4.5:high", "xai/grok-4.5:high"],
+		"the host retry policy must retry the same candidate, not fail over",
+	);
+	assert.deepEqual(
+		retryEvents,
+		["scheduled:1", "attempt", "finished:true"],
+		"host summarization retry lifecycle callbacks must fire",
+	);
+}
+
 function integrationHarness(
 	streamFn: (...args: unknown[]) => unknown,
 	createCompaction = true,
 	priorPrepareNextTurn?: (turn: unknown, signal?: AbortSignal) => unknown,
 ) {
-	const branch: unknown[] = [];
+	const branch: unknown[] = compactionEntries([
+		compactionSettings.keepRecentTokens * 4,
+	]);
 	let compactions = 0;
 	const agent = new Agent({
 		initialState: {
@@ -1790,7 +1918,9 @@ function streamedAssistant(
 	session.agent = agent;
 	session.settingsManager = {
 		getCompactionSettings: () => compactionSettings,
+		getRetrySettings: () => ({ enabled: false }),
 	};
+	session._summarizationRetryCallbacks = () => ({});
 	session.sessionManager = {
 		getBranch: () => branch,
 		appendCompaction: () => {
@@ -2034,7 +2164,9 @@ function streamedAssistant(
 	};
 	session.settingsManager = {
 		getCompactionSettings: () => compactionSettings,
+		getRetrySettings: () => ({ enabled: false }),
 	};
+	session._summarizationRetryCallbacks = () => ({});
 	session.sessionManager = { getBranch: () => branch };
 	session._getSummarizationRequestAuth = async () => ({ apiKey: "test" });
 	session._emit = (event: { type?: string; aborted?: boolean; errorMessage?: string }) => {
@@ -2097,6 +2229,437 @@ function streamedAssistant(
 		compactions(),
 		1,
 		"other errors must keep the stock threshold compaction path",
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Real-session regressions: a full AgentSession over an in-memory
+// SessionManager with a scripted stream function (no network, no shared
+// state). These cover the pre-request gate and auto-compaction semantics the
+// kit's core patch changes.
+// ---------------------------------------------------------------------------
+
+const REAL_SESSION_MODEL = {
+	id: "kit-regress-model",
+	name: "Kit Regress Model",
+	api: "openai-completions",
+	provider: "kitregress",
+	baseUrl: "https://example.invalid",
+	reasoning: false,
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 100_000,
+	maxTokens: 8_000,
+};
+const realCompactionSettings = {
+	enabled: true,
+	reserveTokens: 16_384,
+	keepRecentTokens: 20_000,
+};
+let realSequence = 0;
+function realAssistant(
+	content: unknown[],
+	totalTokens: number,
+	stopReason = "stop",
+	errorMessage?: string,
+) {
+	realSequence++;
+	return {
+		role: "assistant",
+		content,
+		api: REAL_SESSION_MODEL.api,
+		provider: REAL_SESSION_MODEL.provider,
+		model: REAL_SESSION_MODEL.id,
+		usage: {
+			input: totalTokens,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			totalTokens,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+		},
+		stopReason,
+		...(errorMessage === undefined ? {} : { errorMessage }),
+		timestamp: Date.now() + realSequence,
+	};
+}
+const growTool = {
+	name: "grow",
+	label: "Grow",
+	description: "returns text",
+	parameters: {
+		type: "object",
+		properties: { chars: { type: "number" } },
+		required: ["chars"],
+		additionalProperties: false,
+	},
+	execute: async (_id: string, args: { chars: number }) => ({
+		content: [{ type: "text", text: "x".repeat(args.chars) }],
+		details: {},
+	}),
+};
+function isSummarizationRequest(context: { systemPrompt?: string }) {
+	return /summarization assistant/i.test(context.systemPrompt ?? "");
+}
+async function realSession(options: {
+	streamFn: (
+		model: unknown,
+		context: { systemPrompt?: string; messages?: unknown[] },
+		requestOptions?: { signal?: AbortSignal },
+	) => unknown;
+	tools?: unknown[];
+	retry?: Record<string, unknown>;
+}) {
+	const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-real-agent-"));
+	const cwd = mkdtempSync(join(tmpdir(), "pi-kit-real-cwd-"));
+	mkdirSync(join(agentDir, "sessions"), { recursive: true });
+	writeFileSync(
+		join(agentDir, "settings.json"),
+		`${JSON.stringify({
+			compaction: realCompactionSettings,
+			retry: options.retry ?? { enabled: false },
+		})}\n`,
+	);
+	const settingsManager = SettingsManager.create(cwd, agentDir);
+	const resourceLoader = new DefaultResourceLoader({
+		cwd,
+		agentDir,
+		settingsManager,
+	});
+	await resourceLoader.reload();
+	const sessionManager = SessionManager.inMemory(cwd);
+	const tools = options.tools ?? [];
+	const modelRuntime = {
+		getModel: () => REAL_SESSION_MODEL,
+		getModels: () => [REAL_SESSION_MODEL],
+		getAllModels: () => [REAL_SESSION_MODEL],
+		hasConfiguredAuth: () => true,
+		isUsingOAuth: () => false,
+		checkAuth: async () => ({}),
+		getAuth: async () => ({ auth: { apiKey: "test-key" }, env: undefined }),
+		streamSimple: async () => {
+			throw new Error("unexpected modelRuntime.streamSimple call");
+		},
+		subscribe: () => () => {},
+	};
+	const { session } = await createAgentSession({
+		cwd,
+		agentDir,
+		model: REAL_SESSION_MODEL,
+		thinkingLevel: "off",
+		sessionManager,
+		settingsManager,
+		resourceLoader,
+		modelRuntime,
+		noTools: "all",
+		customTools: tools,
+	});
+	session.agent.streamFunction = options.streamFn;
+	session.agent.state.tools = tools;
+	const events: Array<Record<string, unknown>> = [];
+	session.subscribe((event: Record<string, unknown>) => {
+		events.push(event);
+	});
+	const cleanup = () => {
+		rmSync(agentDir, { recursive: true, force: true });
+		rmSync(cwd, { recursive: true, force: true });
+	};
+	return { session, agent: session.agent, sessionManager, events, cleanup };
+}
+
+{
+	// Over-threshold usage with an unsummarizable transcript must stay
+	// advisory end to end: no error events after the run and no blocked
+	// requests on the next run.
+	let requests = 0;
+	const { session, agent, events, cleanup } = await realSession({
+		streamFn: (_model, context) => {
+			if (isSummarizationRequest(context)) {
+				return responseStream(
+					realAssistant([{ type: "text", text: "## Goal\nS" }], 40),
+				);
+			}
+			requests++;
+			return responseStream(
+				realAssistant(
+					[{ type: "text", text: `answer-${requests}` }],
+					84_000,
+				),
+			);
+		},
+	});
+	try {
+		await session.prompt("first");
+		await session.prompt("second");
+		assert.equal(
+			requests,
+			2,
+			"an unsummarizable over-threshold session must keep serving requests",
+		);
+		assert.deepEqual(
+			events.filter((event) => typeof event.errorMessage === "string"),
+			[],
+			"advisory compaction skips must not emit error events",
+		);
+		assert.deepEqual(
+			agent.state.messages.filter(
+				(message: { errorMessage?: string }) =>
+					typeof message.errorMessage === "string",
+			),
+			[],
+			"no request may be blocked when nothing is summarizable",
+		);
+	} finally {
+		cleanup();
+	}
+}
+
+{
+	// Escape during a boundary compaction must cancel it once: the blocked
+	// request error must stay digit-free and non-retryable, and the run must
+	// settle without auto-retry resurrecting the cancelled compaction.
+	let providerRequests = 0;
+	let summarizationStarts = 0;
+	const { session, agent, events, cleanup } = await realSession({
+		retry: { enabled: true, maxRetries: 2, baseDelayMs: 10 },
+		tools: [growTool],
+		streamFn: async (_model, context, requestOptions) => {
+			if (isSummarizationRequest(context)) {
+				summarizationStarts++;
+				setTimeout(() => session.abortCompaction(), 25);
+				await new Promise((resolveHang, rejectHang) => {
+					const timer = setTimeout(resolveHang, 1_500);
+					requestOptions?.signal?.addEventListener(
+						"abort",
+						() => {
+							clearTimeout(timer);
+							rejectHang(
+								Object.assign(new Error("Request aborted"), {
+									name: "AbortError",
+								}),
+							);
+						},
+						{ once: true },
+					);
+				});
+				return responseStream(
+					realAssistant([{ type: "text", text: "## Goal\nS" }], 40),
+				);
+			}
+			providerRequests++;
+			if (providerRequests === 1) {
+				return responseStream({
+					...realAssistant(
+						[
+							{
+								type: "toolCall",
+								id: "escape-call",
+								name: "grow",
+								arguments: { chars: 100_000 },
+							},
+						],
+						84_500,
+						"toolUse",
+					),
+				});
+			}
+			return responseStream(
+				realAssistant([{ type: "text", text: "done" }], 200),
+			);
+		},
+	});
+	try {
+		const startedAt = Date.now();
+		await session.prompt("start");
+		const elapsed = Date.now() - startedAt;
+		const starts = events.filter((event) => event.type === "compaction_start");
+		const ends = events.filter((event) => event.type === "compaction_end");
+		const retries = events.filter(
+			(event) =>
+				typeof event.type === "string" && event.type.startsWith("auto_retry"),
+		);
+		assert.equal(summarizationStarts, 1, "Escape must reach the summarization request once");
+		assert.equal(
+			starts.length,
+			1,
+			"Escape must not restart the cancelled boundary compaction",
+		);
+		assert.deepEqual(
+			[ends.length, ends[0]?.aborted],
+			[1, true],
+			"the cancelled boundary compaction must end exactly once, aborted",
+		);
+		assert.deepEqual(
+			retries,
+			[],
+			"a blocked provider request must never trigger auto-retry",
+		);
+		const lastError = [...agent.state.messages]
+			.reverse()
+			.find(
+				(message: { errorMessage?: string }) =>
+					typeof message.errorMessage === "string",
+			) as { errorMessage?: string } | undefined;
+		assert.match(
+			lastError?.errorMessage ?? "",
+			/Provider request blocked/,
+			"the cancelled compaction must surface the blocked-request error",
+		);
+		assert.doesNotMatch(
+			lastError?.errorMessage ?? "",
+			/\d/,
+			"the blocked-request error must not leak digits into retry classification",
+		);
+		assert.ok(
+			elapsed < 1_200,
+			`the blocked run must settle without retry backoff (took ${elapsed}ms)`,
+		);
+	} finally {
+		cleanup();
+	}
+}
+
+{
+	// Compaction must never resurrect an error assistant that the retry
+	// continuation (stock _prepareRetry) already removed from agent state.
+	let phase = 1;
+	const { session, agent, sessionManager, cleanup } = await realSession({
+		tools: [growTool],
+		streamFn: (_model, context) => {
+			if (isSummarizationRequest(context)) {
+				return responseStream(
+					realAssistant([{ type: "text", text: "## Goal\nS" }], 40),
+				);
+			}
+			if (phase === 1) {
+				phase = 2;
+				return responseStream({
+					...realAssistant(
+						[
+							{
+								type: "toolCall",
+								id: "guard-call",
+								name: "grow",
+								arguments: { chars: 100_000 },
+							},
+						],
+						50_000,
+						"toolUse",
+					),
+				});
+			}
+			return responseStream(
+				realAssistant([], 10, "error", "synthetic upstream failure"),
+			);
+		},
+	});
+	try {
+		await session.prompt("start");
+		const last = agent.state.messages[agent.state.messages.length - 1] as {
+			stopReason?: string;
+		};
+		assert.equal(
+			last?.stopReason,
+			"error",
+			"precondition: the run must end with an error assistant",
+		);
+		// Exactly what the stock retry continuation does before continuing.
+		agent.state.messages = agent.state.messages.slice(0, -1);
+		await session._runAutoCompaction("threshold", false, undefined);
+		const rebuiltLast = agent.state.messages[
+			agent.state.messages.length - 1
+		] as { stopReason?: string };
+		assert.notEqual(
+			rebuiltLast?.stopReason,
+			"error",
+			"compaction must not resurrect an error assistant the retry path removed",
+		);
+		assert.equal(
+			sessionManager
+				.getBranch()
+				.some((entry: { type: string }) => entry.type === "compaction"),
+			true,
+			"the guarded compaction must still be created",
+		);
+	} finally {
+		cleanup();
+	}
+}
+
+{
+	// Manual compaction must summarize the branch as it exists after abort()
+	// settles, and its session_before_compact event must carry the host retry
+	// policy and callbacks.
+	const branchBefore = compactionEntries([
+		compactionSettings.keepRecentTokens * 4,
+	]);
+	const branchAfter = compactionEntries([
+		compactionSettings.keepRecentTokens * 4,
+		compactionSettings.keepRecentTokens * 2,
+	]);
+	const expectedBefore = prepareCompaction(branchBefore, compactionSettings);
+	const expectedAfter = prepareCompaction(branchAfter, compactionSettings);
+	assert.ok(expectedBefore && expectedAfter);
+	assert.notEqual(
+		expectedAfter.tokensBefore,
+		expectedBefore.tokensBefore,
+		"fixture sanity: the post-abort branch must differ",
+	);
+	let branch = branchBefore;
+	const capturedEvents: Array<{
+		preparation?: { tokensBefore?: number };
+		branchEntries?: unknown[];
+		retry?: unknown;
+		retryCallbacks?: unknown;
+	}> = [];
+	const retrySettings = { enabled: true, maxRetries: 3, baseDelayMs: 2_000 };
+	const session = Object.create(AgentSession.prototype);
+	session.agent = {
+		state: { model: { provider: "openai-codex", id: "gpt-5.6-sol" } },
+	};
+	session.settingsManager = {
+		getCompactionSettings: () => compactionSettings,
+		getRetrySettings: () => retrySettings,
+	};
+	session.sessionManager = { getBranch: () => branch };
+	session.abort = async () => {
+		branch = branchAfter;
+	};
+	session._emit = () => undefined;
+	session._getSummarizationRequestAuth = async () => ({
+		model: session.agent.state.model,
+		apiKey: "test",
+	});
+	session._summarizationRetryCallbacks = () => ({
+		onRetryScheduled: () => undefined,
+	});
+	session._extensionRunner = {
+		hasHandlers: (type: string) => type === "session_before_compact",
+		emit: async (event: (typeof capturedEvents)[number]) => {
+			capturedEvents.push(event);
+			return { cancel: true };
+		},
+	};
+	await assert.rejects(session.compact(), /Compaction cancelled/);
+	assert.equal(capturedEvents.length, 1);
+	assert.equal(
+		capturedEvents[0]?.preparation?.tokensBefore,
+		expectedAfter.tokensBefore,
+		"manual compaction must summarize the post-abort branch",
+	);
+	assert.equal(
+		capturedEvents[0]?.branchEntries,
+		branchAfter,
+		"manual extension hooks must receive the same settled branch",
+	);
+	assert.deepEqual(
+		capturedEvents[0]?.retry,
+		retrySettings,
+		"manual session_before_compact must carry the host retry policy",
+	);
+	assert.ok(
+		capturedEvents[0]?.retryCallbacks,
+		"manual session_before_compact must carry retry lifecycle callbacks",
 	);
 }
 

@@ -9,14 +9,14 @@ import { fileURLToPath } from "node:url";
 const PI_PACKAGE = "@earendil-works/pi-coding-agent";
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const patchPath = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
-const patchSha256 = "9350641094f70ac3a98fd3b02a236861fbbbc13503855637a1dc2ff53971dd08";
+const patchSha256 = "e22b2060d2e92e35499386eaf32cde9fe66de6d871b247ae5394c0a945bac486";
 const legacyPatchPath = join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.4.2.patch");
 const legacyPatchSha256 = "5f68de3bb9689ad983168a683bd2cc43426e19325071b75d6fd36425ac191b24";
 const legacyAgentSessionPatched = "cd1f9b9a0b6ad10239394568be5961c5a7d8fc117830e1a09650eb5ade176c6a";
 const commonFiles = {
   "dist/core/agent-session.js": {
     stock: "91e72d5497f665e731cbd79da6a6e826d8cae7d2ce156a7dee39f8ca205e32c8",
-    patched: "e55bf39d43ab95468a8949dd72c541adc1e54421c8666f9d06e06e4b9efa7227",
+    patched: "ee4ffc5bcdfc8b348280f0b370f17f839deb7f11fdeefb9e72b020bbeb1758e2",
   },
   "dist/core/compaction/compaction.js": {
     stock: "fcb12f1eb4d38578978e1a8e3e382a3fccfd5e0ccf87bc86979a9a8d9c145c7b",

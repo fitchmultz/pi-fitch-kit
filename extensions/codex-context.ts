@@ -234,6 +234,13 @@ export default function (pi: ExtensionAPI): void {
 		if (!active) return;
 		const candidates = compactionModels();
 		if (!candidates) return;
+		// The kit's Pi core patch adds the host retry policy and summarization
+		// retry lifecycle to this event; stock Pi omits them, so routed
+		// compaction degrades to zero retries there.
+		const { retry, retryCallbacks } = event as unknown as {
+			retry?: Parameters<typeof compact>[9];
+			retryCallbacks?: Parameters<typeof compact>[10];
+		};
 		const failures: string[] = [];
 		for (const candidate of candidates) {
 			if (event.signal.aborted) return { cancel: true };
@@ -274,6 +281,8 @@ export default function (pi: ExtensionAPI): void {
 					candidate.thinkingLevel,
 					streamFn,
 					auth.env,
+					retry,
+					retryCallbacks,
 				);
 				if (failures.length > 0 && ctx.hasUI) {
 					ctx.ui.notify(
