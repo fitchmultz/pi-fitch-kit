@@ -3,8 +3,9 @@
  * Reproduces the Anthropic-only "Working..." silence reported in session
  * 9fa7bf9f without calling a live provider. Anthropic SSE ping events keep the
  * HTTP body active, but pi-ai filters them before the assistant event stream.
- * The network idle timeout must keep protecting truly idle bodies; the TUI
- * must make a healthy-but-slow request observable without killing it.
+ * The network idle timeout must keep protecting truly idle bodies. The
+ * diagnosis stays pinned without redefining filtered heartbeats as failure or
+ * changing Pi's stock working indicator.
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -17,7 +18,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const stockRoot = join(projectRoot, "node_modules/@earendil-works/pi-coding-agent");
 const currentPatch = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
-const legacyPatch = join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.7.0.patch");
+const v080Patch = join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.8.0.patch");
+assert.match(readFileSync(v080Patch, "utf8"), /status-indicator\.js/);
+assert.doesNotMatch(
+	readFileSync(currentPatch, "utf8"),
+	/status-indicator\.js/,
+	"current patch must not modify Pi's working indicator",
+);
 const fixtureRoot = mkdtempSync(join(tmpdir(), "pi-kit-anthropic-stall-"));
 
 process.on("exit", () => rmSync(fixtureRoot, { recursive: true, force: true }));
@@ -32,7 +39,7 @@ function provisionPi(label, patchPath) {
 	assert.equal(applied.status, 0, applied.stderr || applied.stdout);
 	return root;
 }
-const legacyPiRoot = provisionPi("legacy", legacyPatch);
+const v080PiRoot = provisionPi("v0.8.0", v080Patch);
 const piRoot = provisionPi("current", currentPatch);
 const importFromPi = (root, relativePath) => import(pathToFileURL(join(root, relativePath)).href);
 const { configureHttpDispatcher } = await importFromPi(piRoot, "dist/core/http-dispatcher.js");
@@ -167,8 +174,8 @@ async function collect(port) {
 	assert.ok(firstVisibleProgress?.at >= 2_500, `ping leaked as visible progress at ${firstVisibleProgress?.at}ms`);
 }
 
-// The fix is observability, not a false provider timeout: v0.7.0 stays red,
-// while current shows elapsed time and the existing interrupt key after 30s.
+// v0.8.0 added an unrequested elapsed indicator. Current deliberately restores
+// stock Pi's static working row while retaining the transport diagnosis.
 async function probeWorkingIndicator(root, expectElapsed) {
 	const realDateNow = Date.now;
 	const realSetTimeout = globalThis.setTimeout;
@@ -201,8 +208,16 @@ async function probeWorkingIndicator(root, expectElapsed) {
 		assert.ok(loaderTimer, "working indicator must retain the inherited loader timer");
 		const elapsedDelay = timeouts.find((timer) => timer.delay === 30_000);
 		if (!expectElapsed) {
-			assert.equal(elapsedDelay, undefined, "v0.7.0 must preserve the silent-working red proof");
+			assert.equal(elapsedDelay, undefined, "current must not schedule elapsed disclosure");
+			now += 31_000;
+			assert.equal(indicator.message, "Working...", "current must preserve Pi's stock working row");
+			assert.equal(
+				intervals.some((timer) => timer.delay === 1_000),
+				false,
+				"current must not schedule elapsed updates",
+			);
 			indicator.dispose();
+			assert.ok(cleared.has(loaderTimer), "working indicator must clear its inherited loader timer");
 			return;
 		}
 		assert.ok(elapsedDelay, "working indicator must schedule its 30-second disclosure");
@@ -228,7 +243,7 @@ async function probeWorkingIndicator(root, expectElapsed) {
 		globalThis.clearInterval = realClearInterval;
 	}
 }
-await probeWorkingIndicator(legacyPiRoot, false);
-await probeWorkingIndicator(piRoot, true);
+await probeWorkingIndicator(v080PiRoot, true);
+await probeWorkingIndicator(piRoot, false);
 
-console.log("Anthropic ping-silence and observable working-indicator regression passed");
+console.log("Anthropic ping-silence diagnosis and stock working-indicator regression passed");

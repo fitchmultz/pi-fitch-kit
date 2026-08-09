@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1 — 9 August 2026
+
+- Reverted v0.8.0's elapsed-time and interrupt-hint addition from `WorkingStatusIndicator`, restoring Pi 0.84.1's stock `Working...` row. Organic use proved the timer worked, but it was unrequested and added noise when live child-agent rows already showed progress. Healthy provider slowness is accepted without a token-silence watchdog, provider timeout, or Anthropic-specific retry.
+- Kept the Anthropic stall diagnosis and transport regression: a truly byte-idle response still times out, while filtered SSE heartbeat pings can keep a healthy inference alive without visible assistant events. The correct product response is the diagnosis, not a behavior change.
+- The runtime artifact is again byte-identical to v0.7.0's six-file OpenAI resilience and compaction stream (`sha256:c7917d7eda6b8d6020b52588f01d0fa2896971ae0362f9687ba13702d8de981e`). The guarded applicator still tracks the status-indicator path so it can recognize, reverse, restore, and recover v0.8.0's seven-file legacy era; complete legacy backups also refresh their recorded patch metadata during migration.
+- Existing v0.8.0 installs remain `legacy-patched` until guarded `apply` runs. The UI revert then requires a full Pi process restart and may wait for the next natural approved maintenance window.
+
 ## 0.8.0 — 9 August 2026
 
 - Long agent turns now stop looking like a frozen TUI: after 30 seconds the core working row adds turn-scoped elapsed wall time and the configured interrupt key, with `esc` as a defensive fallback (`Working... (9m 24s; esc to cancel)`). Updating a custom working message preserves the original start time, and disposal clears the new timer. This is visibility and user control only; it does not add a provider timeout or retry.

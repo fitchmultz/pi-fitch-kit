@@ -416,11 +416,12 @@ function stockFixture() {
 
 // Each migration leg rebuilds the exact backup layout its released kit wrote:
 // 0.4.x/0.5.0 tracked the three core files; 0.6.0 also tracked the pi-ai retry
-// classifier; 0.7.0 added the two Responses files. The current release adds the
-// working-status component. This proves
-// migration against released on-disk layouts rather than current-format
-// backups created by this test. The stale patchSha256 variant mirrors a live
-// install whose pre-0.5.0 metadata was carried forward (issue #16).
+// classifier; 0.7.0 added the two Responses files; 0.8.0 added the working-status
+// component. Current restores that component to stock but keeps it tracked so
+// v0.8.0 can migrate safely. This proves migration against released on-disk
+// layouts rather than current-format backups created by this test. The stale
+// patchSha256 variant mirrors a live install whose pre-0.5.0 metadata was
+// carried forward (issue #16).
 const CORE_ERA_FILES = [
 	"dist/core/agent-session.js",
 	"dist/core/compaction/compaction.js",
@@ -471,7 +472,10 @@ for (const { version, stalePatchSha, eraFiles } of [
 	{ version: "0.5.0" },
 	{ version: "0.5.0", stalePatchSha: `f4d8f383${"0".repeat(56)}` },
 	{ version: "0.6.0", eraFiles: [...CORE_ERA_FILES, RETRY_PATH] },
-	{ version: "0.7.0", eraFiles: [...CORE_ERA_FILES, RETRY_PATH, ...RESPONSES_PATHS] },
+	{
+		version: "0.8.0",
+		eraFiles: [...CORE_ERA_FILES, STATUS_INDICATOR_PATH, RETRY_PATH, ...RESPONSES_PATHS],
+	},
 ]) {
 	const root = stockFixture();
 	const legacyPatch = join(
@@ -503,6 +507,11 @@ for (const { version, stalePatchSha, eraFiles } of [
 		`the released v${version} patch must migrate:\n${migration.stderr}`,
 	);
 	assert.equal(JSON.parse(migration.stdout).migratedFrom, "legacy-patched");
+	assert.equal(
+		sha256(join(root, STATUS_INDICATOR_PATH)),
+		sha256(join(stockRoot, STATUS_INDICATOR_PATH)),
+		"current migration must leave the working indicator at stock bytes",
+	);
 	const upgradedManifest = JSON.parse(
 		readFileSync(join(backupDir, "manifest.json"), "utf8"),
 	);
@@ -544,6 +553,44 @@ for (const { version, stalePatchSha, eraFiles } of [
 	assert.equal(JSON.parse(legacyRestore.stdout).state, "stock");
 }
 
+// v0.7.0 and current intentionally produce identical runtime bytes. A released
+// six-file v0.7.0 install is therefore current-patched already; apply must no-op,
+// preserve its valid backup layout, and remain directly restorable.
+{
+	const root = stockFixture();
+	const v070Patch = join(
+		packageRoot,
+		"patches/archive/pi-0.84.1-compaction-v0.7.0.patch",
+	);
+	const eraFiles = [...CORE_ERA_FILES, RETRY_PATH, ...RESPONSES_PATHS];
+	const backupDir = buildLegacyEraBackup(root, v070Patch, { eraFiles });
+	const applied = spawnSync(
+		PATCH_EXECUTABLE,
+		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
+		{ encoding: "utf8", input: readFileSync(v070Patch) },
+	);
+	assert.equal(applied.status, 0, applied.stderr || applied.stdout);
+	const status = spawnSync(
+		process.execPath,
+		[applicator, "status", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(status.status, 0, status.stderr || status.stdout);
+	assert.equal(JSON.parse(status.stdout).state, "patched");
+	const noOp = spawnSync(
+		process.execPath,
+		[applicator, "apply", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(noOp.status, 0, noOp.stderr || noOp.stdout);
+	assert.equal(JSON.parse(noOp.stdout).state, "already-patched");
+	assert.deepEqual(
+		Object.keys(JSON.parse(readFileSync(join(backupDir, "manifest.json"), "utf8")).files).sort(),
+		[...eraFiles].sort(),
+		"current no-op must preserve the released v0.7.0 backup layout",
+	);
+}
+
 const TRACKED_FILES = [
 	...CORE_ERA_FILES,
 	STATUS_INDICATOR_PATH,
@@ -582,11 +629,16 @@ const trackedHashes = (root) =>
 	assert.ok(!existsSync(join(backupDir, "journal.json")), "refused era restore must not journal");
 }
 
-// Matching positive cases: genuine v0.6.0 and v0.7.0 installs with their
-// released era-sized backups restore directly to exact stock before migration.
+// Matching positive cases: released v0.6.0 through v0.8.0 artifact installs
+// with era-sized backups restore directly to exact stock. v0.7.0 is current by
+// identical bytes; the others are legacy states before migration.
 for (const { version, eraFiles } of [
 	{ version: "0.6.0", eraFiles: [...CORE_ERA_FILES, RETRY_PATH] },
 	{ version: "0.7.0", eraFiles: [...CORE_ERA_FILES, RETRY_PATH, ...RESPONSES_PATHS] },
+	{
+		version: "0.8.0",
+		eraFiles: [...CORE_ERA_FILES, STATUS_INDICATOR_PATH, RETRY_PATH, ...RESPONSES_PATHS],
+	},
 ]) {
 	const root = stockFixture();
 	const legacyPatch = join(
@@ -688,13 +740,17 @@ for (const { version, eraFiles } of [
 	assert.ok(existsSync(join(backupDir, "journal.json")), "the journal must be retained for diagnosis");
 }
 
-// The positive branch of the same preflight: genuine three-, four-, and six-file-era
-// interrupted mutations (mixed legacy state, era backup, retained journal)
-// must still recover to exact stock and clear their journals.
+// The positive branch of the same preflight: genuine three-, four-, six-, and
+// seven-file-era interrupted mutations (mixed patched state, era backup, retained
+// journal) must still recover to exact stock and clear their journals.
 for (const { version, eraFiles } of [
 	{ version: "0.5.0", eraFiles: CORE_ERA_FILES },
 	{ version: "0.6.0", eraFiles: [...CORE_ERA_FILES, RETRY_PATH] },
 	{ version: "0.7.0", eraFiles: [...CORE_ERA_FILES, RETRY_PATH, ...RESPONSES_PATHS] },
+	{
+		version: "0.8.0",
+		eraFiles: [...CORE_ERA_FILES, STATUS_INDICATOR_PATH, RETRY_PATH, ...RESPONSES_PATHS],
+	},
 ]) {
 	const root = stockFixture();
 	const legacyPatch = join(
