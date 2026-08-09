@@ -533,6 +533,35 @@ const TRACKED_FILES = [
 const trackedHashes = (root) =>
 	TRACKED_FILES.map((relativePath) => sha256(join(root, relativePath)));
 
+// A backup layout can be valid for a released kit but too small for the era
+// currently installed. v0.6.0 touched retry.js, so its restore cannot journal
+// against a valid older three-file backup: interruption could leave retry.js
+// at v0.6.0 bytes with no stock preimage available for recovery.
+{
+	const root = stockFixture();
+	const legacyPatch = join(
+		packageRoot,
+		"patches/archive/pi-0.84.1-compaction-v0.6.0.patch",
+	);
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, {});
+	const legacyApply = spawnSync(
+		PATCH_EXECUTABLE,
+		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
+		{ encoding: "utf8", input: readFileSync(legacyPatch) },
+	);
+	assert.equal(legacyApply.status, 0, legacyApply.stderr || legacyApply.stdout);
+	const before = trackedHashes(root);
+	const refused = spawnSync(
+		process.execPath,
+		[applicator, "restore", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.notEqual(refused.status, 0, "v0.6.0 restore must refuse a three-file backup");
+	assert.match(refused.stderr, /cannot recover an interrupted restore/);
+	assert.deepEqual(trackedHashes(root), before, "refused era restore must not mutate tracked files");
+	assert.ok(!existsSync(join(backupDir, "journal.json")), "refused era restore must not journal");
+}
+
 // A manifest listing only a subset of a released layout could make recovery
 // restore fewer files than an interrupted patch step touched. Every action
 // must reject it before considering any mutation.

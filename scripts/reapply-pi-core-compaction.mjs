@@ -580,13 +580,20 @@ function main() {
     runPatch(root, steps[0].reverse, true, steps[0].source);
     if (before.name === "stock") backupStock(root);
     else if (action === "apply") upgradeBackupIfIncomplete(root);
-    else if (before.name === "patched") {
-      // Reversing the current patch touches every tracked file, so recovery
-      // from an interruption needs the complete backup layout. Kit flows
-      // always produce one here; anything else is hand-crafted state.
+    else if (action === "restore") {
+      // Recovery must have a stock preimage for every file the installed patch
+      // can reverse. A layout may be valid for another released era but too
+      // small for this one (for example, v0.6.0 touched retry.js while older
+      // three-file backups did not record it).
       const manifest = readBackupManifest(root);
-      if (Object.keys(files).some((relativePath) => !manifest.files[relativePath])) {
-        fail("Backup layout predates the current patch and cannot recover an interrupted restore; refusing mutation");
+      const untouched = before.legacyPatch?.stockFiles ?? [];
+      const uncovered = Object.keys(files).filter(
+        (relativePath) => !untouched.includes(relativePath) && !manifest.files[relativePath],
+      );
+      if (uncovered.length > 0) {
+        fail(
+          `Backup cannot recover an interrupted restore of the installed patch; missing preimages: ${uncovered.join(", ")}`,
+        );
       }
     }
     writeJournal(root, action, before.name);
