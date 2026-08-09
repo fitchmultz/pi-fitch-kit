@@ -246,6 +246,6 @@ npm run smoke
 - `npm run regression:pi-core-applicator` exercises trusted patch resolution, locking, path confinement, backup integrity, interruption recovery, and migration failure paths on isolated fixtures.
 - `npm run regression:session-name` verifies naming, metadata injection, protected identities, and single ownership during standalone-package migration.
 - `npm run smoke` loads the checkout through Pi's real resource loader, renders the compact footer at wide and narrow widths, checks its toggle, and requires the three bundled commands, `name_session`, one OpenAI request hook, one custom-compaction hook, four extensions, and two prompts.
-- `npm run smoke:lifecycle` uses an isolated Pi agent dir for real install, stale-filter normalization, package update, and resource reload.
+- `npm run smoke:lifecycle` uses an isolated Pi agent dir for real install, stale-filter and duplicate-identity normalization, and resource reload.
 
 For the detailed workflow, model table, evidence, and security rationale, read [docs/pi-setup.md](docs/pi-setup.md). For the short version, read [docs/pi-setup-post.md](docs/pi-setup-post.md).

@@ -163,6 +163,10 @@ assert(setupPrompt.includes("openai-codex-fast.json"), "setup prompt must preser
 assert(setupPrompt.includes("pi-codex-context.json"), "setup prompt must preserve Codex compaction consent");
 assert(setupPrompt.includes("enable, disable, or keep"), "setup must offer explicit consent revocation");
 assert(setupPrompt.includes("filtered, pinned, or duplicate"), "setup must normalize stale kit package entries");
+assert(
+  setupPrompt.includes("exactly one removal command per scope and package identity"),
+  "setup must not issue duplicate removal commands for one package identity",
+);
 assert(setupPrompt.includes("stop immediately on the first failed command"), "setup must fail-stop after partial mutation");
 assert(setupPrompt.includes("requiredForCompleteCore"), "setup must include the separately consented core patch in complete-core checks");
 assert(setupPrompt.includes("Treat `recovery-needed` as drift"), "verify mode must not repair interrupted core mutations");

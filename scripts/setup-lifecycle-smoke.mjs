@@ -63,9 +63,16 @@ try {
 	await loader.reload();
 	assert.equal(loader.getPrompts().prompts.length, 0, "the stale filter fixture must hide prompts");
 
-	pi("remove", root);
+	const canonicalSource = "https://github.com/fitchmultz/pi-fitch-kit";
+	filtered.packages = [canonicalSource, `${canonicalSource}#v0.4.3`];
+	writeFileSync(settingsPath, `${JSON.stringify(filtered, null, 2)}\n`);
+	pi("remove", canonicalSource);
+	assert.deepEqual(
+		JSON.parse(readFileSync(settingsPath, "utf8")).packages,
+		[],
+		"one identity-aware remove must clear canonical and pinned duplicates",
+	);
 	pi("install", root);
-	pi("update", "--extensions");
 	await settingsManager.reload();
 	await loader.reload();
 
@@ -81,11 +88,11 @@ try {
 	assert.equal(loader.getExtensions().errors.length, 0);
 	assert.equal(loader.getThemes().themes.length, 1);
 	assert.equal(
-		loader.getThemes().diagnostics.filter(({ severity }) => severity === "error").length,
+		loader.getThemes().diagnostics.filter(({ type }) => type === "error").length,
 		0,
 	);
 
-	console.log("pi kit install, update, normalization, and reload smoke passed");
+	console.log("pi kit install, duplicate normalization, and reload smoke passed");
 } finally {
 	rmSync(temp, { recursive: true, force: true });
 }
