@@ -179,7 +179,7 @@ These constraints are required:
 - Do not inspect `thinkingSignature`, encrypted reasoning metadata, or a whole serialized request. Those fields previously caused a real session at about 149,853 tokens to be misestimated as 260,952 tokens.
 - Apply the pre-request check uniformly to every selected model with a viable compaction budget. Do not add a provider or model allowlist.
 - Skip the check when `contextWindow <= reserveTokens + keepRecentTokens`; attempting fail-closed compaction there can block valid small-context requests without producing usable headroom.
-- Once a valid estimate crosses the threshold, do not send the provider request unless a new compaction entry was created.
+- Once a valid estimate crosses the threshold and `prepareCompaction()` finds summarizable messages, do not send the provider request unless a new compaction entry was created. Keep the documented unsummarizable-transcript case advisory so it cannot wedge the session.
 
 ## Extension responsibilities
 

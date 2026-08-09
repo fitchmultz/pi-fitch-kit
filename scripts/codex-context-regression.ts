@@ -10,7 +10,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -43,6 +43,7 @@ const importFromPi = (path: string) =>
 	import(pathToFileURL(join(piPackageRoot, path)).href);
 
 const { AgentSession } = await importFromPi("dist/core/agent-session.js");
+const { getAgentDir } = await importFromPi("dist/config.js");
 const { streamSimple } = await importFromPi(
 	"node_modules/@earendil-works/pi-ai/dist/compat.js",
 );
@@ -58,8 +59,7 @@ const { SessionManager } = await importFromPi("dist/core/session-manager.js");
 const { SettingsManager } = await importFromPi("dist/core/settings-manager.js");
 const { DefaultResourceLoader } = await importFromPi("dist/core/resource-loader.js");
 
-const activeAgentDir =
-	process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi/agent");
+const activeAgentDir = getAgentDir();
 const models = JSON.parse(
 	readFileSync(join(activeAgentDir, "models.json"), "utf8"),
 );
