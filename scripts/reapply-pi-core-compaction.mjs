@@ -11,39 +11,62 @@ const PATCH_EXECUTABLE = "/usr/bin/patch";
 const SHLOCK_EXECUTABLE = "/usr/bin/shlock";
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const patchPath = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
-const patchSha256 = "bc854f25940e0e95bd67ab160c22deee36d4cebe967fd7b9149fa86be961554b";
-// `stockFiles` names the tracked files a legacy patch never touched: legacy
-// detection expects them at the stock hash, everything else (except the
-// discriminating agent-session hash) at the current patched hash. The legacy
-// migration regression exercises every archived artifact, so hash drift in a
-// future patch version fails loudly there instead of silently here.
+const patchSha256 = "d04ef33e07272e515803426a4b8d7fe7888fd17324d149304ffd08c6c62ccc61";
+const retryPath = "node_modules/@earendil-works/pi-ai/dist/utils/retry.js";
+const responsesPaths = [
+  "node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js",
+  "node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js",
+];
+// `stockFiles` names tracked files a legacy patch never touched. `fileHashes`
+// handles a file changed by both a legacy and current patch to different bytes.
+// Everything else (except the discriminating agent-session hash) must match the
+// current patched hash. Every archived artifact and released backup layout runs
+// through the migration regression, so a missing era override fails loudly.
 const legacyPatches = [
+  {
+    version: "0.6.0",
+    path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.6.0.patch"),
+    sha256: "bc854f25940e0e95bd67ab160c22deee36d4cebe967fd7b9149fa86be961554b",
+    agentSession: "00564702a1d243fa488a30b2cff30a0b7dbde838c6085ac01e96fd90a8c8f984",
+    stockFiles: responsesPaths,
+    fileHashes: {
+      [retryPath]: "bc684353c341a90d8d67aa70b3d1db03e6005cfeaf2fd97a2d4333086d8075ae",
+    },
+  },
   {
     version: "0.5.0",
     path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.5.0.patch"),
     sha256: "b76c2f68a26e4cda22ecd7e0454d36ec4aa729a929886e3a238262c197334753",
     agentSession: "00564702a1d243fa488a30b2cff30a0b7dbde838c6085ac01e96fd90a8c8f984",
-    stockFiles: ["node_modules/@earendil-works/pi-ai/dist/utils/retry.js"],
+    stockFiles: [retryPath, ...responsesPaths],
   },
   {
     version: "0.4.3",
     path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.4.3.patch"),
     sha256: "9350641094f70ac3a98fd3b02a236861fbbbc13503855637a1dc2ff53971dd08",
     agentSession: "e55bf39d43ab95468a8949dd72c541adc1e54421c8666f9d06e06e4b9efa7227",
-    stockFiles: ["node_modules/@earendil-works/pi-ai/dist/utils/retry.js"],
+    stockFiles: [retryPath, ...responsesPaths],
   },
   {
     version: "0.4.2",
     path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.4.2.patch"),
     sha256: "5f68de3bb9689ad983168a683bd2cc43426e19325071b75d6fd36425ac191b24",
     agentSession: "cd1f9b9a0b6ad10239394568be5961c5a7d8fc117830e1a09650eb5ade176c6a",
-    stockFiles: ["node_modules/@earendil-works/pi-ai/dist/utils/retry.js"],
+    stockFiles: [retryPath, ...responsesPaths],
   },
 ];
 const commonFiles = {
-  "node_modules/@earendil-works/pi-ai/dist/utils/retry.js": {
+  [retryPath]: {
     stock: "916476be8a85ad16f9de3d0cfc3eb341b3290445fde3717593b139fd7ee31b7b",
-    patched: "bc684353c341a90d8d67aa70b3d1db03e6005cfeaf2fd97a2d4333086d8075ae",
+    patched: "9f977d98d46af81a24fa8b2a84aca536a46b6a6b3dff6458097742dab743b59f",
+  },
+  [responsesPaths[0]]: {
+    stock: "9671a8b7d40112eb663168dcef71ca8efd21f3fdaefe12b4cff4acb5dd1a7b10",
+    patched: "280d251c95cb93c92f405ae381bebd9516d6c98bbcc81fd9e34c8e16bc54d32f",
+  },
+  [responsesPaths[1]]: {
+    stock: "1f5e40029548bd3e8b62f15b8e764c478ce7612dcba658cca2bba934127e2e3d",
+    patched: "03fe7ce4ab81762251d58e63f857945c45db48b17cb6cae4326426c0b8490a25",
   },
   "dist/core/agent-session.js": {
     stock: "91e72d5497f665e731cbd79da6a6e826d8cae7d2ce156a7dee39f8ca205e32c8",
@@ -205,12 +228,13 @@ function state(root) {
     return { name: "patched" };
   }
   const legacyPatch = legacyPatches.find(
-    ({ agentSession, stockFiles }) =>
+    ({ agentSession, stockFiles, fileHashes = {} }) =>
       hashes["dist/core/agent-session.js"] === agentSession &&
       Object.entries(files).every(
         ([path, expected]) =>
           path === "dist/core/agent-session.js" ||
-          hashes[path] === (stockFiles.includes(path) ? expected.stock : expected.patched),
+          hashes[path] ===
+            (fileHashes[path] ?? (stockFiles.includes(path) ? expected.stock : expected.patched)),
       ),
   );
   if (legacyPatch) return { name: "legacy-patched", legacyPatch };
