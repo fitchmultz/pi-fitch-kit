@@ -410,13 +410,13 @@ const LEGACY_ERA_FILES = [
 const sha256 = (path) =>
 	createHash("sha256").update(readFileSync(path)).digest("hex");
 
-function buildLegacyEraBackup(root, legacyPatchPath, { stalePatchSha } = {}) {
+function buildLegacyEraBackup(root, legacyPatchPath, { stalePatchSha, sourceRoot = root } = {}) {
 	const backupRoot = join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction");
 	const manifestFiles = {};
 	for (const relativePath of LEGACY_ERA_FILES) {
 		const destination = join(backupRoot, relativePath);
 		mkdirSync(dirname(destination), { recursive: true });
-		copyFileSync(join(root, relativePath), destination);
+		copyFileSync(join(sourceRoot, relativePath), destination);
 		manifestFiles[relativePath] = { stock: sha256(destination), patched: "recorded-by-released-kit" };
 	}
 	writeFileSync(
@@ -512,6 +512,15 @@ for (const { version, stalePatchSha } of [
 	assert.equal(JSON.parse(legacyRestore.stdout).state, "stock");
 }
 
+const TRACKED_FILES = [
+	"dist/core/agent-session.js",
+	"dist/core/compaction/compaction.js",
+	"dist/modes/interactive/interactive-mode.js",
+	"node_modules/@earendil-works/pi-ai/dist/utils/retry.js",
+];
+const trackedHashes = (root) =>
+	TRACKED_FILES.map((relativePath) => sha256(join(root, relativePath)));
+
 // A manifest listing only a subset of a released layout could make recovery
 // restore fewer files than an interrupted patch step touched. Every action
 // must reject it before considering any mutation.
@@ -528,6 +537,7 @@ for (const { version, stalePatchSha } of [
 		"dist/core/agent-session.js": manifest.files["dist/core/agent-session.js"],
 	};
 	writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+	const before = trackedHashes(root);
 	for (const action of ["status", "apply", "restore"]) {
 		const result = spawnSync(
 			process.execPath,
@@ -537,6 +547,52 @@ for (const { version, stalePatchSha } of [
 		assert.notEqual(result.status, 0, `${action} must reject a truncated backup manifest`);
 		assert.match(result.stderr, /does not match a released kit backup layout/);
 	}
+	assert.deepEqual(trackedHashes(root), before, "rejected actions must not mutate tracked files");
+	assert.ok(
+		!existsSync(join(backupDir, "journal.json")),
+		"rejected actions must not journal a mutation",
+	);
+}
+
+// A pre-existing recovery journal must not let a valid legacy-layout backup
+// mutate a current-patched install: recovery restores only manifest-listed
+// preimages, so it must preflight that every omitted tracked file already
+// sits at stock bytes and otherwise fail closed without touching anything.
+{
+	const root = stockFixture();
+	const applied = spawnSync(
+		process.execPath,
+		[applicator, "apply", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(applied.status, 0, applied.stderr || applied.stdout);
+	const backupDir = join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction");
+	rmSync(backupDir, { recursive: true, force: true });
+	buildLegacyEraBackup(
+		root,
+		join(packageRoot, "patches/archive/pi-0.84.1-compaction-v0.5.0.patch"),
+		{ sourceRoot: stockRoot },
+	);
+	writeFileSync(
+		join(backupDir, "journal.json"),
+		`${JSON.stringify({ packageRoot: root, version: "0.84.1", action: "restore", before: "patched" })}\n`,
+	);
+	const before = trackedHashes(root);
+	for (const action of ["apply", "restore"]) {
+		const result = spawnSync(
+			process.execPath,
+			[applicator, action, "--pi-root", root],
+			{ encoding: "utf8" },
+		);
+		assert.notEqual(result.status, 0, `${action} must refuse recovery the backup cannot complete`);
+		assert.match(result.stderr, /Recovery cannot restore stock/);
+	}
+	assert.deepEqual(
+		trackedHashes(root),
+		before,
+		"refused recovery must not mutate the patched install",
+	);
+	assert.ok(existsSync(join(backupDir, "journal.json")), "the journal must be retained for diagnosis");
 }
 
 // A fully patched install whose backup still has the legacy layout cannot

@@ -237,19 +237,22 @@ function readBackupManifest(root) {
   if (canonicalPath(manifest.packageRoot) !== root || manifest.version !== piVersion) {
     fail(`Backup belongs to an unexpected installation: ${manifestPath}`);
   }
-  // Only two backup layouts were ever released: the legacy set (every tracked
-  // file except the ones legacy patches left at stock bytes) and the complete
-  // current set. Interrupted-mutation recovery restores exactly the recorded
-  // preimages, so a partial path set could recover fewer files than a patch
-  // step touched and wedge the install; reject anything but the known layouts.
+  // The only released backup layouts are the complete current set and, per
+  // archived legacy patch, every tracked file that patch actually touched.
+  // Interrupted-mutation recovery restores exactly the recorded preimages, so
+  // a partial path set could recover fewer files than a patch step touched
+  // and wedge the install; reject anything but the known layouts.
   const listed = Object.keys(manifest.files ?? {}).sort();
   const currentLayout = Object.keys(files).sort();
-  const legacyLayout = currentLayout.filter(
-    (relativePath) => !legacyPatches.some(({ stockFiles }) => stockFiles.includes(relativePath)),
-  );
-  const matches = (layout) =>
+  const releasedLayouts = [
+    currentLayout,
+    ...legacyPatches.map(({ stockFiles }) =>
+      currentLayout.filter((relativePath) => !stockFiles.includes(relativePath)),
+    ),
+  ];
+  const matchesLayout = (layout) =>
     listed.length === layout.length && layout.every((relativePath, index) => listed[index] === relativePath);
-  if (!matches(currentLayout) && !matches(legacyLayout)) {
+  if (!releasedLayouts.some(matchesLayout)) {
     fail(`Backup manifest does not match a released kit backup layout: ${manifestPath}`);
   }
   return manifest;
@@ -390,10 +393,18 @@ function recoverInterruptedMutation(root) {
   } catch {
     // Mixed state: restore the verified stock preimage below.
   }
-  // Restore exactly the preimages this backup recorded; an interrupted
-  // legacy-era mutation can only have touched the files its own manifest
-  // lists, and the final state check below stays authoritative.
-  for (const relativePath of Object.keys(readBackupManifest(root).files)) {
+  // Recovery restores exactly the preimages this backup recorded, so it can
+  // only end at stock if every tracked file the manifest omits already sits
+  // at stock bytes. A genuine legacy-era interruption satisfies that; any
+  // other pairing must fail closed before touching a single file.
+  const manifest = readBackupManifest(root);
+  for (const [relativePath, expected] of Object.entries(files)) {
+    if (manifest.files[relativePath]) continue;
+    if (sha256(join(root, relativePath)) !== expected.stock) {
+      fail(`Recovery cannot restore stock: ${relativePath} is outside the backup and not at stock bytes`);
+    }
+  }
+  for (const relativePath of Object.keys(manifest.files)) {
     const source = join(backupRoot, relativePath);
     const destination = join(root, relativePath);
     const temporary = `${destination}.pi-fitch-kit-recovery-${randomUUID()}`;
