@@ -225,7 +225,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 
 The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only the selected unpinned sources. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. Agent Browser stays at 0.33.0 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys separately, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources after reload or Pi core after a full restart.
 
-`/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, model availability, consent-gated route state, and guarded Pi core patch status. Complete core cannot pass while its required patch is stock, divergent, or unverified.
+`/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, model availability, consent-gated route state, and guarded Pi core patch status. An interrupted core operation reports `recovery-needed`; verify never repairs it. Complete core cannot pass while its required patch is stock, divergent, recovery-needed, or unverified.
 
 ## Trust and security boundaries
 

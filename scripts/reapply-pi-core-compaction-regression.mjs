@@ -170,6 +170,11 @@ function stockFixture() {
 			before: "stock",
 		})}\n`,
 	);
+	const mixedAgentSession = readFileSync(join(root, "dist/core/agent-session.js"));
+	const journalPath = join(
+		root,
+		".pi-fitch-kit-backup/pi-0.84.1-compaction/journal.json",
+	);
 	result = spawnSync(
 		process.execPath,
 		[applicator, "status", "--pi-root", root],
@@ -177,8 +182,22 @@ function stockFixture() {
 	);
 	assert.equal(result.status, 0, result.stderr || result.stdout);
 	const status = JSON.parse(result.stdout);
-	assert.equal(status.state, "stock");
-	assert.equal(status.recovered, true);
+	assert.equal(status.state, "recovery-needed");
+	assert.equal(status.currentState, "mixed");
+	assert.equal(existsSync(journalPath), true, "status must not clear a recovery journal");
+	assert.deepEqual(
+		readFileSync(join(root, "dist/core/agent-session.js")),
+		mixedAgentSession,
+		"status must not repair interrupted core bytes",
+	);
+	result = spawnSync(
+		process.execPath,
+		[applicator, "restore", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	assert.equal(JSON.parse(result.stdout).state, "already-stock");
+	assert.equal(existsSync(journalPath), false);
 }
 
 {
@@ -333,6 +352,10 @@ function stockFixture() {
 			before: "stock",
 		})}\n`,
 	);
+	const journalPath = join(
+		root,
+		".pi-fitch-kit-backup/pi-0.84.1-compaction/journal.json",
+	);
 	result = spawnSync(
 		process.execPath,
 		[applicator, "status", "--pi-root", root],
@@ -340,8 +363,94 @@ function stockFixture() {
 	);
 	assert.equal(result.status, 0, result.stderr || result.stdout);
 	const status = JSON.parse(result.stdout);
-	assert.equal(status.state, "patched", "a completed apply must not be rolled back");
-	assert.equal(status.recovered, undefined);
+	assert.equal(status.state, "recovery-needed");
+	assert.equal(status.currentState, "patched");
+	assert.equal(existsSync(journalPath), true, "status must leave completed journals untouched");
+	result = spawnSync(
+		process.execPath,
+		[applicator, "apply", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	assert.equal(JSON.parse(result.stdout).state, "already-patched");
+	assert.equal(existsSync(journalPath), false);
+}
+
+{
+	const root = stockFixture();
+	const stale = join(
+		root,
+		".pi-fitch-kit-backup/pi-0.84.1-compaction.tmp-interrupted",
+	);
+	mkdirSync(stale, { recursive: true });
+	writeFileSync(join(stale, "partial"), "stale\n");
+	const result = spawnSync(
+		process.execPath,
+		[applicator, "apply", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	assert.equal(existsSync(stale), false, "a stale backup staging directory must be reaped");
+}
+
+for (const version of ["0.4.2", "0.4.3"]) {
+	const root = stockFixture();
+	for (const action of ["apply", "restore"]) {
+		const result = spawnSync(
+			process.execPath,
+			[applicator, action, "--pi-root", root],
+			{ encoding: "utf8" },
+		);
+		assert.equal(result.status, 0, result.stderr || result.stdout);
+	}
+	const legacyPatch = join(
+		packageRoot,
+		`patches/archive/pi-0.84.1-compaction-v${version}.patch`,
+	);
+	const legacyApply = spawnSync(
+		PATCH_EXECUTABLE,
+		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
+		{ encoding: "utf8", input: readFileSync(legacyPatch) },
+	);
+	assert.equal(legacyApply.status, 0, legacyApply.stderr || legacyApply.stdout);
+	const legacyStatus = spawnSync(
+		process.execPath,
+		[applicator, "status", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(legacyStatus.status, 0, legacyStatus.stderr || legacyStatus.stdout);
+	assert.equal(JSON.parse(legacyStatus.stdout).legacyPatchVersion, version);
+	const migration = spawnSync(
+		process.execPath,
+		[applicator, "apply", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(
+		migration.status,
+		0,
+		`the released v${version} patch must migrate:\n${migration.stderr}`,
+	);
+	assert.equal(JSON.parse(migration.stdout).migratedFrom, "legacy-patched");
+	const restore = spawnSync(
+		process.execPath,
+		[applicator, "restore", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(restore.status, 0, restore.stderr || restore.stdout);
+	assert.equal(JSON.parse(restore.stdout).state, "stock");
+	const legacyReapply = spawnSync(
+		PATCH_EXECUTABLE,
+		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
+		{ encoding: "utf8", input: readFileSync(legacyPatch) },
+	);
+	assert.equal(legacyReapply.status, 0, legacyReapply.stderr || legacyReapply.stdout);
+	const legacyRestore = spawnSync(
+		process.execPath,
+		[applicator, "restore", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(legacyRestore.status, 0, legacyRestore.stderr || legacyRestore.stdout);
+	assert.equal(JSON.parse(legacyRestore.stdout).state, "stock");
 }
 
 console.log("pi core applicator security and recovery checks passed");

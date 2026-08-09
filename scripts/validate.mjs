@@ -31,6 +31,7 @@ assert(
 for (const path of [
   "patches/pi-0.84.1-compaction.patch",
   "patches/archive/pi-0.84.1-compaction-v0.4.2.patch",
+  "patches/archive/pi-0.84.1-compaction-v0.4.3.patch",
   "scripts/reapply-pi-core-compaction.mjs",
 ]) {
   assert(lstatSync(join(root, path)).isFile(), `Pi core restoration resource missing: ${path}`);
@@ -164,6 +165,7 @@ assert(setupPrompt.includes("enable, disable, or keep"), "setup must offer expli
 assert(setupPrompt.includes("filtered, pinned, or duplicate"), "setup must normalize stale kit package entries");
 assert(setupPrompt.includes("stop immediately on the first failed command"), "setup must fail-stop after partial mutation");
 assert(setupPrompt.includes("requiredForCompleteCore"), "setup must include the separately consented core patch in complete-core checks");
+assert(setupPrompt.includes("Treat `recovery-needed` as drift"), "verify mode must not repair interrupted core mutations");
 assert(setupPrompt.includes("full process restart"), "setup must distinguish core restart from resource reload");
 assert(!setupPrompt.includes("@latest"), "setup prompt must reject mutable npm specs without spelling one");
 

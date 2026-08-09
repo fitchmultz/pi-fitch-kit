@@ -18,9 +18,9 @@ const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 const previousHome = process.env.HOME;
 
 try {
-    mkdirSync(agentDir, { recursive: true });
-    mkdirSync(home, { recursive: true });
-    mkdirSync(cwd, { recursive: true });
+	mkdirSync(agentDir, { recursive: true });
+	mkdirSync(home, { recursive: true });
+	mkdirSync(cwd, { recursive: true });
 	writeFileSync(join(agentDir, "settings.json"), `${JSON.stringify({ packages: [root] }, null, 2)}\n`);
 	writeFileSync(
 		join(agentDir, "verbosity.json"),

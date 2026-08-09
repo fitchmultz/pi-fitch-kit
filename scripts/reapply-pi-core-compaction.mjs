@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
-import { delimiter, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, delimiter, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PI_PACKAGE = "@earendil-works/pi-coding-agent";
@@ -12,9 +12,20 @@ const SHLOCK_EXECUTABLE = "/usr/bin/shlock";
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const patchPath = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
 const patchSha256 = "e22b2060d2e92e35499386eaf32cde9fe66de6d871b247ae5394c0a945bac486";
-const legacyPatchPath = join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.4.2.patch");
-const legacyPatchSha256 = "5f68de3bb9689ad983168a683bd2cc43426e19325071b75d6fd36425ac191b24";
-const legacyAgentSessionPatched = "cd1f9b9a0b6ad10239394568be5961c5a7d8fc117830e1a09650eb5ade176c6a";
+const legacyPatches = [
+  {
+    version: "0.4.3",
+    path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.4.3.patch"),
+    sha256: "9350641094f70ac3a98fd3b02a236861fbbbc13503855637a1dc2ff53971dd08",
+    agentSession: "e55bf39d43ab95468a8949dd72c541adc1e54421c8666f9d06e06e4b9efa7227",
+  },
+  {
+    version: "0.4.2",
+    path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.4.2.patch"),
+    sha256: "5f68de3bb9689ad983168a683bd2cc43426e19325071b75d6fd36425ac191b24",
+    agentSession: "cd1f9b9a0b6ad10239394568be5961c5a7d8fc117830e1a09650eb5ade176c6a",
+  },
+];
 const commonFiles = {
   "dist/core/agent-session.js": {
     stock: "91e72d5497f665e731cbd79da6a6e826d8cae7d2ce156a7dee39f8ca205e32c8",
@@ -172,14 +183,14 @@ function state(root) {
   if (Object.entries(files).every(([path, expected]) => hashes[path] === expected.patched)) {
     return { name: "patched" };
   }
-  if (
-    hashes["dist/core/agent-session.js"] === legacyAgentSessionPatched &&
-    Object.entries(files).every(
-      ([path, expected]) => path === "dist/core/agent-session.js" || hashes[path] === expected.patched,
-    )
-  ) {
-    return { name: "legacy-patched" };
-  }
+  const legacyPatch = legacyPatches.find(
+    ({ agentSession }) =>
+      hashes["dist/core/agent-session.js"] === agentSession &&
+      Object.entries(files).every(
+        ([path, expected]) => path === "dist/core/agent-session.js" || hashes[path] === expected.patched,
+      ),
+  );
+  if (legacyPatch) return { name: "legacy-patched", legacyPatch };
   const detail = Object.entries(hashes).map(([path, hash]) => `${path}: ${hash}`).join("\n");
   fail(`Pi core diverges from both reviewed stock and patched states; refusing mutation:\n${detail}`);
 }
@@ -219,6 +230,13 @@ function backupStock(root) {
   const backupParent = dirname(backupRoot);
   assertSafePath(root, backupParent, true);
   mkdirSync(backupParent, { recursive: true });
+  const stagingPrefix = `${basename(backupRoot)}.tmp-`;
+  for (const entry of readdirSync(backupParent)) {
+    if (!entry.startsWith(stagingPrefix)) continue;
+    const stale = join(backupParent, entry);
+    assertSafePath(root, stale);
+    rmSync(stale, { recursive: true, force: true });
+  }
   const stagingRoot = mkdtempSync(`${backupRoot}.tmp-`);
   try {
     for (const [relativePath, expected] of Object.entries(files)) {
@@ -227,6 +245,9 @@ function backupStock(root) {
       const destination = join(stagingRoot, relativePath);
       mkdirSync(dirname(destination), { recursive: true });
       copyFileSync(source, destination);
+      if (sha256(destination) !== expected.stock) {
+        fail(`Staged backup preimage mismatch: ${destination}`);
+      }
     }
     writeFileSync(
       join(stagingRoot, "manifest.json"),
@@ -255,9 +276,10 @@ function clearJournal(root) {
   rmSync(backupPaths(root).journalPath, { force: true });
 }
 
-function recoverInterruptedMutation(root) {
-  const { backupRoot, journalPath } = backupPaths(root);
-  if (!verifyBackup(root) || !existsSync(journalPath)) return false;
+function readRecoveryJournal(root, hasBackup = verifyBackup(root)) {
+  const { journalPath } = backupPaths(root);
+  if (!existsSync(journalPath)) return undefined;
+  if (!hasBackup) fail(`Verified stock backup missing for recovery journal: ${journalPath}`);
   assertSafePath(root, journalPath);
   const journal = JSON.parse(readFileSync(journalPath, "utf8"));
   if (canonicalPath(journal.packageRoot) !== root || journal.version !== piVersion) {
@@ -265,8 +287,15 @@ function recoverInterruptedMutation(root) {
   }
   const target = journal.action === "apply" ? "patched" : journal.action === "restore" ? "stock" : undefined;
   if (!target) fail(`Recovery journal has an invalid action: ${journalPath}`);
+  return { journal, target };
+}
+
+function recoverInterruptedMutation(root) {
+  const pending = readRecoveryJournal(root);
+  if (!pending) return false;
+  const { backupRoot } = backupPaths(root);
   try {
-    if (state(root).name === target) {
+    if (state(root).name === pending.target) {
       clearJournal(root);
       return false;
     }
@@ -286,6 +315,32 @@ function recoverInterruptedMutation(root) {
   return true;
 }
 
+function readStatus(root) {
+  const hasBackup = verifyBackup(root);
+  const pending = readRecoveryJournal(root, hasBackup);
+  let current;
+  try {
+    current = state(root);
+  } catch (error) {
+    if (!pending) throw error;
+    current = { name: "mixed" };
+  }
+  if (current.name !== "stock" && !hasBackup) {
+    fail(`Verified stock backup missing for ${current.name} installation`);
+  }
+  if (pending) {
+    return {
+      state: "recovery-needed",
+      currentState: current.name,
+      pendingAction: pending.journal.action,
+    };
+  }
+  return {
+    state: current.name,
+    ...(current.legacyPatch ? { legacyPatchVersion: current.legacyPatch.version } : {}),
+  };
+}
+
 function runPatch(root, reverse, dryRun, source = patchPath) {
   if (!existsSync(PATCH_EXECUTABLE)) fail(`Required patch executable not found: ${PATCH_EXECUTABLE}`);
   const args = ["--batch", "--forward", "--no-backup-if-mismatch", "--reject-file=-", "-p1", "-d", root];
@@ -303,23 +358,24 @@ function checkSyntax(root) {
   }
 }
 
-function planSteps(action, beforeName) {
+function planSteps(action, before) {
   if (action === "restore") {
-    return [{ reverse: true, source: beforeName === "legacy-patched" ? legacyPatchPath : patchPath }];
+    return [{ reverse: true, source: before.legacyPatch?.path ?? patchPath }];
   }
-  if (beforeName === "legacy-patched") {
+  if (before.legacyPatch) {
     // One-step migration: reverse the superseded reviewed patch, verify the
-    // exact stock intermediate, ensure the stock backup exists, then apply the
-    // current patch. Failures roll back to the legacy-patched pre-state.
+    // exact stock intermediate, then apply the current patch. Main has already
+    // required the legacy install's verified stock backup before this plan runs.
+    // Failures roll back to the same legacy-patched pre-state.
     return [
-      { reverse: true, source: legacyPatchPath, verify: "stock", backup: true },
+      { reverse: true, source: before.legacyPatch.path, verify: "stock" },
       { reverse: false, source: patchPath },
     ];
   }
   return [{ reverse: false, source: patchPath }];
 }
 
-function mutateAndVerify(root, action, beforeName, steps) {
+function mutateAndVerify(root, action, before, steps) {
   const snapshots = Object.fromEntries(
     Object.keys(files).map((relativePath) => [relativePath, readFileSync(join(root, relativePath))]),
   );
@@ -329,7 +385,6 @@ function mutateAndVerify(root, action, beforeName, steps) {
       if (step.verify && state(root).name !== step.verify) {
         fail(`Expected ${step.verify} state mid-${action}, found a divergent intermediate`);
       }
-      if (step.backup) backupStock(root);
     }
     const expected = action === "apply" ? "patched" : "stock";
     const after = state(root);
@@ -343,14 +398,19 @@ function mutateAndVerify(root, action, beforeName, steps) {
         writeFileSync(join(root, relativePath), contents);
       }
       const restored = state(root);
-      if (restored.name !== beforeName) fail(`Rollback restored ${restored.name}, expected ${beforeName}`);
+      if (
+        restored.name !== before.name ||
+        restored.legacyPatch?.version !== before.legacyPatch?.version
+      ) {
+        fail(`Rollback restored ${restored.name}, expected ${before.name}`);
+      }
       checkSyntax(root);
       clearJournal(root);
     } catch (rollbackError) {
       throw new AggregateError([error, rollbackError], `Pi core ${action} failed and rollback could not be verified`);
     }
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Pi core ${action} failed; restored and verified the ${beforeName} pre-operation state.\n${message}`, { cause: error });
+    throw new Error(`Pi core ${action} failed; restored and verified the ${before.name} pre-operation state.\n${message}`, { cause: error });
   }
 }
 
@@ -358,6 +418,16 @@ function main() {
   const { action, explicitRoot } = parseArgs();
   const root = resolvePiRoot(explicitRoot);
   verifyInstallation(root);
+  if (action === "status") {
+    console.log(
+      JSON.stringify(
+        { ok: true, action, packageRoot: root, version: piVersion, ...readStatus(root) },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
   const releaseLock = acquireLock(root);
   try {
     const recovered = recoverInterruptedMutation(root);
@@ -370,14 +440,10 @@ function main() {
         (action === "restore" && before.name === "patched")) {
       verifyPatch(patchPath, patchSha256);
     }
-    if (before.name === "legacy-patched" && action !== "status") {
-      verifyPatch(legacyPatchPath, legacyPatchSha256);
+    if (before.legacyPatch) {
+      verifyPatch(before.legacyPatch.path, before.legacyPatch.sha256);
     }
 
-    if (action === "status") {
-      console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: before.name, ...(recovered ? { recovered: true } : {}) }, null, 2));
-      return;
-    }
     if (action === "apply" && before.name === "patched") {
       console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: "already-patched", changed: false, ...(recovered ? { recovered: true } : {}) }, null, 2));
       return;
@@ -387,11 +453,11 @@ function main() {
       return;
     }
 
-    const steps = planSteps(action, before.name);
+    const steps = planSteps(action, before);
     runPatch(root, steps[0].reverse, true, steps[0].source);
     if (before.name === "stock") backupStock(root);
     writeJournal(root, action, before.name);
-    const after = mutateAndVerify(root, action, before.name, steps);
+    const after = mutateAndVerify(root, action, before, steps);
     console.log(
       JSON.stringify(
         {
@@ -401,7 +467,9 @@ function main() {
           version: piVersion,
           state: after.name,
           changed: true,
-          ...(before.name === "legacy-patched" ? { migratedFrom: "legacy-patched" } : {}),
+          ...(before.legacyPatch
+            ? { migratedFrom: "legacy-patched", legacyPatchVersion: before.legacyPatch.version }
+            : {}),
           ...(recovered ? { recovered: true } : {}),
         },
         null,
