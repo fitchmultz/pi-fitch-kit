@@ -251,6 +251,7 @@ function stockFixture() {
 	const root = stockFixture();
 	const lockPath = join(root, ".pi-fitch-kit.lock");
 	writeFileSync(lockPath, "999999\n");
+	// shlock waits for the lock mtime to stabilize before deleting a dead owner's file.
 	await new Promise((resolveDelay) => setTimeout(resolveDelay, 2_100));
 	const result = spawnSync(
 		process.execPath,
