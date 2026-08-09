@@ -418,14 +418,11 @@ function main() {
   const { action, explicitRoot } = parseArgs();
   const root = resolvePiRoot(explicitRoot);
   verifyInstallation(root);
+  const report = (result) => console.log(
+    JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, ...result }, null, 2),
+  );
   if (action === "status") {
-    console.log(
-      JSON.stringify(
-        { ok: true, action, packageRoot: root, version: piVersion, ...readStatus(root) },
-        null,
-        2,
-      ),
-    );
+    report(readStatus(root));
     return;
   }
   const releaseLock = acquireLock(root);
@@ -445,11 +442,11 @@ function main() {
     }
 
     if (action === "apply" && before.name === "patched") {
-      console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: "already-patched", changed: false, ...(recovered ? { recovered: true } : {}) }, null, 2));
+      report({ state: "already-patched", changed: false, ...(recovered ? { recovered: true } : {}) });
       return;
     }
     if (action === "restore" && before.name === "stock") {
-      console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: "already-stock", changed: false, ...(recovered ? { recovered: true } : {}) }, null, 2));
+      report({ state: "already-stock", changed: false, ...(recovered ? { recovered: true } : {}) });
       return;
     }
 
@@ -458,24 +455,14 @@ function main() {
     if (before.name === "stock") backupStock(root);
     writeJournal(root, action, before.name);
     const after = mutateAndVerify(root, action, before, steps);
-    console.log(
-      JSON.stringify(
-        {
-          ok: true,
-          action,
-          packageRoot: root,
-          version: piVersion,
-          state: after.name,
-          changed: true,
-          ...(before.legacyPatch
-            ? { migratedFrom: "legacy-patched", legacyPatchVersion: before.legacyPatch.version }
-            : {}),
-          ...(recovered ? { recovered: true } : {}),
-        },
-        null,
-        2,
-      ),
-    );
+    report({
+      state: after.name,
+      changed: true,
+      ...(before.legacyPatch
+        ? { migratedFrom: "legacy-patched", legacyPatchVersion: before.legacyPatch.version }
+        : {}),
+      ...(recovered ? { recovered: true } : {}),
+    });
   } finally {
     releaseLock();
   }
