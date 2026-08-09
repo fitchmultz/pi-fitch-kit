@@ -2712,6 +2712,8 @@ async function realSession(options: {
 			"stock",
 			"the fixture must start from the reviewed stock identity",
 		);
+		runReapply("apply");
+		runReapply("restore");
 		applyLegacyPatch();
 		assert.equal(
 			runReapply("status").state,
