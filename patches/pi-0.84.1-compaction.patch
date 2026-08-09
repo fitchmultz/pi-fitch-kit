@@ -1,6 +1,6 @@
 diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
 --- a/dist/core/agent-session.js	2026-08-08 21:24:47
-+++ b/dist/core/agent-session.js	2026-08-08 21:47:52
++++ b/dist/core/agent-session.js	2026-08-08 23:38:34
 @@ -155,6 +155,7 @@
          this._unsubscribeAgent = this.agent.subscribe(this._handleAgentEvent);
          this._installAgentToolHooks();
@@ -9,7 +9,48 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
          this._buildRuntime({
              activeToolNames: this._initialActiveToolNames,
              includeAllExtensionTools: true,
-@@ -271,6 +272,91 @@
+@@ -163,10 +164,10 @@
+     get modelRuntime() {
+         return this._modelRuntime;
+     }
+-    async _getRequiredRequestAuth(model) {
++    async _getRequiredRequestAuth(model, signal) {
+         let result;
+         try {
+-            result = await this._modelRuntime.getAuth(model);
++            result = await this._modelRuntime.getAuth(model, { signal });
+         }
+         catch (error) {
+             const cause = error instanceof Error ? error.cause : undefined;
+@@ -192,12 +193,12 @@
+         }
+         throw new Error(formatNoApiKeyFoundMessage(model.provider));
+     }
+-    async _getSummarizationRequestAuth(model) {
++    async _getSummarizationRequestAuth(model, signal) {
+         if (this.agent.streamFunction === streamSimple) {
+-            return this._getRequiredRequestAuth(model);
++            return this._getRequiredRequestAuth(model, signal);
+         }
+         try {
+-            const result = await this._modelRuntime.getAuth(model);
++            const result = await this._modelRuntime.getAuth(model, { signal });
+             if (!result)
+                 return { model };
+             const requestModel = result.auth.baseUrl ? { ...model, baseUrl: result.auth.baseUrl } : model;
+@@ -208,7 +209,10 @@
+                 env: result.env,
+             };
+         }
+-        catch {
++        catch (error) {
++            if (signal?.aborted) {
++                throw error;
++            }
+             return { model };
+         }
+     }
+@@ -271,6 +275,91 @@
              };
          };
      }
@@ -101,7 +142,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
      _installAgentNextTurnRefresh() {
          const previousPrepareNextTurnWithContext = this.agent.prepareNextTurnWithContext ??
              (this.agent.prepareNextTurn
-@@ -1365,36 +1451,57 @@
+@@ -1365,36 +1454,57 @@
       * @param customInstructions Optional instructions for the compaction summary
       */
      async compact(customInstructions) {
@@ -157,7 +198,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
 +            if (!model) {
 +                throw new Error(formatNoModelSelectedMessage());
 +            }
-+            const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(model);
++            const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(model, compactionController.signal);
              let extensionCompaction;
              let fromExtension = false;
              if (this._extensionRunner.hasHandlers("session_before_compact")) {
@@ -177,7 +218,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
                  }));
                  if (result?.cancel) {
                      throw new Error("Compaction cancelled");
-@@ -1419,14 +1526,14 @@
+@@ -1419,14 +1529,14 @@
              }
              else {
                  // Generate compaction result
@@ -194,7 +235,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
                  throw new Error("Compaction cancelled");
              }
              this.sessionManager.appendCompaction(summary, firstKeptEntryId, tokensBefore, details, fromExtension, usage);
-@@ -1479,7 +1586,9 @@
+@@ -1479,7 +1589,9 @@
              throw error;
          }
          finally {
@@ -205,7 +246,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
          }
      }
      /**
-@@ -1511,6 +1620,12 @@
+@@ -1511,6 +1623,12 @@
          const settings = this.settingsManager.getCompactionSettings();
          if (!settings.enabled)
              return false;
@@ -218,7 +259,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
          // Skip if message was aborted (user cancelled) - unless skipAbortedCheck is false
          if (skipAbortedCheck && assistantMessage.stopReason === "aborted")
              return false;
-@@ -1592,22 +1707,43 @@
+@@ -1592,22 +1710,43 @@
      /**
       * Internal: Run auto-compaction with events.
       */
@@ -270,11 +311,11 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
 -            this._emit({ type: "compaction_start", reason });
 -            this._autoCompactionAbortController = new AbortController();
 -            started = true;
-+            const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(model);
++            const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(model, compactionSignal);
              let extensionCompaction;
              let fromExtension = false;
              if (this._extensionRunner.hasHandlers("session_before_compact")) {
-@@ -1618,7 +1754,10 @@
+@@ -1618,7 +1757,10 @@
                      customInstructions: undefined,
                      reason,
                      willRetry,
@@ -286,7 +327,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
                  }));
                  if (extensionResult?.cancel) {
                      this._emit({
-@@ -1650,14 +1789,14 @@
+@@ -1650,14 +1792,14 @@
              }
              else {
                  // Generate compaction result
@@ -303,7 +344,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
                  this._emit({
                      type: "compaction_end",
                      reason,
-@@ -1667,6 +1806,9 @@
+@@ -1667,6 +1809,9 @@
                  });
                  return false;
              }
@@ -313,7 +354,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
              this.sessionManager.appendCompaction(summary, firstKeptEntryId, tokensBefore, details, fromExtension, usage);
              const newEntries = this.sessionManager.getEntries();
              const sessionContext = this.sessionManager.buildSessionContext();
-@@ -1692,16 +1834,21 @@
+@@ -1692,16 +1837,21 @@
                  details,
              };
              this._emit({ type: "compaction_end", reason, result, aborted: false, willRetry });
@@ -341,7 +382,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
                  return true;
              }
              // Auto-compaction can complete while follow-up/steering/custom messages are waiting.
-@@ -1709,23 +1856,35 @@
+@@ -1709,23 +1859,35 @@
              return this.agent.hasQueuedMessages();
          }
          catch (error) {
@@ -384,6 +425,28 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
          }
      }
      /**
+@@ -2372,7 +2534,7 @@
+             let summaryUsage;
+             if (options.summarize && entriesToSummarize.length > 0 && !extensionSummary) {
+                 const model = this.model;
+-                const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(model);
++                const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(model, this._branchSummaryAbortController.signal);
+                 const branchSummarySettings = this.settingsManager.getBranchSummarySettings();
+                 const result = await generateBranchSummary(entriesToSummarize, {
+                     model: requestModel,
+@@ -2459,6 +2621,12 @@
+             });
+             // Emit to custom tools
+             return { editorText, cancelled: false, summaryEntry };
++        }
++        catch (error) {
++            if (this._branchSummaryAbortController?.signal.aborted) {
++                return { cancelled: true, aborted: true };
++            }
++            throw error;
+         }
+         finally {
+             this._branchSummaryAbortController = undefined;
 diff -ruN a/dist/core/compaction/compaction.js b/dist/core/compaction/compaction.js
 --- a/dist/core/compaction/compaction.js	2026-08-08 21:24:47
 +++ b/dist/core/compaction/compaction.js	2026-08-08 21:24:47

@@ -11,7 +11,7 @@ const PATCH_EXECUTABLE = "/usr/bin/patch";
 const SHLOCK_EXECUTABLE = "/usr/bin/shlock";
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const patchPath = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
-const patchSha256 = "e22b2060d2e92e35499386eaf32cde9fe66de6d871b247ae5394c0a945bac486";
+const patchSha256 = "b76c2f68a26e4cda22ecd7e0454d36ec4aa729a929886e3a238262c197334753";
 const legacyPatches = [
   {
     version: "0.4.3",
@@ -29,7 +29,7 @@ const legacyPatches = [
 const commonFiles = {
   "dist/core/agent-session.js": {
     stock: "91e72d5497f665e731cbd79da6a6e826d8cae7d2ce156a7dee39f8ca205e32c8",
-    patched: "ee4ffc5bcdfc8b348280f0b370f17f839deb7f11fdeefb9e72b020bbeb1758e2",
+    patched: "00564702a1d243fa488a30b2cff30a0b7dbde838c6085ac01e96fd90a8c8f984",
   },
   "dist/core/compaction/compaction.js": {
     stock: "fcb12f1eb4d38578978e1a8e3e382a3fccfd5e0ccf87bc86979a9a8d9c145c7b",

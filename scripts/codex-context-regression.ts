@@ -43,6 +43,9 @@ const importFromPi = (path: string) =>
 	import(pathToFileURL(join(piPackageRoot, path)).href);
 
 const { AgentSession } = await importFromPi("dist/core/agent-session.js");
+const { streamSimple } = await importFromPi(
+	"node_modules/@earendil-works/pi-ai/dist/compat.js",
+);
 const { estimateContextTokens, prepareCompaction } = await importFromPi(
 	"dist/core/compaction/compaction.js",
 );
@@ -2151,6 +2154,142 @@ function streamedAssistant(
 		"a pre-aborted compaction must emit balanced start and aborted end events",
 	);
 	assert.equal(session._autoCompactionAbortController, undefined);
+}
+
+{
+	// Escape must stop waiting when provider auth is already in flight.
+	const branch = compactionEntries([compactionSettings.keepRecentTokens * 4]);
+	const events: Array<{ type?: string; aborted?: boolean; errorMessage?: string }> = [];
+	let resolveAuth: ((value: { auth: { apiKey: string } }) => void) | undefined;
+	let authStartedResolve: (() => void) | undefined;
+	let authSignal: AbortSignal | undefined;
+	const authStarted = new Promise<void>((resolve) => {
+		authStartedResolve = resolve;
+	});
+	const session = Object.create(AgentSession.prototype);
+	session.agent = {
+		streamFunction: streamSimple,
+		state: { model: { provider: "openai-codex", id: "gpt-5.6-sol" } },
+	};
+	session.settingsManager = {
+		getCompactionSettings: () => compactionSettings,
+		getRetrySettings: () => ({ enabled: false }),
+	};
+	session._summarizationRetryCallbacks = () => ({});
+	session.sessionManager = { getBranch: () => branch };
+	session._modelRuntime = {
+		getAuth: (
+			_model: unknown,
+			overrides?: { signal?: AbortSignal },
+		) => {
+			authSignal = overrides?.signal;
+			authStartedResolve?.();
+			return new Promise<{ auth: { apiKey: string } }>((resolve, reject) => {
+				resolveAuth = resolve;
+				overrides?.signal?.addEventListener(
+					"abort",
+					() => reject(overrides.signal?.reason),
+					{ once: true },
+				);
+			});
+		},
+	};
+	session._emit = (event: { type?: string; aborted?: boolean; errorMessage?: string }) => {
+		events.push(event);
+	};
+	session._extensionRunner = {
+		hasHandlers: (type: string) => type === "session_before_compact",
+		emit: async () => ({ cancel: true }),
+	};
+
+	const autoCompaction = session._runAutoCompaction("threshold", false);
+	await authStarted;
+	session._autoCompactionAbortController.abort();
+	const timeout = Symbol("timeout");
+	let timer: ReturnType<typeof setTimeout>;
+	const outcome = await Promise.race([
+		autoCompaction,
+		new Promise<symbol>((resolve) => {
+			timer = setTimeout(() => resolve(timeout), 1_000);
+		}),
+	]);
+	clearTimeout(timer!);
+	if (outcome === timeout) {
+		resolveAuth?.({ auth: { apiKey: "test" } });
+		await autoCompaction;
+	}
+	assert.notEqual(outcome, timeout, "aborting during auth must settle promptly");
+	assert.equal(authSignal?.aborted, true, "summarization auth must receive the compaction signal");
+	assert.deepEqual(
+		events.map((event) => [event.type, event.aborted, event.errorMessage]),
+		[
+			["compaction_start", undefined, undefined],
+			["compaction_end", true, undefined],
+		],
+		"mid-auth cancellation must emit balanced start and aborted end events",
+	);
+	assert.equal(session._autoCompactionAbortController, undefined);
+}
+
+{
+	// Cancelling tree navigation during auth must return the existing clean
+	// branch-summary cancellation result instead of throwing into the TUI.
+	const rootEntry = {
+		type: "message",
+		id: "root",
+		parentId: null,
+		message: { role: "user", content: "root", timestamp: 1_000 },
+	};
+	const oldEntry = {
+		type: "message",
+		id: "old",
+		parentId: "root",
+		message: { role: "assistant", content: [], timestamp: 2_000 },
+	};
+	const targetEntry = {
+		type: "message",
+		id: "target",
+		parentId: "root",
+		message: { role: "assistant", content: [], timestamp: 3_000 },
+	};
+	let authStartedResolve: (() => void) | undefined;
+	const authStarted = new Promise<void>((resolve) => {
+		authStartedResolve = resolve;
+	});
+	const session = Object.create(AgentSession.prototype);
+	session._isAgentRunActive = false;
+	session.agent = {
+		state: { model: { provider: "openai-codex", id: "gpt-5.6-sol" } },
+	};
+	session.sessionManager = {
+		getLeafId: () => "old",
+		getEntry: (id: string) =>
+			({ root: rootEntry, old: oldEntry, target: targetEntry })[
+				id as "root" | "old" | "target"
+			],
+		getBranch: (id: string) =>
+			id === "old" ? [rootEntry, oldEntry] : [rootEntry, targetEntry],
+	};
+	session._extensionRunner = { hasHandlers: () => false };
+	session._getSummarizationRequestAuth = (
+		_model: unknown,
+		signal: AbortSignal,
+	) => {
+		authStartedResolve?.();
+		return new Promise((_, reject) => {
+			signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+		});
+	};
+
+	const navigation = session.navigateTree("target", { summarize: true });
+	await authStarted;
+	session.abortBranchSummary();
+	assert.deepEqual(
+		await navigation,
+		{ cancelled: true, aborted: true },
+		"mid-auth tree cancellation must stay a clean cancellation",
+	);
+	assert.equal(session._branchSummaryAbortController, undefined);
 }
 
 {
