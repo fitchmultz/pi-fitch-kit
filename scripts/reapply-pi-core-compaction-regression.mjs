@@ -602,7 +602,10 @@ const trackedHashes = (root) =>
 	assert.equal(restored.status, 0, restored.stderr || restored.stdout);
 	assert.equal(JSON.parse(restored.stdout).state, "stock");
 	assert.deepEqual(trackedHashes(root), trackedHashes(stockRoot));
-	assert.ok(!existsSync(join(backupDir, "journal.json")));
+	assert.ok(
+		!existsSync(join(backupDir, "journal.json")),
+		"successful direct v0.6.0 restore must clear its journal",
+	);
 }
 
 // A manifest listing only a subset of a released layout could make recovery
