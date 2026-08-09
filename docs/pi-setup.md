@@ -91,7 +91,7 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 
 Bundled `codex-context` loads safely with custom compaction disabled. Enabling its manifest-gated route is a separate choice because retained compaction context can include selected messages, prior summaries, split-turn prefixes, and custom instructions, and goes to `xai/grok-4.5`, then `openai-codex/gpt-5.6-luna` on fallback, regardless of the active chat provider. `/fitch-setup` previews the destinations and exact config before asking whether to enable, disable, or keep that consent state.
 
-Complete core also includes the reviewed request-boundary compaction patch, but the setup never silently mutates Pi core. It previews the guarded status/apply/restore commands and asks separately. Applying it creates a verified stock backup and requires a full process restart; `/reload` only refreshes package resources.
+Complete core also includes the reviewed request-boundary compaction and provider-resilience patch, but the setup never silently mutates Pi core. It previews the guarded status/apply/restore commands and asks separately. Applying it creates a verified stock backup and requires a full process restart; `/reload` only refreshes package resources.
 
 Most reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
 

@@ -123,6 +123,21 @@ function stockFixture() {
 
 {
 	const root = stockFixture();
+	const external = mkdtempSync(join(tmpdir(), "pi-kit-external-modules-"));
+	fixtures.push(external);
+	rmSync(join(root, "node_modules/@earendil-works"), { recursive: true });
+	symlinkSync(external, join(root, "node_modules/@earendil-works"));
+	const result = spawnSync(
+		process.execPath,
+		[applicator, "apply", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.notEqual(result.status, 0, "a symlinked nested pi-ai path must be refused");
+	assert.match(result.stderr, /symlink/i);
+}
+
+{
+	const root = stockFixture();
 	for (const action of ["apply", "restore"]) {
 		const result = spawnSync(
 			process.execPath,
@@ -636,16 +651,19 @@ const trackedHashes = (root) =>
 	assert.ok(existsSync(join(backupDir, "journal.json")), "the journal must be retained for diagnosis");
 }
 
-// The positive branch of the same preflight: a genuine three-file-era
-// interrupted mutation (mixed legacy state, era backup, retained journal)
-// must still recover to exact stock and clear its journal.
-{
+// The positive branch of the same preflight: genuine three- and four-file-era
+// interrupted mutations (mixed legacy state, era backup, retained journal)
+// must still recover to exact stock and clear their journals.
+for (const { version, eraFiles } of [
+	{ version: "0.5.0", eraFiles: CORE_ERA_FILES },
+	{ version: "0.6.0", eraFiles: [...CORE_ERA_FILES, RETRY_PATH] },
+]) {
 	const root = stockFixture();
 	const legacyPatch = join(
 		packageRoot,
-		"patches/archive/pi-0.84.1-compaction-v0.5.0.patch",
+		`patches/archive/pi-0.84.1-compaction-v${version}.patch`,
 	);
-	const backupDir = buildLegacyEraBackup(root, legacyPatch, {});
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, { eraFiles });
 	const legacyApply = spawnSync(
 		PATCH_EXECUTABLE,
 		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
@@ -669,7 +687,7 @@ const trackedHashes = (root) =>
 	);
 	assert.equal(restored.status, 0, restored.stderr || restored.stdout);
 	const report = JSON.parse(restored.stdout);
-	assert.equal(report.recovered, true, "the interrupted era mutation must be recovered");
+	assert.equal(report.recovered, true, `v${version} interruption must be recovered`);
 	assert.equal(report.state, "already-stock");
 	assert.deepEqual(trackedHashes(root), trackedHashes(stockRoot), "recovery must restore exact stock bytes");
 	assert.ok(!existsSync(join(backupDir, "journal.json")), "completed recovery must clear the journal");

@@ -550,7 +550,7 @@ diff -ruN a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.
                  ? `${error.code || "unknown"}: ${error.message || "no message"}`
 diff -ruN a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js
 --- a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js	2026-08-09 13:56:52
-+++ b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js	2026-08-09 13:56:52
++++ b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js	2026-08-09 14:18:03
 @@ -111,6 +111,10 @@
                  maxRetryDelayMs: options?.maxRetryDelayMs,
                  signal: options?.signal,
@@ -571,7 +571,7 @@ diff -ruN a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js b/no
 +                    ...output.providerMetadata,
 +                    httpStatus: error.status ?? output.providerMetadata?.httpStatus,
 +                    code: error.code ?? error.error?.code ?? output.providerMetadata?.code,
-+                    requestId: error.request_id ?? output.providerMetadata?.requestId,
++                    requestId: error.requestID ?? error.request_id ?? output.providerMetadata?.requestId,
 +                };
 +            }
              output.errorMessage = formatOpenAIResponsesError(error);

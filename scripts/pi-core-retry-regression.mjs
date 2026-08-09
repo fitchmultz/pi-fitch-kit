@@ -10,7 +10,9 @@
  * request succeeds (captured live on 2026-08-09, provider openai-codex, empty
  * content and zero usage on the failed attempt).
  *
- * The same harness also covers the TARS-original OpenAI Responses resilience
+ * This harness provisions archived and current Pi installs, drives their real
+ * `pi --mode rpc` binaries against local model servers, and directly probes
+ * the bundled Responses stream. It also covers the TARS-original resilience
  * patch adopted in v0.7.0: archived v0.6.0 stays red for the exact generic
  * assistant error and lacks stream diagnostics; current captures HTTP and
  * response.failed metadata, then the real RPC binary recovers from a transient
@@ -71,16 +73,25 @@ function provisionPi(patchPath, label) {
 	return piRoot;
 }
 
-function startCompletionsServer(mode) {
+function serve(handle) {
 	let hits = 0;
 	const server = createServer((req, res) => {
-		let body = "";
-		req.setEncoding("utf8");
-		req.on("data", (chunk) => {
-			body += chunk;
+		req.resume();
+		req.on("end", () => handle(++hits, res));
+	});
+	return new Promise((resolve) => {
+		server.listen(0, "127.0.0.1", () => {
+			resolve({
+				port: server.address().port,
+				requestCount: () => hits,
+				close: () => server.close(),
+			});
 		});
-		req.on("end", () => {
-			hits++;
+	});
+}
+
+function startCompletionsServer(mode) {
+	return serve((hits, res) => {
 			const failing = mode === "always-fail" || (mode === "fail-once" && hits === 1);
 			if (failing) {
 				res.writeHead(400, { "content-type": "text/plain" });
@@ -104,29 +115,27 @@ function startCompletionsServer(mode) {
 					usage: { prompt_tokens: 50, completion_tokens: 5, total_tokens: 55 },
 				},
 			];
-			for (const chunk of chunks) {
-				res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-			}
-			res.end("data: [DONE]\n\n");
-		});
-	});
-	return new Promise((resolve) => {
-		server.listen(0, "127.0.0.1", () => {
-			resolve({
-				port: server.address().port,
-				requestCount: () => hits,
-				close: () => server.close(),
-			});
-		});
+		for (const chunk of chunks) {
+			res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+		}
+		res.end("data: [DONE]\n\n");
 	});
 }
 
 function startResponsesServer(mode) {
-	let hits = 0;
-	const server = createServer((req, res) => {
-		req.resume();
-		req.on("end", () => {
-			hits++;
+	return serve((hits, res) => {
+			if (mode === "http-error") {
+				res.writeHead(500, {
+					"content-type": "application/json",
+					"x-request-id": `req-${hits}`,
+				});
+				res.end(
+					JSON.stringify({
+						error: { message: GENERIC_OPENAI_ERROR, type: "server_error", code: "server_error" },
+					}),
+				);
+				return;
+			}
 			res.writeHead(200, {
 				"content-type": "text/event-stream",
 				"cache-control": "no-cache",
@@ -149,80 +158,43 @@ function startResponsesServer(mode) {
 				res.end();
 				return;
 			}
-			const item = {
-				id: `msg-${hits}`,
-				type: "message",
+		const item = {
+			id: `msg-${hits}`,
+			type: "message",
+			content: [{ type: "output_text", text: "recovered" }],
+		};
+		send("response.output_item.done", {
+			type: "response.output_item.done",
+			output_index: 0,
+			item,
+		});
+		send("response.completed", {
+			type: "response.completed",
+			response: {
+				id: `resp-${hits}`,
 				status: "completed",
-				role: "assistant",
-				content: [{ type: "output_text", text: "recovered", annotations: [] }],
-			};
-			send("response.created", {
-				type: "response.created",
-				sequence_number: 1,
-				response: { id: `resp-${hits}`, status: "in_progress" },
-			});
-			send("response.output_item.added", {
-				type: "response.output_item.added",
-				sequence_number: 2,
-				output_index: 0,
-				item: { ...item, status: "in_progress", content: [] },
-			});
-			send("response.output_text.delta", {
-				type: "response.output_text.delta",
-				sequence_number: 3,
-				output_index: 0,
-				item_id: item.id,
-				content_index: 0,
-				delta: "recovered",
-			});
-			send("response.output_item.done", {
-				type: "response.output_item.done",
-				sequence_number: 4,
-				output_index: 0,
-				item,
-			});
-			send("response.completed", {
-				type: "response.completed",
-				sequence_number: 5,
-				response: {
-					id: `resp-${hits}`,
-					status: "completed",
-					output: [item],
-					usage: {
-						input_tokens: 10,
-						output_tokens: 2,
-						input_tokens_details: { cached_tokens: 0 },
-						output_tokens_details: { reasoning_tokens: 0 },
-					},
-				},
-			});
-			res.end();
+				output: [item],
+				usage: { input_tokens: 10, output_tokens: 2 },
+			},
 		});
-	});
-	return new Promise((resolve) => {
-		server.listen(0, "127.0.0.1", () => {
-			resolve({
-				port: server.address().port,
-				requestCount: () => hits,
-				close: () => server.close(),
-			});
-		});
+		res.end();
 	});
 }
 
-async function retryClassifier(piRoot) {
-	const module = await import(
-		pathToFileURL(join(piRoot, "node_modules/@earendil-works/pi-ai/dist/utils/retry.js")).href
+const importPiAi = (piRoot, relativePath) =>
+	import(
+		pathToFileURL(
+			join(piRoot, "node_modules/@earendil-works/pi-ai/dist", relativePath),
+		).href
 	);
+
+async function retryClassifier(piRoot) {
+	const module = await importPiAi(piRoot, "utils/retry.js");
 	return module.isRetryableAssistantError;
 }
 
 async function streamOneFailure(piRoot, port) {
-	const module = await import(
-		pathToFileURL(
-			join(piRoot, "node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js"),
-		).href
-	);
+	const module = await importPiAi(piRoot, "api/openai-responses.js");
 	const model = {
 		id: "dogfood-model",
 		name: "Dogfood Model",
@@ -313,8 +285,8 @@ function runTurn({ piRoot, root, port, api = "openai-completions" }) {
 			],
 			{
 				env: {
-					...process.env,
 					HOME: root,
+					PATH: process.env.PATH ?? "",
 					PI_CODING_AGENT_DIR: agentDir,
 				},
 				stdio: ["pipe", "pipe", "pipe"],
@@ -409,6 +381,11 @@ const responsesLegacyPiRoot = provisionPi(responsesLegacyPatch, "responses-legac
 	assert.equal(legacyClassifier(message), false, "v0.6.0 must preserve the generic-error red proof");
 	assert.equal(currentClassifier(message), true, "current must classify the exact generic error");
 	assert.equal(
+		currentClassifier({ ...message, errorMessage: GENERIC_OPENAI_ERROR.slice(0, -1) }),
+		true,
+		"the optional final period must stay optional",
+	);
+	assert.equal(
 		currentClassifier({ ...message, errorMessage: `${GENERIC_OPENAI_ERROR} Extra detail.` }),
 		false,
 		"the generic retry classification must stay narrow",
@@ -437,6 +414,15 @@ const responsesLegacyPiRoot = provisionPi(responsesLegacyPatch, "responses-legac
 	});
 	assert.equal(currentFailure.responseId, "resp-failed-1");
 	currentServer.close();
+
+	const httpErrorServer = await startResponsesServer("http-error");
+	const httpFailure = await streamOneFailure(currentPiRoot, httpErrorServer.port);
+	assert.deepEqual(
+		httpFailure.providerMetadata,
+		{ httpStatus: 500, code: "server_error", requestId: "req-1" },
+		"OpenAI APIError.requestID must survive an HTTP failure",
+	);
+	httpErrorServer.close();
 }
 
 // Scenario 2 (green): the current patch must classify the edge error as
