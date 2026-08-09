@@ -32,7 +32,9 @@ for (const path of [
   "patches/pi-0.84.1-compaction.patch",
   "patches/archive/pi-0.84.1-compaction-v0.4.2.patch",
   "patches/archive/pi-0.84.1-compaction-v0.4.3.patch",
+  "patches/archive/pi-0.84.1-compaction-v0.5.0.patch",
   "scripts/reapply-pi-core-compaction.mjs",
+  "scripts/pi-core-retry-regression.mjs",
 ]) {
   assert(lstatSync(join(root, path)).isFile(), `Pi core restoration resource missing: ${path}`);
 }

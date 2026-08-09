@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	chmodSync,
 	copyFileSync,
@@ -41,6 +42,7 @@ function stockFixture() {
 		"dist/core/agent-session.js",
 		"dist/core/compaction/compaction.js",
 		"dist/modes/interactive/interactive-mode.js",
+		"node_modules/@earendil-works/pi-ai/dist/utils/retry.js",
 	]) {
 		const destination = join(root, relativePath);
 		mkdirSync(dirname(destination), { recursive: true });
@@ -394,20 +396,58 @@ function stockFixture() {
 	assert.equal(existsSync(stale), false, "a stale backup staging directory must be reaped");
 }
 
-for (const version of ["0.4.2", "0.4.3"]) {
-	const root = stockFixture();
-	for (const action of ["apply", "restore"]) {
-		const result = spawnSync(
-			process.execPath,
-			[applicator, action, "--pi-root", root],
-			{ encoding: "utf8" },
-		);
-		assert.equal(result.status, 0, result.stderr || result.stdout);
+// Released kit applicators tracked only these three core files; their backups
+// and manifests never contained the later-tracked pi-ai retry classifier.
+// Each migration leg rebuilds that exact on-disk layout so the current
+// applicator is proven against real released-era backups, not backups it
+// created itself. The stale patchSha256 variant mirrors a live install whose
+// pre-0.5.0 backup metadata was carried forward (issue #16).
+const LEGACY_ERA_FILES = [
+	"dist/core/agent-session.js",
+	"dist/core/compaction/compaction.js",
+	"dist/modes/interactive/interactive-mode.js",
+];
+const sha256 = (path) =>
+	createHash("sha256").update(readFileSync(path)).digest("hex");
+
+function buildLegacyEraBackup(root, legacyPatchPath, { stalePatchSha, sourceRoot = root } = {}) {
+	const backupRoot = join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction");
+	const manifestFiles = {};
+	for (const relativePath of LEGACY_ERA_FILES) {
+		const destination = join(backupRoot, relativePath);
+		mkdirSync(dirname(destination), { recursive: true });
+		copyFileSync(join(sourceRoot, relativePath), destination);
+		manifestFiles[relativePath] = { stock: sha256(destination), patched: "recorded-by-released-kit" };
 	}
+	writeFileSync(
+		join(backupRoot, "manifest.json"),
+		`${JSON.stringify(
+			{
+				packageRoot: root,
+				package: "@earendil-works/pi-coding-agent",
+				version: "0.84.1",
+				patchSha256: stalePatchSha ?? sha256(legacyPatchPath),
+				files: manifestFiles,
+			},
+			null,
+			2,
+		)}\n`,
+	);
+	return backupRoot;
+}
+
+for (const { version, stalePatchSha } of [
+	{ version: "0.4.2" },
+	{ version: "0.4.3" },
+	{ version: "0.5.0" },
+	{ version: "0.5.0", stalePatchSha: `f4d8f383${"0".repeat(56)}` },
+]) {
+	const root = stockFixture();
 	const legacyPatch = join(
 		packageRoot,
 		`patches/archive/pi-0.84.1-compaction-v${version}.patch`,
 	);
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, { stalePatchSha });
 	const legacyApply = spawnSync(
 		PATCH_EXECUTABLE,
 		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
@@ -432,6 +472,24 @@ for (const version of ["0.4.2", "0.4.3"]) {
 		`the released v${version} patch must migrate:\n${migration.stderr}`,
 	);
 	assert.equal(JSON.parse(migration.stdout).migratedFrom, "legacy-patched");
+	const upgradedManifest = JSON.parse(
+		readFileSync(join(backupDir, "manifest.json"), "utf8"),
+	);
+	const retryPath = "node_modules/@earendil-works/pi-ai/dist/utils/retry.js";
+	assert.ok(
+		upgradedManifest.files[retryPath],
+		"migration must extend the released-era backup to newly tracked files",
+	);
+	assert.equal(
+		sha256(join(backupDir, retryPath)),
+		sha256(join(stockRoot, retryPath)),
+		"the upgraded backup must hold the stock retry classifier preimage",
+	);
+	assert.equal(
+		upgradedManifest.patchSha256,
+		sha256(join(packageRoot, "patches/pi-0.84.1-compaction.patch")),
+		"migration must refresh recorded backup patch metadata to the executed artifact",
+	);
 	const restore = spawnSync(
 		process.execPath,
 		[applicator, "restore", "--pi-root", root],
@@ -452,6 +510,162 @@ for (const version of ["0.4.2", "0.4.3"]) {
 	);
 	assert.equal(legacyRestore.status, 0, legacyRestore.stderr || legacyRestore.stdout);
 	assert.equal(JSON.parse(legacyRestore.stdout).state, "stock");
+}
+
+const TRACKED_FILES = [
+	"dist/core/agent-session.js",
+	"dist/core/compaction/compaction.js",
+	"dist/modes/interactive/interactive-mode.js",
+	"node_modules/@earendil-works/pi-ai/dist/utils/retry.js",
+];
+const trackedHashes = (root) =>
+	TRACKED_FILES.map((relativePath) => sha256(join(root, relativePath)));
+
+// A manifest listing only a subset of a released layout could make recovery
+// restore fewer files than an interrupted patch step touched. Every action
+// must reject it before considering any mutation.
+{
+	const root = stockFixture();
+	const legacyPatch = join(
+		packageRoot,
+		"patches/archive/pi-0.84.1-compaction-v0.5.0.patch",
+	);
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, {});
+	const manifestPath = join(backupDir, "manifest.json");
+	const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+	manifest.files = {
+		"dist/core/agent-session.js": manifest.files["dist/core/agent-session.js"],
+	};
+	writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+	const before = trackedHashes(root);
+	for (const action of ["status", "apply", "restore"]) {
+		const result = spawnSync(
+			process.execPath,
+			[applicator, action, "--pi-root", root],
+			{ encoding: "utf8" },
+		);
+		assert.notEqual(result.status, 0, `${action} must reject a truncated backup manifest`);
+		assert.match(result.stderr, /does not match a released kit backup layout/);
+	}
+	assert.deepEqual(trackedHashes(root), before, "rejected actions must not mutate tracked files");
+	assert.ok(
+		!existsSync(join(backupDir, "journal.json")),
+		"rejected actions must not journal a mutation",
+	);
+}
+
+// A pre-existing recovery journal must not let a valid legacy-layout backup
+// mutate a current-patched install: recovery restores only manifest-listed
+// preimages, so it must preflight that every omitted tracked file already
+// sits at stock bytes and otherwise fail closed without touching anything.
+{
+	const root = stockFixture();
+	const applied = spawnSync(
+		process.execPath,
+		[applicator, "apply", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(applied.status, 0, applied.stderr || applied.stdout);
+	const backupDir = join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction");
+	rmSync(backupDir, { recursive: true, force: true });
+	buildLegacyEraBackup(
+		root,
+		join(packageRoot, "patches/archive/pi-0.84.1-compaction-v0.5.0.patch"),
+		{ sourceRoot: stockRoot },
+	);
+	writeFileSync(
+		join(backupDir, "journal.json"),
+		`${JSON.stringify({ packageRoot: root, version: "0.84.1", action: "restore", before: "patched" })}\n`,
+	);
+	const before = trackedHashes(root);
+	for (const action of ["apply", "restore"]) {
+		const result = spawnSync(
+			process.execPath,
+			[applicator, action, "--pi-root", root],
+			{ encoding: "utf8" },
+		);
+		assert.notEqual(result.status, 0, `${action} must refuse recovery the backup cannot complete`);
+		assert.match(result.stderr, /Recovery cannot restore stock/);
+	}
+	assert.deepEqual(
+		trackedHashes(root),
+		before,
+		"refused recovery must not mutate the patched install",
+	);
+	assert.ok(existsSync(join(backupDir, "journal.json")), "the journal must be retained for diagnosis");
+}
+
+// The positive branch of the same preflight: a genuine three-file-era
+// interrupted mutation (mixed legacy state, era backup, retained journal)
+// must still recover to exact stock and clear its journal.
+{
+	const root = stockFixture();
+	const legacyPatch = join(
+		packageRoot,
+		"patches/archive/pi-0.84.1-compaction-v0.5.0.patch",
+	);
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, {});
+	const legacyApply = spawnSync(
+		PATCH_EXECUTABLE,
+		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
+		{ encoding: "utf8", input: readFileSync(legacyPatch) },
+	);
+	assert.equal(legacyApply.status, 0, legacyApply.stderr || legacyApply.stdout);
+	// Interruption mid-restore: one era file already back at stock, the rest
+	// still patched, journal pending.
+	copyFileSync(
+		join(stockRoot, "dist/core/agent-session.js"),
+		join(root, "dist/core/agent-session.js"),
+	);
+	writeFileSync(
+		join(backupDir, "journal.json"),
+		`${JSON.stringify({ packageRoot: root, version: "0.84.1", action: "restore", before: "legacy-patched" })}\n`,
+	);
+	const restored = spawnSync(
+		process.execPath,
+		[applicator, "restore", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(restored.status, 0, restored.stderr || restored.stdout);
+	const report = JSON.parse(restored.stdout);
+	assert.equal(report.recovered, true, "the interrupted era mutation must be recovered");
+	assert.equal(report.state, "already-stock");
+	assert.deepEqual(trackedHashes(root), trackedHashes(stockRoot), "recovery must restore exact stock bytes");
+	assert.ok(!existsSync(join(backupDir, "journal.json")), "completed recovery must clear the journal");
+}
+
+// A fully patched install whose backup still has the legacy layout cannot
+// recover an interrupted restore of the current patch; restore must refuse
+// to journal the mutation. The state is unreachable through kit flows.
+{
+	const root = stockFixture();
+	const applied = spawnSync(
+		process.execPath,
+		[applicator, "apply", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(applied.status, 0, applied.stderr || applied.stdout);
+	const backupDir = join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction");
+	const manifestPath = join(backupDir, "manifest.json");
+	const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+	const retryPath = "node_modules/@earendil-works/pi-ai/dist/utils/retry.js";
+	delete manifest.files[retryPath];
+	writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+	rmSync(join(backupDir, retryPath));
+	const refused = spawnSync(
+		process.execPath,
+		[applicator, "restore", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.notEqual(refused.status, 0, "restore must refuse a patched install with a legacy-layout backup");
+	assert.match(refused.stderr, /cannot recover an interrupted restore/);
+	const status = spawnSync(
+		process.execPath,
+		[applicator, "status", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(status.status, 0, status.stderr || status.stdout);
+	assert.equal(JSON.parse(status.stdout).state, "patched", "the refused restore must not have mutated the install");
 }
 
 console.log("pi core applicator security and recovery checks passed");

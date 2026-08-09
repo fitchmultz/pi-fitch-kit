@@ -1,4 +1,4 @@
-# Reapply the Pi 0.84.1 tool-loop compaction fixes
+# Reapply the Pi 0.84.1 tool-loop compaction and transient-retry fixes
 
 ## Instructions for the Pi agent handling an update
 
@@ -58,9 +58,9 @@ npm run reapply:pi-core-compaction
 
 The default command ignores npm-injected local `node_modules/.bin` entries when resolving the active `pi`, so the kit's validation dependency cannot be mistaken for the system installation. A wrapper or shim that does not resolve directly to Pi's `dist/cli.js` fails with an explicit `--pi-root` diagnostic. For an isolated package root, append `-- --pi-root /path/to/@earendil-works/pi-coding-agent`.
 
-The applicator supports only the reviewed Pi 0.84.0 and 0.84.1 package identities and exact stock hashes. It uses `/usr/bin/patch`, never an executable injected through `PATH`; serializes every action with `/usr/bin/shlock` and reclaims dead-owner locks after its brief freshness guard; refuses symlinked mutable, backup, or lock paths; preflights patch anchors; builds and hash-verifies the stock backup in a staging directory before atomically renaming it; validates any existing backup on every action; canonicalizes manifest roots; writes a recovery journal before mutation; reports `recovery-needed` without changing files on read-only `status`; restores exact stock bytes on the next separately authorized `apply` or `restore` after an interrupted mutation; suppresses reject sidecars; verifies patched hashes and JavaScript syntax; and rolls back and verifies the complete pre-operation state after an in-process failure. Patch checksums are required only for artifacts the requested action will execute. The command fails closed on all other divergence and no-ops when already applied. Restore the reviewed stock preimage with `npm run restore:pi-core-compaction` and the same optional `--pi-root` argument.
+The applicator supports only the reviewed Pi 0.84.0 and 0.84.1 package identities and exact stock hashes. It uses `/usr/bin/patch`, never an executable injected through `PATH`; serializes every action with `/usr/bin/shlock` and reclaims dead-owner locks after its brief freshness guard; refuses symlinked mutable, backup, or lock paths; preflights patch anchors; builds and hash-verifies the stock backup in a staging directory before atomically renaming it; validates any existing backup on every action against the file set its own manifest records, with preimage hashes always taken from the compiled-in registry; canonicalizes manifest roots; writes a recovery journal before mutation; reports `recovery-needed` without changing files on read-only `status`; restores exact stock bytes on the next separately authorized `apply` or `restore` after an interrupted mutation; suppresses reject sidecars; verifies patched hashes and JavaScript syntax; and rolls back and verifies the complete pre-operation state after an in-process failure. Patch checksums are required only for artifacts the requested action will execute. The command fails closed on all other divergence and no-ops when already applied. Restore the reviewed stock preimage with `npm run restore:pi-core-compaction` and the same optional `--pi-root` argument.
 
-An install patched by kit 0.4.1, 0.4.2, or 0.4.3 is recognized as a sha-pinned `legacy-patched` state. `apply` migrates it in one guarded run: it reverses the matching checksum-pinned archive (`patches/archive/pi-0.84.1-compaction-v0.4.2.patch` or `pi-0.84.1-compaction-v0.4.3.patch`), verifies the exact stock intermediate, ensures the stock backup exists, then applies the current patch; any failure rolls back to the same verified legacy pre-state. `restore` reverses the matching archived patch directly to stock. Any other divergence still fails closed.
+An install patched by kit 0.4.1 through 0.5.0 is recognized as a sha-pinned `legacy-patched` state. `apply` migrates it in one guarded run: it reverses the matching checksum-pinned archive under `patches/archive/`, verifies the exact stock intermediate, ensures the stock backup exists, then applies the current patch; any failure rolls back to the same verified legacy pre-state. Backups written by those released kits predate later-tracked core files; before mutating, `apply` extends such a backup with the missing stock preimages taken from the install (legacy patches never touched them, and anything else fails closed) and atomically rewrites the manifest last, which also refreshes stale recorded patch metadata. `restore` reverses the matching archived patch directly to stock. Any other divergence still fails closed.
 
 Every Pi update replaces the installed package with stock core. After any update, rerun the exact-version status/regression checks and this guarded reapply command; never assume the prior patch survived. A later Pi version requires a new reviewed patch and hash set rather than bypassing the guard.
 
@@ -154,6 +154,14 @@ Pi marks any `session_before_compact` result as hook-generated, including this e
 
 A successful manual or automatic compaction is persisted before `compaction_end`. The interactive handler must rebuild the chat from `sessionManager.buildContextEntries()` and must not append a second `createCompactionSummaryMessage()` afterward. Rebuilding already renders the persisted summary in the correct transcript position.
 
+## Required transient-edge retry classification
+
+Cloudflare-fronted provider backends (the chatgpt.com backend behind `openai-codex`, Cloudflare AI Gateway deployments in front of other providers) occasionally answer a provider request with the HTTP error body `exceeded request buffer limit while retrying upstream`: the edge tried to retry its own upstream hop, could not replay the buffered request body within its cap, and aborted. Provider adapters surface that body verbatim as the assistant error message.
+
+Pi's session-level auto-retry (`_prepareRetry`, bounded by `settings.retry`, exponential backoff, abortable, with `auto_retry_start`/`auto_retry_end` events) classifies errors through the shared allowlist `RETRYABLE_PROVIDER_ERROR_PATTERN` in `node_modules/@earendil-works/pi-ai/dist/utils/retry.js`. Unknown text fails fast by design, so this edge error ended the turn and stalled the session even though the state was fully resumable — a live capture shows the failed attempt with empty content and zero usage, followed by a manual user bump re-sending the identical context successfully.
+
+The patch adds `"request buffer limit"` to the retryable pattern list. Retrying is safe for this error class because Pi rebuilds the provider request from session state on every attempt (nothing accumulates client-side), the failed attempt produced no output to lose, and the edge failure depends on its upstream hiccuping on that specific attempt. Bounded budget and exhaustion behavior are Pi's native machinery; the patch must not add a custom retry loop, change the budget, or auto-continue past exhausted retries. If a future Pi version classifies this error natively, drop the hunk rather than layering a duplicate pattern.
+
 ## Accepted provider-recovery tradeoffs
 
 The following verified deltas are intentional. Each is bounded by stock Pi recovery, and closing it locally would require re-forking machinery this kit deliberately retired: a custom token estimator, a `_prepareProviderRequest` agent-core hook, post-compaction fit fingerprints, or double-running extension context transforms. Do not "fix" these without new evidence that stock recovery fails.
@@ -198,13 +206,15 @@ Run all of the following against the active Pi 0.84.1 installation:
 1. `pi --version` and confirm the installation path resolved from `command -v pi`.
 2. Run `pi --list-models 'openai/gpt-5.6'` and `pi --list-models 'openai-codex/gpt-5.6'`, then use the allowlisted local structural parser from step 2 to confirm Sol, Terra, and Luna match every active context-window override in `models.json`.
 3. Using the allowlisted local structural parser from step 2, confirm global settings still have compaction enabled with the intended reserve and keep-recent values. Use the same local allowlist for only the structural routing keys in the optional `<Pi agent dir>/pi-codex-context.json`: absent or non-literal consent must keep custom routing off; if `customCompactionEnabled` is `true`, confirm the user approved the exact listed destinations. An omitted model list means xAI Grok 4.5 high before Codex Luna high; a valid override replaces that order.
-4. Run `node --check` on all three modified Pi JavaScript files.
+4. Run `node --check` on all four modified Pi JavaScript files, including `node_modules/@earendil-works/pi-ai/dist/utils/retry.js`.
 5. If `pi-codex-goal` is installed, require version 0.1.38 or newer and confirm its runtime has no proactive `ctx.compact()` trigger.
 6. Resolve `pi-fitch-kit`'s installed root with `pi list`, then run:
 
    `PI_REGRESSION_PATH=/path/to/pi-0.84.1/node_modules/.bin:$PATH npm run regression:codex-context --prefix <package-root>`
 
    Omit `PI_REGRESSION_PATH` only when the normal active `pi` is the isolated 0.84.1 installation.
+
+   Then run `npm run regression:pi-core-retry --prefix <package-root>` to prove the transient-edge stall class stays fixed: the archived legacy patch must stall, the current patch must recover through one bounded retry and surface exhaustion honestly.
 
 7. Confirm Pi loads one bundled `codex-context` extension, one `session_before_compact` handler, one `before_provider_request` handler, zero replacement provider registrations, and one `/codex-fast` command.
 

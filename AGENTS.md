@@ -52,6 +52,7 @@
 
 - Run `npm run check` after edits to `package.json`, `setup-manifest.json`, `extensions/`, `scripts/`, or registered prompts; add `npm run smoke` when package resources changed.
 - Run `npm run regression:codex-context` after changing Codex fast mode, alternate-model compaction, its state/config migration, or the Pi core runbook.
+- Run `npm run regression:pi-core-applicator` and `npm run regression:pi-core-retry` after changing the core patch artifact, the applicator, its archives, or retry classification.
 - Run `npm run regression:session-name` after changing naming guidance, metadata injection, protected identities, or its migration gate.
 - For runtime-facing changes, also verify Pi loads the package through `pi install ...` plus `/reload` or a fresh Pi session when practical.
 - Keep this file short and project-specific; point to `README.md` or Pi docs instead of copying generic coding rules.

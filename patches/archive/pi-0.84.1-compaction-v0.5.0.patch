@@ -514,20 +514,3 @@ diff -ruN a/dist/modes/interactive/interactive-mode.js b/dist/modes/interactive/
          }
      }
      stop() {
-diff -ruN a/node_modules/@earendil-works/pi-ai/dist/utils/retry.js b/node_modules/@earendil-works/pi-ai/dist/utils/retry.js
---- a/node_modules/@earendil-works/pi-ai/dist/utils/retry.js	2026-08-09 10:08:18
-+++ b/node_modules/@earendil-works/pi-ai/dist/utils/retry.js	2026-08-09 10:08:18
-@@ -47,6 +47,13 @@
-     "ENOTFOUND",
-     "EAI_AGAIN",
-     "upstream.?connect",
-+    // Cloudflare-fronted backends abort with "exceeded request buffer limit
-+    // while retrying upstream" when the edge cannot replay a buffered request
-+    // body for its own upstream retry. The failed attempt streams no output
-+    // and Pi rebuilds the request from session state on every attempt, so a
-+    // bounded retry is safe; an identical follow-up request succeeds
-+    // (pi-fitch-kit).
-+    "request buffer limit",
-     "reset before headers",
-     "socket hang up",
-     "socket connection was closed",

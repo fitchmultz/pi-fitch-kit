@@ -11,22 +11,40 @@ const PATCH_EXECUTABLE = "/usr/bin/patch";
 const SHLOCK_EXECUTABLE = "/usr/bin/shlock";
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const patchPath = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
-const patchSha256 = "b76c2f68a26e4cda22ecd7e0454d36ec4aa729a929886e3a238262c197334753";
+const patchSha256 = "bc854f25940e0e95bd67ab160c22deee36d4cebe967fd7b9149fa86be961554b";
+// `stockFiles` names the tracked files a legacy patch never touched: legacy
+// detection expects them at the stock hash, everything else (except the
+// discriminating agent-session hash) at the current patched hash. The legacy
+// migration regression exercises every archived artifact, so hash drift in a
+// future patch version fails loudly there instead of silently here.
 const legacyPatches = [
+  {
+    version: "0.5.0",
+    path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.5.0.patch"),
+    sha256: "b76c2f68a26e4cda22ecd7e0454d36ec4aa729a929886e3a238262c197334753",
+    agentSession: "00564702a1d243fa488a30b2cff30a0b7dbde838c6085ac01e96fd90a8c8f984",
+    stockFiles: ["node_modules/@earendil-works/pi-ai/dist/utils/retry.js"],
+  },
   {
     version: "0.4.3",
     path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.4.3.patch"),
     sha256: "9350641094f70ac3a98fd3b02a236861fbbbc13503855637a1dc2ff53971dd08",
     agentSession: "e55bf39d43ab95468a8949dd72c541adc1e54421c8666f9d06e06e4b9efa7227",
+    stockFiles: ["node_modules/@earendil-works/pi-ai/dist/utils/retry.js"],
   },
   {
     version: "0.4.2",
     path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.4.2.patch"),
     sha256: "5f68de3bb9689ad983168a683bd2cc43426e19325071b75d6fd36425ac191b24",
     agentSession: "cd1f9b9a0b6ad10239394568be5961c5a7d8fc117830e1a09650eb5ade176c6a",
+    stockFiles: ["node_modules/@earendil-works/pi-ai/dist/utils/retry.js"],
   },
 ];
 const commonFiles = {
+  "node_modules/@earendil-works/pi-ai/dist/utils/retry.js": {
+    stock: "916476be8a85ad16f9de3d0cfc3eb341b3290445fde3717593b139fd7ee31b7b",
+    patched: "bc684353c341a90d8d67aa70b3d1db03e6005cfeaf2fd97a2d4333086d8075ae",
+  },
   "dist/core/agent-session.js": {
     stock: "91e72d5497f665e731cbd79da6a6e826d8cae7d2ce156a7dee39f8ca205e32c8",
     patched: "00564702a1d243fa488a30b2cff30a0b7dbde838c6085ac01e96fd90a8c8f984",
@@ -77,7 +95,10 @@ function assertSafePath(root, target, allowMissing = false) {
     try {
       stat = lstatSync(current);
     } catch (error) {
-      if (allowMissing && error?.code === "ENOENT") return;
+      if (error?.code === "ENOENT") {
+        if (allowMissing) return;
+        fail(`Tracked Pi core path missing: ${current}`);
+      }
       throw error;
     }
     if (stat.isSymbolicLink()) fail(`Refusing symlinked Pi path: ${current}`);
@@ -184,10 +205,12 @@ function state(root) {
     return { name: "patched" };
   }
   const legacyPatch = legacyPatches.find(
-    ({ agentSession }) =>
+    ({ agentSession, stockFiles }) =>
       hashes["dist/core/agent-session.js"] === agentSession &&
       Object.entries(files).every(
-        ([path, expected]) => path === "dist/core/agent-session.js" || hashes[path] === expected.patched,
+        ([path, expected]) =>
+          path === "dist/core/agent-session.js" ||
+          hashes[path] === (stockFiles.includes(path) ? expected.stock : expected.patched),
       ),
   );
   if (legacyPatch) return { name: "legacy-patched", legacyPatch };
@@ -204,29 +227,97 @@ function backupPaths(root) {
   };
 }
 
-function verifyBackup(root) {
+function readBackupManifest(root) {
   const { backupRoot, manifestPath } = backupPaths(root);
   assertSafePath(root, backupRoot, true);
-  if (!existsSync(backupRoot)) return false;
+  if (!existsSync(backupRoot)) return undefined;
   if (!existsSync(manifestPath)) fail(`Backup manifest missing: ${manifestPath}`);
   assertSafePath(root, manifestPath);
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   if (canonicalPath(manifest.packageRoot) !== root || manifest.version !== piVersion) {
     fail(`Backup belongs to an unexpected installation: ${manifestPath}`);
   }
-  for (const [relativePath, expected] of Object.entries(files)) {
+  // The only released backup layouts are the complete current set and, per
+  // archived legacy patch, every tracked file that patch actually touched.
+  // Interrupted-mutation recovery restores exactly the recorded preimages, so
+  // a partial path set could recover fewer files than a patch step touched
+  // and wedge the install; reject anything but the known layouts.
+  const listed = Object.keys(manifest.files ?? {}).sort();
+  const currentLayout = Object.keys(files).sort();
+  const releasedLayouts = [
+    currentLayout,
+    ...legacyPatches.map(({ stockFiles }) =>
+      currentLayout.filter((relativePath) => !stockFiles.includes(relativePath)),
+    ),
+  ];
+  const matchesLayout = (layout) =>
+    listed.length === layout.length && layout.every((relativePath, index) => listed[index] === relativePath);
+  if (!releasedLayouts.some(matchesLayout)) {
+    fail(`Backup manifest does not match a released kit backup layout: ${manifestPath}`);
+  }
+  return manifest;
+}
+
+function verifyBackup(root) {
+  // Older kit releases tracked fewer core files, so a backup is verified
+  // against the paths its own manifest records. Preimage hashes always come
+  // from the compiled-in registry, never from manifest data.
+  const manifest = readBackupManifest(root);
+  if (!manifest) return false;
+  const { backupRoot } = backupPaths(root);
+  for (const relativePath of Object.keys(manifest.files)) {
     const backupPath = join(backupRoot, relativePath);
     assertSafePath(root, backupPath);
-    if (sha256(backupPath) !== expected.stock) {
+    if (sha256(backupPath) !== files[relativePath].stock) {
       fail(`Backup preimage mismatch: ${backupPath}`);
     }
   }
   return true;
 }
 
+function upgradeBackupIfIncomplete(root) {
+  // A backup written by an older kit release predates newly tracked core
+  // files. Every missing entry must still sit at stock bytes in the install
+  // (legacy patches never touched those files), so stage each one in, then
+  // atomically replace the manifest last: an interruption at any point leaves
+  // the previous manifest authoritative and the extra staged files inert.
+  // The manifest rewrite also refreshes a stale recorded patchSha256.
+  const { backupRoot, manifestPath } = backupPaths(root);
+  const manifest = readBackupManifest(root);
+  const missing = Object.keys(files).filter((relativePath) => !manifest.files[relativePath]);
+  if (missing.length === 0) return;
+  for (const relativePath of missing) {
+    const source = join(root, relativePath);
+    if (sha256(source) !== files[relativePath].stock) {
+      fail(`Stock preimage unavailable for backup upgrade: ${source}`);
+    }
+    const destination = join(backupRoot, relativePath);
+    assertSafePath(root, destination, true);
+    mkdirSync(dirname(destination), { recursive: true });
+    const temporary = `${destination}.tmp-${process.pid}-${randomUUID()}`;
+    copyFileSync(source, temporary);
+    if (sha256(temporary) !== files[relativePath].stock) {
+      rmSync(temporary, { force: true });
+      fail(`Staged backup preimage mismatch: ${temporary}`);
+    }
+    renameSync(temporary, destination);
+  }
+  const temporary = `${manifestPath}.tmp-${process.pid}-${randomUUID()}`;
+  writeFileSync(
+    temporary,
+    `${JSON.stringify({ packageRoot: root, package: PI_PACKAGE, version: piVersion, patchSha256, files }, null, 2)}\n`,
+    "utf8",
+  );
+  renameSync(temporary, manifestPath);
+  verifyBackup(root);
+}
+
 function backupStock(root) {
   const { backupRoot } = backupPaths(root);
-  if (verifyBackup(root)) return;
+  if (verifyBackup(root)) {
+    upgradeBackupIfIncomplete(root);
+    return;
+  }
   const backupParent = dirname(backupRoot);
   assertSafePath(root, backupParent, true);
   mkdirSync(backupParent, { recursive: true });
@@ -302,7 +393,18 @@ function recoverInterruptedMutation(root) {
   } catch {
     // Mixed state: restore the verified stock preimage below.
   }
-  for (const [relativePath] of Object.entries(files)) {
+  // Recovery restores exactly the preimages this backup recorded, so it can
+  // only end at stock if every tracked file the manifest omits already sits
+  // at stock bytes. A genuine legacy-era interruption satisfies that; any
+  // other pairing must fail closed before touching a single file.
+  const manifest = readBackupManifest(root);
+  for (const [relativePath, expected] of Object.entries(files)) {
+    if (manifest.files[relativePath]) continue;
+    if (sha256(join(root, relativePath)) !== expected.stock) {
+      fail(`Recovery cannot restore stock: ${relativePath} is outside the backup and not at stock bytes`);
+    }
+  }
+  for (const relativePath of Object.keys(manifest.files)) {
     const source = join(backupRoot, relativePath);
     const destination = join(root, relativePath);
     const temporary = `${destination}.pi-fitch-kit-recovery-${randomUUID()}`;
@@ -453,6 +555,16 @@ function main() {
     const steps = planSteps(action, before);
     runPatch(root, steps[0].reverse, true, steps[0].source);
     if (before.name === "stock") backupStock(root);
+    else if (action === "apply") upgradeBackupIfIncomplete(root);
+    else if (before.name === "patched") {
+      // Reversing the current patch touches every tracked file, so recovery
+      // from an interruption needs the complete backup layout. Kit flows
+      // always produce one here; anything else is hand-crafted state.
+      const manifest = readBackupManifest(root);
+      if (Object.keys(files).some((relativePath) => !manifest.files[relativePath])) {
+        fail("Backup layout predates the current patch and cannot recover an interrupted restore; refusing mutation");
+      }
+    }
     writeJournal(root, action, before.name);
     const after = mutateAndVerify(root, action, before, steps);
     report({
