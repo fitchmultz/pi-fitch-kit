@@ -11,20 +11,22 @@ import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-codin
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const temp = mkdtempSync(join(tmpdir(), "pi-fitch-kit-package-"));
-const agentDir = join(temp, ".pi", "agent");
+const agentDir = join(temp, "agent");
+const home = join(temp, "home");
 const cwd = join(temp, "project");
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 const previousHome = process.env.HOME;
 
 try {
-	mkdirSync(agentDir, { recursive: true });
-	mkdirSync(cwd, { recursive: true });
+    mkdirSync(agentDir, { recursive: true });
+    mkdirSync(home, { recursive: true });
+    mkdirSync(cwd, { recursive: true });
 	writeFileSync(join(agentDir, "settings.json"), `${JSON.stringify({ packages: [root] }, null, 2)}\n`);
 	writeFileSync(
 		join(agentDir, "verbosity.json"),
 		`${JSON.stringify({ showIndicator: true, models: { " openai-codex/gpt-5.6-sol ": " MEDIUM " } }, null, 2)}\n`,
 	);
-	process.env.HOME = temp;
+	process.env.HOME = home;
 	process.env.PI_CODING_AGENT_DIR = agentDir;
 
 	const settingsManager = await SettingsManager.create(cwd, agentDir, { projectTrusted: false });
@@ -83,6 +85,35 @@ try {
 			theme: { fg: (_color, text) => text },
 		},
 	});
+	const beforeCompact = codex.handlers.get("session_before_compact")?.[0];
+	if (!beforeCompact) throw new Error("Codex context session_before_compact handler missing");
+	const compactionConfig = join(agentDir, "pi-codex-context.json");
+	let modelLookups = 0;
+	const compactionContext = {
+		hasUI: false,
+		modelRegistry: {
+			find: () => {
+				modelLookups++;
+				return undefined;
+			},
+			getProvider: () => undefined,
+		},
+	};
+	for (const value of [undefined, false, "true", 1]) {
+		if (value === undefined) rmSync(compactionConfig, { force: true });
+		else writeFileSync(compactionConfig, `${JSON.stringify({ customCompactionEnabled: value })}\n`);
+		await beforeCompact(
+			{ signal: new AbortController().signal },
+			compactionContext,
+		);
+	}
+	if (modelLookups !== 0) throw new Error("Non-literal custom compaction consent triggered a model lookup");
+	writeFileSync(compactionConfig, `${JSON.stringify({ customCompactionEnabled: true })}\n`);
+	await beforeCompact(
+		{ signal: new AbortController().signal },
+		compactionContext,
+	);
+	if (modelLookups === 0) throw new Error("Literal custom compaction consent did not activate routing");
 	const sessionNameStart = sessionName.handlers.get("session_start")?.[0];
 	if (!sessionNameStart) throw new Error("Session-name session_start handler missing");
 	await sessionNameStart({}, {});

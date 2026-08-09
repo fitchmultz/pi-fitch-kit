@@ -4,7 +4,10 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
-const VERBOSITY_PATH = join(homedir(), ".pi", "agent", "verbosity.json");
+const VERBOSITY_PATH = join(
+	process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"),
+	"verbosity.json",
+);
 const VERBOSITY_APIS = new Set(["openai-responses", "openai-codex-responses", "azure-openai-responses"]);
 type Verbosity = "low" | "medium" | "high";
 type VerbosityConfig = { showIndicator: boolean; models: Record<string, Verbosity> };
