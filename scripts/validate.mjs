@@ -171,6 +171,10 @@ assert(setupPrompt.includes("stop immediately on the first failed command"), "se
 assert(setupPrompt.includes("requiredForCompleteCore"), "setup must include the separately consented core patch in complete-core checks");
 assert(setupPrompt.includes("Treat `recovery-needed` as drift"), "verify mode must not repair interrupted core mutations");
 assert(setupPrompt.includes("full process restart"), "setup must distinguish core restart from resource reload");
+assert(
+  setupPrompt.includes("`/reload` does not clear its model-runtime provider override"),
+  "setup must require restart after removing the Anthropic provider override",
+);
 assert(!setupPrompt.includes("@latest"), "setup prompt must reject mutable npm specs without spelling one");
 
 console.log(JSON.stringify({ ok: true, manifestChecked: true, duplicateAgentSurfaceAbsent: true }, null, 2));

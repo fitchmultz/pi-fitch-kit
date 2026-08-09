@@ -11,8 +11,8 @@ import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-codin
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const temp = mkdtempSync(join(tmpdir(), "pi-fitch-kit-package-"));
-const agentDir = join(temp, "agent");
 const home = join(temp, "home");
+const agentDir = join(home, "agent");
 const cwd = join(temp, "project");
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 const previousHome = process.env.HOME;
@@ -27,7 +27,7 @@ try {
 		`${JSON.stringify({ showIndicator: true, models: { " openai-codex/gpt-5.6-sol ": " MEDIUM " } }, null, 2)}\n`,
 	);
 	process.env.HOME = home;
-	process.env.PI_CODING_AGENT_DIR = agentDir;
+	process.env.PI_CODING_AGENT_DIR = "~/agent";
 
 	const settingsManager = await SettingsManager.create(cwd, agentDir, { projectTrusted: false });
 	const loader = new DefaultResourceLoader({

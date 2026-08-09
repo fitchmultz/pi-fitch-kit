@@ -44,16 +44,14 @@ const DEFAULT_COMPACTION_MODELS: CompactionModel[] = [
 ];
 function raceWithAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
 	if (signal.aborted) {
+		// A fulfilled operation listed first can beat a pre-rejected abort in Promise.race.
 		void operation.catch(() => undefined);
 		return Promise.reject(signal.reason);
 	}
-	let onAbort: () => void = () => undefined;
-	const aborted = new Promise<never>((_, reject) => {
-		onAbort = () => reject(signal.reason);
-		signal.addEventListener("abort", onAbort, { once: true });
-		if (signal.aborted) onAbort();
-	});
-	return Promise.race([operation, aborted]).finally(() =>
+	const { promise, reject } = Promise.withResolvers<never>();
+	const onAbort = () => reject(signal.reason);
+	signal.addEventListener("abort", onAbort, { once: true });
+	return Promise.race([operation, promise]).finally(() =>
 		signal.removeEventListener("abort", onAbort),
 	);
 }

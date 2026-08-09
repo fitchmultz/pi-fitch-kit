@@ -66,7 +66,7 @@ Requests carrying a caller-supplied `client` are left on standard speed, since t
 Accepted caveat: appending a mandatory header at the wire requires owning Anthropic's stream callback, because Pi exposes no wire-header hook and no full-versus-simple stream provenance. This extension therefore wraps Anthropic streaming whenever it is loaded, and classifies full-stream calls by their Anthropic-native options. Consequences worth knowing:
 
 - Do not combine it with another Anthropic provider override without reviewing both, since Pi merges registrations last-write-wins.
-- Run `/reload` after disabling or removing it; Pi 0.84.1 reloads provider registrations from a clean registry.
+- Start a fresh Pi process after disabling or removing it; Pi 0.84.1 `/reload` does not clear model-runtime provider overrides.
 - Revalidate it when upgrading Pi, since it depends on Pi's provider composition and header-merge behavior. Agent profiles now ship directly with `pi-subagents`, so this kit no longer copies or syncs them.
 
 ### Selective experimental extension

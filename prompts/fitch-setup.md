@@ -61,7 +61,7 @@ For integrations, install only the MCP adapter from the manifest and follow its 
 
 Execute the confirmed plan sequentially and stop immediately on the first failed command. Do not run later installs, config writes, patch mutation, or smokes after a failure. Report commands and writes already completed, the failed step, and every remaining step so rerunning is unambiguous.
 
-After resource or configuration changes, tell the user to run `/reload` or start a fresh session before in-session verification. If `piCorePatch` was applied, require a full process restart instead; `/reload` cannot load changed Pi core.
+After resource or configuration changes, tell the user to run `/reload` or start a fresh session before in-session verification. If `anthropic-image-guard` was disabled or removed, require a full process restart because Pi 0.84.1 `/reload` does not clear its model-runtime provider override. If `piCorePatch` was applied, require a full process restart instead; `/reload` cannot load changed Pi core.
 
 ## Verify mode and smokes
 
