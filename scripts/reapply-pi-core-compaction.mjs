@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { delimiter, dirname, join, resolve, sep } from "node:path";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { delimiter, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PI_PACKAGE = "@earendil-works/pi-coding-agent";
+const PATCH_EXECUTABLE = "/usr/bin/patch";
+const SHLOCK_EXECUTABLE = "/usr/bin/shlock";
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const patchPath = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
 const patchSha256 = "e22b2060d2e92e35499386eaf32cde9fe66de6d871b247ae5394c0a945bac486";
@@ -44,6 +46,57 @@ function sha256(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
+function canonicalPath(path) {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path ?? "");
+  }
+}
+
+function assertSafePath(root, target, allowMissing = false) {
+  const absolute = resolve(target);
+  if (absolute !== root && !absolute.startsWith(`${root}${sep}`)) {
+    fail(`Refusing path outside Pi package root: ${absolute}`);
+  }
+  let current = root;
+  for (const part of relative(root, absolute).split(sep).filter(Boolean)) {
+    current = join(current, part);
+    let stat;
+    try {
+      stat = lstatSync(current);
+    } catch (error) {
+      if (allowMissing && error?.code === "ENOENT") return;
+      throw error;
+    }
+    if (stat.isSymbolicLink()) fail(`Refusing symlinked Pi path: ${current}`);
+  }
+}
+
+function acquireLock(root) {
+  if (!existsSync(SHLOCK_EXECUTABLE)) fail(`Required lock executable not found: ${SHLOCK_EXECUTABLE}`);
+  const lockPath = join(root, ".pi-fitch-kit.lock");
+  assertSafePath(root, lockPath, true);
+  const result = spawnSync(
+    SHLOCK_EXECUTABLE,
+    ["-f", lockPath, "-p", String(process.pid)],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) {
+    const owner = existsSync(lockPath) ? readFileSync(lockPath, "utf8").trim() : "unknown";
+    fail(`Pi core operation already in progress (pid ${owner}): ${lockPath}`);
+  }
+  return () => {
+    try {
+      if (readFileSync(lockPath, "utf8").trim() === String(process.pid)) {
+        rmSync(lockPath, { force: true });
+      }
+    } catch {
+      // Do not remove a lock we can no longer prove we own.
+    }
+  };
+}
+
 function parseArgs() {
   const args = process.argv.slice(2);
   const action = args.shift() ?? "status";
@@ -76,8 +129,12 @@ function resolvePiRoot(explicitRoot) {
   }).trim();
   const realExecutable = realpathSync(executable);
   const root = dirname(dirname(realExecutable));
-  if (realExecutable !== realpathSync(join(root, "dist/cli.js"))) {
-    fail(`Refusing unexpected Pi executable: ${realExecutable}`);
+  const cliPath = join(root, "dist/cli.js");
+  if (!existsSync(cliPath)) {
+    fail(`Unable to resolve a Pi package root from ${realExecutable}; pass --pi-root explicitly`);
+  }
+  if (realExecutable !== realpathSync(cliPath)) {
+    fail(`Refusing unexpected Pi executable: ${realExecutable}; pass --pi-root explicitly`);
   }
   return root;
 }
@@ -95,8 +152,10 @@ function verifyInstallation(root) {
     ...commonFiles,
     "dist/modes/interactive/interactive-mode.js": interactiveMode,
   };
-  const cli = realpathSync(join(root, "dist/cli.js"));
-  if (!cli.startsWith(`${root}/`)) fail(`Refusing Pi CLI outside package root: ${cli}`);
+  for (const relativePath of Object.keys(files)) {
+    assertSafePath(root, join(root, relativePath));
+  }
+  assertSafePath(root, join(root, "dist/cli.js"));
 }
 
 function verifyPatch(path, expected) {
@@ -125,41 +184,114 @@ function state(root) {
   fail(`Pi core diverges from both reviewed stock and patched states; refusing mutation:\n${detail}`);
 }
 
-function backupStock(root) {
+function backupPaths(root) {
   const backupRoot = join(root, ".pi-fitch-kit-backup", `pi-${piVersion}-compaction`);
-  const manifestPath = join(backupRoot, "manifest.json");
-  if (existsSync(manifestPath)) {
-    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-    if (manifest.packageRoot !== root || manifest.version !== piVersion) {
-      fail(`Backup belongs to an unexpected installation: ${manifestPath}`);
-    }
-    for (const [relativePath, expected] of Object.entries(files)) {
-      if (sha256(join(backupRoot, relativePath)) !== expected.stock) {
-        fail(`Backup preimage mismatch: ${join(backupRoot, relativePath)}`);
-      }
-    }
-    return;
+  return {
+    backupRoot,
+    manifestPath: join(backupRoot, "manifest.json"),
+    journalPath: join(backupRoot, "journal.json"),
+  };
+}
+
+function verifyBackup(root) {
+  const { backupRoot, manifestPath } = backupPaths(root);
+  assertSafePath(root, backupRoot, true);
+  if (!existsSync(backupRoot)) return false;
+  if (!existsSync(manifestPath)) fail(`Backup manifest missing: ${manifestPath}`);
+  assertSafePath(root, manifestPath);
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  if (canonicalPath(manifest.packageRoot) !== root || manifest.version !== piVersion) {
+    fail(`Backup belongs to an unexpected installation: ${manifestPath}`);
   }
-  mkdirSync(backupRoot, { recursive: true });
   for (const [relativePath, expected] of Object.entries(files)) {
-    const source = join(root, relativePath);
-    if (sha256(source) !== expected.stock) fail(`Stock preimage changed before backup: ${source}`);
-    const destination = join(backupRoot, relativePath);
-    mkdirSync(dirname(destination), { recursive: true });
-    copyFileSync(source, destination);
+    const backupPath = join(backupRoot, relativePath);
+    assertSafePath(root, backupPath);
+    if (sha256(backupPath) !== expected.stock) {
+      fail(`Backup preimage mismatch: ${backupPath}`);
+    }
   }
+  return true;
+}
+
+function backupStock(root) {
+  const { backupRoot } = backupPaths(root);
+  if (verifyBackup(root)) return;
+  const backupParent = dirname(backupRoot);
+  assertSafePath(root, backupParent, true);
+  mkdirSync(backupParent, { recursive: true });
+  const stagingRoot = mkdtempSync(`${backupRoot}.tmp-`);
+  try {
+    for (const [relativePath, expected] of Object.entries(files)) {
+      const source = join(root, relativePath);
+      if (sha256(source) !== expected.stock) fail(`Stock preimage changed before backup: ${source}`);
+      const destination = join(stagingRoot, relativePath);
+      mkdirSync(dirname(destination), { recursive: true });
+      copyFileSync(source, destination);
+    }
+    writeFileSync(
+      join(stagingRoot, "manifest.json"),
+      `${JSON.stringify({ packageRoot: root, package: PI_PACKAGE, version: piVersion, patchSha256, files }, null, 2)}\n`,
+      "utf8",
+    );
+    renameSync(stagingRoot, backupRoot);
+  } finally {
+    rmSync(stagingRoot, { recursive: true, force: true });
+  }
+  verifyBackup(root);
+}
+
+function writeJournal(root, action, before) {
+  const { journalPath } = backupPaths(root);
+  const temporary = `${journalPath}.tmp-${process.pid}-${randomUUID()}`;
   writeFileSync(
-    manifestPath,
-    `${JSON.stringify({ packageRoot: root, package: PI_PACKAGE, version: piVersion, patchSha256, files }, null, 2)}\n`,
+    temporary,
+    `${JSON.stringify({ packageRoot: root, version: piVersion, action, before })}\n`,
     "utf8",
   );
+  renameSync(temporary, journalPath);
+}
+
+function clearJournal(root) {
+  rmSync(backupPaths(root).journalPath, { force: true });
+}
+
+function recoverInterruptedMutation(root) {
+  const { backupRoot, journalPath } = backupPaths(root);
+  if (!verifyBackup(root) || !existsSync(journalPath)) return false;
+  assertSafePath(root, journalPath);
+  const journal = JSON.parse(readFileSync(journalPath, "utf8"));
+  if (canonicalPath(journal.packageRoot) !== root || journal.version !== piVersion) {
+    fail(`Recovery journal belongs to an unexpected installation: ${journalPath}`);
+  }
+  const target = journal.action === "apply" ? "patched" : journal.action === "restore" ? "stock" : undefined;
+  if (!target) fail(`Recovery journal has an invalid action: ${journalPath}`);
+  try {
+    if (state(root).name === target) {
+      clearJournal(root);
+      return false;
+    }
+  } catch {
+    // Mixed state: restore the verified stock preimage below.
+  }
+  for (const [relativePath] of Object.entries(files)) {
+    const source = join(backupRoot, relativePath);
+    const destination = join(root, relativePath);
+    const temporary = `${destination}.pi-fitch-kit-recovery-${randomUUID()}`;
+    copyFileSync(source, temporary);
+    renameSync(temporary, destination);
+  }
+  if (state(root).name !== "stock") fail("Interrupted Pi core mutation recovery did not restore stock");
+  checkSyntax(root);
+  clearJournal(root);
+  return true;
 }
 
 function runPatch(root, reverse, dryRun, source = patchPath) {
+  if (!existsSync(PATCH_EXECUTABLE)) fail(`Required patch executable not found: ${PATCH_EXECUTABLE}`);
   const args = ["--batch", "--forward", "--no-backup-if-mismatch", "--reject-file=-", "-p1", "-d", root];
   if (reverse) args.unshift("--reverse");
   if (dryRun) args.unshift("--dry-run");
-  const result = spawnSync("patch", args, { encoding: "utf8", input: readFileSync(source) });
+  const result = spawnSync(PATCH_EXECUTABLE, args, { encoding: "utf8", input: readFileSync(source) });
   if (result.status !== 0) {
     fail(`Patch ${dryRun ? "preflight" : "mutation"} failed:\n${result.stdout}${result.stderr}`);
   }
@@ -203,6 +335,7 @@ function mutateAndVerify(root, action, beforeName, steps) {
     const after = state(root);
     if (after.name !== expected) fail(`Expected ${expected} state after ${action}, found ${after.name}`);
     checkSyntax(root);
+    clearJournal(root);
     return after;
   } catch (error) {
     try {
@@ -212,6 +345,7 @@ function mutateAndVerify(root, action, beforeName, steps) {
       const restored = state(root);
       if (restored.name !== beforeName) fail(`Rollback restored ${restored.name}, expected ${beforeName}`);
       checkSyntax(root);
+      clearJournal(root);
     } catch (rollbackError) {
       throw new AggregateError([error, rollbackError], `Pi core ${action} failed and rollback could not be verified`);
     }
@@ -220,44 +354,63 @@ function mutateAndVerify(root, action, beforeName, steps) {
   }
 }
 
-const { action, explicitRoot } = parseArgs();
-const root = resolvePiRoot(explicitRoot);
-verifyInstallation(root);
-verifyPatch(patchPath, patchSha256);
-const before = state(root);
-if (before.name === "legacy-patched" && action !== "status") {
-  verifyPatch(legacyPatchPath, legacyPatchSha256);
+function main() {
+  const { action, explicitRoot } = parseArgs();
+  const root = resolvePiRoot(explicitRoot);
+  verifyInstallation(root);
+  const releaseLock = acquireLock(root);
+  try {
+    const recovered = recoverInterruptedMutation(root);
+    const before = state(root);
+    const hasBackup = verifyBackup(root);
+    if (before.name !== "stock" && !hasBackup) {
+      fail(`Verified stock backup missing for ${before.name} installation`);
+    }
+    if ((action === "apply" && before.name !== "patched") ||
+        (action === "restore" && before.name === "patched")) {
+      verifyPatch(patchPath, patchSha256);
+    }
+    if (before.name === "legacy-patched" && action !== "status") {
+      verifyPatch(legacyPatchPath, legacyPatchSha256);
+    }
+
+    if (action === "status") {
+      console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: before.name, ...(recovered ? { recovered: true } : {}) }, null, 2));
+      return;
+    }
+    if (action === "apply" && before.name === "patched") {
+      console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: "already-patched", changed: false, ...(recovered ? { recovered: true } : {}) }, null, 2));
+      return;
+    }
+    if (action === "restore" && before.name === "stock") {
+      console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: "already-stock", changed: false, ...(recovered ? { recovered: true } : {}) }, null, 2));
+      return;
+    }
+
+    const steps = planSteps(action, before.name);
+    runPatch(root, steps[0].reverse, true, steps[0].source);
+    if (before.name === "stock") backupStock(root);
+    writeJournal(root, action, before.name);
+    const after = mutateAndVerify(root, action, before.name, steps);
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action,
+          packageRoot: root,
+          version: piVersion,
+          state: after.name,
+          changed: true,
+          ...(before.name === "legacy-patched" ? { migratedFrom: "legacy-patched" } : {}),
+          ...(recovered ? { recovered: true } : {}),
+        },
+        null,
+        2,
+      ),
+    );
+  } finally {
+    releaseLock();
+  }
 }
 
-if (action === "status") {
-  console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: before.name }, null, 2));
-  process.exit(0);
-}
-if (action === "apply" && before.name === "patched") {
-  console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: "already-patched", changed: false }, null, 2));
-  process.exit(0);
-}
-if (action === "restore" && before.name === "stock") {
-  console.log(JSON.stringify({ ok: true, action, packageRoot: root, version: piVersion, state: "already-stock", changed: false }, null, 2));
-  process.exit(0);
-}
-
-const steps = planSteps(action, before.name);
-runPatch(root, steps[0].reverse, true, steps[0].source);
-if (action === "apply" && before.name === "stock") backupStock(root);
-const after = mutateAndVerify(root, action, before.name, steps);
-console.log(
-  JSON.stringify(
-    {
-      ok: true,
-      action,
-      packageRoot: root,
-      version: piVersion,
-      state: after.name,
-      changed: true,
-      ...(before.name === "legacy-patched" ? { migratedFrom: "legacy-patched" } : {}),
-    },
-    null,
-    2,
-  ),
-);
+main();
