@@ -10,14 +10,16 @@
   "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node --check extensions/clean-footer.ts && node --check extensions/codex-context.ts && node --check extensions/session-name.ts && node --check scripts/codex-context-regression.ts && node --check scripts/session-name-regression.ts && node --check scripts/reapply-pi-core-compaction.mjs && node scripts/reapply-pi-core-compaction.mjs status --pi-root node_modules/@earendil-works/pi-coding-agent && node scripts/image-guard-smoke.mjs && npm run regression:session-name && node scripts/validate.mjs",
+    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node --check extensions/clean-footer.ts && node --check extensions/codex-context.ts && node --check extensions/session-name.ts && node --check scripts/codex-context-regression.ts && node --check scripts/session-name-regression.ts && node --check scripts/reapply-pi-core-compaction.mjs && node --check scripts/setup-lifecycle-smoke.mjs && node scripts/reapply-pi-core-compaction.mjs status --pi-root node_modules/@earendil-works/pi-coding-agent && node scripts/image-guard-smoke.mjs && npm run regression:session-name && npm run regression:pi-core-applicator && npm run smoke:lifecycle && node scripts/validate.mjs",
     "typecheck": "tsc --noEmit",
     "regression:codex-context": "node --experimental-strip-types scripts/codex-context-regression.ts",
+    "regression:pi-core-applicator": "node scripts/reapply-pi-core-compaction-regression.mjs",
     "regression:session-name": "node --experimental-strip-types scripts/session-name-regression.ts",
     "reapply:pi-core-compaction": "node scripts/reapply-pi-core-compaction.mjs apply",
     "restore:pi-core-compaction": "node scripts/reapply-pi-core-compaction.mjs restore",
     "status:pi-core-compaction": "node scripts/reapply-pi-core-compaction.mjs status",
-    "smoke": "node scripts/package-smoke.mjs"
+    "smoke": "node scripts/package-smoke.mjs",
+    "smoke:lifecycle": "node scripts/setup-lifecycle-smoke.mjs"
   },
   "keywords": [
     "pi-package"
@@ -34,7 +36,7 @@
       "./prompts/audit/github-open-issues-prs.md"
     ],
     "themes": [
-      "./themes"
+      "./themes/calm.json"
     ]
   },
   "engines": {

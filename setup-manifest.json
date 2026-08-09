@@ -1,10 +1,11 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "runtime": {
     "pi": "0.84.1",
     "node": ">=24.0.0"
   },
   "kit": {
+    "packageName": "@fitch/pi-kit",
     "repository": "https://github.com/fitchmultz/pi-fitch-kit",
     "installSource": "git:github.com/fitchmultz/pi-fitch-kit"
   },
@@ -65,10 +66,26 @@
               "thinkingLevel": "high"
             }
           ]
+        },
+        "disabledConfig": {
+          "customCompactionEnabled": false
         }
       }
     }
   ],
+  "piCorePatch": {
+    "id": "request-boundary-compaction",
+    "requiredForCompleteCore": true,
+    "consent": {
+      "required": true,
+      "default": "disabled"
+    },
+    "docs": "docs/pi-core-compaction.md",
+    "statusScript": "status:pi-core-compaction",
+    "applyScript": "reapply:pi-core-compaction",
+    "restoreScript": "restore:pi-core-compaction",
+    "restartRequired": true
+  },
   "retiredPackageSources": [
     "git:github.com/fitchmultz/pi-codex-context",
     "git:github.com/fitchmultz/pi-session-name"

@@ -88,6 +88,6 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-`/fitch-setup` reads unpinned package sources from [`setup-manifest.json`](../setup-manifest.json), previews every selected change, and stops for each user's own authentication. `/fitch-setup verify` reports drift without changing anything.
+`/fitch-setup` reads unpinned package sources from [`setup-manifest.json`](../setup-manifest.json), normalizes duplicate or filtered kit entries, previews every selected change, and stops for each user's own authentication. Alternate-model compaction consent is revocable, and the Complete-core Pi patch is a separate opt-in that requires a full restart. `/fitch-setup verify` reports drift without changing anything.
 
 The [README](../README.md) is the navigation hub. The [full guide](./pi-setup.md) explains the model table, launch policy, evidence rules, usage sample, and security boundaries.

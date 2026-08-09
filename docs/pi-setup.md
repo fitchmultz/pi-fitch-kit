@@ -89,7 +89,9 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - deterministic support: calculator, tool duration, verbosity, session editing, stash, and raw message copy;
 - kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, and OpenAI fast mode plus consented alternate-model compaction, while `pi-subagents` owns its profile defaults.
 
-Bundled `codex-context` loads safely with custom compaction disabled. Enabling its manifest-gated route is a separate choice because retained compaction context can include selected messages, prior summaries, split-turn prefixes, and custom instructions, and goes to `xai/grok-4.5`, then `openai-codex/gpt-5.6-luna` on fallback, regardless of the active chat provider. `/fitch-setup` previews the destinations and exact config before asking for that consent.
+Bundled `codex-context` loads safely with custom compaction disabled. Enabling its manifest-gated route is a separate choice because retained compaction context can include selected messages, prior summaries, split-turn prefixes, and custom instructions, and goes to `xai/grok-4.5`, then `openai-codex/gpt-5.6-luna` on fallback, regardless of the active chat provider. `/fitch-setup` previews the destinations and exact config before asking whether to enable, disable, or keep that consent state.
+
+Complete core also includes the reviewed request-boundary compaction patch, but the setup never silently mutates Pi core. It previews the guarded status/apply/restore commands and asks separately. Applying it creates a verified stock backup and requires a full process restart; `/reload` only refreshes package resources.
 
 Most reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
 
@@ -221,9 +223,9 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only the selected unpinned sources. Agent Browser stays at 0.33.0 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys separately, preserves unrelated configuration, stops for authentication, and verifies loaded resources after reload.
+The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only the selected unpinned sources. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. Agent Browser stays at 0.33.0 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys separately, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources after reload or Pi core after a full restart.
 
-`/fitch-setup verify` is read-only. It reports drift in package sources, profiles, extensions, prompts, skills, model availability, and consent-gated route state.
+`/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, model availability, consent-gated route state, and guarded Pi core patch status. Complete core cannot pass while its required patch is stock, divergent, or unverified.
 
 ## Trust and security boundaries
 
