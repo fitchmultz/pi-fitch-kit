@@ -35,6 +35,7 @@ for (const path of [
   "patches/archive/pi-0.84.1-compaction-v0.5.0.patch",
   "patches/archive/pi-0.84.1-compaction-v0.6.0.patch",
   "patches/archive/pi-0.84.1-compaction-v0.7.0.patch",
+  "patches/archive/pi-0.84.1-compaction-v0.8.0.patch",
   "scripts/reapply-pi-core-compaction.mjs",
   "scripts/anthropic-stall-regression.mjs",
   "scripts/pi-core-retry-regression.mjs",

@@ -1,4 +1,4 @@
-# Reapply the Pi 0.84.1 compaction, recovery, diagnostics, and working-status fixes
+# Reapply the Pi 0.84.1 compaction, recovery, and diagnostics fixes
 
 ## Instructions for the Pi agent handling an update
 
@@ -39,7 +39,7 @@ The interactive compaction UI must render one summary card. `buildContextEntries
 
 Pi 0.84.1 natively persists compaction and branch-summary usage, resumes messages queued during compaction, retries native summarization with lifecycle events, uses fresh routing session IDs, disables one-off prompt-cache writes where supported, and accepts header-only compaction authentication. Preserve those native behaviors, the `compact(..., settingsManager.getRetrySettings(), _summarizationRetryCallbacks(...))` arguments, and `completeSummarization()` request options while restoring the local request-boundary and safety fixes.
 
-A provider can also be healthy without producing a visible assistant event. Anthropic's Messages stream sends SSE `ping` events, and Pi's adapter intentionally filters them before the assistant event stream. Those bytes correctly reset undici's body-idle timeout, so a long inference can outlive `httpIdleTimeoutMs` while the TUI shows only `Working...`. Do not redefine network idle as “no visible model token”: that would abort a live connection. The local visibility fix instead adds elapsed time and the interrupt key to the working row after 30 seconds.
+A provider can also be healthy without producing a visible assistant event. Anthropic's Messages stream sends SSE `ping` events, and Pi's adapter intentionally filters them before the assistant event stream. Those bytes correctly reset undici's body-idle timeout, so a long inference can outlive `httpIdleTimeoutMs` while the TUI shows only `Working...`. That diagnosed behavior is accepted. Do not redefine network idle as “no visible model token,” add a watchdog, change provider timeouts, or add Anthropic-specific retries: each would turn healthy slowness into failure.
 
 ## Where to make the change
 
@@ -47,7 +47,7 @@ First resolve the active Pi installation from `command -v pi`; do not assume the
 
 - `dist/core/agent-session.js`
 - `dist/core/compaction/compaction.js`
-- `dist/modes/interactive/components/status-indicator.js`
+- `dist/modes/interactive/components/status-indicator.js` (tracked only to remove the v0.8.0 legacy hunk; current must match stock)
 - `dist/modes/interactive/interactive-mode.js`
 - `node_modules/@earendil-works/pi-ai/dist/utils/retry.js`
 - `node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js`
@@ -66,11 +66,11 @@ The default command ignores npm-injected local `node_modules/.bin` entries when 
 
 The applicator supports only the reviewed Pi 0.84.0 and 0.84.1 package identities and exact stock hashes. It uses `/usr/bin/patch`, never an executable injected through `PATH`; serializes every action with `/usr/bin/shlock` and reclaims dead-owner locks after its brief freshness guard; refuses symlinked mutable, backup, or lock paths; preflights patch anchors; builds and hash-verifies the stock backup in a staging directory before atomically renaming it; validates any existing backup on every action against the file set its own manifest records, with preimage hashes always taken from the compiled-in registry; canonicalizes manifest roots; writes a recovery journal before mutation; reports `recovery-needed` without changing files on read-only `status`; restores exact stock bytes on the next separately authorized `apply` or `restore` after an interrupted mutation; suppresses reject sidecars; verifies patched hashes and JavaScript syntax; and rolls back and verifies the complete pre-operation state after an in-process failure. Patch checksums are required only for artifacts the requested action will execute. The command fails closed on all other divergence and no-ops when already applied. Restore the reviewed stock preimage with `npm run restore:pi-core-compaction` and the same optional `--pi-root` argument.
 
-An install patched by kit 0.4.1 through 0.7.0 is recognized as a sha-pinned `legacy-patched` state. `apply` migrates it in one guarded run: it reverses the matching checksum-pinned archive under `patches/archive/`, verifies the exact stock intermediate, ensures the stock backup exists, then applies the current patch; any failure rolls back to the same verified legacy pre-state. Backups written by those released kits predate later-tracked core files; before mutating, `apply` extends such a backup with the missing stock preimages taken from the install (legacy patches never touched them, and anything else fails closed) and atomically rewrites the manifest last, which also refreshes stale recorded patch metadata. `restore` reverses the matching archived patch directly to stock only after confirming the backup records every file that installed era can reverse; a layout valid for a different release is insufficient. Any other divergence still fails closed.
+An install patched by kit 0.4.1 through 0.6.0 or by kit 0.8.0 is recognized as a sha-pinned `legacy-patched` state. Kit 0.7.0 is byte-identical to the current runtime artifact and is therefore already `patched`. `apply` migrates each legacy state in one guarded run: it reverses the matching checksum-pinned archive under `patches/archive/`, verifies the exact stock intermediate, ensures the stock backup exists, then applies the current patch; any failure rolls back to the same verified legacy pre-state. When a released backup predates later-tracked core files, `apply` extends it with the missing stock preimages taken from the install (legacy patches never touched them, and anything else fails closed) and atomically rewrites the manifest last. A complete legacy backup needs no new preimages but still refreshes stale recorded patch metadata. `restore` reverses the matching archived patch directly to stock only after confirming the backup records every file that installed era can reverse; a layout valid for a different release is insufficient. Any other divergence still fails closed.
 
 `status` reports only the verified code state; it does not warn that a valid released backup layout is too small for that particular state. Restore performs the era-coverage check before journaling and names missing preimages.
 
-A hand-built two-stream state can be v0.7.0-patched while still carrying a released four-file backup — for example, kit v0.6.0 followed by a manual application of TARS's old standalone resilience patch. The applicator intentionally refuses restore because an interruption could not recover the two unrecorded Responses files, and `apply` cannot reconstruct their stock preimages after they are patched. Do not edit the manifest or backup by hand. In a separately authorized maintenance window, reinstall exact stock Pi 0.84.1 at that package root, verify `status` reports `stock`, then run guarded `apply`; it will create or safely extend a complete seven-file stock backup before applying v0.8.0.
+A hand-built two-stream state can be v0.7.0-patched while still carrying a released four-file backup — for example, kit v0.6.0 followed by a manual application of TARS's old standalone resilience patch. The applicator intentionally refuses restore because an interruption could not recover the two unrecorded Responses files, and `apply` cannot reconstruct their stock preimages after they are patched. Do not edit the manifest or backup by hand. In a separately authorized maintenance window, reinstall exact stock Pi 0.84.1 at that package root, verify `status` reports `stock`, then run guarded `apply`; it will create or safely extend a complete seven-file stock backup before applying v0.8.1.
 
 Every Pi update replaces the installed package with stock core. After any update, rerun the exact-version status/regression checks and this guarded reapply command; never assume the prior patch survived. A later Pi version requires a new reviewed patch and hash set rather than bypassing the guard.
 
@@ -183,11 +183,11 @@ The real-binary regression keeps causality honest: a `response.failed` event car
 
 **Upstream Pi asks:** add the exact generic transient pattern to pi-ai's shared retry classifier and retain the additive vanilla Responses diagnostic fields. A separate Codex adapter change is required if terminal failure status/code/ID or HTTP request diagnostics should reach `providerMetadata`; this adoption does not claim them. The existing shared-parser expression ``new Error(`Error Code ${event.code}: ${event.message}` || "Unknown error")`` has a dead fallback because a template string is always truthy; carry that as an upstream cleanup only rather than expanding this adoption. The kit otherwise preserves the TARS source behavior but includes one review-driven compatibility correction: OpenAI SDK 6.26 exposes `APIError.requestID`, not only `request_id`; a real HTTP-500 regression pins both the SDK property and wrapper fallback.
 
-## Required slow-provider visibility
+## Required slow-provider behavior
 
-`WorkingStatusIndicator` records one start time when constructed. Its existing loader animation continues unchanged. After 30 seconds, a one-second interval updates only the displayed message to append compact elapsed time and `keyText("app.interrupt")`; use `esc` only when the key lookup is unexpectedly empty. Calls to `setMessage()` replace the base message without resetting elapsed time. `dispose()` must clear the disclosure timeout, the elapsed interval when started, and the inherited loader interval. Do not emit synthetic assistant content, expose provider heartbeat events, add a watchdog, or change HTTP/retry semantics.
+Keep Pi's stock `WorkingStatusIndicator` unchanged. Healthy long inference may leave the static working row visible until the provider emits an assistant event. Do not emit synthetic assistant content, expose provider heartbeat events, add elapsed-time UI, add a token-silence watchdog, change provider timeouts, or add Anthropic-specific retries.
 
-The focused regression uses local Anthropic-compatible SSE servers. A body with no bytes must still fail at the configured idle timeout. A body sending only filtered `ping` events must outlive that timeout and finish normally while producing no assistant progress until the terminal content arrives. A fake-clock check keeps archived v0.7.0 as the red proof and requires current to render elapsed time and the interrupt hint, preserve a custom base message, and clear the timer.
+The focused regression uses local Anthropic-compatible SSE servers. A body with no bytes must still fail at the configured idle timeout. A body sending only filtered `ping` events must outlive that timeout and finish normally while producing no assistant progress until terminal content arrives. A fake-clock check keeps archived v0.8.0 as the red proof for the superseded elapsed indicator and requires current to schedule no disclosure timer, no one-second elapsed interval, and to preserve the stock working message.
 
 ## Accepted provider-recovery tradeoffs
 
@@ -233,7 +233,7 @@ Run all of the following against the active Pi 0.84.1 installation:
 1. `pi --version` and confirm the installation path resolved from `command -v pi`.
 2. Run `pi --list-models 'openai/gpt-5.6'` and `pi --list-models 'openai-codex/gpt-5.6'`, then use the allowlisted local structural parser from step 2 to confirm Sol, Terra, and Luna match every active context-window override in `models.json`.
 3. Using the allowlisted local structural parser from step 2, confirm global settings still have compaction enabled with the intended reserve and keep-recent values. Use the same local allowlist for only the structural routing keys in the optional `<Pi agent dir>/pi-codex-context.json`: absent or non-literal consent must keep custom routing off; if `customCompactionEnabled` is `true`, confirm the user approved the exact listed destinations. An omitted model list means xAI Grok 4.5 high before Codex Luna high; a valid override replaces that order.
-4. Run `node --check` on all seven modified Pi JavaScript files, including `node_modules/@earendil-works/pi-ai/dist/utils/retry.js`, `openai-responses.js`, and `openai-responses-shared.js`.
+4. Run `node --check` on the six modified Pi JavaScript files plus the tracked stock `status-indicator.js`, including `node_modules/@earendil-works/pi-ai/dist/utils/retry.js`, `openai-responses.js`, and `openai-responses-shared.js`.
 5. If `pi-codex-goal` is installed, require version 0.1.38 or newer and confirm its runtime has no proactive `ctx.compact()` trigger.
 6. Resolve `pi-fitch-kit`'s installed root with `pi list`, then run:
 
@@ -243,7 +243,7 @@ Run all of the following against the active Pi 0.84.1 installation:
 
    Then run `npm run regression:pi-core-retry --prefix <package-root>` to prove the transient-edge stall class stays fixed: the archived legacy patch must stall, the current patch must recover through one bounded retry and surface exhaustion honestly.
 
-   Run `npm run regression:anthropic-stall --prefix <package-root>` to prove true byte-idle timeout, healthy filtered-heartbeat survival, the archived v0.7.0 silent red, and the current elapsed-time/interrupt-hint green.
+   Run `npm run regression:anthropic-stall --prefix <package-root>` to prove true byte-idle timeout, healthy filtered-heartbeat survival, the archived v0.8.0 elapsed-indicator red, and the current stock-working-row green.
 
 7. Confirm Pi loads one bundled `codex-context` extension, one `session_before_compact` handler, one `before_provider_request` handler, zero replacement provider registrations, and one `/codex-fast` command.
 
