@@ -11,13 +11,14 @@ const PATCH_EXECUTABLE = "/usr/bin/patch";
 const SHLOCK_EXECUTABLE = "/usr/bin/shlock";
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const patchPath = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
-const patchSha256 = "c7917d7eda6b8d6020b52588f01d0fa2896971ae0362f9687ba13702d8de981e";
+const patchSha256 = "d506d720c738a0e56c2b79c659dcc53169740b7ab4c656b357152e730e9cdfa1";
+const statusIndicatorPath = "dist/modes/interactive/components/status-indicator.js";
 const retryPath = "node_modules/@earendil-works/pi-ai/dist/utils/retry.js";
 const responsesPaths = [
   "node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js",
   "node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js",
 ];
-const pre060StockFiles = [retryPath, ...responsesPaths];
+const pre060StockFiles = [statusIndicatorPath, retryPath, ...responsesPaths];
 // `stockFiles` names tracked files a legacy patch never touched. `fileHashes`
 // handles a file changed by both a legacy and current patch to different bytes.
 // Everything else (except the discriminating agent-session hash) must match the
@@ -25,11 +26,18 @@ const pre060StockFiles = [retryPath, ...responsesPaths];
 // through the migration regression, so a missing era override fails loudly.
 const legacyPatches = [
   {
+    version: "0.7.0",
+    path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.7.0.patch"),
+    sha256: "c7917d7eda6b8d6020b52588f01d0fa2896971ae0362f9687ba13702d8de981e",
+    agentSession: "00564702a1d243fa488a30b2cff30a0b7dbde838c6085ac01e96fd90a8c8f984",
+    stockFiles: [statusIndicatorPath],
+  },
+  {
     version: "0.6.0",
     path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.6.0.patch"),
     sha256: "bc854f25940e0e95bd67ab160c22deee36d4cebe967fd7b9149fa86be961554b",
     agentSession: "00564702a1d243fa488a30b2cff30a0b7dbde838c6085ac01e96fd90a8c8f984",
-    stockFiles: responsesPaths,
+    stockFiles: [statusIndicatorPath, ...responsesPaths],
     fileHashes: {
       [retryPath]: "bc684353c341a90d8d67aa70b3d1db03e6005cfeaf2fd97a2d4333086d8075ae",
     },
@@ -57,6 +65,10 @@ const legacyPatches = [
   },
 ];
 const commonFiles = {
+  [statusIndicatorPath]: {
+    stock: "17ab1d377df099d69f4a4404b8a36dc1f060d0f73dd21a9f258c8ab465e1a21b",
+    patched: "4e4bfe739d5b43b86f96f9bfd4ff26d32d188197bee0dc6557cc65681cb5e27f",
+  },
   [retryPath]: {
     stock: "916476be8a85ad16f9de3d0cfc3eb341b3290445fde3717593b139fd7ee31b7b",
     patched: "9f977d98d46af81a24fa8b2a84aca536a46b6a6b3dff6458097742dab743b59f",

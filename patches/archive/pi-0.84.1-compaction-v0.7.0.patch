@@ -1,6 +1,6 @@
 diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
---- a/dist/core/agent-session.js	2026-08-09 15:01:39
-+++ b/dist/core/agent-session.js	2026-08-09 15:01:45
+--- a/dist/core/agent-session.js	2026-08-09 13:56:52
++++ b/dist/core/agent-session.js	2026-08-09 13:56:52
 @@ -155,6 +155,7 @@
          this._unsubscribeAgent = this.agent.subscribe(this._handleAgentEvent);
          this._installAgentToolHooks();
@@ -448,8 +448,8 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
          finally {
              this._branchSummaryAbortController = undefined;
 diff -ruN a/dist/core/compaction/compaction.js b/dist/core/compaction/compaction.js
---- a/dist/core/compaction/compaction.js	2026-08-09 15:01:40
-+++ b/dist/core/compaction/compaction.js	2026-08-09 15:01:45
+--- a/dist/core/compaction/compaction.js	2026-08-09 13:56:52
++++ b/dist/core/compaction/compaction.js	2026-08-09 13:56:52
 @@ -14,11 +14,10 @@
   */
  function extractFileOperations(messages, entries, prevCompactionIndex) {
@@ -481,68 +481,9 @@ diff -ruN a/dist/core/compaction/compaction.js b/dist/core/compaction/compaction
              break;
          }
      }
-diff -ruN a/dist/modes/interactive/components/status-indicator.js b/dist/modes/interactive/components/status-indicator.js
---- a/dist/modes/interactive/components/status-indicator.js	2026-08-09 15:01:40
-+++ b/dist/modes/interactive/components/status-indicator.js	2026-08-09 15:11:18
-@@ -12,9 +12,55 @@
-         this.stop();
-     }
- }
-+const WORKING_ELAPSED_DELAY_MS = 30_000;
-+function formatElapsed(ms) {
-+    const totalSeconds = Math.floor(ms / 1000);
-+    const hours = Math.floor(totalSeconds / 3600);
-+    const minutes = Math.floor((totalSeconds % 3600) / 60);
-+    const seconds = totalSeconds % 60;
-+    if (hours > 0)
-+        return `${hours}h ${minutes}m`;
-+    if (minutes > 0)
-+        return `${minutes}m ${seconds}s`;
-+    return `${seconds}s`;
-+}
- export class WorkingStatusIndicator extends StatusIndicator {
-+    elapsedTimeout;
-+    elapsedInterval;
-+    startedAt;
-+    baseMessage;
-     constructor(ui, message, indicator) {
-         super("working", ui, (spinner) => theme.fg("accent", spinner), (text) => theme.fg("muted", text), message, indicator);
-+        this.startedAt = Date.now();
-+        this.baseMessage = message;
-+        this.elapsedTimeout = setTimeout(() => {
-+            this.refreshElapsedMessage();
-+            this.elapsedInterval = setInterval(() => this.refreshElapsedMessage(), 1000);
-+            this.elapsedInterval.unref?.();
-+        }, WORKING_ELAPSED_DELAY_MS);
-+        this.elapsedTimeout.unref?.();
-+    }
-+    refreshElapsedMessage() {
-+        const elapsed = Date.now() - this.startedAt;
-+        if (elapsed < WORKING_ELAPSED_DELAY_MS)
-+            return;
-+        const interruptKey = keyText("app.interrupt") || "esc";
-+        super.setMessage(`${this.baseMessage} (${formatElapsed(elapsed)}; ${interruptKey} to cancel)`);
-+    }
-+    setMessage(message) {
-+        this.baseMessage = message;
-+        const elapsed = Date.now() - this.startedAt;
-+        if (elapsed < WORKING_ELAPSED_DELAY_MS) {
-+            super.setMessage(message);
-+            return;
-+        }
-+        this.refreshElapsedMessage();
-+    }
-+    dispose() {
-+        clearTimeout(this.elapsedTimeout);
-+        if (this.elapsedInterval)
-+            clearInterval(this.elapsedInterval);
-+        super.dispose();
-     }
- }
- export class RetryStatusIndicator extends StatusIndicator {
 diff -ruN a/dist/modes/interactive/interactive-mode.js b/dist/modes/interactive/interactive-mode.js
---- a/dist/modes/interactive/interactive-mode.js	2026-08-09 15:01:40
-+++ b/dist/modes/interactive/interactive-mode.js	2026-08-09 15:01:45
+--- a/dist/modes/interactive/interactive-mode.js	2026-08-09 13:56:52
++++ b/dist/modes/interactive/interactive-mode.js	2026-08-09 13:56:52
 @@ -17,7 +17,6 @@
  import { FooterDataProvider } from "../../core/footer-data-provider.js";
  import { configureHttpDispatcher, formatHttpIdleTimeoutMs } from "../../core/http-dispatcher.js";
@@ -574,8 +515,8 @@ diff -ruN a/dist/modes/interactive/interactive-mode.js b/dist/modes/interactive/
      }
      stop() {
 diff -ruN a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js
---- a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js	2026-08-09 15:01:40
-+++ b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js	2026-08-09 15:01:45
+--- a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js	2026-08-09 13:56:52
++++ b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js	2026-08-09 13:56:52
 @@ -419,6 +419,10 @@
          if (response?.id) {
              output.responseId = response.id;
@@ -608,8 +549,8 @@ diff -ruN a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.
              const msg = error
                  ? `${error.code || "unknown"}: ${error.message || "no message"}`
 diff -ruN a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js
---- a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js	2026-08-09 15:01:40
-+++ b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js	2026-08-09 15:01:45
+--- a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js	2026-08-09 13:56:52
++++ b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js	2026-08-09 14:18:03
 @@ -111,6 +111,10 @@
                  maxRetryDelayMs: options?.maxRetryDelayMs,
                  signal: options?.signal,
@@ -637,8 +578,8 @@ diff -ruN a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js b/no
              stream.push({ type: "error", reason: output.stopReason, error: output });
              stream.end();
 diff -ruN a/node_modules/@earendil-works/pi-ai/dist/utils/retry.js b/node_modules/@earendil-works/pi-ai/dist/utils/retry.js
---- a/node_modules/@earendil-works/pi-ai/dist/utils/retry.js	2026-08-09 15:01:40
-+++ b/node_modules/@earendil-works/pi-ai/dist/utils/retry.js	2026-08-09 15:01:45
+--- a/node_modules/@earendil-works/pi-ai/dist/utils/retry.js	2026-08-09 13:56:52
++++ b/node_modules/@earendil-works/pi-ai/dist/utils/retry.js	2026-08-09 13:56:52
 @@ -31,6 +31,8 @@
      "service.?unavailable",
      "server.?error",
