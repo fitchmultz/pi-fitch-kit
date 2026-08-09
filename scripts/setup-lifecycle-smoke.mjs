@@ -44,7 +44,10 @@ const pi = (...args) =>
 try {
 	assert.equal(pi("--version").trim(), "0.84.1");
 	pi("install", root);
-	assert.match(pi("list"), /pi-fitch-kit|@fitch\/pi-kit/);
+	assert.ok(
+		pi("list").includes(root),
+		"installed package list must include the resolved checkout path",
+	);
 
 	const filtered = JSON.parse(readFileSync(settingsPath, "utf8"));
 	filtered.packages = [{ source: root, prompts: [] }];
