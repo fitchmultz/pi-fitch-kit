@@ -447,7 +447,7 @@ for (const { version, stalePatchSha } of [
 		packageRoot,
 		`patches/archive/pi-0.84.1-compaction-v${version}.patch`,
 	);
-	buildLegacyEraBackup(root, legacyPatch, { stalePatchSha });
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, { stalePatchSha });
 	const legacyApply = spawnSync(
 		PATCH_EXECUTABLE,
 		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
@@ -473,10 +473,7 @@ for (const { version, stalePatchSha } of [
 	);
 	assert.equal(JSON.parse(migration.stdout).migratedFrom, "legacy-patched");
 	const upgradedManifest = JSON.parse(
-		readFileSync(
-			join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction/manifest.json"),
-			"utf8",
-		),
+		readFileSync(join(backupDir, "manifest.json"), "utf8"),
 	);
 	const retryPath = "node_modules/@earendil-works/pi-ai/dist/utils/retry.js";
 	assert.ok(
@@ -484,7 +481,7 @@ for (const { version, stalePatchSha } of [
 		"migration must extend the released-era backup to newly tracked files",
 	);
 	assert.equal(
-		sha256(join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction", retryPath)),
+		sha256(join(backupDir, retryPath)),
 		sha256(join(stockRoot, retryPath)),
 		"the upgraded backup must hold the stock retry classifier preimage",
 	);
@@ -513,6 +510,67 @@ for (const { version, stalePatchSha } of [
 	);
 	assert.equal(legacyRestore.status, 0, legacyRestore.stderr || legacyRestore.stdout);
 	assert.equal(JSON.parse(legacyRestore.stdout).state, "stock");
+}
+
+// A manifest listing only a subset of a released layout could make recovery
+// restore fewer files than an interrupted patch step touched. Every action
+// must reject it before considering any mutation.
+{
+	const root = stockFixture();
+	const legacyPatch = join(
+		packageRoot,
+		"patches/archive/pi-0.84.1-compaction-v0.5.0.patch",
+	);
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, {});
+	const manifestPath = join(backupDir, "manifest.json");
+	const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+	manifest.files = {
+		"dist/core/agent-session.js": manifest.files["dist/core/agent-session.js"],
+	};
+	writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+	for (const action of ["status", "apply", "restore"]) {
+		const result = spawnSync(
+			process.execPath,
+			[applicator, action, "--pi-root", root],
+			{ encoding: "utf8" },
+		);
+		assert.notEqual(result.status, 0, `${action} must reject a truncated backup manifest`);
+		assert.match(result.stderr, /does not match a released kit backup layout/);
+	}
+}
+
+// A fully patched install whose backup still has the legacy layout cannot
+// recover an interrupted restore of the current patch; restore must refuse
+// to journal the mutation. The state is unreachable through kit flows.
+{
+	const root = stockFixture();
+	const applied = spawnSync(
+		process.execPath,
+		[applicator, "apply", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(applied.status, 0, applied.stderr || applied.stdout);
+	const backupDir = join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction");
+	const manifestPath = join(backupDir, "manifest.json");
+	const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+	const retryPath = "node_modules/@earendil-works/pi-ai/dist/utils/retry.js";
+	delete manifest.files[retryPath];
+	writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+	rmSync(join(backupDir, retryPath));
+	const refused = spawnSync(
+		process.execPath,
+		[applicator, "restore", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.notEqual(refused.status, 0, "restore must refuse a patched install with a legacy-layout backup");
+	assert.match(refused.stderr, /cannot recover an interrupted restore/);
+	const status = spawnSync(
+		process.execPath,
+		[applicator, "status", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(status.status, 0, status.stderr || status.stdout);
+	assert.equal(JSON.parse(status.stdout).state, "patched", "the refused restore must not have mutated the install");
 }
 
 console.log("pi core applicator security and recovery checks passed");

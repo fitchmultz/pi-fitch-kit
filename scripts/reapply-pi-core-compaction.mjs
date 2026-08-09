@@ -237,10 +237,20 @@ function readBackupManifest(root) {
   if (canonicalPath(manifest.packageRoot) !== root || manifest.version !== piVersion) {
     fail(`Backup belongs to an unexpected installation: ${manifestPath}`);
   }
-  const listed = Object.keys(manifest.files ?? {});
-  if (listed.length === 0) fail(`Backup manifest lists no stock preimages: ${manifestPath}`);
-  for (const relativePath of listed) {
-    if (!files[relativePath]) fail(`Backup manifest lists an untracked path: ${relativePath}`);
+  // Only two backup layouts were ever released: the legacy set (every tracked
+  // file except the ones legacy patches left at stock bytes) and the complete
+  // current set. Interrupted-mutation recovery restores exactly the recorded
+  // preimages, so a partial path set could recover fewer files than a patch
+  // step touched and wedge the install; reject anything but the known layouts.
+  const listed = Object.keys(manifest.files ?? {}).sort();
+  const currentLayout = Object.keys(files).sort();
+  const legacyLayout = currentLayout.filter(
+    (relativePath) => !legacyPatches.some(({ stockFiles }) => stockFiles.includes(relativePath)),
+  );
+  const matches = (layout) =>
+    listed.length === layout.length && layout.every((relativePath, index) => listed[index] === relativePath);
+  if (!matches(currentLayout) && !matches(legacyLayout)) {
+    fail(`Backup manifest does not match a released kit backup layout: ${manifestPath}`);
   }
   return manifest;
 }
@@ -248,8 +258,7 @@ function readBackupManifest(root) {
 function verifyBackup(root) {
   // Older kit releases tracked fewer core files, so a backup is verified
   // against the paths its own manifest records. Preimage hashes always come
-  // from the compiled-in registry, never from manifest data, and end states
-  // are independently re-verified against that registry after every mutation.
+  // from the compiled-in registry, never from manifest data.
   const manifest = readBackupManifest(root);
   if (!manifest) return false;
   const { backupRoot } = backupPaths(root);
@@ -273,7 +282,7 @@ function upgradeBackupIfIncomplete(root) {
   const { backupRoot, manifestPath } = backupPaths(root);
   const manifest = readBackupManifest(root);
   const missing = Object.keys(files).filter((relativePath) => !manifest.files[relativePath]);
-  if (missing.length === 0) return false;
+  if (missing.length === 0) return;
   for (const relativePath of missing) {
     const source = join(root, relativePath);
     if (sha256(source) !== files[relativePath].stock) {
@@ -298,7 +307,6 @@ function upgradeBackupIfIncomplete(root) {
   );
   renameSync(temporary, manifestPath);
   verifyBackup(root);
-  return true;
 }
 
 function backupStock(root) {
@@ -537,6 +545,15 @@ function main() {
     runPatch(root, steps[0].reverse, true, steps[0].source);
     if (before.name === "stock") backupStock(root);
     else if (action === "apply") upgradeBackupIfIncomplete(root);
+    else if (before.name === "patched") {
+      // Reversing the current patch touches every tracked file, so recovery
+      // from an interruption needs the complete backup layout. Kit flows
+      // always produce one here; anything else is hand-crafted state.
+      const manifest = readBackupManifest(root);
+      if (Object.keys(files).some((relativePath) => !manifest.files[relativePath])) {
+        fail("Backup layout predates the current patch and cannot recover an interrupted restore; refusing mutation");
+      }
+    }
     writeJournal(root, action, before.name);
     const after = mutateAndVerify(root, action, before, steps);
     report({

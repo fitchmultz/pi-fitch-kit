@@ -267,10 +267,9 @@ const currentPiRoot = provisionPi(currentPatch, "current");
 // Scenario 2 (green): the current patch must classify the edge error as
 // transient, retry once with the native bounded machinery, and recover.
 {
-	const piRoot = currentPiRoot;
 	const root = scenarioRoot("current");
 	const server = await startModelServer("fail-once");
-	const { events } = await runTurn({ piRoot, root, port: server.port });
+	const { events } = await runTurn({ piRoot: currentPiRoot, root, port: server.port });
 	const { retryStarts, retryEnds, finalAssistant } = summarize(events);
 	assert.equal(retryStarts.length, 1, "current patch must schedule exactly one retry");
 	assert.equal(retryStarts[0]?.attempt, 1);
@@ -286,10 +285,9 @@ const currentPiRoot = provisionPi(currentPatch, "current");
 // Scenario 3 (honest exhaustion): when the edge error persists, the current
 // patch must stop after the configured budget and surface the provider error.
 {
-	const piRoot = currentPiRoot;
 	const root = scenarioRoot("exhaust");
 	const server = await startModelServer("always-fail");
-	const { events } = await runTurn({ piRoot, root, port: server.port });
+	const { events } = await runTurn({ piRoot: currentPiRoot, root, port: server.port });
 	const { retryStarts, retryEnds, finalAssistant } = summarize(events);
 	assert.equal(retryStarts.length, 2, "retry budget (maxRetries=2) must bound the attempts");
 	assert.deepEqual(
