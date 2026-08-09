@@ -595,6 +595,45 @@ const trackedHashes = (root) =>
 	assert.ok(existsSync(join(backupDir, "journal.json")), "the journal must be retained for diagnosis");
 }
 
+// The positive branch of the same preflight: a genuine three-file-era
+// interrupted mutation (mixed legacy state, era backup, retained journal)
+// must still recover to exact stock and clear its journal.
+{
+	const root = stockFixture();
+	const legacyPatch = join(
+		packageRoot,
+		"patches/archive/pi-0.84.1-compaction-v0.5.0.patch",
+	);
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, {});
+	const legacyApply = spawnSync(
+		PATCH_EXECUTABLE,
+		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
+		{ encoding: "utf8", input: readFileSync(legacyPatch) },
+	);
+	assert.equal(legacyApply.status, 0, legacyApply.stderr || legacyApply.stdout);
+	// Interruption mid-restore: one era file already back at stock, the rest
+	// still patched, journal pending.
+	copyFileSync(
+		join(stockRoot, "dist/core/agent-session.js"),
+		join(root, "dist/core/agent-session.js"),
+	);
+	writeFileSync(
+		join(backupDir, "journal.json"),
+		`${JSON.stringify({ packageRoot: root, version: "0.84.1", action: "restore", before: "legacy-patched" })}\n`,
+	);
+	const restored = spawnSync(
+		process.execPath,
+		[applicator, "restore", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(restored.status, 0, restored.stderr || restored.stdout);
+	const report = JSON.parse(restored.stdout);
+	assert.equal(report.recovered, true, "the interrupted era mutation must be recovered");
+	assert.equal(report.state, "already-stock");
+	assert.deepEqual(trackedHashes(root), trackedHashes(stockRoot), "recovery must restore exact stock bytes");
+	assert.ok(!existsSync(join(backupDir, "journal.json")), "completed recovery must clear the journal");
+}
+
 // A fully patched install whose backup still has the legacy layout cannot
 // recover an interrupted restore of the current patch; restore must refuse
 // to journal the mutation. The state is unreachable through kit flows.
