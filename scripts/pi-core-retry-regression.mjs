@@ -10,15 +10,16 @@
  * request succeeds (captured live on 2026-08-09, provider openai-codex, empty
  * content and zero usage on the failed attempt).
  *
- * This regression provisions two runnable Pi installs from the kit's own
- * dependency and drives the real `pi --mode rpc` binary against a local
- * openai-completions HTTP server:
- *   - legacy (archived v0.5.0 patch): the transient scenario MUST still stall
- *     with exactly one upstream request — the permanent red proof that the
- *     scenario reproduces the defect.
- *   - current (patches/pi-0.84.1-compaction.patch): the same scenario MUST
- *     auto-retry once and recover, and the always-failing scenario MUST stop
- *     after the bounded retry budget with the provider error surfaced.
+ * This harness provisions archived and current Pi installs, drives their real
+ * `pi --mode rpc` binaries against local model servers, and directly probes
+ * the bundled Responses stream. It also covers the TARS-original resilience
+ * patch adopted in v0.7.0: archived v0.6.0 stays red for the exact generic
+ * assistant error and lacks stream diagnostics; current captures HTTP and
+ * response.failed metadata, then the real RPC binary recovers from a transient
+ * response.failed event and stops honestly when it persists. response.failed
+ * with code server_error was already retryable through the older server-error
+ * pattern; that e2e leg proves the parser, metadata, and bounded lifecycle, not
+ * causality from the new exact generic-error pattern.
  */
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -26,14 +27,22 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const PATCH_EXECUTABLE = "/usr/bin/patch";
 const EDGE_ERROR = "exceeded request buffer limit while retrying upstream";
 const stockRoot = join(projectRoot, "node_modules/@earendil-works/pi-coding-agent");
 const currentPatch = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
-const legacyPatch = join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.5.0.patch");
+const bufferLegacyPatch = join(
+	projectRoot,
+	"patches/archive/pi-0.84.1-compaction-v0.5.0.patch",
+);
+const responsesLegacyPatch = join(
+	projectRoot,
+	"patches/archive/pi-0.84.1-compaction-v0.6.0.patch",
+);
+const GENERIC_OPENAI_ERROR = "Sorry, something went wrong.";
 
 const cleanups = [];
 process.on("exit", () => {
@@ -64,44 +73,11 @@ function provisionPi(patchPath, label) {
 	return piRoot;
 }
 
-function startModelServer(mode) {
+function serve(handle) {
 	let hits = 0;
 	const server = createServer((req, res) => {
-		let body = "";
-		req.setEncoding("utf8");
-		req.on("data", (chunk) => {
-			body += chunk;
-		});
-		req.on("end", () => {
-			hits++;
-			const failing = mode === "always-fail" || (mode === "fail-once" && hits === 1);
-			if (failing) {
-				res.writeHead(400, { "content-type": "text/plain" });
-				res.end(EDGE_ERROR);
-				return;
-			}
-			res.writeHead(200, {
-				"content-type": "text/event-stream",
-				"cache-control": "no-cache",
-			});
-			const chunks = [
-				{
-					id: `ok-${hits}`,
-					model: "dogfood-model",
-					choices: [{ index: 0, delta: { content: "recovered" }, finish_reason: null }],
-				},
-				{
-					id: `ok-${hits}`,
-					model: "dogfood-model",
-					choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
-					usage: { prompt_tokens: 50, completion_tokens: 5, total_tokens: 55 },
-				},
-			];
-			for (const chunk of chunks) {
-				res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-			}
-			res.end("data: [DONE]\n\n");
-		});
+		req.resume();
+		req.on("end", () => handle(++hits, res));
 	});
 	return new Promise((resolve) => {
 		server.listen(0, "127.0.0.1", () => {
@@ -114,7 +90,137 @@ function startModelServer(mode) {
 	});
 }
 
-function provisionAgentDir(root, port) {
+function startCompletionsServer(mode) {
+	return serve((hits, res) => {
+		const failing = mode === "always-fail" || (mode === "fail-once" && hits === 1);
+		if (failing) {
+			res.writeHead(400, { "content-type": "text/plain" });
+			res.end(EDGE_ERROR);
+			return;
+		}
+		res.writeHead(200, {
+			"content-type": "text/event-stream",
+			"cache-control": "no-cache",
+		});
+		const chunks = [
+			{
+				id: `ok-${hits}`,
+				model: "dogfood-model",
+				choices: [{ index: 0, delta: { content: "recovered" }, finish_reason: null }],
+			},
+			{
+				id: `ok-${hits}`,
+				model: "dogfood-model",
+				choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+				usage: { prompt_tokens: 50, completion_tokens: 5, total_tokens: 55 },
+			},
+		];
+		for (const chunk of chunks) {
+			res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+		}
+		res.end("data: [DONE]\n\n");
+	});
+}
+
+function startResponsesServer(mode) {
+	return serve((hits, res) => {
+		if (mode === "http-error") {
+			res.writeHead(500, {
+				"content-type": "application/json",
+				"x-request-id": `req-${hits}`,
+			});
+			res.end(
+				JSON.stringify({
+					error: { message: GENERIC_OPENAI_ERROR, type: "server_error", code: "server_error" },
+				}),
+			);
+			return;
+		}
+		res.writeHead(200, {
+			"content-type": "text/event-stream",
+			"cache-control": "no-cache",
+			"x-request-id": `req-${hits}`,
+		});
+		const send = (type, payload) => {
+			res.write(`event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`);
+		};
+		const failing = mode === "always-fail" || (mode === "fail-once" && hits === 1);
+		if (failing) {
+			send("response.failed", {
+				type: "response.failed",
+				sequence_number: 1,
+				response: {
+					id: `resp-failed-${hits}`,
+					status: "failed",
+					error: { code: "server_error", message: GENERIC_OPENAI_ERROR },
+				},
+			});
+			res.end();
+			return;
+		}
+		const item = {
+			id: `msg-${hits}`,
+			type: "message",
+			content: [{ type: "output_text", text: "recovered" }],
+		};
+		send("response.output_item.done", {
+			type: "response.output_item.done",
+			output_index: 0,
+			item,
+		});
+		send("response.completed", {
+			type: "response.completed",
+			response: {
+				id: `resp-${hits}`,
+				status: "completed",
+				output: [item],
+				usage: { input_tokens: 10, output_tokens: 2 },
+			},
+		});
+		res.end();
+	});
+}
+
+const importPiAi = (piRoot, relativePath) =>
+	import(
+		pathToFileURL(
+			join(piRoot, "node_modules/@earendil-works/pi-ai/dist", relativePath),
+		).href
+	);
+
+async function retryClassifier(piRoot) {
+	const module = await importPiAi(piRoot, "utils/retry.js");
+	return module.isRetryableAssistantError;
+}
+
+async function streamOneFailure(piRoot, port) {
+	const module = await importPiAi(piRoot, "api/openai-responses.js");
+	const model = {
+		id: "dogfood-model",
+		name: "Dogfood Model",
+		api: "openai-responses",
+		provider: "dogfood",
+		baseUrl: `http://127.0.0.1:${port}/v1`,
+		reasoning: false,
+		input: ["text"],
+		contextWindow: 20000,
+		maxTokens: 2000,
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	};
+	const events = module.stream(
+		model,
+		{ messages: [{ role: "user", content: "hello", timestamp: Date.now() }] },
+		{ apiKey: "test", maxRetries: 0 },
+	);
+	let failure;
+	for await (const event of events) {
+		if (event.type === "error") failure = event.error;
+	}
+	assert.ok(failure, "Responses stream must surface the response.failed event");
+	return failure;
+}
+
+function provisionAgentDir(root, port, api) {
 	const agentDir = join(root, "agent");
 	mkdirSync(agentDir, { recursive: true });
 	writeFileSync(
@@ -123,7 +229,7 @@ function provisionAgentDir(root, port) {
 			providers: {
 				dogfood: {
 					baseUrl: `http://127.0.0.1:${port}/v1`,
-					api: "openai-completions",
+					api,
 					apiKey: "test",
 					compat: {
 						supportsDeveloperRole: false,
@@ -159,8 +265,8 @@ function provisionAgentDir(root, port) {
 
 const TURN_TIMEOUT_MS = 60_000;
 
-function runTurn({ piRoot, root, port }) {
-	const agentDir = provisionAgentDir(root, port);
+function runTurn({ piRoot, root, port, api = "openai-completions" }) {
+	const agentDir = provisionAgentDir(root, port, api);
 	const sessionDir = join(root, "sessions");
 	mkdirSync(sessionDir, { recursive: true });
 	return new Promise((resolve, reject) => {
@@ -179,8 +285,8 @@ function runTurn({ piRoot, root, port }) {
 			],
 			{
 				env: {
-					...process.env,
 					HOME: root,
+					PATH: process.env.PATH ?? "",
 					PI_CODING_AGENT_DIR: agentDir,
 				},
 				stdio: ["pipe", "pipe", "pipe"],
@@ -247,9 +353,9 @@ function summarize(events) {
 // Scenario 1 (permanent red): the legacy patch must stall on the transient
 // edge error without retrying, proving the scenario reproduces the defect.
 {
-	const piRoot = provisionPi(legacyPatch, "legacy");
+	const piRoot = provisionPi(bufferLegacyPatch, "legacy");
 	const root = scenarioRoot("legacy");
-	const server = await startModelServer("fail-once");
+	const server = await startCompletionsServer("fail-once");
 	const { events } = await runTurn({ piRoot, root, port: server.port });
 	const { retryStarts, finalAssistant } = summarize(events);
 	assert.equal(retryStarts.length, 0, "legacy patch must not classify the edge error as retryable");
@@ -263,12 +369,67 @@ function summarize(events) {
 // Scenarios 2 and 3 share one patched install; runs never mutate it (HOME,
 // agent dir, and session dir live under each scenario's own root).
 const currentPiRoot = provisionPi(currentPatch, "current");
+const responsesLegacyPiRoot = provisionPi(responsesLegacyPatch, "responses-legacy");
+
+// v0.7.0 classifier red/green: archived v0.6.0 must stay false for the exact
+// generic assistant error; current must classify only the exact optional-dot
+// shape adopted from TARS (extra detail remains non-retryable).
+{
+	const legacyClassifier = await retryClassifier(responsesLegacyPiRoot);
+	const currentClassifier = await retryClassifier(currentPiRoot);
+	const message = { stopReason: "error", errorMessage: GENERIC_OPENAI_ERROR };
+	assert.equal(legacyClassifier(message), false, "v0.6.0 must preserve the generic-error red proof");
+	assert.equal(currentClassifier(message), true, "current must classify the exact generic error");
+	assert.equal(
+		currentClassifier({ ...message, errorMessage: GENERIC_OPENAI_ERROR.slice(0, -1) }),
+		true,
+		"the optional final period must stay optional",
+	);
+	assert.equal(
+		currentClassifier({ ...message, errorMessage: `${GENERIC_OPENAI_ERROR} Extra detail.` }),
+		false,
+		"the generic retry classification must stay narrow",
+	);
+}
+
+// v0.7.0 stream diagnostics red/green: response.failed without a prior
+// response.created event had no metadata or response ID in v0.6.0. Current
+// preserves HTTP/request diagnostics plus terminal response status, ID, and
+// provider error code. The shared processor is also used by Codex Responses;
+// HTTP-level metadata here is specific to the vanilla Responses adapter.
+{
+	const legacyServer = await startResponsesServer("always-fail");
+	const legacyFailure = await streamOneFailure(responsesLegacyPiRoot, legacyServer.port);
+	assert.equal(legacyFailure.providerMetadata, undefined);
+	assert.equal(legacyFailure.responseId, undefined);
+	legacyServer.close();
+
+	const currentServer = await startResponsesServer("always-fail");
+	const currentFailure = await streamOneFailure(currentPiRoot, currentServer.port);
+	assert.deepEqual(currentFailure.providerMetadata, {
+		httpStatus: 200,
+		requestId: "req-1",
+		status: "failed",
+		code: "server_error",
+	});
+	assert.equal(currentFailure.responseId, "resp-failed-1");
+	currentServer.close();
+
+	const httpErrorServer = await startResponsesServer("http-error");
+	const httpFailure = await streamOneFailure(currentPiRoot, httpErrorServer.port);
+	assert.deepEqual(
+		httpFailure.providerMetadata,
+		{ httpStatus: 500, code: "server_error", requestId: "req-1" },
+		"OpenAI APIError.requestID must survive an HTTP failure",
+	);
+	httpErrorServer.close();
+}
 
 // Scenario 2 (green): the current patch must classify the edge error as
 // transient, retry once with the native bounded machinery, and recover.
 {
 	const root = scenarioRoot("current");
-	const server = await startModelServer("fail-once");
+	const server = await startCompletionsServer("fail-once");
 	const { events } = await runTurn({ piRoot: currentPiRoot, root, port: server.port });
 	const { retryStarts, retryEnds, finalAssistant } = summarize(events);
 	assert.equal(retryStarts.length, 1, "current patch must schedule exactly one retry");
@@ -286,7 +447,7 @@ const currentPiRoot = provisionPi(currentPatch, "current");
 // patch must stop after the configured budget and surface the provider error.
 {
 	const root = scenarioRoot("exhaust");
-	const server = await startModelServer("always-fail");
+	const server = await startCompletionsServer("always-fail");
 	const { events } = await runTurn({ piRoot: currentPiRoot, root, port: server.port });
 	const { retryStarts, retryEnds, finalAssistant } = summarize(events);
 	assert.equal(retryStarts.length, 2, "retry budget (maxRetries=2) must bound the attempts");
@@ -302,7 +463,66 @@ const currentPiRoot = provisionPi(currentPatch, "current");
 	console.log("current patch: bounded exhaustion surfaced honestly (3 requests, final error)");
 }
 
-console.log("pi core retry regression passed");
+// Responses scenario 4: a transient response.failed event must travel through
+// the real parser and Agent retry lifecycle, retain diagnostics, and recover on
+// one bounded retry. Its server_error code was already retryable before v0.7.0;
+// this leg proves the adopted Responses path and lifecycle, not classifier
+// causality from the new exact generic-error pattern.
+{
+	const root = scenarioRoot("responses-current");
+	const server = await startResponsesServer("fail-once");
+	const { events } = await runTurn({
+		piRoot: currentPiRoot,
+		root,
+		port: server.port,
+		api: "openai-responses",
+	});
+	const { retryStarts, retryEnds, finalAssistant } = summarize(events);
+	assert.equal(retryStarts.length, 1, "response.failed must schedule exactly one retry");
+	assert.match(retryStarts[0]?.errorMessage ?? "", /server_error: Sorry, something went wrong/);
+	assert.equal(server.requestCount(), 2, "Responses recovery must re-send exactly once");
+	assert.equal(finalAssistant?.stopReason, "stop");
+	assert.match(JSON.stringify(finalAssistant?.content ?? []), /recovered/);
+	assert.deepEqual(finalAssistant?.providerMetadata, {
+		httpStatus: 200,
+		requestId: "req-2",
+		status: "completed",
+	});
+	assert.equal(retryEnds.at(-1)?.success, true);
+	server.close();
+	console.log("Responses current patch: recovered via one bounded retry with diagnostics");
+}
+
+// Responses scenario 5: persistent response.failed events must stop at the
+// configured budget and surface both the provider error and final-attempt
+// diagnostics honestly.
+{
+	const root = scenarioRoot("responses-exhaust");
+	const server = await startResponsesServer("always-fail");
+	const { events } = await runTurn({
+		piRoot: currentPiRoot,
+		root,
+		port: server.port,
+		api: "openai-responses",
+	});
+	const { retryStarts, retryEnds, finalAssistant } = summarize(events);
+	assert.equal(retryStarts.length, 2, "Responses retries must stop at maxRetries=2");
+	assert.equal(server.requestCount(), 3, "Responses exhaustion must stop after three attempts");
+	assert.equal(finalAssistant?.stopReason, "error");
+	assert.match(finalAssistant?.errorMessage ?? "", /server_error: Sorry, something went wrong/);
+	assert.deepEqual(finalAssistant?.providerMetadata, {
+		httpStatus: 200,
+		requestId: "req-3",
+		status: "failed",
+		code: "server_error",
+	});
+	assert.equal(finalAssistant?.responseId, "resp-failed-3");
+	assert.equal(retryEnds.at(-1)?.success, false);
+	server.close();
+	console.log("Responses current patch: bounded exhaustion surfaced with diagnostics");
+}
+
+console.log("pi core retry and OpenAI Responses resilience regression passed");
 // Fixture teardown is registered on the exit event; leave nothing implicit
 // keeping the loop alive (killed children release stdio asynchronously).
 process.exit(0);

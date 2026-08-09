@@ -1,6 +1,6 @@
 diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
---- a/dist/core/agent-session.js	2026-08-09 13:56:52
-+++ b/dist/core/agent-session.js	2026-08-09 13:56:52
+--- a/dist/core/agent-session.js	2026-08-08 21:24:47
++++ b/dist/core/agent-session.js	2026-08-08 23:38:34
 @@ -155,6 +155,7 @@
          this._unsubscribeAgent = this.agent.subscribe(this._handleAgentEvent);
          this._installAgentToolHooks();
@@ -448,8 +448,8 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
          finally {
              this._branchSummaryAbortController = undefined;
 diff -ruN a/dist/core/compaction/compaction.js b/dist/core/compaction/compaction.js
---- a/dist/core/compaction/compaction.js	2026-08-09 13:56:52
-+++ b/dist/core/compaction/compaction.js	2026-08-09 13:56:52
+--- a/dist/core/compaction/compaction.js	2026-08-08 21:24:47
++++ b/dist/core/compaction/compaction.js	2026-08-08 21:24:47
 @@ -14,11 +14,10 @@
   */
  function extractFileOperations(messages, entries, prevCompactionIndex) {
@@ -482,8 +482,8 @@ diff -ruN a/dist/core/compaction/compaction.js b/dist/core/compaction/compaction
          }
      }
 diff -ruN a/dist/modes/interactive/interactive-mode.js b/dist/modes/interactive/interactive-mode.js
---- a/dist/modes/interactive/interactive-mode.js	2026-08-09 13:56:52
-+++ b/dist/modes/interactive/interactive-mode.js	2026-08-09 13:56:52
+--- a/dist/modes/interactive/interactive-mode.js	2026-08-08 21:24:47
++++ b/dist/modes/interactive/interactive-mode.js	2026-08-08 21:24:47
 @@ -17,7 +17,6 @@
  import { FooterDataProvider } from "../../core/footer-data-provider.js";
  import { configureHttpDispatcher, formatHttpIdleTimeoutMs } from "../../core/http-dispatcher.js";
@@ -514,82 +514,10 @@ diff -ruN a/dist/modes/interactive/interactive-mode.js b/dist/modes/interactive/
          }
      }
      stop() {
-diff -ruN a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js
---- a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js	2026-08-09 13:56:52
-+++ b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js	2026-08-09 13:56:52
-@@ -419,6 +419,10 @@
-         if (response?.id) {
-             output.responseId = response.id;
-         }
-+        output.providerMetadata = {
-+            ...output.providerMetadata,
-+            status: response?.status,
-+        };
-         if (response?.usage) {
-             const inputDetails = response.usage.input_tokens_details;
-             const cachedTokens = inputDetails?.cached_tokens || 0;
-@@ -614,12 +618,19 @@
-             finalizeResponse(event.response);
-         }
-         else if (event.type === "error") {
-+            output.providerMetadata = { ...output.providerMetadata, code: event.code };
-             throw new Error(`Error Code ${event.code}: ${event.message}` || "Unknown error");
-         }
-         else if (event.type === "response.failed") {
-             sawTerminalResponseEvent = true;
-+            output.responseId = event.response?.id || output.responseId;
-             output.rawStopReason = event.response?.status;
-             const error = event.response?.error;
-+            output.providerMetadata = {
-+                ...output.providerMetadata,
-+                status: event.response?.status,
-+                code: error?.code,
-+            };
-             const details = event.response?.incomplete_details;
-             const msg = error
-                 ? `${error.code || "unknown"}: ${error.message || "no message"}`
-diff -ruN a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js
---- a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js	2026-08-09 13:56:52
-+++ b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js	2026-08-09 14:18:03
-@@ -111,6 +111,10 @@
-                 maxRetryDelayMs: options?.maxRetryDelayMs,
-                 signal: options?.signal,
-             });
-+            output.providerMetadata = {
-+                httpStatus: response.status,
-+                requestId: response.headers.get("x-request-id") || undefined,
-+            };
-             await options?.onResponse?.({ status: response.status, headers: headersToRecord(response.headers) }, model);
-             stream.push({ type: "start", partial: output });
-             await processResponsesStream(openaiStream, output, stream, model, {
-@@ -138,6 +142,14 @@
-                 delete block.customInput;
-             }
-             output.stopReason = options?.signal?.aborted ? "aborted" : "error";
-+            if (error && typeof error === "object") {
-+                output.providerMetadata = {
-+                    ...output.providerMetadata,
-+                    httpStatus: error.status ?? output.providerMetadata?.httpStatus,
-+                    code: error.code ?? error.error?.code ?? output.providerMetadata?.code,
-+                    requestId: error.requestID ?? error.request_id ?? output.providerMetadata?.requestId,
-+                };
-+            }
-             output.errorMessage = formatOpenAIResponsesError(error);
-             stream.push({ type: "error", reason: output.stopReason, error: output });
-             stream.end();
 diff -ruN a/node_modules/@earendil-works/pi-ai/dist/utils/retry.js b/node_modules/@earendil-works/pi-ai/dist/utils/retry.js
---- a/node_modules/@earendil-works/pi-ai/dist/utils/retry.js	2026-08-09 13:56:52
-+++ b/node_modules/@earendil-works/pi-ai/dist/utils/retry.js	2026-08-09 13:56:52
-@@ -31,6 +31,8 @@
-     "service.?unavailable",
-     "server.?error",
-     "internal.?error",
-+    // Generic transient assistant error returned by OpenAI Responses.
-+    "^Sorry, something went wrong\\.?$",
-     // Wrapper/provider text for transient upstream failures, including OpenRouter
-     // "Provider returned error" responses (#2264).
-     "provider.?returned.?error",
-@@ -47,6 +49,13 @@
+--- a/node_modules/@earendil-works/pi-ai/dist/utils/retry.js	2026-08-09 10:08:18
++++ b/node_modules/@earendil-works/pi-ai/dist/utils/retry.js	2026-08-09 10:08:18
+@@ -47,6 +47,13 @@
      "ENOTFOUND",
      "EAI_AGAIN",
      "upstream.?connect",

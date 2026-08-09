@@ -43,6 +43,8 @@ function stockFixture() {
 		"dist/core/compaction/compaction.js",
 		"dist/modes/interactive/interactive-mode.js",
 		"node_modules/@earendil-works/pi-ai/dist/utils/retry.js",
+		"node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js",
+		"node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js",
 	]) {
 		const destination = join(root, relativePath);
 		mkdirSync(dirname(destination), { recursive: true });
@@ -116,6 +118,21 @@ function stockFixture() {
 		{ encoding: "utf8" },
 	);
 	assert.notEqual(result.status, 0, "a symlinked mutable path must be refused");
+	assert.match(result.stderr, /symlink/i);
+}
+
+{
+	const root = stockFixture();
+	const external = mkdtempSync(join(tmpdir(), "pi-kit-external-modules-"));
+	fixtures.push(external);
+	rmSync(join(root, "node_modules/@earendil-works"), { recursive: true });
+	symlinkSync(external, join(root, "node_modules/@earendil-works"));
+	const result = spawnSync(
+		process.execPath,
+		[applicator, "apply", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.notEqual(result.status, 0, "a symlinked nested pi-ai path must be refused");
 	assert.match(result.stderr, /symlink/i);
 }
 
@@ -396,24 +413,33 @@ function stockFixture() {
 	assert.equal(existsSync(stale), false, "a stale backup staging directory must be reaped");
 }
 
-// Released kit applicators tracked only these three core files; their backups
-// and manifests never contained the later-tracked pi-ai retry classifier.
-// Each migration leg rebuilds that exact on-disk layout so the current
-// applicator is proven against real released-era backups, not backups it
-// created itself. The stale patchSha256 variant mirrors a live install whose
-// pre-0.5.0 backup metadata was carried forward (issue #16).
-const LEGACY_ERA_FILES = [
+// Each migration leg rebuilds the exact backup layout its released kit wrote:
+// 0.4.x/0.5.0 tracked the three core files; 0.6.0 also tracked the pi-ai retry
+// classifier. The current release adds the two Responses files. This proves
+// migration against released on-disk layouts rather than current-format
+// backups created by this test. The stale patchSha256 variant mirrors a live
+// install whose pre-0.5.0 metadata was carried forward (issue #16).
+const CORE_ERA_FILES = [
 	"dist/core/agent-session.js",
 	"dist/core/compaction/compaction.js",
 	"dist/modes/interactive/interactive-mode.js",
 ];
+const RETRY_PATH = "node_modules/@earendil-works/pi-ai/dist/utils/retry.js";
+const RESPONSES_PATHS = [
+	"node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js",
+	"node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js",
+];
 const sha256 = (path) =>
 	createHash("sha256").update(readFileSync(path)).digest("hex");
 
-function buildLegacyEraBackup(root, legacyPatchPath, { stalePatchSha, sourceRoot = root } = {}) {
+function buildLegacyEraBackup(
+	root,
+	legacyPatchPath,
+	{ stalePatchSha, sourceRoot = root, eraFiles = CORE_ERA_FILES } = {},
+) {
 	const backupRoot = join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction");
 	const manifestFiles = {};
-	for (const relativePath of LEGACY_ERA_FILES) {
+	for (const relativePath of eraFiles) {
 		const destination = join(backupRoot, relativePath);
 		mkdirSync(dirname(destination), { recursive: true });
 		copyFileSync(join(sourceRoot, relativePath), destination);
@@ -436,18 +462,19 @@ function buildLegacyEraBackup(root, legacyPatchPath, { stalePatchSha, sourceRoot
 	return backupRoot;
 }
 
-for (const { version, stalePatchSha } of [
+for (const { version, stalePatchSha, eraFiles } of [
 	{ version: "0.4.2" },
 	{ version: "0.4.3" },
 	{ version: "0.5.0" },
 	{ version: "0.5.0", stalePatchSha: `f4d8f383${"0".repeat(56)}` },
+	{ version: "0.6.0", eraFiles: [...CORE_ERA_FILES, RETRY_PATH] },
 ]) {
 	const root = stockFixture();
 	const legacyPatch = join(
 		packageRoot,
 		`patches/archive/pi-0.84.1-compaction-v${version}.patch`,
 	);
-	const backupDir = buildLegacyEraBackup(root, legacyPatch, { stalePatchSha });
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, { stalePatchSha, eraFiles });
 	const legacyApply = spawnSync(
 		PATCH_EXECUTABLE,
 		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
@@ -475,16 +502,17 @@ for (const { version, stalePatchSha } of [
 	const upgradedManifest = JSON.parse(
 		readFileSync(join(backupDir, "manifest.json"), "utf8"),
 	);
-	const retryPath = "node_modules/@earendil-works/pi-ai/dist/utils/retry.js";
-	assert.ok(
-		upgradedManifest.files[retryPath],
-		"migration must extend the released-era backup to newly tracked files",
-	);
-	assert.equal(
-		sha256(join(backupDir, retryPath)),
-		sha256(join(stockRoot, retryPath)),
-		"the upgraded backup must hold the stock retry classifier preimage",
-	);
+	for (const relativePath of [RETRY_PATH, ...RESPONSES_PATHS]) {
+		assert.ok(
+			upgradedManifest.files[relativePath],
+			"migration must extend the released-era backup to every currently tracked file",
+		);
+		assert.equal(
+			sha256(join(backupDir, relativePath)),
+			sha256(join(stockRoot, relativePath)),
+			`the upgraded backup must hold the stock preimage for ${relativePath}`,
+		);
+	}
 	assert.equal(
 		upgradedManifest.patchSha256,
 		sha256(join(packageRoot, "patches/pi-0.84.1-compaction.patch")),
@@ -513,13 +541,72 @@ for (const { version, stalePatchSha } of [
 }
 
 const TRACKED_FILES = [
-	"dist/core/agent-session.js",
-	"dist/core/compaction/compaction.js",
-	"dist/modes/interactive/interactive-mode.js",
-	"node_modules/@earendil-works/pi-ai/dist/utils/retry.js",
+	...CORE_ERA_FILES,
+	RETRY_PATH,
+	...RESPONSES_PATHS,
 ];
 const trackedHashes = (root) =>
 	TRACKED_FILES.map((relativePath) => sha256(join(root, relativePath)));
+
+// A backup layout can be valid for a released kit but too small for the era
+// currently installed. v0.6.0 touched retry.js, so its restore cannot journal
+// against a valid older three-file backup: interruption could leave retry.js
+// at v0.6.0 bytes with no stock preimage available for recovery.
+{
+	const root = stockFixture();
+	const legacyPatch = join(
+		packageRoot,
+		"patches/archive/pi-0.84.1-compaction-v0.6.0.patch",
+	);
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, {});
+	const legacyApply = spawnSync(
+		PATCH_EXECUTABLE,
+		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
+		{ encoding: "utf8", input: readFileSync(legacyPatch) },
+	);
+	assert.equal(legacyApply.status, 0, legacyApply.stderr || legacyApply.stdout);
+	const before = trackedHashes(root);
+	const refused = spawnSync(
+		process.execPath,
+		[applicator, "restore", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.notEqual(refused.status, 0, "v0.6.0 restore must refuse a three-file backup");
+	assert.match(refused.stderr, /cannot recover an interrupted restore/);
+	assert.deepEqual(trackedHashes(root), before, "refused era restore must not mutate tracked files");
+	assert.ok(!existsSync(join(backupDir, "journal.json")), "refused era restore must not journal");
+}
+
+// The matching positive case: a genuine v0.6.0 install with its released
+// four-file backup can restore directly to exact stock without first migrating.
+{
+	const root = stockFixture();
+	const legacyPatch = join(
+		packageRoot,
+		"patches/archive/pi-0.84.1-compaction-v0.6.0.patch",
+	);
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, {
+		eraFiles: [...CORE_ERA_FILES, RETRY_PATH],
+	});
+	const legacyApply = spawnSync(
+		PATCH_EXECUTABLE,
+		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
+		{ encoding: "utf8", input: readFileSync(legacyPatch) },
+	);
+	assert.equal(legacyApply.status, 0, legacyApply.stderr || legacyApply.stdout);
+	const restored = spawnSync(
+		process.execPath,
+		[applicator, "restore", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(restored.status, 0, restored.stderr || restored.stdout);
+	assert.equal(JSON.parse(restored.stdout).state, "stock");
+	assert.deepEqual(trackedHashes(root), trackedHashes(stockRoot));
+	assert.ok(
+		!existsSync(join(backupDir, "journal.json")),
+		"successful direct v0.6.0 restore must clear its journal",
+	);
+}
 
 // A manifest listing only a subset of a released layout could make recovery
 // restore fewer files than an interrupted patch step touched. Every action
@@ -595,16 +682,19 @@ const trackedHashes = (root) =>
 	assert.ok(existsSync(join(backupDir, "journal.json")), "the journal must be retained for diagnosis");
 }
 
-// The positive branch of the same preflight: a genuine three-file-era
-// interrupted mutation (mixed legacy state, era backup, retained journal)
-// must still recover to exact stock and clear its journal.
-{
+// The positive branch of the same preflight: genuine three- and four-file-era
+// interrupted mutations (mixed legacy state, era backup, retained journal)
+// must still recover to exact stock and clear their journals.
+for (const { version, eraFiles } of [
+	{ version: "0.5.0", eraFiles: CORE_ERA_FILES },
+	{ version: "0.6.0", eraFiles: [...CORE_ERA_FILES, RETRY_PATH] },
+]) {
 	const root = stockFixture();
 	const legacyPatch = join(
 		packageRoot,
-		"patches/archive/pi-0.84.1-compaction-v0.5.0.patch",
+		`patches/archive/pi-0.84.1-compaction-v${version}.patch`,
 	);
-	const backupDir = buildLegacyEraBackup(root, legacyPatch, {});
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, { eraFiles });
 	const legacyApply = spawnSync(
 		PATCH_EXECUTABLE,
 		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
@@ -628,7 +718,7 @@ const trackedHashes = (root) =>
 	);
 	assert.equal(restored.status, 0, restored.stderr || restored.stdout);
 	const report = JSON.parse(restored.stdout);
-	assert.equal(report.recovered, true, "the interrupted era mutation must be recovered");
+	assert.equal(report.recovered, true, `v${version} interruption must be recovered`);
 	assert.equal(report.state, "already-stock");
 	assert.deepEqual(trackedHashes(root), trackedHashes(stockRoot), "recovery must restore exact stock bytes");
 	assert.ok(!existsSync(join(backupDir, "journal.json")), "completed recovery must clear the journal");
@@ -648,10 +738,11 @@ const trackedHashes = (root) =>
 	const backupDir = join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction");
 	const manifestPath = join(backupDir, "manifest.json");
 	const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-	const retryPath = "node_modules/@earendil-works/pi-ai/dist/utils/retry.js";
-	delete manifest.files[retryPath];
+	for (const relativePath of RESPONSES_PATHS) {
+		delete manifest.files[relativePath];
+		rmSync(join(backupDir, relativePath));
+	}
 	writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-	rmSync(join(backupDir, retryPath));
 	const refused = spawnSync(
 		process.execPath,
 		[applicator, "restore", "--pi-root", root],

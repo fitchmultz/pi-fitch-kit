@@ -2894,6 +2894,8 @@ async function realSession(options: {
 		"dist/core/compaction/compaction.js",
 		"dist/modes/interactive/interactive-mode.js",
 		"node_modules/@earendil-works/pi-ai/dist/utils/retry.js",
+		"node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js",
+		"node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js",
 	];
 	const applyLegacyPatch = () =>
 		execFileSync(
