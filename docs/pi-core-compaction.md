@@ -1,4 +1,4 @@
-# Reapply the Pi 0.84.1 tool-loop compaction and transient-retry fixes
+# Reapply the Pi 0.84.1 compaction, transient-retry, and Responses diagnostics fixes
 
 ## Instructions for the Pi agent handling an update
 
@@ -46,6 +46,9 @@ First resolve the active Pi installation from `command -v pi`; do not assume the
 - `dist/core/agent-session.js`
 - `dist/core/compaction/compaction.js`
 - `dist/modes/interactive/interactive-mode.js`
+- `node_modules/@earendil-works/pi-ai/dist/utils/retry.js`
+- `node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js`
+- `node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js`
 
 The implementation described below targets the released Pi 0.84.1 code and emitted types. On later versions, read the current request loop and compaction code first, then preserve the behavior rather than blindly copying line numbers.
 
@@ -60,7 +63,7 @@ The default command ignores npm-injected local `node_modules/.bin` entries when 
 
 The applicator supports only the reviewed Pi 0.84.0 and 0.84.1 package identities and exact stock hashes. It uses `/usr/bin/patch`, never an executable injected through `PATH`; serializes every action with `/usr/bin/shlock` and reclaims dead-owner locks after its brief freshness guard; refuses symlinked mutable, backup, or lock paths; preflights patch anchors; builds and hash-verifies the stock backup in a staging directory before atomically renaming it; validates any existing backup on every action against the file set its own manifest records, with preimage hashes always taken from the compiled-in registry; canonicalizes manifest roots; writes a recovery journal before mutation; reports `recovery-needed` without changing files on read-only `status`; restores exact stock bytes on the next separately authorized `apply` or `restore` after an interrupted mutation; suppresses reject sidecars; verifies patched hashes and JavaScript syntax; and rolls back and verifies the complete pre-operation state after an in-process failure. Patch checksums are required only for artifacts the requested action will execute. The command fails closed on all other divergence and no-ops when already applied. Restore the reviewed stock preimage with `npm run restore:pi-core-compaction` and the same optional `--pi-root` argument.
 
-An install patched by kit 0.4.1 through 0.5.0 is recognized as a sha-pinned `legacy-patched` state. `apply` migrates it in one guarded run: it reverses the matching checksum-pinned archive under `patches/archive/`, verifies the exact stock intermediate, ensures the stock backup exists, then applies the current patch; any failure rolls back to the same verified legacy pre-state. Backups written by those released kits predate later-tracked core files; before mutating, `apply` extends such a backup with the missing stock preimages taken from the install (legacy patches never touched them, and anything else fails closed) and atomically rewrites the manifest last, which also refreshes stale recorded patch metadata. `restore` reverses the matching archived patch directly to stock. Any other divergence still fails closed.
+An install patched by kit 0.4.1 through 0.6.0 is recognized as a sha-pinned `legacy-patched` state. `apply` migrates it in one guarded run: it reverses the matching checksum-pinned archive under `patches/archive/`, verifies the exact stock intermediate, ensures the stock backup exists, then applies the current patch; any failure rolls back to the same verified legacy pre-state. Backups written by those released kits predate later-tracked core files; before mutating, `apply` extends such a backup with the missing stock preimages taken from the install (legacy patches never touched them, and anything else fails closed) and atomically rewrites the manifest last, which also refreshes stale recorded patch metadata. `restore` reverses the matching archived patch directly to stock. Any other divergence still fails closed.
 
 Every Pi update replaces the installed package with stock core. After any update, rerun the exact-version status/regression checks and this guarded reapply command; never assume the prior patch survived. A later Pi version requires a new reviewed patch and hash set rather than bypassing the guard.
 
@@ -162,6 +165,17 @@ Pi's session-level auto-retry (`_prepareRetry`, bounded by `settings.retry`, exp
 
 The patch adds `"request buffer limit"` to the retryable pattern list. Retrying is safe for this error class because Pi rebuilds the provider request from session state on every attempt (nothing accumulates client-side), the failed attempt produced no output to lose, and the edge failure depends on its upstream hiccuping on that specific attempt. Bounded budget and exhaustion behavior are Pi's native machinery; the patch must not add a custom retry loop, change the budget, or auto-continue past exhausted retries. If a future Pi version classifies this error natively, drop the hunk rather than layering a duplicate pattern.
 
+## Required OpenAI Responses resilience
+
+This kit adopts the TARS-original `pi-openai-resilience.patch` in v0.7.0 so local Pi and TARS share one reviewed patch stream instead of stacking independent retry.js patches. The adoption has two components:
+
+1. **Exact generic transient classification.** OpenAI Responses can surface the bare assistant error `Sorry, something went wrong` (with an optional final period). The patch adds the deliberately narrow `^Sorry, something went wrong\\.?$` pattern to the shared retry allowlist. Extra text does not match. Retry policy remains Pi's native bounded, abortable backoff; the patch adds no loop or budget. The regression keeps archived v0.6.0 permanently red for this exact shape and current green, while preserving unknown-error fail-fast behavior.
+2. **Additive Responses diagnostics.** `openai-responses.js` records HTTP status and `x-request-id`, including SDK error fields when setup or streaming throws. `openai-responses-shared.js` records terminal response status, response ID, and provider error code for `error` / `response.failed` events. These fields live in `providerMetadata` and do not change stop-reason mapping or response content. `openai-codex-responses.js` uses the shared processor for both SSE and WebSocket paths, so terminal status/code/ID diagnostics apply to Mitch's Codex Responses models; the adapter-specific HTTP status and request ID capture is only in vanilla `openai-responses.js`, so Codex HTTP-level diagnostics remain partial.
+
+The real-binary regression keeps causality honest: a `response.failed` event carrying `server_error` was already retryable through Pi's older `server.?error` pattern. That scenario proves the real Responses parser, propagated metadata, bounded recovery, and honest exhaustion, but it is not evidence that the new exact generic pattern enabled that particular retry. Stream-level v0.6.0/current assertions provide the red/green proof for diagnostics.
+
+**Upstream Pi asks:** add the exact generic transient pattern to pi-ai's shared retry classifier and retain the additive Responses diagnostic fields in both adapters. The existing shared-parser expression ``new Error(`Error Code ${event.code}: ${event.message}` || "Unknown error")`` has a dead fallback because a template string is always truthy; carry that as an upstream cleanup only rather than expanding this byte-for-byte TARS adoption.
+
 ## Accepted provider-recovery tradeoffs
 
 The following verified deltas are intentional. Each is bounded by stock Pi recovery, and closing it locally would require re-forking machinery this kit deliberately retired: a custom token estimator, a `_prepareProviderRequest` agent-core hook, post-compaction fit fingerprints, or double-running extension context transforms. Do not "fix" these without new evidence that stock recovery fails.
@@ -206,7 +220,7 @@ Run all of the following against the active Pi 0.84.1 installation:
 1. `pi --version` and confirm the installation path resolved from `command -v pi`.
 2. Run `pi --list-models 'openai/gpt-5.6'` and `pi --list-models 'openai-codex/gpt-5.6'`, then use the allowlisted local structural parser from step 2 to confirm Sol, Terra, and Luna match every active context-window override in `models.json`.
 3. Using the allowlisted local structural parser from step 2, confirm global settings still have compaction enabled with the intended reserve and keep-recent values. Use the same local allowlist for only the structural routing keys in the optional `<Pi agent dir>/pi-codex-context.json`: absent or non-literal consent must keep custom routing off; if `customCompactionEnabled` is `true`, confirm the user approved the exact listed destinations. An omitted model list means xAI Grok 4.5 high before Codex Luna high; a valid override replaces that order.
-4. Run `node --check` on all four modified Pi JavaScript files, including `node_modules/@earendil-works/pi-ai/dist/utils/retry.js`.
+4. Run `node --check` on all six modified Pi JavaScript files, including `node_modules/@earendil-works/pi-ai/dist/utils/retry.js`, `openai-responses.js`, and `openai-responses-shared.js`.
 5. If `pi-codex-goal` is installed, require version 0.1.38 or newer and confirm its runtime has no proactive `ctx.compact()` trigger.
 6. Resolve `pi-fitch-kit`'s installed root with `pi list`, then run:
 
