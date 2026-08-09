@@ -1334,6 +1334,74 @@ writeCompactionConfig({ customCompactionEnabled: true });
 writeCompactionConfig({ customCompactionEnabled: true });
 
 {
+	// Alternate-model auth must stop blocking as soon as compaction is cancelled.
+	const controller = new AbortController();
+	const model = customCompactionModel("xai", "grok-4.5");
+	let authStartedResolve: (() => void) | undefined;
+	let resolveAuth: ((value: { ok: false; error: string }) => void) | undefined;
+	const authStarted = new Promise<void>((resolve) => {
+		authStartedResolve = resolve;
+	});
+	const pendingAuth = customCompactionHandler(
+		{
+			type: "session_before_compact",
+			preparation: {
+				firstKeptEntryId: "kept",
+				messagesToSummarize: [
+					{ role: "user", content: "summarize me", timestamp: 1 },
+				],
+				turnPrefixMessages: [],
+				isSplitTurn: false,
+				tokensBefore: 10_000,
+				fileOps: {
+					read: new Set<string>(),
+					written: new Set<string>(),
+					edited: new Set<string>(),
+				},
+				settings: compactionSettings,
+			},
+			reason: "threshold",
+			willRetry: false,
+			signal: controller.signal,
+		},
+		{
+			hasUI: false,
+			modelRegistry: {
+				find: () => model,
+				getProvider: () => ({
+					streamSimple: () => {
+						throw new Error("cancelled auth must not reach the provider");
+					},
+				}),
+				getApiKeyAndHeaders: () => {
+					authStartedResolve?.();
+					return new Promise<{ ok: false; error: string }>((resolve) => {
+						resolveAuth = resolve;
+					});
+				},
+			},
+		},
+	);
+	await authStarted;
+	controller.abort();
+	const timeout = Symbol("timeout");
+	let timer: ReturnType<typeof setTimeout>;
+	const outcome = await Promise.race([
+		pendingAuth,
+		new Promise<symbol>((resolve) => {
+			timer = setTimeout(() => resolve(timeout), 1_000);
+		}),
+	]);
+	clearTimeout(timer!);
+	if (outcome === timeout) {
+		resolveAuth?.({ ok: false, error: "released after timeout" });
+		await pendingAuth;
+	}
+	assert.notEqual(outcome, timeout, "custom compaction must settle when auth is cancelled");
+	assert.deepEqual(outcome, { cancel: true });
+}
+
+{
 	const { result, calls, notifications } = await runCustomCompaction({
 		"xai/grok-4.5": new Error("xAI unavailable"),
 		"openai-codex/gpt-5.6-luna": "luna summary",

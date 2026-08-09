@@ -64,13 +64,16 @@ try {
 	assert.equal(loader.getPrompts().prompts.length, 0, "the stale filter fixture must hide prompts");
 
 	const canonicalSource = "https://github.com/fitchmultz/pi-fitch-kit";
-	filtered.packages = [canonicalSource, `${canonicalSource}#v0.4.3`];
+	filtered.packages = [
+		{ source: canonicalSource, prompts: [] },
+		`${canonicalSource}#v0.4.3`,
+	];
 	writeFileSync(settingsPath, `${JSON.stringify(filtered, null, 2)}\n`);
 	pi("remove", canonicalSource);
 	assert.deepEqual(
 		JSON.parse(readFileSync(settingsPath, "utf8")).packages,
 		[],
-		"one identity-aware remove must clear canonical and pinned duplicates",
+		"one identity-aware remove must clear filtered canonical and pinned duplicates",
 	);
 	pi("install", root);
 	await settingsManager.reload();

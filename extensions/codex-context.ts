@@ -42,6 +42,22 @@ const DEFAULT_COMPACTION_MODELS: CompactionModel[] = [
 		thinkingLevel: "high",
 	},
 ];
+function raceWithAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+	if (signal.aborted) {
+		void operation.catch(() => undefined);
+		return Promise.reject(signal.reason);
+	}
+	let onAbort: () => void = () => undefined;
+	const aborted = new Promise<never>((_, reject) => {
+		onAbort = () => reject(signal.reason);
+		signal.addEventListener("abort", onAbort, { once: true });
+		if (signal.aborted) onAbort();
+	});
+	return Promise.race([operation, aborted]).finally(() =>
+		signal.removeEventListener("abort", onAbort),
+	);
+}
+
 const THINKING_LEVELS = new Set([
 	"off",
 	"minimal",
@@ -261,7 +277,10 @@ export default function (pi: ExtensionAPI): void {
 					: providerStream;
 
 			try {
-				const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+				const auth = await raceWithAbort(
+					ctx.modelRegistry.getApiKeyAndHeaders(model),
+					event.signal,
+				);
 				if (!auth.ok) {
 					failures.push(
 						`${candidate.provider}/${candidate.model}: ${auth.error}`,
@@ -292,6 +311,7 @@ export default function (pi: ExtensionAPI): void {
 				}
 				return { compaction: result };
 			} catch (error) {
+				if (event.signal.aborted) return { cancel: true };
 				failures.push(
 					`${candidate.provider}/${candidate.model}: ${error instanceof Error ? error.message : String(error)}`,
 				);
