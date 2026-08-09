@@ -92,29 +92,29 @@ function serve(handle) {
 
 function startCompletionsServer(mode) {
 	return serve((hits, res) => {
-			const failing = mode === "always-fail" || (mode === "fail-once" && hits === 1);
-			if (failing) {
-				res.writeHead(400, { "content-type": "text/plain" });
-				res.end(EDGE_ERROR);
-				return;
-			}
-			res.writeHead(200, {
-				"content-type": "text/event-stream",
-				"cache-control": "no-cache",
-			});
-			const chunks = [
-				{
-					id: `ok-${hits}`,
-					model: "dogfood-model",
-					choices: [{ index: 0, delta: { content: "recovered" }, finish_reason: null }],
-				},
-				{
-					id: `ok-${hits}`,
-					model: "dogfood-model",
-					choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
-					usage: { prompt_tokens: 50, completion_tokens: 5, total_tokens: 55 },
-				},
-			];
+		const failing = mode === "always-fail" || (mode === "fail-once" && hits === 1);
+		if (failing) {
+			res.writeHead(400, { "content-type": "text/plain" });
+			res.end(EDGE_ERROR);
+			return;
+		}
+		res.writeHead(200, {
+			"content-type": "text/event-stream",
+			"cache-control": "no-cache",
+		});
+		const chunks = [
+			{
+				id: `ok-${hits}`,
+				model: "dogfood-model",
+				choices: [{ index: 0, delta: { content: "recovered" }, finish_reason: null }],
+			},
+			{
+				id: `ok-${hits}`,
+				model: "dogfood-model",
+				choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+				usage: { prompt_tokens: 50, completion_tokens: 5, total_tokens: 55 },
+			},
+		];
 		for (const chunk of chunks) {
 			res.write(`data: ${JSON.stringify(chunk)}\n\n`);
 		}
@@ -124,40 +124,40 @@ function startCompletionsServer(mode) {
 
 function startResponsesServer(mode) {
 	return serve((hits, res) => {
-			if (mode === "http-error") {
-				res.writeHead(500, {
-					"content-type": "application/json",
-					"x-request-id": `req-${hits}`,
-				});
-				res.end(
-					JSON.stringify({
-						error: { message: GENERIC_OPENAI_ERROR, type: "server_error", code: "server_error" },
-					}),
-				);
-				return;
-			}
-			res.writeHead(200, {
-				"content-type": "text/event-stream",
-				"cache-control": "no-cache",
+		if (mode === "http-error") {
+			res.writeHead(500, {
+				"content-type": "application/json",
 				"x-request-id": `req-${hits}`,
 			});
-			const send = (type, payload) => {
-				res.write(`event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`);
-			};
-			const failing = mode === "always-fail" || (mode === "fail-once" && hits === 1);
-			if (failing) {
-				send("response.failed", {
-					type: "response.failed",
-					sequence_number: 1,
-					response: {
-						id: `resp-failed-${hits}`,
-						status: "failed",
-						error: { code: "server_error", message: GENERIC_OPENAI_ERROR },
-					},
-				});
-				res.end();
-				return;
-			}
+			res.end(
+				JSON.stringify({
+					error: { message: GENERIC_OPENAI_ERROR, type: "server_error", code: "server_error" },
+				}),
+			);
+			return;
+		}
+		res.writeHead(200, {
+			"content-type": "text/event-stream",
+			"cache-control": "no-cache",
+			"x-request-id": `req-${hits}`,
+		});
+		const send = (type, payload) => {
+			res.write(`event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`);
+		};
+		const failing = mode === "always-fail" || (mode === "fail-once" && hits === 1);
+		if (failing) {
+			send("response.failed", {
+				type: "response.failed",
+				sequence_number: 1,
+				response: {
+					id: `resp-failed-${hits}`,
+					status: "failed",
+					error: { code: "server_error", message: GENERIC_OPENAI_ERROR },
+				},
+			});
+			res.end();
+			return;
+		}
 		const item = {
 			id: `msg-${hits}`,
 			type: "message",

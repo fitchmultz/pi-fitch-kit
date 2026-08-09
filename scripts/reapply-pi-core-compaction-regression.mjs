@@ -577,6 +577,34 @@ const trackedHashes = (root) =>
 	assert.ok(!existsSync(join(backupDir, "journal.json")), "refused era restore must not journal");
 }
 
+// The matching positive case: a genuine v0.6.0 install with its released
+// four-file backup can restore directly to exact stock without first migrating.
+{
+	const root = stockFixture();
+	const legacyPatch = join(
+		packageRoot,
+		"patches/archive/pi-0.84.1-compaction-v0.6.0.patch",
+	);
+	const backupDir = buildLegacyEraBackup(root, legacyPatch, {
+		eraFiles: [...CORE_ERA_FILES, RETRY_PATH],
+	});
+	const legacyApply = spawnSync(
+		PATCH_EXECUTABLE,
+		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
+		{ encoding: "utf8", input: readFileSync(legacyPatch) },
+	);
+	assert.equal(legacyApply.status, 0, legacyApply.stderr || legacyApply.stdout);
+	const restored = spawnSync(
+		process.execPath,
+		[applicator, "restore", "--pi-root", root],
+		{ encoding: "utf8" },
+	);
+	assert.equal(restored.status, 0, restored.stderr || restored.stdout);
+	assert.equal(JSON.parse(restored.stdout).state, "stock");
+	assert.deepEqual(trackedHashes(root), trackedHashes(stockRoot));
+	assert.ok(!existsSync(join(backupDir, "journal.json")));
+}
+
 // A manifest listing only a subset of a released layout could make recovery
 // restore fewer files than an interrupted patch step touched. Every action
 // must reject it before considering any mutation.
