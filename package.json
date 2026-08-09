@@ -1,6 +1,6 @@
 {
   "name": "@fitch/pi-kit",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "regression:codex-context": "node --experimental-strip-types scripts/codex-context-regression.ts",
     "regression:pi-core-applicator": "node scripts/reapply-pi-core-compaction-regression.mjs",
+    "regression:pi-core-retry": "node scripts/pi-core-retry-regression.mjs",
     "regression:session-name": "node --experimental-strip-types scripts/session-name-regression.ts",
     "reapply:pi-core-compaction": "node scripts/reapply-pi-core-compaction.mjs apply",
     "restore:pi-core-compaction": "node scripts/reapply-pi-core-compaction.mjs restore",

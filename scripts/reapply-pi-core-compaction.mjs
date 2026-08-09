@@ -11,22 +11,40 @@ const PATCH_EXECUTABLE = "/usr/bin/patch";
 const SHLOCK_EXECUTABLE = "/usr/bin/shlock";
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const patchPath = join(projectRoot, "patches/pi-0.84.1-compaction.patch");
-const patchSha256 = "b76c2f68a26e4cda22ecd7e0454d36ec4aa729a929886e3a238262c197334753";
+const patchSha256 = "bc854f25940e0e95bd67ab160c22deee36d4cebe967fd7b9149fa86be961554b";
+// `stockFiles` names the tracked files a legacy patch never touched: legacy
+// detection expects them at the stock hash, everything else (except the
+// discriminating agent-session hash) at the current patched hash. The legacy
+// migration regression exercises every archived artifact, so hash drift in a
+// future patch version fails loudly there instead of silently here.
 const legacyPatches = [
+  {
+    version: "0.5.0",
+    path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.5.0.patch"),
+    sha256: "b76c2f68a26e4cda22ecd7e0454d36ec4aa729a929886e3a238262c197334753",
+    agentSession: "00564702a1d243fa488a30b2cff30a0b7dbde838c6085ac01e96fd90a8c8f984",
+    stockFiles: ["node_modules/@earendil-works/pi-ai/dist/utils/retry.js"],
+  },
   {
     version: "0.4.3",
     path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.4.3.patch"),
     sha256: "9350641094f70ac3a98fd3b02a236861fbbbc13503855637a1dc2ff53971dd08",
     agentSession: "e55bf39d43ab95468a8949dd72c541adc1e54421c8666f9d06e06e4b9efa7227",
+    stockFiles: ["node_modules/@earendil-works/pi-ai/dist/utils/retry.js"],
   },
   {
     version: "0.4.2",
     path: join(projectRoot, "patches/archive/pi-0.84.1-compaction-v0.4.2.patch"),
     sha256: "5f68de3bb9689ad983168a683bd2cc43426e19325071b75d6fd36425ac191b24",
     agentSession: "cd1f9b9a0b6ad10239394568be5961c5a7d8fc117830e1a09650eb5ade176c6a",
+    stockFiles: ["node_modules/@earendil-works/pi-ai/dist/utils/retry.js"],
   },
 ];
 const commonFiles = {
+  "node_modules/@earendil-works/pi-ai/dist/utils/retry.js": {
+    stock: "916476be8a85ad16f9de3d0cfc3eb341b3290445fde3717593b139fd7ee31b7b",
+    patched: "bc684353c341a90d8d67aa70b3d1db03e6005cfeaf2fd97a2d4333086d8075ae",
+  },
   "dist/core/agent-session.js": {
     stock: "91e72d5497f665e731cbd79da6a6e826d8cae7d2ce156a7dee39f8ca205e32c8",
     patched: "00564702a1d243fa488a30b2cff30a0b7dbde838c6085ac01e96fd90a8c8f984",
@@ -77,7 +95,10 @@ function assertSafePath(root, target, allowMissing = false) {
     try {
       stat = lstatSync(current);
     } catch (error) {
-      if (allowMissing && error?.code === "ENOENT") return;
+      if (error?.code === "ENOENT") {
+        if (allowMissing) return;
+        fail(`Tracked Pi core path missing: ${current}`);
+      }
       throw error;
     }
     if (stat.isSymbolicLink()) fail(`Refusing symlinked Pi path: ${current}`);
@@ -184,10 +205,12 @@ function state(root) {
     return { name: "patched" };
   }
   const legacyPatch = legacyPatches.find(
-    ({ agentSession }) =>
+    ({ agentSession, stockFiles }) =>
       hashes["dist/core/agent-session.js"] === agentSession &&
       Object.entries(files).every(
-        ([path, expected]) => path === "dist/core/agent-session.js" || hashes[path] === expected.patched,
+        ([path, expected]) =>
+          path === "dist/core/agent-session.js" ||
+          hashes[path] === (stockFiles.includes(path) ? expected.stock : expected.patched),
       ),
   );
   if (legacyPatch) return { name: "legacy-patched", legacyPatch };

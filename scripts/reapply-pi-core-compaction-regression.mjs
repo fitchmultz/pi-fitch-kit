@@ -41,6 +41,7 @@ function stockFixture() {
 		"dist/core/agent-session.js",
 		"dist/core/compaction/compaction.js",
 		"dist/modes/interactive/interactive-mode.js",
+		"node_modules/@earendil-works/pi-ai/dist/utils/retry.js",
 	]) {
 		const destination = join(root, relativePath);
 		mkdirSync(dirname(destination), { recursive: true });
@@ -394,7 +395,7 @@ function stockFixture() {
 	assert.equal(existsSync(stale), false, "a stale backup staging directory must be reaped");
 }
 
-for (const version of ["0.4.2", "0.4.3"]) {
+for (const version of ["0.4.2", "0.4.3", "0.5.0"]) {
 	const root = stockFixture();
 	for (const action of ["apply", "restore"]) {
 		const result = spawnSync(
