@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0 — 9 August 2026
+
+- The core patch now classifies the Cloudflare-edge "exceeded request buffer limit while retrying upstream" response as transient, so Pi's native bounded auto-retry (settings budget, exponential backoff, abortable, honest exhaustion) recovers the turn instead of stalling the session until a manual bump message. Root-caused from live captures: the failed attempt streams no output and Pi rebuilds the request from session state per attempt, so retrying cannot accumulate or loop; an identical follow-up request succeeded immediately.
+- Archived the v0.5.0 patch identity for checksum-pinned legacy migration, taught the applicator that legacy patches leave the retry classifier at stock bytes, and added a red/green regression that drives the real patched `pi --mode rpc` binary against a local model server: the archived patch must still stall (one request, no retry), the current patch must recover through one bounded retry and stop honestly after the budget when the error persists.
+
 ## 0.5.0 — 9 August 2026
 
 - Hardened request-boundary compaction against unsummarizable high-usage sessions, retry-classifier collisions, cancelled-compaction restarts, removed error-assistant resurrection, pre-aborted and pending-auth cancellation races, and stale manual preflight snapshots. Alternate-model compaction now receives Pi's native retry policy and lifecycle callbacks, and cancellation no longer waits for candidate authentication.
