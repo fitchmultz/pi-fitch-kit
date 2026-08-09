@@ -227,29 +227,86 @@ function backupPaths(root) {
   };
 }
 
-function verifyBackup(root) {
+function readBackupManifest(root) {
   const { backupRoot, manifestPath } = backupPaths(root);
   assertSafePath(root, backupRoot, true);
-  if (!existsSync(backupRoot)) return false;
+  if (!existsSync(backupRoot)) return undefined;
   if (!existsSync(manifestPath)) fail(`Backup manifest missing: ${manifestPath}`);
   assertSafePath(root, manifestPath);
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   if (canonicalPath(manifest.packageRoot) !== root || manifest.version !== piVersion) {
     fail(`Backup belongs to an unexpected installation: ${manifestPath}`);
   }
-  for (const [relativePath, expected] of Object.entries(files)) {
+  const listed = Object.keys(manifest.files ?? {});
+  if (listed.length === 0) fail(`Backup manifest lists no stock preimages: ${manifestPath}`);
+  for (const relativePath of listed) {
+    if (!files[relativePath]) fail(`Backup manifest lists an untracked path: ${relativePath}`);
+  }
+  return manifest;
+}
+
+function verifyBackup(root) {
+  // Older kit releases tracked fewer core files, so a backup is verified
+  // against the paths its own manifest records. Preimage hashes always come
+  // from the compiled-in registry, never from manifest data, and end states
+  // are independently re-verified against that registry after every mutation.
+  const manifest = readBackupManifest(root);
+  if (!manifest) return false;
+  const { backupRoot } = backupPaths(root);
+  for (const relativePath of Object.keys(manifest.files)) {
     const backupPath = join(backupRoot, relativePath);
     assertSafePath(root, backupPath);
-    if (sha256(backupPath) !== expected.stock) {
+    if (sha256(backupPath) !== files[relativePath].stock) {
       fail(`Backup preimage mismatch: ${backupPath}`);
     }
   }
   return true;
 }
 
+function upgradeBackupIfIncomplete(root) {
+  // A backup written by an older kit release predates newly tracked core
+  // files. Every missing entry must still sit at stock bytes in the install
+  // (legacy patches never touched those files), so stage each one in, then
+  // atomically replace the manifest last: an interruption at any point leaves
+  // the previous manifest authoritative and the extra staged files inert.
+  // The manifest rewrite also refreshes a stale recorded patchSha256.
+  const { backupRoot, manifestPath } = backupPaths(root);
+  const manifest = readBackupManifest(root);
+  const missing = Object.keys(files).filter((relativePath) => !manifest.files[relativePath]);
+  if (missing.length === 0) return false;
+  for (const relativePath of missing) {
+    const source = join(root, relativePath);
+    if (sha256(source) !== files[relativePath].stock) {
+      fail(`Stock preimage unavailable for backup upgrade: ${source}`);
+    }
+    const destination = join(backupRoot, relativePath);
+    assertSafePath(root, destination, true);
+    mkdirSync(dirname(destination), { recursive: true });
+    const temporary = `${destination}.tmp-${process.pid}-${randomUUID()}`;
+    copyFileSync(source, temporary);
+    if (sha256(temporary) !== files[relativePath].stock) {
+      rmSync(temporary, { force: true });
+      fail(`Staged backup preimage mismatch: ${temporary}`);
+    }
+    renameSync(temporary, destination);
+  }
+  const temporary = `${manifestPath}.tmp-${process.pid}-${randomUUID()}`;
+  writeFileSync(
+    temporary,
+    `${JSON.stringify({ packageRoot: root, package: PI_PACKAGE, version: piVersion, patchSha256, files }, null, 2)}\n`,
+    "utf8",
+  );
+  renameSync(temporary, manifestPath);
+  verifyBackup(root);
+  return true;
+}
+
 function backupStock(root) {
   const { backupRoot } = backupPaths(root);
-  if (verifyBackup(root)) return;
+  if (verifyBackup(root)) {
+    upgradeBackupIfIncomplete(root);
+    return;
+  }
   const backupParent = dirname(backupRoot);
   assertSafePath(root, backupParent, true);
   mkdirSync(backupParent, { recursive: true });
@@ -325,7 +382,10 @@ function recoverInterruptedMutation(root) {
   } catch {
     // Mixed state: restore the verified stock preimage below.
   }
-  for (const [relativePath] of Object.entries(files)) {
+  // Restore exactly the preimages this backup recorded; an interrupted
+  // legacy-era mutation can only have touched the files its own manifest
+  // lists, and the final state check below stays authoritative.
+  for (const relativePath of Object.keys(readBackupManifest(root).files)) {
     const source = join(backupRoot, relativePath);
     const destination = join(root, relativePath);
     const temporary = `${destination}.pi-fitch-kit-recovery-${randomUUID()}`;
@@ -476,6 +536,7 @@ function main() {
     const steps = planSteps(action, before);
     runPatch(root, steps[0].reverse, true, steps[0].source);
     if (before.name === "stock") backupStock(root);
+    else if (action === "apply") upgradeBackupIfIncomplete(root);
     writeJournal(root, action, before.name);
     const after = mutateAndVerify(root, action, before, steps);
     report({

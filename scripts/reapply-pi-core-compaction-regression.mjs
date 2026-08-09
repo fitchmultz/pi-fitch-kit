@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	chmodSync,
 	copyFileSync,
@@ -395,20 +396,58 @@ function stockFixture() {
 	assert.equal(existsSync(stale), false, "a stale backup staging directory must be reaped");
 }
 
-for (const version of ["0.4.2", "0.4.3", "0.5.0"]) {
-	const root = stockFixture();
-	for (const action of ["apply", "restore"]) {
-		const result = spawnSync(
-			process.execPath,
-			[applicator, action, "--pi-root", root],
-			{ encoding: "utf8" },
-		);
-		assert.equal(result.status, 0, result.stderr || result.stdout);
+// Released kit applicators tracked only these three core files; their backups
+// and manifests never contained the later-tracked pi-ai retry classifier.
+// Each migration leg rebuilds that exact on-disk layout so the current
+// applicator is proven against real released-era backups, not backups it
+// created itself. The stale patchSha256 variant mirrors a live install whose
+// pre-0.5.0 backup metadata was carried forward (issue #16).
+const LEGACY_ERA_FILES = [
+	"dist/core/agent-session.js",
+	"dist/core/compaction/compaction.js",
+	"dist/modes/interactive/interactive-mode.js",
+];
+const sha256 = (path) =>
+	createHash("sha256").update(readFileSync(path)).digest("hex");
+
+function buildLegacyEraBackup(root, legacyPatchPath, { stalePatchSha } = {}) {
+	const backupRoot = join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction");
+	const manifestFiles = {};
+	for (const relativePath of LEGACY_ERA_FILES) {
+		const destination = join(backupRoot, relativePath);
+		mkdirSync(dirname(destination), { recursive: true });
+		copyFileSync(join(root, relativePath), destination);
+		manifestFiles[relativePath] = { stock: sha256(destination), patched: "recorded-by-released-kit" };
 	}
+	writeFileSync(
+		join(backupRoot, "manifest.json"),
+		`${JSON.stringify(
+			{
+				packageRoot: root,
+				package: "@earendil-works/pi-coding-agent",
+				version: "0.84.1",
+				patchSha256: stalePatchSha ?? sha256(legacyPatchPath),
+				files: manifestFiles,
+			},
+			null,
+			2,
+		)}\n`,
+	);
+	return backupRoot;
+}
+
+for (const { version, stalePatchSha } of [
+	{ version: "0.4.2" },
+	{ version: "0.4.3" },
+	{ version: "0.5.0" },
+	{ version: "0.5.0", stalePatchSha: `f4d8f383${"0".repeat(56)}` },
+]) {
+	const root = stockFixture();
 	const legacyPatch = join(
 		packageRoot,
 		`patches/archive/pi-0.84.1-compaction-v${version}.patch`,
 	);
+	buildLegacyEraBackup(root, legacyPatch, { stalePatchSha });
 	const legacyApply = spawnSync(
 		PATCH_EXECUTABLE,
 		["--batch", "--forward", "--no-backup-if-mismatch", "-p1", "-d", root],
@@ -433,6 +472,27 @@ for (const version of ["0.4.2", "0.4.3", "0.5.0"]) {
 		`the released v${version} patch must migrate:\n${migration.stderr}`,
 	);
 	assert.equal(JSON.parse(migration.stdout).migratedFrom, "legacy-patched");
+	const upgradedManifest = JSON.parse(
+		readFileSync(
+			join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction/manifest.json"),
+			"utf8",
+		),
+	);
+	const retryPath = "node_modules/@earendil-works/pi-ai/dist/utils/retry.js";
+	assert.ok(
+		upgradedManifest.files[retryPath],
+		"migration must extend the released-era backup to newly tracked files",
+	);
+	assert.equal(
+		sha256(join(root, ".pi-fitch-kit-backup/pi-0.84.1-compaction", retryPath)),
+		sha256(join(stockRoot, retryPath)),
+		"the upgraded backup must hold the stock retry classifier preimage",
+	);
+	assert.equal(
+		upgradedManifest.patchSha256,
+		sha256(join(packageRoot, "patches/pi-0.84.1-compaction.patch")),
+		"migration must refresh recorded backup patch metadata to the executed artifact",
+	);
 	const restore = spawnSync(
 		process.execPath,
 		[applicator, "restore", "--pi-root", root],

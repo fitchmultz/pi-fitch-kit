@@ -46,10 +46,14 @@ process.on("exit", () => {
 	}
 });
 
-function provisionPi(patchPath, label) {
+function scenarioRoot(label) {
 	const root = mkdtempSync(join(tmpdir(), `pi-kit-retry-${label}-`));
 	cleanups.push(() => rmSync(root, { recursive: true, force: true }));
-	const piRoot = join(root, "pi");
+	return root;
+}
+
+function provisionPi(patchPath, label) {
+	const piRoot = join(scenarioRoot(`${label}-pi`), "pi");
 	cpSync(stockRoot, piRoot, { recursive: true });
 	const result = spawnSync(
 		PATCH_EXECUTABLE,
@@ -57,7 +61,7 @@ function provisionPi(patchPath, label) {
 		{ encoding: "utf8", input: readFileSync(patchPath) },
 	);
 	assert.equal(result.status, 0, `${label}: patch failed\n${result.stdout}\n${result.stderr}`);
-	return { root, piRoot };
+	return piRoot;
 }
 
 function startModelServer(mode) {
@@ -153,7 +157,9 @@ function provisionAgentDir(root, port) {
 	return agentDir;
 }
 
-function runTurn({ piRoot, root, port, timeoutMs = 60_000 }) {
+const TURN_TIMEOUT_MS = 60_000;
+
+function runTurn({ piRoot, root, port }) {
 	const agentDir = provisionAgentDir(root, port);
 	const sessionDir = join(root, "sessions");
 	mkdirSync(sessionDir, { recursive: true });
@@ -185,8 +191,8 @@ function runTurn({ piRoot, root, port, timeoutMs = 60_000 }) {
 		let stderr = "";
 		let settled = false;
 		const timer = setTimeout(() => {
-			finish(new Error(`turn did not settle within ${timeoutMs}ms\nstderr: ${stderr}`));
-		}, timeoutMs);
+			finish(new Error(`turn did not settle within ${TURN_TIMEOUT_MS}ms\nstderr: ${stderr}`));
+		}, TURN_TIMEOUT_MS);
 		function finish(error) {
 			if (settled) return;
 			settled = true;
@@ -195,7 +201,7 @@ function runTurn({ piRoot, root, port, timeoutMs = 60_000 }) {
 			if (error) {
 				reject(error);
 			} else {
-				resolve({ events, stderr });
+				resolve({ events });
 			}
 		}
 		child.on("error", finish);
@@ -241,7 +247,8 @@ function summarize(events) {
 // Scenario 1 (permanent red): the legacy patch must stall on the transient
 // edge error without retrying, proving the scenario reproduces the defect.
 {
-	const { root, piRoot } = provisionPi(legacyPatch, "legacy");
+	const piRoot = provisionPi(legacyPatch, "legacy");
+	const root = scenarioRoot("legacy");
 	const server = await startModelServer("fail-once");
 	const { events } = await runTurn({ piRoot, root, port: server.port });
 	const { retryStarts, finalAssistant } = summarize(events);
@@ -253,10 +260,15 @@ function summarize(events) {
 	console.log("legacy patch: stall reproduced (1 request, no retry, turn error)");
 }
 
+// Scenarios 2 and 3 share one patched install; runs never mutate it (HOME,
+// agent dir, and session dir live under each scenario's own root).
+const currentPiRoot = provisionPi(currentPatch, "current");
+
 // Scenario 2 (green): the current patch must classify the edge error as
 // transient, retry once with the native bounded machinery, and recover.
 {
-	const { root, piRoot } = provisionPi(currentPatch, "current");
+	const piRoot = currentPiRoot;
+	const root = scenarioRoot("current");
 	const server = await startModelServer("fail-once");
 	const { events } = await runTurn({ piRoot, root, port: server.port });
 	const { retryStarts, retryEnds, finalAssistant } = summarize(events);
@@ -274,7 +286,8 @@ function summarize(events) {
 // Scenario 3 (honest exhaustion): when the edge error persists, the current
 // patch must stop after the configured budget and surface the provider error.
 {
-	const { root, piRoot } = provisionPi(currentPatch, "exhaust");
+	const piRoot = currentPiRoot;
+	const root = scenarioRoot("exhaust");
 	const server = await startModelServer("always-fail");
 	const { events } = await runTurn({ piRoot, root, port: server.port });
 	const { retryStarts, retryEnds, finalAssistant } = summarize(events);
