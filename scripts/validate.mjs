@@ -12,7 +12,7 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-assert(manifest.schemaVersion === 4, "setup manifest schema must match the bundled-consent shape");
+assert(manifest.schemaVersion === 5, "setup manifest schema must match the revocable-consent and core-patch shape");
 assert(manifest.runtime.pi === "0.84.1", "the kit must pin the reviewed Pi 0.84.1 runtime");
 const resolvedOrigins = Object.values(packageLock.packages)
   .map((entry) => entry.resolved)
@@ -31,6 +31,7 @@ assert(
 for (const path of [
   "patches/pi-0.84.1-compaction.patch",
   "patches/archive/pi-0.84.1-compaction-v0.4.2.patch",
+  "patches/archive/pi-0.84.1-compaction-v0.4.3.patch",
   "scripts/reapply-pi-core-compaction.mjs",
 ]) {
   assert(lstatSync(join(root, path)).isFile(), `Pi core restoration resource missing: ${path}`);
@@ -51,6 +52,10 @@ assert(
 assert(
   JSON.stringify(packageJson.pi.prompts) === JSON.stringify(manifest.kitResources.prompts.map((path) => `./${path}`)),
   "package.json pi.prompts must match manifest kitResources.prompts",
+);
+assert(
+  JSON.stringify(packageJson.pi.themes) === JSON.stringify(manifest.kitResources.themes.map((path) => `./${path}`)),
+  "package.json pi.themes must match manifest kitResources.themes",
 );
 for (const resource of [
   ...manifest.kitResources.extensions,
@@ -122,6 +127,18 @@ assert(
 );
 assert(codexContext?.consent?.configPath === "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/pi-codex-context.json", "consent config path must honor the Pi agent directory");
 assert(codexContext?.consent?.config?.customCompactionEnabled === true, "consent config must be explicit");
+assert(
+  codexContext?.consent?.disabledConfig?.customCompactionEnabled === false,
+  "cross-provider compaction consent must be explicitly revocable",
+);
+
+assert(manifest.kit.packageName === "@fitch/pi-kit", "setup must identify duplicate kit package entries");
+assert(manifest.piCorePatch?.requiredForCompleteCore === true, "complete core must include the reviewed Pi core patch");
+assert(manifest.piCorePatch?.consent?.required === true, "Pi core mutation must require separate consent");
+assert(manifest.piCorePatch?.consent?.default === "disabled", "Pi core mutation must default off");
+assert(manifest.piCorePatch?.statusScript === "status:pi-core-compaction", "manifest must name the guarded status script");
+assert(manifest.piCorePatch?.applyScript === "reapply:pi-core-compaction", "manifest must name the guarded apply script");
+assert(manifest.piCorePatch?.restartRequired === true, "Pi core mutation must require a process restart");
 
 const editSession = manifest.corePackages.find(({ id }) => id === "edit-session");
 assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");
@@ -144,6 +161,20 @@ assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), 
 assert(setupPrompt.includes("consentBehaviors"), "setup prompt must honor consent-gated behavior");
 assert(setupPrompt.includes("openai-codex-fast.json"), "setup prompt must preserve Codex fast-mode state");
 assert(setupPrompt.includes("pi-codex-context.json"), "setup prompt must preserve Codex compaction consent");
+assert(setupPrompt.includes("enable, disable, or keep"), "setup must offer explicit consent revocation");
+assert(setupPrompt.includes("filtered, pinned, or duplicate"), "setup must normalize stale kit package entries");
+assert(
+  setupPrompt.includes("exactly one removal command per scope and package identity"),
+  "setup must not issue duplicate removal commands for one package identity",
+);
+assert(setupPrompt.includes("stop immediately on the first failed command"), "setup must fail-stop after partial mutation");
+assert(setupPrompt.includes("requiredForCompleteCore"), "setup must include the separately consented core patch in complete-core checks");
+assert(setupPrompt.includes("Treat `recovery-needed` as drift"), "verify mode must not repair interrupted core mutations");
+assert(setupPrompt.includes("full process restart"), "setup must distinguish core restart from resource reload");
+assert(
+  setupPrompt.includes("`/reload` does not clear its model-runtime provider override"),
+  "setup must require restart after removing the Anthropic provider override",
+);
 assert(!setupPrompt.includes("@latest"), "setup prompt must reject mutable npm specs without spelling one");
 
 console.log(JSON.stringify({ ok: true, manifestChecked: true, duplicateAgentSurfaceAbsent: true }, null, 2));

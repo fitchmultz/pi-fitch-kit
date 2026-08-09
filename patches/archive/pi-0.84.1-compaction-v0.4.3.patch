@@ -1,6 +1,6 @@
 diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
---- a/dist/core/agent-session.js	2026-08-08 21:24:47
-+++ b/dist/core/agent-session.js	2026-08-08 23:38:34
+--- a/dist/core/agent-session.js	2026-08-08 13:56:25
++++ b/dist/core/agent-session.js	2026-08-08 14:46:48
 @@ -155,6 +155,7 @@
          this._unsubscribeAgent = this.agent.subscribe(this._handleAgentEvent);
          this._installAgentToolHooks();
@@ -9,48 +9,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
          this._buildRuntime({
              activeToolNames: this._initialActiveToolNames,
              includeAllExtensionTools: true,
-@@ -163,10 +164,10 @@
-     get modelRuntime() {
-         return this._modelRuntime;
-     }
--    async _getRequiredRequestAuth(model) {
-+    async _getRequiredRequestAuth(model, signal) {
-         let result;
-         try {
--            result = await this._modelRuntime.getAuth(model);
-+            result = await this._modelRuntime.getAuth(model, { signal });
-         }
-         catch (error) {
-             const cause = error instanceof Error ? error.cause : undefined;
-@@ -192,12 +193,12 @@
-         }
-         throw new Error(formatNoApiKeyFoundMessage(model.provider));
-     }
--    async _getSummarizationRequestAuth(model) {
-+    async _getSummarizationRequestAuth(model, signal) {
-         if (this.agent.streamFunction === streamSimple) {
--            return this._getRequiredRequestAuth(model);
-+            return this._getRequiredRequestAuth(model, signal);
-         }
-         try {
--            const result = await this._modelRuntime.getAuth(model);
-+            const result = await this._modelRuntime.getAuth(model, { signal });
-             if (!result)
-                 return { model };
-             const requestModel = result.auth.baseUrl ? { ...model, baseUrl: result.auth.baseUrl } : model;
-@@ -208,7 +209,10 @@
-                 env: result.env,
-             };
-         }
--        catch {
-+        catch (error) {
-+            if (signal?.aborted) {
-+                throw error;
-+            }
-             return { model };
-         }
-     }
-@@ -271,6 +275,91 @@
+@@ -271,6 +272,78 @@
              };
          };
      }
@@ -93,9 +52,6 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
 +        };
 +    }
 +    async _compactBeforeProviderRequest(messages, requestSignal) {
-+        if (requestSignal?.aborted) {
-+            return false;
-+        }
 +        const model = this.model;
 +        const settings = this.settingsManager.getCompactionSettings();
 +        if (!model ||
@@ -121,28 +77,18 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
 +        if (!shouldCompact(estimate.tokens, model.contextWindow, settings)) {
 +            return false;
 +        }
-+        if (!prepareCompaction(this.sessionManager.getBranch(), settings)) {
-+            // Usage-based estimates can cross the threshold while the retained
-+            // transcript itself has nothing summarizable. Stock treats that as
-+            // "compaction unavailable" and proceeds, so stay advisory here
-+            // instead of blocking every later request.
-+            return false;
-+        }
 +        const previousCompactionId = compactionEntry?.id;
 +        await this._runAutoCompaction("threshold", false, requestSignal);
 +        const latestCompaction = getLatestCompactionEntry(this.sessionManager.getBranch());
 +        if (!latestCompaction || latestCompaction.id === previousCompactionId) {
-+            // Keep this message free of token counts: interpolated digits can
-+            // collide with retry classifier status substrings ("500", "429", ...)
-+            // and restart a compaction the user just cancelled.
-+            throw new Error("Pre-request compaction was required but did not complete. Provider request blocked.");
++            throw new Error(`Pre-request compaction was required at ${estimate.tokens} tokens but did not complete. Provider request blocked.`);
 +        }
 +        return true;
 +    }
      _installAgentNextTurnRefresh() {
          const previousPrepareNextTurnWithContext = this.agent.prepareNextTurnWithContext ??
              (this.agent.prepareNextTurn
-@@ -1365,36 +1454,57 @@
+@@ -1365,25 +1438,36 @@
       * @param customInstructions Optional instructions for the compaction summary
       */
      async compact(customInstructions) {
@@ -154,7 +100,8 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
 +        }
 +        const pathEntries = this.sessionManager.getBranch();
 +        const settings = this.settingsManager.getCompactionSettings();
-+        if (!prepareCompaction(pathEntries, settings)) {
++        const preparation = prepareCompaction(pathEntries, settings);
++        if (!preparation) {
 +            const lastEntry = pathEntries[pathEntries.length - 1];
 +            const error = new Error(lastEntry?.type === "compaction" ? "Already compacted" : "Nothing to compact (session too small)");
 +            this._emit({ type: "compaction_start", reason: "manual" });
@@ -172,53 +119,38 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
 +        this._compactionAbortController = compactionController;
          try {
 -            if (!this.model) {
--                throw new Error(formatNoModelSelectedMessage());
--            }
++            this._emit({ type: "compaction_start", reason: "manual" });
++            await this.abort();
++            const model = this.model;
++            if (!model) {
+                 throw new Error(formatNoModelSelectedMessage());
+             }
 -            const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(this.model);
 -            const pathEntries = this.sessionManager.getBranch();
 -            const settings = this.settingsManager.getCompactionSettings();
 -            const preparation = prepareCompaction(pathEntries, settings);
-+            this._emit({ type: "compaction_start", reason: "manual" });
-+            await this.abort();
-+            // abort() can append aborted assistant/tool entries; recompute so the
-+            // summary covers the branch as it exists after the active run settled.
-+            const compactingEntries = this.sessionManager.getBranch();
-+            const preparation = prepareCompaction(compactingEntries, settings);
-             if (!preparation) {
+-            if (!preparation) {
 -                // Check why we can't compact
 -                const lastEntry = pathEntries[pathEntries.length - 1];
 -                if (lastEntry?.type === "compaction") {
 -                    throw new Error("Already compacted");
 -                }
 -                throw new Error("Nothing to compact (session too small)");
-+                const lastEntry = compactingEntries[compactingEntries.length - 1];
-+                throw new Error(lastEntry?.type === "compaction" ? "Already compacted" : "Nothing to compact (session too small)");
-             }
-+            const model = this.model;
-+            if (!model) {
-+                throw new Error(formatNoModelSelectedMessage());
-+            }
-+            const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(model, compactionController.signal);
+-            }
++            const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(model);
              let extensionCompaction;
              let fromExtension = false;
              if (this._extensionRunner.hasHandlers("session_before_compact")) {
-                 const result = (await this._extensionRunner.emit({
-                     type: "session_before_compact",
-                     preparation,
--                    branchEntries: pathEntries,
-+                    branchEntries: compactingEntries,
+@@ -1394,7 +1478,7 @@
                      customInstructions,
                      reason: "manual",
                      willRetry: false,
 -                    signal: this._compactionAbortController.signal,
 +                    signal: compactionController.signal,
-+                    // Let extension-owned compaction preserve native retry behavior.
-+                    retry: this.settingsManager.getRetrySettings(),
-+                    retryCallbacks: this._summarizationRetryCallbacks({ source: "compaction", reason: "manual" }),
                  }));
                  if (result?.cancel) {
                      throw new Error("Compaction cancelled");
-@@ -1419,14 +1529,14 @@
+@@ -1419,14 +1503,14 @@
              }
              else {
                  // Generate compaction result
@@ -235,7 +167,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
                  throw new Error("Compaction cancelled");
              }
              this.sessionManager.appendCompaction(summary, firstKeptEntryId, tokensBefore, details, fromExtension, usage);
-@@ -1479,7 +1589,9 @@
+@@ -1479,7 +1563,9 @@
              throw error;
          }
          finally {
@@ -246,7 +178,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
          }
      }
      /**
-@@ -1511,6 +1623,12 @@
+@@ -1511,6 +1597,12 @@
          const settings = this.settingsManager.getCompactionSettings();
          if (!settings.enabled)
              return false;
@@ -259,7 +191,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
          // Skip if message was aborted (user cancelled) - unless skipAbortedCheck is false
          if (skipAbortedCheck && assistantMessage.stopReason === "aborted")
              return false;
-@@ -1592,22 +1710,43 @@
+@@ -1592,22 +1684,42 @@
      /**
       * Internal: Run auto-compaction with events.
       */
@@ -272,13 +204,6 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
 +        }
 +        const model = this.model;
 +        if (!model) {
-+            return false;
-+        }
-+        const pathEntries = this.sessionManager.getBranch();
-+        const preparation = prepareCompaction(pathEntries, settings);
-+        if (!preparation) {
-+            // Stock semantics: nothing can be prepared, so auto-compaction is a
-+            // silent advisory no-op rather than an error event.
 +            return false;
 +        }
 +        const autoCompactionController = new AbortController();
@@ -303,31 +228,30 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
                  return false;
              }
 -            const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(this.model);
--            const pathEntries = this.sessionManager.getBranch();
--            const preparation = prepareCompaction(pathEntries, settings);
--            if (!preparation) {
++            const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(model);
+             const pathEntries = this.sessionManager.getBranch();
+             const preparation = prepareCompaction(pathEntries, settings);
+             if (!preparation) {
 -                return false;
--            }
++                const lastEntry = pathEntries[pathEntries.length - 1];
++                throw new Error(lastEntry?.type === "compaction" ? "Already compacted" : "Nothing to compact (session too small)");
+             }
 -            this._emit({ type: "compaction_start", reason });
 -            this._autoCompactionAbortController = new AbortController();
 -            started = true;
-+            const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(model, compactionSignal);
              let extensionCompaction;
              let fromExtension = false;
              if (this._extensionRunner.hasHandlers("session_before_compact")) {
-@@ -1618,7 +1757,10 @@
+@@ -1618,7 +1730,7 @@
                      customInstructions: undefined,
                      reason,
                      willRetry,
 -                    signal: this._autoCompactionAbortController.signal,
 +                    signal: compactionSignal,
-+                    // Let extension-owned compaction preserve native retry behavior.
-+                    retry: this.settingsManager.getRetrySettings(),
-+                    retryCallbacks: this._summarizationRetryCallbacks({ source: "compaction", reason }),
                  }));
                  if (extensionResult?.cancel) {
                      this._emit({
-@@ -1650,14 +1792,14 @@
+@@ -1650,14 +1762,14 @@
              }
              else {
                  // Generate compaction result
@@ -344,45 +268,7 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
                  this._emit({
                      type: "compaction_end",
                      reason,
-@@ -1667,6 +1809,9 @@
-                 });
-                 return false;
-             }
-+            const lastBeforeRebuild = this.agent.state.messages[this.agent.state.messages.length - 1];
-+            const hadTrailingRemovableAssistant = lastBeforeRebuild?.role === "assistant" &&
-+                (lastBeforeRebuild.stopReason === "error" || lastBeforeRebuild.stopReason === "length");
-             this.sessionManager.appendCompaction(summary, firstKeptEntryId, tokensBefore, details, fromExtension, usage);
-             const newEntries = this.sessionManager.getEntries();
-             const sessionContext = this.sessionManager.buildSessionContext();
-@@ -1692,16 +1837,21 @@
-                 details,
-             };
-             this._emit({ type: "compaction_end", reason, result, aborted: false, willRetry });
--            if (willRetry) {
-+            {
-                 const messages = this.agent.state.messages;
-                 const lastMsg = messages[messages.length - 1];
--                // The overflow response was persisted on message_end before _checkCompaction() removed it
--                // from agent state. Rebuilding state from the new compaction can restore that kept entry,
--                // leaving an assistant as the final message. agent.continue() rejects that state, so remove
--                // the retriable error or truncated-length response again before continuing the interrupted turn.
--                if (lastMsg?.role === "assistant" && (lastMsg.stopReason === "error" || lastMsg.stopReason === "length")) {
-+                // Retry preparation and the request gate can remove a trailing
-+                // error/length assistant from agent state while the session keeps it.
-+                // Rebuilding state from the new compaction must never ADD such a
-+                // message back: agent.continue() rejects that state and providers
-+                // reject payloads ending in an assistant error.
-+                if (!hadTrailingRemovableAssistant &&
-+                    lastMsg?.role === "assistant" &&
-+                    (lastMsg.stopReason === "error" || lastMsg.stopReason === "length")) {
-                     this.agent.state.messages = messages.slice(0, -1);
-                 }
-+            }
-+            if (willRetry) {
-                 return true;
-             }
-             // Auto-compaction can complete while follow-up/steering/custom messages are waiting.
-@@ -1709,23 +1859,35 @@
+@@ -1709,23 +1821,35 @@
              return this.agent.hasQueuedMessages();
          }
          catch (error) {
@@ -425,31 +311,9 @@ diff -ruN a/dist/core/agent-session.js b/dist/core/agent-session.js
          }
      }
      /**
-@@ -2372,7 +2534,7 @@
-             let summaryUsage;
-             if (options.summarize && entriesToSummarize.length > 0 && !extensionSummary) {
-                 const model = this.model;
--                const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(model);
-+                const { model: requestModel, apiKey, headers, env } = await this._getSummarizationRequestAuth(model, this._branchSummaryAbortController.signal);
-                 const branchSummarySettings = this.settingsManager.getBranchSummarySettings();
-                 const result = await generateBranchSummary(entriesToSummarize, {
-                     model: requestModel,
-@@ -2459,6 +2621,12 @@
-             });
-             // Emit to custom tools
-             return { editorText, cancelled: false, summaryEntry };
-+        }
-+        catch (error) {
-+            if (this._branchSummaryAbortController?.signal.aborted) {
-+                return { cancelled: true, aborted: true };
-+            }
-+            throw error;
-         }
-         finally {
-             this._branchSummaryAbortController = undefined;
 diff -ruN a/dist/core/compaction/compaction.js b/dist/core/compaction/compaction.js
---- a/dist/core/compaction/compaction.js	2026-08-08 21:24:47
-+++ b/dist/core/compaction/compaction.js	2026-08-08 21:24:47
+--- a/dist/core/compaction/compaction.js	2026-08-08 13:56:25
++++ b/dist/core/compaction/compaction.js	2026-08-08 13:56:25
 @@ -14,11 +14,10 @@
   */
  function extractFileOperations(messages, entries, prevCompactionIndex) {
@@ -482,8 +346,8 @@ diff -ruN a/dist/core/compaction/compaction.js b/dist/core/compaction/compaction
          }
      }
 diff -ruN a/dist/modes/interactive/interactive-mode.js b/dist/modes/interactive/interactive-mode.js
---- a/dist/modes/interactive/interactive-mode.js	2026-08-08 21:24:47
-+++ b/dist/modes/interactive/interactive-mode.js	2026-08-08 21:24:47
+--- a/dist/modes/interactive/interactive-mode.js	2026-08-08 13:56:25
++++ b/dist/modes/interactive/interactive-mode.js	2026-08-08 13:56:25
 @@ -17,7 +17,6 @@
  import { FooterDataProvider } from "../../core/footer-data-provider.js";
  import { configureHttpDispatcher, formatHttpIdleTimeoutMs } from "../../core/http-dispatcher.js";

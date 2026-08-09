@@ -263,6 +263,10 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 		description: "Toggle Anthropic Opus fast mode (2x token price)",
 		handler: async (args, ctx) => {
 			const arg = args.trim().toLowerCase();
+			if (arg !== "" && arg !== "on" && arg !== "off") {
+				ctx.ui.notify("Usage: /anthropic-fast [on|off]", "warning");
+				return;
+			}
 			if (arg === "on" || arg === "off") {
 				writeFileSync(FAST_STATE_PATH, `${JSON.stringify({ enabled: arg === "on" })}\n`);
 			}

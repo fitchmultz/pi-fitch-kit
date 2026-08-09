@@ -59,14 +59,14 @@ These are the extensions loaded in my current setup. Every external extension li
 
 [`codex-context`](extensions/codex-context.ts) owns `/codex-fast`, its OpenAI-only footer, and optional alternate-model compaction without replacing Pi's native OpenAI streams. It preserves the standalone extension's `openai-codex-fast.json` state and `pi-codex-context.json` consent config, so moving into the kit does not reset either setting. While the standalone extension is still active, the bundled copy sees its effective `/codex-fast` command at session start and stays inert until `/fitch-setup` removes it and Pi reloads. The [core compaction runbook](docs/pi-core-compaction.md) and its active-install regression remain beside it.
 
-[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. It also owns `/anthropic-fast [on|off]`, Anthropic's research-preview fast mode for Opus 5 and Opus 4.8 at double the token price. Anthropic documents fast mode as a research preview requiring account access, and it is verified working on this setup's Claude subscription OAuth route: identical output ran roughly 2x faster with the toggle on. While an Opus 5 or Opus 4.8 model is selected, the footer shows `anthropic-fast:on` or `:off`, and it clears on models that ignore fast mode. Because the toggle is shared by every session, the footer follows changes made elsewhere.
+[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. It also owns `/anthropic-fast [on|off]`, Anthropic's research-preview fast mode for Opus 5 and Opus 4.8 at double the token price. Anthropic documents fast mode as a research preview requiring account access, and it is verified working on this setup's Claude subscription OAuth route: identical output ran roughly 2x faster with the toggle on. While an Opus 5 or Opus 4.8 model is selected, the footer shows `fast:on` or `:off`, and it clears on models that ignore fast mode. Because the toggle is shared by every session, the footer follows changes made elsewhere.
 
 Requests carrying a caller-supplied `client` are left on standard speed, since the mandatory beta header cannot be attached to them.
 
 Accepted caveat: appending a mandatory header at the wire requires owning Anthropic's stream callback, because Pi exposes no wire-header hook and no full-versus-simple stream provenance. This extension therefore wraps Anthropic streaming whenever it is loaded, and classifies full-stream calls by their Anthropic-native options. Consequences worth knowing:
 
 - Do not combine it with another Anthropic provider override without reviewing both, since Pi merges registrations last-write-wins.
-- Restart Pi rather than `/reload` after disabling or removing it, because the registration can persist for the session.
+- Start a fresh Pi process after disabling or removing it; Pi 0.84.1 `/reload` does not clear model-runtime provider overrides.
 - Revalidate it when upgrading Pi, since it depends on Pi's provider composition and header-merge behavior. Agent profiles now ship directly with `pi-subagents`, so this kit no longer copies or syncs them.
 
 ### Selective experimental extension
@@ -196,7 +196,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every package install and file change, and asks which parts to apply. It never reads or copies credentials. Run it again after an upgrade to preview removal of retired standalone packages, the archived Intercom package, and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. `/fitch-setup verify` reports drift without changing anything.
+`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every package install and file change, and asks which parts to apply. It never reads or copies credentials. Complete core includes the reviewed request-boundary compaction patch, but applying that Pi core mutation is a separate opt-in and requires a full process restart. Reruns offer enable, disable, or keep for alternate-model compaction consent and normalize filtered, pinned, or duplicate kit entries to one canonical source. They also preview removal of retired standalone packages, the archived Intercom package, and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. `/fitch-setup verify` reports all drift without changing anything.
 
 The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.0 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
 
@@ -243,7 +243,9 @@ npm run smoke
 
 - `npm run check` type-checks and syntax-checks the bundled extensions, exercises session naming and the image guard boundary, then validates unpinned package sources, manifest resources, package metadata alignment, and the absence of retired duplicate surfaces.
 - `npm run regression:codex-context` verifies the active Pi installation's compaction patch, literal consent gate, native-stream preservation, priority payload, and watcher cleanup.
+- `npm run regression:pi-core-applicator` exercises trusted patch resolution, locking, path confinement, backup integrity, interruption recovery, and migration failure paths on isolated fixtures.
 - `npm run regression:session-name` verifies naming, metadata injection, protected identities, and single ownership during standalone-package migration.
 - `npm run smoke` loads the checkout through Pi's real resource loader, renders the compact footer at wide and narrow widths, checks its toggle, and requires the three bundled commands, `name_session`, one OpenAI request hook, one custom-compaction hook, four extensions, and two prompts.
+- `npm run smoke:lifecycle` uses an isolated Pi agent dir for real install, stale-filter and duplicate-identity normalization, and resource reload.
 
 For the detailed workflow, model table, evidence, and security rationale, read [docs/pi-setup.md](docs/pi-setup.md). For the short version, read [docs/pi-setup-post.md](docs/pi-setup-post.md).

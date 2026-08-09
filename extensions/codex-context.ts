@@ -42,6 +42,20 @@ const DEFAULT_COMPACTION_MODELS: CompactionModel[] = [
 		thinkingLevel: "high",
 	},
 ];
+function raceWithAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+	if (signal.aborted) {
+		// A fulfilled operation listed first can beat a pre-rejected abort in Promise.race.
+		void operation.catch(() => undefined);
+		return Promise.reject(signal.reason);
+	}
+	const { promise, reject } = Promise.withResolvers<never>();
+	const onAbort = () => reject(signal.reason);
+	signal.addEventListener("abort", onAbort, { once: true });
+	return Promise.race([operation, promise]).finally(() =>
+		signal.removeEventListener("abort", onAbort),
+	);
+}
+
 const THINKING_LEVELS = new Set([
 	"off",
 	"minimal",
@@ -234,6 +248,13 @@ export default function (pi: ExtensionAPI): void {
 		if (!active) return;
 		const candidates = compactionModels();
 		if (!candidates) return;
+		// The kit's Pi core patch adds the host retry policy and summarization
+		// retry lifecycle to this event; stock Pi omits them, so routed
+		// compaction degrades to zero retries there.
+		const { retry, retryCallbacks } = event as unknown as {
+			retry?: Parameters<typeof compact>[9];
+			retryCallbacks?: Parameters<typeof compact>[10];
+		};
 		const failures: string[] = [];
 		for (const candidate of candidates) {
 			if (event.signal.aborted) return { cancel: true };
@@ -254,7 +275,10 @@ export default function (pi: ExtensionAPI): void {
 					: providerStream;
 
 			try {
-				const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+				const auth = await raceWithAbort(
+					ctx.modelRegistry.getApiKeyAndHeaders(model),
+					event.signal,
+				);
 				if (!auth.ok) {
 					failures.push(
 						`${candidate.provider}/${candidate.model}: ${auth.error}`,
@@ -274,6 +298,8 @@ export default function (pi: ExtensionAPI): void {
 					candidate.thinkingLevel,
 					streamFn,
 					auth.env,
+					retry,
+					retryCallbacks,
 				);
 				if (failures.length > 0 && ctx.hasUI) {
 					ctx.ui.notify(
@@ -283,6 +309,7 @@ export default function (pi: ExtensionAPI): void {
 				}
 				return { compaction: result };
 			} catch (error) {
+				if (event.signal.aborted) return { cancel: true };
 				failures.push(
 					`${candidate.provider}/${candidate.model}: ${error instanceof Error ? error.message : String(error)}`,
 				);

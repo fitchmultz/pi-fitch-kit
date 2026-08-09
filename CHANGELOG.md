@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 — 9 August 2026
+
+- Hardened request-boundary compaction against unsummarizable high-usage sessions, retry-classifier collisions, cancelled-compaction restarts, removed error-assistant resurrection, pre-aborted and pending-auth cancellation races, and stale manual preflight snapshots. Alternate-model compaction now receives Pi's native retry policy and lifecycle callbacks, and cancellation no longer waits for candidate authentication.
+- Made the exact-version core applicator concurrency- and crash-safe with `/usr/bin/patch`, atomic PID locking, symlink confinement, staged stock backups, action-scoped artifact checksums, canonical manifests, durable recovery journals, early backup-health failures, and targeted wrapper diagnostics. Read-only status reports interrupted mutations without repairing them, and released 0.4.1–0.4.3 patch identities migrate through checksum-pinned archives. Added isolated security, migration, and interruption fixtures.
+- Made `/fitch-setup` consent revocable, normalized filtered/pinned/duplicate kit entries with one identity-aware removal per scope, added separately confirmed Complete-core patch status/apply/restore handling, stopped on the first failed step, and distinguished `/reload` from the full restart required by Pi core changes.
+- Added a real isolated install/filter-and-duplicate-normalization/reload smoke, exact theme-manifest validation, and portable consent-gate coverage. Fixed `/anthropic-fast` typo handling, the documented `fast:on|off` label and reload behavior, canonical agent-directory lookup in clean-footer and the Codex regression, and the full-restart requirement after removing the Anthropic provider override.
+
 ## 0.4.3 — 8 August 2026
 
 - The tool-loop compaction patch now also compacts at the turn boundary, after tool results and before queued steering drains, so messages queued during an in-run compaction ride the immediate next provider request instead of arriving one request late; interactive input enqueued by the fire-and-forget compaction flush is included on a best-effort basis. The request-boundary check remains as a fail-closed backstop for messages injected after the turn boundary.

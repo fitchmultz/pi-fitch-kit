@@ -225,6 +225,18 @@ assert.equal(
 await commands["anthropic-fast"].handler("off", fastCtx);
 assert.equal(notices.at(-1), "Anthropic fast mode OFF");
 assert.equal((await fastRequest("claude-opus-5")).payload.speed, undefined);
+const disabledState = readFileSync(join(agentDir, "anthropic-fast.json"), "utf8");
+await commands["anthropic-fast"].handler("of", fastCtx);
+assert.equal(
+	notices.at(-1),
+	"Usage: /anthropic-fast [on|off]",
+	"invalid arguments must warn instead of masquerading as a status query",
+);
+assert.equal(
+	readFileSync(join(agentDir, "anthropic-fast.json"), "utf8"),
+	disabledState,
+	"invalid arguments must not change fast-mode state",
+);
 
 const fullStream = await fastRequest("claude-opus-5", "pi-existing-beta", {
 	thinkingEnabled: true,

@@ -1,6 +1,6 @@
 # My Pi harness, and why it is structured this way
 
-_Updated 8 August 2026 for Pi 0.84.1 on Node.js 24 or newer._
+_Updated 9 August 2026 for Pi 0.84.1 on Node.js 24 or newer._
 
 A few people have asked about my terminal agent setup. The public, installable version is [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit).
 
@@ -88,6 +88,6 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-`/fitch-setup` reads unpinned package sources from [`setup-manifest.json`](../setup-manifest.json), previews every selected change, and stops for each user's own authentication. `/fitch-setup verify` reports drift without changing anything.
+`/fitch-setup` reads unpinned package sources from [`setup-manifest.json`](../setup-manifest.json), normalizes duplicate or filtered kit entries, previews every selected change, and stops for each user's own authentication. Alternate-model compaction consent is revocable, and the Complete-core Pi patch is a separate opt-in that requires a full restart. `/fitch-setup verify` reports drift without changing anything.
 
 The [README](../README.md) is the navigation hub. The [full guide](./pi-setup.md) explains the model table, launch policy, evidence rules, usage sample, and security boundaries.
