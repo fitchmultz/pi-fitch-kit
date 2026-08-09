@@ -1,5 +1,6 @@
 .DS_Store
 node_modules/
+.dogfood/
 
 # CueLoop local/runtime state (do not commit)
 .cueloop/
