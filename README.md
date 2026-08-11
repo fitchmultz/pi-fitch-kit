@@ -4,7 +4,7 @@ My real Pi harness, packaged as a versioned, inspectable setup.
 
 This repository shows the composition layer I use every day: public extensions, model-routed subagents, reusable skills, authenticated MCP connections, and a small amount of local policy. It is also a working prototype for a model-agnostic organization harness built on top of [Pi](https://github.com/badlogic/pi-mono), without forking Pi core.
 
-Extension installs follow their package's default channel instead of freezing refs or versions. The current kit targets and pins Pi `0.84.1` on Node.js `>=24.0.0`; Agent Browser 0.33.0 sets the Node floor. The guarded core-compaction reapply command supports only the exact reviewed Pi `0.84.1` and `0.84.0` package identities.
+Extension installs follow their package's default channel instead of freezing refs or versions. The current kit targets and pins Pi `0.84.1` on Node.js `>=24.0.0`; Agent Browser 0.33.2 sets the Node floor. The guarded core-compaction reapply command supports only the exact reviewed Pi `0.84.1` and `0.84.0` package identities.
 
 ## Start here
 
@@ -200,7 +200,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 
 `/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every package install and file change, and asks which parts to apply. It never reads or copies credentials. Complete core includes the reviewed request-boundary compaction and provider-resilience patch, but applying that Pi core mutation is a separate opt-in and requires a full process restart. Reruns offer enable, disable, or keep for alternate-model compaction consent and normalize filtered, pinned, or duplicate kit entries to one canonical source. They also preview removal of retired standalone packages, the archived Intercom package, and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. `/fitch-setup verify` reports all drift without changing anything.
 
-The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.0 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
+The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.2 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
 
 ## Prompts
 

@@ -55,7 +55,7 @@ Installing the kit is already consent for its bundled resources. Its two prompts
 
 Installing `pi-agent-skills` loads the active public skill set from that package. Preserve other user skill roots and filters. If a skill name collides, show both sources and ask which one should remain active rather than deleting either copy.
 
-Agent Browser has one prerequisite outside Pi package installation. Run the manifest's exact global npm command for the wrapper's tested 0.33.0 baseline. Its optional browser runtime download remains a separate command. Preview both steps and ask before the sequence. Declining leaves Agent Browser as a manual step and does not block unrelated components.
+Agent Browser has one prerequisite outside Pi package installation. Run the manifest's exact global npm command for the wrapper's tested 0.33.2 baseline. Its optional browser runtime download remains a separate command. Preview both steps and ask before the sequence. Declining leaves Agent Browser as a manual step and does not block unrelated components.
 
 For integrations, install only the MCP adapter from the manifest and follow its current docs. Configure only selected `optionalIntegrations`; do not add unrelated presets. Preview the exact config path and shape, then stop for user authentication or organization-specific values. Never persist a mutable npm distribution tag; if a user separately requests a local stdio MCP server, resolve and preview an exact version first. Do not infer endpoints, inspect credentials, invoke service reads as a smoke, or make service writes.
 

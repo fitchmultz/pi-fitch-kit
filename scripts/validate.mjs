@@ -150,9 +150,9 @@ const editSession = manifest.corePackages.find(({ id }) => id === "edit-session"
 assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");
 
 const browser = manifest.corePackages.find(({ id }) => id === "agent-browser")?.externalPrerequisite;
-assert(browser?.version === "0.33.0", "Agent Browser prerequisite must match the wrapper's tested 0.33.0 baseline");
+assert(browser?.version === "0.33.2", "Agent Browser prerequisite must match the wrapper's tested 0.33.2 baseline");
 assert(
-  browser?.installCommand === "npm install --global agent-browser@0.33.0",
+  browser?.installCommand === "npm install --global agent-browser@0.33.2",
   "Agent Browser install must use the exact tested version",
 );
 
