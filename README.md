@@ -105,7 +105,7 @@ The parent session remains responsible for the task. Specialists return evidence
 
 The routing is intentional:
 
-- `xai/grok-4.5` handles speed-sensitive scouting, context assembly, bounded implementation, and confirmed fixes.
+- `xai/grok-4.6` handles speed-sensitive scouting, context assembly, bounded implementation, and confirmed fixes.
 - `openai-codex/gpt-5.6-sol` handles diagnosis, research, planning, GPT review, security review, and oracle decisions.
 - `anthropic/claude-fable-5` supplies an independent model family for writing, UI judgment, and cross-model review, with Opus 5 behind it.
 - `oracle` alone uses forked parent context. Every other role starts fresh, and every profile is a leaf agent.
@@ -161,7 +161,7 @@ The current setup has authenticated, read-only-discovery-verified connections fo
 
 The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session. The optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary. The setup configures only integrations listed in the manifest and never persists mutable npm specs such as `@latest`.
 
-Bundled `codex-context` uses Pi's current session model for compaction by default. Alternate routing is a separate data-routing choice that activates only when `pi-codex-context.json` contains literal consent and an explicit non-empty model list. `/fitch-setup` can write the disclosed `xai/grok-4.5` then `openai-codex/gpt-5.6-luna` route after separate consent.
+Bundled `codex-context` uses Pi's current session model for compaction by default. Alternate routing is a separate data-routing choice that activates only when `pi-codex-context.json` contains literal consent and an explicit non-empty model list. `/fitch-setup` can write the disclosed `xai/grok-4.6` then `openai-codex/gpt-5.6-luna` route after separate consent.
 
 ## How the workflow fits together
 

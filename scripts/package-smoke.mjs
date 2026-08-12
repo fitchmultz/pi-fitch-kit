@@ -113,7 +113,7 @@ try {
 		`${JSON.stringify({
 			customCompactionEnabled: true,
 			compactionModels: [
-				{ provider: "xai", model: "grok-4.5", thinkingLevel: "high" },
+				{ provider: "xai", model: "grok-4.6", thinkingLevel: "high" },
 			],
 		})}\n`,
 	);

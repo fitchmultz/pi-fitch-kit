@@ -128,7 +128,7 @@ assert(codexContext?.consent?.required === true, "cross-provider compaction must
 assert(codexContext?.consent?.default === "disabled", "cross-provider compaction must default off");
 assert(
   JSON.stringify(codexContext?.consent?.destinations) ===
-    JSON.stringify(["xai/grok-4.5", "openai-codex/gpt-5.6-luna"]),
+    JSON.stringify(["xai/grok-4.6", "openai-codex/gpt-5.6-luna"]),
   "compaction destinations must stay explicit",
 );
 assert(codexContext?.consent?.configPath === "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/pi-codex-context.json", "consent config path must honor the Pi agent directory");

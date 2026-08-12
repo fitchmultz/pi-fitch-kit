@@ -84,11 +84,11 @@ assert.ok(configuredRoutes.length > 0, "at least one GPT-5.6 route must have an 
 const fallbackContextWindow =
 	modelContextWindows["openai-codex/gpt-5.6-sol"] ?? configuredRoutes[0].contextWindow;
 const xaiContextWindow =
-	models.providers.xai.modelOverrides["grok-4.5"].contextWindow;
+	models.providers.xai.modelOverrides["grok-4.6"].contextWindow;
 const compactionSettings = settings.compaction;
 assert.equal(compactionSettings.enabled, true, "compaction must be enabled");
 const defaultCompactionModels = [
-	{ provider: "xai", model: "grok-4.5", thinkingLevel: "high" },
+	{ provider: "xai", model: "grok-4.6", thinkingLevel: "high" },
 	{
 		provider: "openai-codex",
 		model: "gpt-5.6-luna",
@@ -550,7 +550,7 @@ boundaryRoutes.push(
 		model: "gpt-5.5",
 		contextWindow: fallbackContextWindow,
 	},
-	{ provider: "xai", model: "grok-4.5", contextWindow: xaiContextWindow },
+	{ provider: "xai", model: "grok-4.6", contextWindow: xaiContextWindow },
 );
 
 for (const { provider, model, contextWindow } of boundaryRoutes) {
@@ -1243,7 +1243,7 @@ for (const [label, setup] of [
 ] as const) {
 	setup();
 	const { result, calls, finds, notifications } = await runCustomCompaction({
-		"xai/grok-4.5": "must not run",
+		"xai/grok-4.6": "must not run",
 		"openai-codex/gpt-5.6-luna": "must not run",
 	});
 	assert.equal(result, undefined, `${label} config must not custom-compact`);
@@ -1256,13 +1256,13 @@ writeCompactionConfig({ customCompactionEnabled: true, ...contextConfig });
 
 {
 	const { result, calls, requestOptions, requestBaseUrls } = await runCustomCompaction({
-		"xai/grok-4.5": "xAI summary",
+		"xai/grok-4.6": "xAI summary",
 	});
 	const secondRun = await runCustomCompaction({
-		"xai/grok-4.5": "second xAI summary",
+		"xai/grok-4.6": "second xAI summary",
 	});
 	assert.match(result?.compaction?.summary ?? "", /xAI summary/);
-	assert.deepEqual(calls, ["xai/grok-4.5:high"]);
+	assert.deepEqual(calls, ["xai/grok-4.6:high"]);
 	assert.equal(result?.compaction?.usage?.totalTokens, 1);
 	assert.equal(requestOptions[0]?.cacheRetention, "none");
 	assert.equal(requestBaseUrls[0], "https://resolved.invalid/xai");
@@ -1324,7 +1324,7 @@ writeCompactionConfig({ customCompactionEnabled: true, ...contextConfig });
 			compactionModels,
 		});
 		const invalid = await runCustomCompaction({
-			"xai/grok-4.5": "must not run after invalid list",
+			"xai/grok-4.6": "must not run after invalid list",
 		});
 		assert.equal(invalid.result, undefined);
 		assert.deepEqual(invalid.finds, []);
@@ -1337,7 +1337,7 @@ writeCompactionConfig({ customCompactionEnabled: true, ...contextConfig });
 {
 	// Alternate-model auth must stop blocking as soon as compaction is cancelled.
 	const controller = new AbortController();
-	const model = customCompactionModel("xai", "grok-4.5");
+	const model = customCompactionModel("xai", "grok-4.6");
 	let authStartedResolve: (() => void) | undefined;
 	let resolveAuth: ((value: { ok: false; error: string }) => void) | undefined;
 	const authStarted = new Promise<void>((resolve) => {
@@ -1404,12 +1404,12 @@ writeCompactionConfig({ customCompactionEnabled: true, ...contextConfig });
 
 {
 	const { result, calls, notifications } = await runCustomCompaction({
-		"xai/grok-4.5": new Error("xAI unavailable"),
+		"xai/grok-4.6": new Error("xAI unavailable"),
 		"openai-codex/gpt-5.6-luna": "luna summary",
 	});
 	assert.match(result?.compaction?.summary ?? "", /luna summary/);
 	assert.deepEqual(calls, [
-		"xai/grok-4.5:high",
+		"xai/grok-4.6:high",
 		"openai-codex/gpt-5.6-luna:high",
 	]);
 	assert.match(notifications.join("\n"), /xAI unavailable/);
@@ -1418,7 +1418,7 @@ writeCompactionConfig({ customCompactionEnabled: true, ...contextConfig });
 {
 	const { result, calls } = await runCustomCompaction(
 		{ "openai-codex/gpt-5.6-luna": "luna summary" },
-		{ "xai/grok-4.5": "no xAI auth" },
+		{ "xai/grok-4.6": "no xAI auth" },
 	);
 	assert.match(result?.compaction?.summary ?? "", /luna summary/);
 	assert.deepEqual(calls, ["openai-codex/gpt-5.6-luna:high"]);
@@ -1426,20 +1426,20 @@ writeCompactionConfig({ customCompactionEnabled: true, ...contextConfig });
 
 {
 	const { result, calls, requestOptions } = await runCustomCompaction(
-		{ "xai/grok-4.5": "header-only summary" },
+		{ "xai/grok-4.6": "header-only summary" },
 		{},
 		new AbortController().signal,
-		new Set(["xai/grok-4.5"]),
+		new Set(["xai/grok-4.6"]),
 	);
 	assert.match(result?.compaction?.summary ?? "", /header-only summary/);
-	assert.deepEqual(calls, ["xai/grok-4.5:high"]);
+	assert.deepEqual(calls, ["xai/grok-4.6:high"]);
 	assert.equal(requestOptions[0]?.headers?.Authorization, null);
 	assert.equal(requestOptions[0]?.headers?.["x-route"], "test");
 }
 
 {
 	const { result, notifications } = await runCustomCompaction({
-		"xai/grok-4.5": new Error("xAI unavailable"),
+		"xai/grok-4.6": new Error("xAI unavailable"),
 		"openai-codex/gpt-5.6-luna": new Error("luna unavailable"),
 	});
 	assert.equal(
@@ -1471,7 +1471,7 @@ writeCompactionConfig({ customCompactionEnabled: true, ...contextConfig });
 	const retryEvents: string[] = [];
 	const { result, calls } = await runCustomCompaction(
 		{
-			"xai/grok-4.5": [
+			"xai/grok-4.6": [
 				{ stopReason: "error", errorMessage: "HTTP 500 transient upstream" },
 				"retried xAI summary",
 			],
@@ -1502,7 +1502,7 @@ writeCompactionConfig({ customCompactionEnabled: true, ...contextConfig });
 	);
 	assert.deepEqual(
 		calls,
-		["xai/grok-4.5:high", "xai/grok-4.5:high"],
+		["xai/grok-4.6:high", "xai/grok-4.6:high"],
 		"the host retry policy must retry the same candidate, not fail over",
 	);
 	assert.deepEqual(
