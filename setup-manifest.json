@@ -10,7 +10,7 @@
     "installSource": "git:github.com/fitchmultz/pi-fitch-kit"
   },
   "requiredModels": [
-    "xai/grok-4.5",
+    "xai/grok-4.6",
     "openai-codex/gpt-5.6-sol",
     "openai-codex/gpt-5.6-terra",
     "openai-codex/gpt-5.6-luna",
@@ -48,7 +48,7 @@
         "default": "disabled",
         "data": "retained compaction context, including messages selected for summarization, prior summaries, split-turn prefixes, and custom instructions",
         "destinations": [
-          "xai/grok-4.5",
+          "xai/grok-4.6",
           "openai-codex/gpt-5.6-luna"
         ],
         "configPath": "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/pi-codex-context.json",
@@ -57,7 +57,7 @@
           "compactionModels": [
             {
               "provider": "xai",
-              "model": "grok-4.5",
+              "model": "grok-4.6",
               "thinkingLevel": "high"
             },
             {
