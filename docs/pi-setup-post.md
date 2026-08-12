@@ -33,7 +33,7 @@ I keep `images.autoResize` off so agents can inspect original image detail. Anth
 
 The fourteen `pi-subagents` specialist profiles cover scouting, context assembly, debugging, research, planning, bounded implementation, focused fixes, GPT review, Claude review, security review, UI review, oracle decisions, and writing. Its general-purpose `delegate` remains available beside them.
 
-Grok 4.5 handles fast bounded work. GPT-5.6 Sol handles diagnosis, research, planning, and the GPT review path. Claude Fable 5 supplies an independent model family for writing, UI judgment, and cross-model review, with Opus 5 behind it.
+Grok 4.6 handles fast bounded work. GPT-5.6 Sol handles diagnosis, research, planning, and the GPT review path. Claude Fable 5 supplies an independent model family for writing, UI judgment, and cross-model review, with Opus 5 behind it.
 
 Every profile is a leaf. Almost every child starts with fresh context. The parent inspects the actual files and evidence, makes the final decision, and stays accountable for the outcome.
 
