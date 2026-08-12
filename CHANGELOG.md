@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2 — 12 August 2026
+
+- Compaction now uses Pi's active session model unless `pi-codex-context.json` explicitly enables custom routing and supplies a valid non-empty `compactionModels` list. Literal consent without model candidates, missing or malformed config, and invalid or empty lists all return control to Pi's native active-model compaction.
+- Kept explicitly configured alternate-model routing, ordered failover, native retry/cancellation, fast-mode payload handling, usage accounting, and active-model fallback unchanged. The Pi core artifact is unchanged from v0.8.1.
+
 ## 0.8.1 — 9 August 2026
 
 - Reverted v0.8.0's elapsed-time and interrupt-hint addition from `WorkingStatusIndicator`, restoring Pi 0.84.1's stock `Working...` row. Organic use proved the timer worked, but it was unrequested and added noise when live child-agent rows already showed progress. Healthy provider slowness is accepted without a token-silence watchdog, provider timeout, or Anthropic-specific retry.

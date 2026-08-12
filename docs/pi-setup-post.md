@@ -1,6 +1,6 @@
 # My Pi harness, and why it is structured this way
 
-_Updated 9 August 2026 for Pi 0.84.1 on Node.js 24 or newer._
+_Updated 12 August 2026 for Pi 0.84.1 on Node.js 24 or newer._
 
 A few people have asked about my terminal agent setup. The public, installable version is [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit).
 
@@ -11,7 +11,7 @@ I use [Pi](https://github.com/badlogic/pi-mono), a small terminal coding agent, 
 3. task-selected skills and working agreements;
 4. authenticated MCP access to the systems around the code.
 
-The main session remains responsible for the task. This is not an autonomous swarm. Cross-provider custom compaction is separately disclosed and opt-in: when enabled, retained compaction context, including selected messages, prior summaries, split-turn prefixes, and custom instructions, goes to xAI first and OpenAI Codex on fallback, regardless of the active chat provider.
+The main session remains responsible for the task. This is not an autonomous swarm. Compaction uses the current session model by default. Cross-provider custom compaction is separately disclosed and activates only when its JSON config explicitly lists alternate models.
 
 ## Extensions
 

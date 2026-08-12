@@ -43,7 +43,7 @@
 - Before changing Pi runtime/package behavior, read the installed Pi docs/types for the touched surface, especially `docs/packages.md`, `docs/prompt-templates.md`, and `docs/extensions.md` under the installed Pi root.
 - Keep `extensions/anthropic-image-guard.ts` provider-scoped and based on Pi's native `resizeImage`; preserve its pre-decode source limits and do not reintroduce global resizing logic.
 - Keep `extensions/clean-footer.ts` free of cumulative token, cache, and cost counters; preserve context usage, model details, extension statuses, and wrapping without truncation.
-- Keep `extensions/codex-context.ts` hook-only for native OpenAI requests. Preserve the literal opt-in gate, existing state filenames, and xAI-then-Codex routing disclosure; do not register replacement OpenAI providers.
+- Keep `extensions/codex-context.ts` hook-only for native OpenAI requests. Preserve the active-model default, literal opt-in gate, existing state filenames, and disclosure for every explicitly configured alternate route; do not register replacement OpenAI providers.
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's tested compatibility baseline.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.

@@ -99,7 +99,7 @@ try {
 			getProvider: () => undefined,
 		},
 	};
-	for (const value of [undefined, false, "true", 1]) {
+	for (const value of [undefined, false, "true", 1, true]) {
 		if (value === undefined) rmSync(compactionConfig, { force: true });
 		else writeFileSync(compactionConfig, `${JSON.stringify({ customCompactionEnabled: value })}\n`);
 		await beforeCompact(
@@ -107,13 +107,21 @@ try {
 			compactionContext,
 		);
 	}
-	if (modelLookups !== 0) throw new Error("Non-literal custom compaction consent triggered a model lookup");
-	writeFileSync(compactionConfig, `${JSON.stringify({ customCompactionEnabled: true })}\n`);
+	if (modelLookups !== 0) throw new Error("Compaction config without an explicit model list triggered a model lookup");
+	writeFileSync(
+		compactionConfig,
+		`${JSON.stringify({
+			customCompactionEnabled: true,
+			compactionModels: [
+				{ provider: "xai", model: "grok-4.5", thinkingLevel: "high" },
+			],
+		})}\n`,
+	);
 	await beforeCompact(
 		{ signal: new AbortController().signal },
 		compactionContext,
 	);
-	if (modelLookups === 0) throw new Error("Literal custom compaction consent did not activate routing");
+	if (modelLookups === 0) throw new Error("Explicit custom compaction model did not activate routing");
 	const sessionNameStart = sessionName.handlers.get("session_start")?.[0];
 	if (!sessionNameStart) throw new Error("Session-name session_start handler missing");
 	await sessionNameStart({}, {});

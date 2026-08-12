@@ -1231,13 +1231,14 @@ function writeCompactionConfig(config: unknown): void {
 	);
 }
 
-// Default-off: no cross-provider routing without explicit opt-in.
+// The active model owns compaction unless alternate models are explicitly configured.
 for (const [label, setup] of [
 	["absent", () => rmSync(join(extensionAgentDir, "pi-codex-context.json"), { force: true })],
 	["malformed", () => writeFileSync(join(extensionAgentDir, "pi-codex-context.json"), "{not-json\n", "utf8")],
 	["false", () => writeCompactionConfig({ customCompactionEnabled: false })],
 	["string true", () => writeCompactionConfig({ customCompactionEnabled: "true" })],
 	["numeric one", () => writeCompactionConfig({ customCompactionEnabled: 1 })],
+	["literal true without models", () => writeCompactionConfig({ customCompactionEnabled: true })],
 	["empty object", () => writeCompactionConfig({})],
 ] as const) {
 	setup();
@@ -1251,7 +1252,7 @@ for (const [label, setup] of [
 	assert.deepEqual(notifications, [], `${label} config must stay silent`);
 }
 
-writeCompactionConfig({ customCompactionEnabled: true });
+writeCompactionConfig({ customCompactionEnabled: true, ...contextConfig });
 
 {
 	const { result, calls, requestOptions, requestBaseUrls } = await runCustomCompaction({
@@ -1331,7 +1332,7 @@ writeCompactionConfig({ customCompactionEnabled: true });
 	}
 }
 
-writeCompactionConfig({ customCompactionEnabled: true });
+writeCompactionConfig({ customCompactionEnabled: true, ...contextConfig });
 
 {
 	// Alternate-model auth must stop blocking as soon as compaction is cancelled.
@@ -1466,7 +1467,7 @@ writeCompactionConfig({ customCompactionEnabled: true });
 	// (added to session_before_compact by the kit's core patch) must reach the
 	// routed compaction request instead of failing over on the first transient
 	// provider error.
-	writeCompactionConfig({ customCompactionEnabled: true });
+	writeCompactionConfig({ customCompactionEnabled: true, ...contextConfig });
 	const retryEvents: string[] = [];
 	const { result, calls } = await runCustomCompaction(
 		{

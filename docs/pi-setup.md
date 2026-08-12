@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Updated 9 August 2026 for Pi 0.84.1 on Node.js 24 or newer._
+_Updated 12 August 2026 for Pi 0.84.1 on Node.js 24 or newer._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 
@@ -89,7 +89,7 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - deterministic support: calculator, tool duration, verbosity, session editing, stash, and raw message copy;
 - kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, and OpenAI fast mode plus consented alternate-model compaction, while `pi-subagents` owns its profile defaults.
 
-Bundled `codex-context` loads safely with custom compaction disabled. Enabling its manifest-gated route is a separate choice because retained compaction context can include selected messages, prior summaries, split-turn prefixes, and custom instructions, and goes to `xai/grok-4.5`, then `openai-codex/gpt-5.6-luna` on fallback, regardless of the active chat provider. `/fitch-setup` previews the destinations and exact config before asking whether to enable, disable, or keep that consent state.
+Bundled `codex-context` leaves compaction on Pi's current session model unless its config contains literal consent and an explicit non-empty alternate-model list. The manifest-gated route is a separate choice because retained compaction context can include selected messages, prior summaries, split-turn prefixes, and custom instructions, and goes to `xai/grok-4.5`, then `openai-codex/gpt-5.6-luna` on fallback, regardless of the active chat provider. `/fitch-setup` previews the destinations and exact config before asking whether to enable, disable, or keep that consent state.
 
 Complete core also includes the reviewed request-boundary compaction and provider-resilience patch, but the setup never silently mutates Pi core. It previews the guarded status/apply/restore commands and asks separately. Applying it creates a verified stock backup and requires a full process restart; `/reload` only refreshes package resources.
 

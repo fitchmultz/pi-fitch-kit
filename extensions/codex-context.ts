@@ -34,14 +34,6 @@ type CompactionModel = {
 		| "max";
 };
 
-const DEFAULT_COMPACTION_MODELS: CompactionModel[] = [
-	{ provider: "xai", model: "grok-4.5", thinkingLevel: "high" },
-	{
-		provider: "openai-codex",
-		model: "gpt-5.6-luna",
-		thinkingLevel: "high",
-	},
-];
 function raceWithAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
 	if (signal.aborted) {
 		// A fulfilled operation listed first can beat a pre-rejected abort in Promise.race.
@@ -85,7 +77,6 @@ function compactionModels(): CompactionModel[] | undefined {
 	const config = readCompactionConfig();
 	if (config?.customCompactionEnabled !== true) return undefined;
 	const models = config.compactionModels;
-	if (models === undefined) return DEFAULT_COMPACTION_MODELS;
 	if (
 		!Array.isArray(models) ||
 		models.length === 0 ||
