@@ -42,7 +42,7 @@ const pi = (...args) =>
 	});
 
 try {
-	assert.equal(pi("--version").trim(), "0.84.1");
+	assert.equal(pi("--version").trim(), "0.84.2");
 	pi("install", root);
 	assert.ok(
 		pi("list").includes(root),

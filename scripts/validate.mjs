@@ -12,8 +12,8 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-assert(manifest.schemaVersion === 5, "setup manifest schema must match the revocable-consent and core-patch shape");
-assert(manifest.runtime.pi === "0.84.1", "the kit must pin the reviewed Pi 0.84.1 runtime");
+assert(manifest.schemaVersion === 6, "setup manifest schema must match the patch-free revocable-consent shape");
+assert(manifest.runtime.pi === "0.84.2", "the kit must pin the validated Pi runtime");
 const resolvedOrigins = Object.values(packageLock.packages)
   .map((entry) => entry.resolved)
   .filter(Boolean)
@@ -23,25 +23,11 @@ assert(
   resolvedOrigins.every((origin) => origin === "https://registry.npmjs.org"),
   `the public lockfile must use only the npm registry; found ${[...new Set(resolvedOrigins)].join(", ")}`,
 );
+assert(!existsSync(join(root, "patches")), "Pi core patch artifacts are retired; the kit must stay patch-free");
 assert(
-  packageJson.scripts["reapply:pi-core-compaction"] === "node scripts/reapply-pi-core-compaction.mjs apply" &&
-    packageJson.scripts["restore:pi-core-compaction"] === "node scripts/reapply-pi-core-compaction.mjs restore",
-  "Pi core apply and restore commands must remain tracked package scripts",
+  !Object.keys(packageJson.scripts).some((script) => script.includes("pi-core")),
+  "guarded Pi core scripts are retired with the patch stack",
 );
-for (const path of [
-  "patches/pi-0.84.1-compaction.patch",
-  "patches/archive/pi-0.84.1-compaction-v0.4.2.patch",
-  "patches/archive/pi-0.84.1-compaction-v0.4.3.patch",
-  "patches/archive/pi-0.84.1-compaction-v0.5.0.patch",
-  "patches/archive/pi-0.84.1-compaction-v0.6.0.patch",
-  "patches/archive/pi-0.84.1-compaction-v0.7.0.patch",
-  "patches/archive/pi-0.84.1-compaction-v0.8.0.patch",
-  "scripts/reapply-pi-core-compaction.mjs",
-  "scripts/anthropic-stall-regression.mjs",
-  "scripts/pi-core-retry-regression.mjs",
-]) {
-  assert(lstatSync(join(root, path)).isFile(), `Pi core restoration resource missing: ${path}`);
-}
 for (const dependency of [
   "@earendil-works/pi-ai",
   "@earendil-works/pi-coding-agent",
@@ -74,15 +60,16 @@ for (const resource of [
 
 assert(!existsSync(join(root, "agents")), "agent profiles belong to pi-subagents, not the kit");
 assert(!existsSync(join(root, "extensions", "sync-agents.ts")), "sync-agents is redundant with pi-subagents defaults");
+assert(!existsSync(join(root, "extensions", "codex-context.ts")), "codex-context is retired; fast-mode owns both fast toggles");
 assert(
   JSON.stringify(manifest.kitResources.extensions) ===
     JSON.stringify([
       "extensions/anthropic-image-guard.ts",
       "extensions/clean-footer.ts",
-      "extensions/codex-context.ts",
+      "extensions/fast-mode.ts",
       "extensions/session-name.ts",
     ]),
-  "the kit must bundle the Anthropic, clean-footer, Codex context, and session-name extensions",
+  "the kit must bundle the image-guard, clean-footer, fast-mode, and session-name extensions",
 );
 
 for (const pkg of manifest.corePackages) {
@@ -111,7 +98,7 @@ assert(
   "agent-skills must use its public source",
 );
 
-assert(!manifest.corePackages.some(({ id }) => id === "codex-context"), "codex-context now belongs to the kit");
+assert(!manifest.corePackages.some(({ id }) => id === "codex-context"), "codex-context is retired, not a core package");
 assert(!manifest.corePackages.some(({ id }) => id === "session-name"), "session-name now belongs to the kit");
 for (const source of [
   "git:github.com/fitchmultz/pi-codex-context",
@@ -122,29 +109,14 @@ for (const source of [
     `upgrades must remove the retired standalone package: ${source}`,
   );
 }
-const codexContext = manifest.consentBehaviors.find(({ id }) => id === "codex-context");
-assert(codexContext?.extension === "extensions/codex-context.ts", "consent must identify the bundled extension");
-assert(codexContext?.consent?.required === true, "cross-provider compaction must require explicit consent");
-assert(codexContext?.consent?.default === "disabled", "cross-provider compaction must default off");
-assert(
-  JSON.stringify(codexContext?.consent?.destinations) ===
-    JSON.stringify(["xai/grok-4.6", "openai-codex/gpt-5.6-luna"]),
-  "compaction destinations must stay explicit",
-);
-assert(codexContext?.consent?.configPath === "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/pi-codex-context.json", "consent config path must honor the Pi agent directory");
-assert(codexContext?.consent?.config?.customCompactionEnabled === true, "consent config must be explicit");
-assert(
-  codexContext?.consent?.disabledConfig?.customCompactionEnabled === false,
-  "cross-provider compaction consent must be explicitly revocable",
-);
+assert(Array.isArray(manifest.consentBehaviors), "consentBehaviors must stay a declared list, even when empty");
+for (const behavior of manifest.consentBehaviors) {
+  assert(behavior?.consent?.required === true, "consent behaviors must require explicit consent");
+  assert(behavior?.consent?.default === "disabled", "consent behaviors must default off");
+}
+assert(manifest.piCorePatch === undefined, "the retired Pi core patch must not reappear in the manifest");
 
 assert(manifest.kit.packageName === "@fitch/pi-kit", "setup must identify duplicate kit package entries");
-assert(manifest.piCorePatch?.requiredForCompleteCore === true, "complete core must include the reviewed Pi core patch");
-assert(manifest.piCorePatch?.consent?.required === true, "Pi core mutation must require separate consent");
-assert(manifest.piCorePatch?.consent?.default === "disabled", "Pi core mutation must default off");
-assert(manifest.piCorePatch?.statusScript === "status:pi-core-compaction", "manifest must name the guarded status script");
-assert(manifest.piCorePatch?.applyScript === "reapply:pi-core-compaction", "manifest must name the guarded apply script");
-assert(manifest.piCorePatch?.restartRequired === true, "Pi core mutation must require a process restart");
 
 const editSession = manifest.corePackages.find(({ id }) => id === "edit-session");
 assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");
@@ -165,8 +137,8 @@ assert(setupPrompt.includes("${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"), "setup p
 assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");
 assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
 assert(setupPrompt.includes("consentBehaviors"), "setup prompt must honor consent-gated behavior");
-assert(setupPrompt.includes("openai-codex-fast.json"), "setup prompt must preserve Codex fast-mode state");
-assert(setupPrompt.includes("pi-codex-context.json"), "setup prompt must preserve Codex compaction consent");
+assert(setupPrompt.includes("openai-codex-fast.json"), "setup prompt must preserve fast-mode state during legacy removals");
+assert(setupPrompt.includes("pi-codex-context.json"), "setup prompt must preserve legacy compaction consent files");
 assert(setupPrompt.includes("enable, disable, or keep"), "setup must offer explicit consent revocation");
 assert(setupPrompt.includes("filtered, pinned, or duplicate"), "setup must normalize stale kit package entries");
 assert(
@@ -174,13 +146,7 @@ assert(
   "setup must not issue duplicate removal commands for one package identity",
 );
 assert(setupPrompt.includes("stop immediately on the first failed command"), "setup must fail-stop after partial mutation");
-assert(setupPrompt.includes("requiredForCompleteCore"), "setup must include the separately consented core patch in complete-core checks");
-assert(setupPrompt.includes("Treat `recovery-needed` as drift"), "verify mode must not repair interrupted core mutations");
-assert(setupPrompt.includes("full process restart"), "setup must distinguish core restart from resource reload");
-assert(
-  setupPrompt.includes("`/reload` does not clear its model-runtime provider override"),
-  "setup must require restart after removing the Anthropic provider override",
-);
+assert(!setupPrompt.includes("piCorePatch"), "the retired core patch must not survive in the setup prompt");
 assert(!setupPrompt.includes("@latest"), "setup prompt must reject mutable npm specs without spelling one");
 
 console.log(JSON.stringify({ ok: true, manifestChecked: true, duplicateAgentSurfaceAbsent: true }, null, 2));

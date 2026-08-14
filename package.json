@@ -1,6 +1,6 @@
 {
   "name": "@fitch/pi-kit",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -10,16 +10,10 @@
   "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node --check extensions/clean-footer.ts && node --check extensions/codex-context.ts && node --check extensions/session-name.ts && node --check scripts/codex-context-regression.ts && node --check scripts/session-name-regression.ts && node --check scripts/reapply-pi-core-compaction.mjs && node --check scripts/setup-lifecycle-smoke.mjs && node scripts/reapply-pi-core-compaction.mjs status --pi-root node_modules/@earendil-works/pi-coding-agent && node scripts/image-guard-smoke.mjs && npm run regression:anthropic-stall && npm run regression:session-name && npm run regression:pi-core-applicator && npm run smoke:lifecycle && node scripts/validate.mjs",
+    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node --check extensions/clean-footer.ts && node --check extensions/fast-mode.ts && node --check extensions/session-name.ts && node --check scripts/fast-mode-regression.ts && node --check scripts/session-name-regression.ts && node --check scripts/setup-lifecycle-smoke.mjs && node scripts/image-guard-smoke.mjs && npm run regression:fast-mode && npm run regression:session-name && npm run smoke:lifecycle && node scripts/validate.mjs",
     "typecheck": "tsc --noEmit",
-    "regression:anthropic-stall": "node scripts/anthropic-stall-regression.mjs",
-    "regression:codex-context": "node --experimental-strip-types scripts/codex-context-regression.ts",
-    "regression:pi-core-applicator": "node scripts/reapply-pi-core-compaction-regression.mjs",
-    "regression:pi-core-retry": "node scripts/pi-core-retry-regression.mjs",
+    "regression:fast-mode": "node --experimental-strip-types scripts/fast-mode-regression.ts",
     "regression:session-name": "node --experimental-strip-types scripts/session-name-regression.ts",
-    "reapply:pi-core-compaction": "node scripts/reapply-pi-core-compaction.mjs apply",
-    "restore:pi-core-compaction": "node scripts/reapply-pi-core-compaction.mjs restore",
-    "status:pi-core-compaction": "node scripts/reapply-pi-core-compaction.mjs status",
     "smoke": "node scripts/package-smoke.mjs",
     "smoke:lifecycle": "node scripts/setup-lifecycle-smoke.mjs"
   },
@@ -30,7 +24,7 @@
     "extensions": [
       "./extensions/anthropic-image-guard.ts",
       "./extensions/clean-footer.ts",
-      "./extensions/codex-context.ts",
+      "./extensions/fast-mode.ts",
       "./extensions/session-name.ts"
     ],
     "prompts": [
@@ -46,9 +40,9 @@
   },
   "packageManager": "npm@11.16.0",
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.84.1",
-    "@earendil-works/pi-coding-agent": "0.84.1",
-    "@earendil-works/pi-tui": "0.84.1",
+    "@earendil-works/pi-ai": "0.84.2",
+    "@earendil-works/pi-coding-agent": "0.84.2",
+    "@earendil-works/pi-tui": "0.84.2",
     "@types/node": "^24.13.3",
     "typescript": "^6.0.3"
   },

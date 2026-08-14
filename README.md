@@ -4,7 +4,7 @@ My real Pi harness, packaged as a versioned, inspectable setup.
 
 This repository shows the composition layer I use every day: public extensions, model-routed subagents, reusable skills, authenticated MCP connections, and a small amount of local policy. It is also a working prototype for a model-agnostic organization harness built on top of [Pi](https://github.com/badlogic/pi-mono), without forking Pi core.
 
-Extension installs follow their package's default channel instead of freezing refs or versions. The current kit targets and pins Pi `0.84.1` on Node.js `>=24.0.0`; Agent Browser 0.33.2 sets the Node floor. The guarded core-compaction reapply command supports only the exact reviewed Pi `0.84.1` and `0.84.0` package identities.
+Extension installs follow their package's default channel instead of freezing refs or versions. The current kit targets and pins Pi `0.84.2` on Node.js `>=24.0.0`; Agent Browser 0.33.2 sets the Node floor. The kit is patch-free: it modifies no Pi core files.
 
 ## Start here
 
@@ -57,19 +57,11 @@ These are the extensions loaded in my current setup. Every external extension li
 
 [`session-name`](extensions/session-name.ts) provides the `name_session` tool and inert session-name metadata that keep `/resume` searchable without renaming sessions for every subtask. It preserves coordinator and numbered subagent identities unless the user confirms their removal. During migration, it defers to an already loaded standalone `name_session` tool until `/fitch-setup` removes that package and Pi reloads.
 
-[`codex-context`](extensions/codex-context.ts) owns `/codex-fast`, its OpenAI-only footer, and optional alternate-model compaction without replacing Pi's native OpenAI streams. Pi's current session model remains the compaction model unless `pi-codex-context.json` explicitly enables custom routing and supplies alternate models. It preserves the standalone extension's `openai-codex-fast.json` state and `pi-codex-context.json` consent config, so moving into the kit does not reset either setting. While the standalone extension is still active, the bundled copy sees its effective `/codex-fast` command at session start and stays inert until `/fitch-setup` removes it and Pi reloads. The [core compaction runbook](docs/pi-core-compaction.md) and its active-install regression remain beside it.
+[`fast-mode`](extensions/fast-mode.ts) owns both provider fast toggles in one place. `/anthropic-fast [on|off|toggle|status]` requests Anthropic's research-preview fast mode for Opus 5 and Opus 4.8 at double the token price, with reported cost rates doubled to match; it is verified working on this setup's Claude subscription OAuth route, where identical output ran roughly 2x faster with the toggle on. `/codex-fast [on|off|toggle|status]` requests OpenAI's priority service tier on the `openai` and `openai-codex` providers through Pi's stock `before_provider_request` hook. Anthropic fast mode cannot ride the stock hooks: pi-ai assembles `anthropic-beta` (OAuth identity and feature markers) inside its client after extension header hooks run, and merges header sources last-write-wins, so a hook-written value would drop Pi's own markers. The extension therefore owns the `anthropic-messages` stream callback for exactly the `anthropic` and `cloudflare-ai-gateway` providers and appends the mandatory beta at fetch time, so `speed` and header travel atomically and gateway Opus gets the same toggle as the direct route. Other Opus proxies such as `github-copilot` and `opencode` stay stock, requests carrying a caller-supplied `client` stay on standard speed, and Pi-internal requests such as compaction run fast on an eligible model while the toggle is on. Toggle state lives in the shared per-user `anthropic-fast.json` and `openai-codex-fast.json` files; the footer shows `fast:on` or `fast:off` only while an eligible model is selected and follows changes made in other sessions.
 
-The same guarded Pi 0.84.1 core artifact carries bounded transient-error recovery and additive OpenAI Responses diagnostics. Anthropic's filtered SSE heartbeat pings can keep a healthy long inference alive while the terminal remains at stock Pi's static `Working...`; that diagnosed behavior is accepted. The kit adds no token-silence watchdog, provider timeout, or Anthropic-specific retry. Applying any core artifact remains opt-in and requires a full Pi process restart.
+Accepted caveats of owning that callback: do not combine it with another Anthropic or gateway provider override without reviewing both, since Pi merges registrations last-write-wins; start a fresh Pi process after disabling or removing it, because `/reload` does not clear model-runtime provider overrides; and revalidate it when upgrading Pi, since it depends on Pi's provider composition and header-merge behavior.
 
-[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits. It also owns `/anthropic-fast [on|off]`, Anthropic's research-preview fast mode for Opus 5 and Opus 4.8 at double the token price. Anthropic documents fast mode as a research preview requiring account access, and it is verified working on this setup's Claude subscription OAuth route: identical output ran roughly 2x faster with the toggle on. While an Opus 5 or Opus 4.8 model is selected, the footer shows `fast:on` or `:off`, and it clears on models that ignore fast mode. Because the toggle is shared by every session, the footer follows changes made elsewhere.
-
-Requests carrying a caller-supplied `client` are left on standard speed, since the mandatory beta header cannot be attached to them.
-
-Accepted caveat: appending a mandatory header at the wire requires owning Anthropic's stream callback, because Pi exposes no wire-header hook and no full-versus-simple stream provenance. This extension therefore wraps Anthropic streaming whenever it is loaded, and classifies full-stream calls by their Anthropic-native options. Consequences worth knowing:
-
-- Do not combine it with another Anthropic provider override without reviewing both, since Pi merges registrations last-write-wins.
-- Start a fresh Pi process after disabling or removing it; Pi 0.84.1 `/reload` does not clear model-runtime provider overrides.
-- Revalidate it when upgrading Pi, since it depends on Pi's provider composition and header-merge behavior. Agent profiles now ship directly with `pi-subagents`, so this kit no longer copies or syncs them.
+[`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other providers while resizing only Anthropic-bound images to that provider's inline limits.
 
 ### Selective experimental extension
 
@@ -161,8 +153,6 @@ The current setup has authenticated, read-only-discovery-verified connections fo
 
 The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session. The optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary. The setup configures only integrations listed in the manifest and never persists mutable npm specs such as `@latest`.
 
-Bundled `codex-context` uses Pi's current session model for compaction by default. Alternate routing is a separate data-routing choice that activates only when `pi-codex-context.json` contains literal consent and an explicit non-empty model list. `/fitch-setup` can write the disclosed `xai/grok-4.6` then `openai-codex/gpt-5.6-luna` route after separate consent.
-
 ## How the workflow fits together
 
 A typical substantial change looks like this:
@@ -190,7 +180,7 @@ This is already the working composition layer for a broader organization harness
 ## Install the kit
 
 ```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.1
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.2
 pi
 # Complete provider login in Pi, then:
 pi install git:github.com/fitchmultz/pi-fitch-kit
@@ -198,7 +188,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every package install and file change, and asks which parts to apply. It never reads or copies credentials. Complete core includes the reviewed request-boundary compaction and provider-resilience patch, but applying that Pi core mutation is a separate opt-in and requires a full process restart. Reruns offer enable, disable, or keep for alternate-model compaction consent and normalize filtered, pinned, or duplicate kit entries to one canonical source. They also preview removal of retired standalone packages, the archived Intercom package, and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. `/fitch-setup verify` reports all drift without changing anything.
+`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every package install and file change, and asks which parts to apply. It never reads or copies credentials. Reruns normalize filtered, pinned, or duplicate kit entries to one canonical source. They also preview removal of retired standalone packages, the archived Intercom package, and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. `/fitch-setup verify` reports all drift without changing anything.
 
 The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.2 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
 
@@ -224,15 +214,14 @@ The older prompt files remain in `prompts/` as source material, but the package 
 ## Repository map
 
 ```text
-extensions/             compact footer, Anthropic image guard, Codex context hooks, and session naming
+extensions/             compact footer, Anthropic image guard, fast-mode toggles, and session naming
 examples/settings.json  safe, non-secret behavioral settings
 prompts/                setup, one active operational prompt, and retained source material
 themes/                 calm theme: event-horizon neutrals, single steel-blue accent family
 setup-manifest.json     package sources and selectable integrations
 templates/              optional working-agreement blocks
-docs/                   technical guide, overview, and Pi core compaction runbook
-patches/                exact-version, reviewed Pi core patch artifacts
-scripts/                validation, package smoke, guarded core reapply, and focused regressions
+docs/                   technical guide and overview
+scripts/                validation, package smoke, and focused regressions
 ```
 
 ## Validation
@@ -243,13 +232,10 @@ npm run check
 npm run smoke
 ```
 
-- `npm run check` type-checks and syntax-checks the bundled extensions, exercises session naming and the image guard boundary, then validates unpinned package sources, manifest resources, package metadata alignment, and the absence of retired duplicate surfaces.
-- `npm run regression:codex-context` verifies the active Pi installation's compaction patch, literal consent gate, native-stream preservation, priority payload, and watcher cleanup.
-- `npm run regression:pi-core-applicator` exercises trusted patch resolution, locking, path confinement, backup integrity, interruption recovery, and migration failure paths on isolated fixtures.
-- `npm run regression:anthropic-stall` proves a real byte-idle Anthropic body still times out, heartbeat pings keep a healthy stream alive without visible assistant progress, v0.8.0 carries the superseded elapsed indicator, and current preserves stock Pi's static working row.
-- `npm run regression:pi-core-retry` drives real isolated `pi --mode rpc` binaries against local Completions and Responses servers: archived releases retain both permanent red proofs, while current must recover through bounded retry, preserve diagnostics, and surface exhausted errors honestly.
+- `npm run check` type-checks and syntax-checks the bundled extensions, exercises the image guard boundary, both fast toggles, and session naming, then validates unpinned package sources, manifest resources, package metadata alignment, and the absence of retired patch and duplicate surfaces.
+- `npm run regression:fast-mode` verifies both toggles at the wire through real pi-ai serialization: `speed` plus fetch-time beta append on direct and gateway Opus routes without dropping existing markers, beta deduplication, prebuilt-client bypass, full-stream option survival, OpenAI priority payloads, off-state passthrough, footer eligibility including proxy exclusion, and watcher cleanup.
 - `npm run regression:session-name` verifies naming, metadata injection, protected identities, and single ownership during standalone-package migration.
-- `npm run smoke` loads the checkout through Pi's real resource loader, renders the compact footer at wide and narrow widths, checks its toggle, and requires the three bundled commands, `name_session`, one OpenAI request hook, one custom-compaction hook, four extensions, and two prompts.
+- `npm run smoke` loads the checkout through Pi's real resource loader, renders the compact footer at wide and narrow widths, checks its toggle, and requires the three bundled commands, `name_session`, one provider request hook, four extensions, and two prompts.
 - `npm run smoke:lifecycle` uses an isolated Pi agent dir for real install, stale-filter and duplicate-identity normalization, and resource reload.
 
 For the detailed workflow, model table, evidence, and security rationale, read [docs/pi-setup.md](docs/pi-setup.md). For the short version, read [docs/pi-setup-post.md](docs/pi-setup-post.md).

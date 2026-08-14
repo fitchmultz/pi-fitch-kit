@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Updated 12 August 2026 for Pi 0.84.1 on Node.js 24 or newer._
+_Updated 14 August 2026 for Pi 0.84.2 on Node.js 24 or newer._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 
@@ -87,11 +87,7 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - repository work: `pi-fff`, `pi-apply-edits`;
 - task control: structured questions, persistent todos, session naming, and working-directory changes;
 - deterministic support: calculator, tool duration, verbosity, session editing, stash, and raw message copy;
-- kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, and OpenAI fast mode plus consented alternate-model compaction, while `pi-subagents` owns its profile defaults.
-
-Bundled `codex-context` leaves compaction on Pi's current session model unless its config contains literal consent and an explicit non-empty alternate-model list. The manifest-gated route is a separate choice because retained compaction context can include selected messages, prior summaries, split-turn prefixes, and custom instructions, and goes to `xai/grok-4.6`, then `openai-codex/gpt-5.6-luna` on fallback, regardless of the active chat provider. `/fitch-setup` previews the destinations and exact config before asking whether to enable, disable, or keep that consent state.
-
-Complete core also includes the reviewed request-boundary compaction and provider-resilience patch, but the setup never silently mutates Pi core. It previews the guarded status/apply/restore commands and asks separately. Applying it creates a verified stock backup and requires a full process restart; `/reload` only refreshes package resources.
+- kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, and shared fast-mode toggles for Anthropic Opus and OpenAI routes, while `pi-subagents` owns its profile defaults.
 
 Most reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
 
@@ -176,7 +172,7 @@ My safe settings subset is checked in at [`examples/settings.json`](../examples/
 }
 ```
 
-Disabling global resize preserves original detail for image analysis. [`anthropic-image-guard.ts`](../extensions/anthropic-image-guard.ts) then enforces the stricter boundary only when the selected provider is Anthropic. After disabling or removing that extension, start a fresh Pi process; Pi 0.84.1 `/reload` does not clear its model-runtime provider override. It caches eight recent successful transformations, clears them on session start and compaction, retries failures, and omits sources above 32 MiB of base64 or contexts above 64 MiB before native decoding. This is the same pattern used elsewhere in the setup: retain capability globally, then adapt at the narrow provider boundary that needs it.
+Disabling global resize preserves original detail for image analysis. [`anthropic-image-guard.ts`](../extensions/anthropic-image-guard.ts) then enforces the stricter boundary only when the selected provider is Anthropic. It caches eight recent successful transformations, clears them on session start and compaction, retries failures, and omits sources above 32 MiB of base64 or contexts above 64 MiB before native decoding. This is the same pattern used elsewhere in the setup: retain capability globally, then adapt at the narrow provider boundary that needs it.
 
 ## Subagent launch policy
 
@@ -215,7 +211,7 @@ The contrast is the point: the main session usually implements, while specialist
 ## Install and verify
 
 ```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.1
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.2
 pi
 # Complete provider login, then:
 pi install git:github.com/fitchmultz/pi-fitch-kit
@@ -223,9 +219,9 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only the selected unpinned sources. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. Agent Browser stays at 0.33.2 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys separately, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources after reload or Pi core after a full restart.
+The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only the selected unpinned sources. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. Agent Browser stays at 0.33.2 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys separately, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources after reload.
 
-`/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, model availability, consent-gated route state, and guarded Pi core patch status. An interrupted core operation reports `recovery-needed`; verify never repairs it. Complete core cannot pass while its required patch is stock, divergent, recovery-needed, or unverified.
+`/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, model availability, and consent-gated route state.
 
 ## Trust and security boundaries
 
