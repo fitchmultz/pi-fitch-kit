@@ -1,6 +1,6 @@
 # My Pi harness, and why it is structured this way
 
-_Updated 12 August 2026 for Pi 0.84.1 on Node.js 24 or newer._
+_Updated 14 August 2026 for Pi 0.84.2 on Node.js 24 or newer._
 
 A few people have asked about my terminal agent setup. The public, installable version is [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit).
 
@@ -11,7 +11,7 @@ I use [Pi](https://github.com/badlogic/pi-mono), a small terminal coding agent, 
 3. task-selected skills and working agreements;
 4. authenticated MCP access to the systems around the code.
 
-The main session remains responsible for the task. This is not an autonomous swarm. Compaction uses the current session model by default. Cross-provider custom compaction is separately disclosed and activates only when its JSON config explicitly lists alternate models.
+The main session remains responsible for the task. This is not an autonomous swarm. Compaction always uses the current session model.
 
 ## Extensions
 
@@ -23,7 +23,7 @@ The normal path includes:
 - small public tools for structured questions, persistent todos, working-directory changes, deterministic math, timing, verbosity, stash, session editing, and raw message copy;
 - [`ponytail`](https://github.com/DietrichGebert/ponytail) to keep the code path boring and small.
 
-The kit itself bundles stable session naming, the Anthropic image-provider boundary, OpenAI fast mode, and opt-in alternate-model compaction. The profiles ship directly with `pi-subagents`, so there is no second copy or sync layer.
+The kit itself bundles stable session naming, the Anthropic image-provider boundary, and shared fast-mode toggles for Anthropic Opus and OpenAI routes. The profiles ship directly with `pi-subagents`, so there is no second copy or sync layer.
 
 For native macOS automation, [`macuse`](https://github.com/fitchmultz/macuse) is a selective experimental add-on. I enable it only when browser DOM and CLI tools are insufficient; Codex app updates can break its integration surface.
 
@@ -80,7 +80,7 @@ A product layer would add centralized provisioning, policy distribution, scoped 
 ## Install it
 
 ```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.1
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.2
 pi
 # Complete provider login, then:
 pi install git:github.com/fitchmultz/pi-fitch-kit
@@ -88,6 +88,6 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-`/fitch-setup` reads unpinned package sources from [`setup-manifest.json`](../setup-manifest.json), normalizes duplicate or filtered kit entries, previews every selected change, and stops for each user's own authentication. Alternate-model compaction consent is revocable, and the Complete-core Pi patch is a separate opt-in that requires a full restart. `/fitch-setup verify` reports drift without changing anything.
+`/fitch-setup` reads unpinned package sources from [`setup-manifest.json`](../setup-manifest.json), normalizes duplicate or filtered kit entries, previews every selected change, and stops for each user's own authentication. `/fitch-setup verify` reports drift without changing anything.
 
 The [README](../README.md) is the navigation hub. The [full guide](./pi-setup.md) explains the model table, launch policy, evidence rules, usage sample, and security boundaries.

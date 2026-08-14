@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 — 14 August 2026
+
+- Retired the Pi core patch stack. Pi 0.84.2 plus current settings replaced its motivation: the Cloudflare "exceeded request buffer limit while retrying upstream" retry classification landed upstream in pi-ai, and flat 320k `contextWindow` overrides against ~1M catalog windows leave stock post-run compaction roughly 700k tokens of headroom before real overflow, with stock overflow recovery behind it. Deleted the patch artifact and archives, the guarded applicator, the core runbook, and the applicator, retry, and Anthropic-stall regressions. The kit no longer modifies any Pi core file, and the manifest no longer declares `piCorePatch`.
+- Regrouped the extensions by function. New `extensions/fast-mode.ts` owns both fast toggles: `/anthropic-fast` (Opus fast mode, 2x token price) and `/codex-fast` (OpenAI priority tier), with per-model footer status and the existing `anthropic-fast.json` / `openai-codex-fast.json` state files, so current toggle state carries over. Fast mode is now hook-based on stock `before_provider_request` and `before_provider_headers`, replacing the Anthropic provider-stream override; `/reload` now suffices after disabling any kit extension. Anthropic eligibility follows the `anthropic-messages` wire API, which extends Opus fast mode to `cloudflare-ai-gateway` routes. Accepted tradeoff: reported cost rates are no longer doubled while Anthropic fast mode is on.
+- `anthropic-image-guard` is image handling only again. Retired `codex-context.ts`: its `/codex-fast` moved to `fast-mode.ts`, and its alternate-model compaction router was removed with its consent block (the config had remained disabled; native active-model compaction is the behavior). Legacy `pi-codex-context.json` files are left untouched.
+- Pinned the validated runtime at Pi 0.84.2 across the manifest, devDependencies, lifecycle smoke, and docs. Added `regression:fast-mode`; simplified `npm run check` accordingly.
+
 ## 0.8.2 — 12 August 2026
 
 - Compaction now uses Pi's active session model unless `pi-codex-context.json` explicitly enables custom routing and supplies a valid non-empty `compactionModels` list. Literal consent without model candidates, missing or malformed config, and invalid or empty lists all return control to Pi's native active-model compaction.

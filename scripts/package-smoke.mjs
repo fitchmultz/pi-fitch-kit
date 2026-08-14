@@ -53,8 +53,8 @@ try {
 	if (extensions.extensions.length !== 4) throw new Error(`Expected 4 extensions, got ${extensions.extensions.length}`);
 	const cleanFooter = extensions.extensions.find(({ path }) => path.endsWith("/extensions/clean-footer.ts"));
 	if (!cleanFooter) throw new Error("Clean-footer extension missing");
-	const codex = extensions.extensions.find(({ path }) => path.endsWith("/extensions/codex-context.ts"));
-	if (!codex) throw new Error("Codex context extension missing");
+	const fastMode = extensions.extensions.find(({ path }) => path.endsWith("/extensions/fast-mode.ts"));
+	if (!fastMode) throw new Error("Fast-mode extension missing");
 	const sessionName = extensions.extensions.find(({ path }) => path.endsWith("/extensions/session-name.ts"));
 	if (!sessionName) throw new Error("Session-name extension missing");
 	extensions.runtime.getCommands = () =>
@@ -75,53 +75,21 @@ try {
 		);
 	extensions.runtime.getActiveTools = () => ["name_session"];
 	extensions.runtime.getSessionName = () => undefined;
-	const codexStart = codex.handlers.get("session_start")?.[0];
-	if (!codexStart) throw new Error("Codex context session_start handler missing");
-	await codexStart({}, {
-		model: { provider: "openai-codex" },
+	const fastModeStart = fastMode.handlers.get("session_start")?.[0];
+	if (!fastModeStart) throw new Error("Fast-mode session_start handler missing");
+	const fastStatuses = new Map();
+	await fastModeStart({}, {
+		model: { provider: "openai-codex", id: "gpt-5.6-sol", api: "openai-codex-responses" },
 		hasUI: false,
 		ui: {
-			setStatus: () => {},
+			setStatus: (key, value) => fastStatuses.set(key, value),
 			theme: { fg: (_color, text) => text },
 		},
 	});
-	const beforeCompact = codex.handlers.get("session_before_compact")?.[0];
-	if (!beforeCompact) throw new Error("Codex context session_before_compact handler missing");
-	const compactionConfig = join(agentDir, "pi-codex-context.json");
-	let modelLookups = 0;
-	const compactionContext = {
-		hasUI: false,
-		modelRegistry: {
-			find: () => {
-				modelLookups++;
-				return undefined;
-			},
-			getProvider: () => undefined,
-		},
-	};
-	for (const value of [undefined, false, "true", 1, true]) {
-		if (value === undefined) rmSync(compactionConfig, { force: true });
-		else writeFileSync(compactionConfig, `${JSON.stringify({ customCompactionEnabled: value })}\n`);
-		await beforeCompact(
-			{ signal: new AbortController().signal },
-			compactionContext,
-		);
+	if (!fastStatuses.has("codex-fast")) throw new Error("Fast-mode footer status missing for OpenAI models");
+	if (fastStatuses.get("anthropic-fast") !== undefined) {
+		throw new Error("Fast-mode must clear the Anthropic status on OpenAI models");
 	}
-	if (modelLookups !== 0) throw new Error("Compaction config without an explicit model list triggered a model lookup");
-	writeFileSync(
-		compactionConfig,
-		`${JSON.stringify({
-			customCompactionEnabled: true,
-			compactionModels: [
-				{ provider: "xai", model: "grok-4.6", thinkingLevel: "high" },
-			],
-		})}\n`,
-	);
-	await beforeCompact(
-		{ signal: new AbortController().signal },
-		compactionContext,
-	);
-	if (modelLookups === 0) throw new Error("Explicit custom compaction model did not activate routing");
 	const sessionNameStart = sessionName.handlers.get("session_start")?.[0];
 	if (!sessionNameStart) throw new Error("Session-name session_start handler missing");
 	await sessionNameStart({}, {});
@@ -255,7 +223,7 @@ try {
 	if (JSON.stringify(commandNames) !== JSON.stringify(expectedCommands)) {
 		throw new Error(`Expected ${JSON.stringify(expectedCommands)}, got ${JSON.stringify(commandNames)}`);
 	}
-	for (const event of ["before_provider_request", "session_before_compact"]) {
+	for (const event of ["before_provider_request", "before_provider_headers"]) {
 		const count = extensions.extensions.reduce(
 			(total, extension) => total + (extension.handlers.get(event)?.length ?? 0),
 			0,

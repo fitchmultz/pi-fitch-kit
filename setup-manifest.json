@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "runtime": {
-    "pi": "0.84.1",
+    "pi": "0.84.2",
     "node": ">=24.0.0"
   },
   "kit": {
@@ -26,7 +26,7 @@
     "extensions": [
       "extensions/anthropic-image-guard.ts",
       "extensions/clean-footer.ts",
-      "extensions/codex-context.ts",
+      "extensions/fast-mode.ts",
       "extensions/session-name.ts"
     ],
     "prompts": [
@@ -39,53 +39,7 @@
     "workingAgreementTemplate": "templates/working-agreement.md",
     "settingsExample": "examples/settings.json"
   },
-  "consentBehaviors": [
-    {
-      "id": "codex-context",
-      "extension": "extensions/codex-context.ts",
-      "consent": {
-        "required": true,
-        "default": "disabled",
-        "data": "retained compaction context, including messages selected for summarization, prior summaries, split-turn prefixes, and custom instructions",
-        "destinations": [
-          "xai/grok-4.6",
-          "openai-codex/gpt-5.6-luna"
-        ],
-        "configPath": "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/pi-codex-context.json",
-        "config": {
-          "customCompactionEnabled": true,
-          "compactionModels": [
-            {
-              "provider": "xai",
-              "model": "grok-4.6",
-              "thinkingLevel": "high"
-            },
-            {
-              "provider": "openai-codex",
-              "model": "gpt-5.6-luna",
-              "thinkingLevel": "high"
-            }
-          ]
-        },
-        "disabledConfig": {
-          "customCompactionEnabled": false
-        }
-      }
-    }
-  ],
-  "piCorePatch": {
-    "id": "request-boundary-compaction",
-    "requiredForCompleteCore": true,
-    "consent": {
-      "required": true,
-      "default": "disabled"
-    },
-    "docs": "docs/pi-core-compaction.md",
-    "statusScript": "status:pi-core-compaction",
-    "applyScript": "reapply:pi-core-compaction",
-    "restoreScript": "restore:pi-core-compaction",
-    "restartRequired": true
-  },
+  "consentBehaviors": [],
   "retiredPackageSources": [
     "git:github.com/fitchmultz/pi-codex-context",
     "git:github.com/fitchmultz/pi-session-name"
