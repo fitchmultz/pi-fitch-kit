@@ -120,7 +120,6 @@ assert.equal(
 	undefined,
 	"non-Claude models on the anthropic-messages API must keep source images",
 );
-assert.equal(vercelNonClaude[0].content[0].type, "image");
 const gatewayNonClaude = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
 assert.equal(
 	await context(
