@@ -2,7 +2,7 @@
 
 ## 0.9.1 — 14 August 2026
 
-- `anthropic-image-guard` now gates on the `anthropic-messages` wire API instead of the `anthropic` provider name, so Claude behind Cloudflare AI Gateway or proxies such as GitHub Copilot gets the same resize/omission protection as the direct route. Previously a gateway-default setup ran its daily Anthropic models with no image guard at all. Smoke coverage now drives gateway and proxy routes and asserts non-Anthropic APIs from those providers stay untouched.
+- `anthropic-image-guard` now gates on Claude models over the `anthropic-messages` wire API instead of the `anthropic` provider name, so Claude behind Cloudflare AI Gateway or proxies such as GitHub Copilot gets the same resize/omission protection as the direct route. Previously a gateway-default setup ran its daily Claude models with no image guard at all. The API alone would be too broad: providers such as `vercel-ai-gateway`, `kimi-coding`, and `minimax` speak `anthropic-messages` for non-Claude models whose image limits differ, so those keep full-resolution sources (Claude ids are matched anywhere in the id to cover namespaced forms like `anthropic/claude-opus-5`). Smoke coverage drives gateway and namespaced-Claude routes and asserts non-Claude `anthropic-messages` models and non-Anthropic APIs stay untouched.
 
 ## 0.9.0 — 14 August 2026
 

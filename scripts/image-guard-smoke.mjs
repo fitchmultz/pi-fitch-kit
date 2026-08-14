@@ -9,7 +9,7 @@ const WIDE_PNG =
 	"iVBORw0KGgoAAAANSUhEUgAAB9EAAAABCAIAAADmXckUAAAAH0lEQVR4nO3CMREAAAwDofdvuhWRFY6uVFVVVVXV/QNsD8mZm8ZR8gAAAABJRU5ErkJggg==";
 const SMALL_BMP = "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAATCwAAEwsAAAAAAAAAAAAAAAD/AA==";
 
-const anthropicModel = { provider: "anthropic", api: "anthropic-messages" };
+const anthropicModel = { provider: "anthropic", api: "anthropic-messages", id: "claude-opus-5" };
 
 const handlers = {};
 anthropicImageGuard({
@@ -94,26 +94,38 @@ const oversizedResult = await context({ messages: oversized }, { model: anthropi
 assert.match(oversizedResult.messages[0].content[0].text, /resize safety limit/);
 assert.equal(oversizedResult.messages[0].content[1].type, "image");
 
-// The guard keys on the wire API: Claude behind a gateway or proxy hits the
-// same Anthropic image limits, while non-Anthropic APIs from those providers do not.
+// The guard requires a Claude model on the anthropic-messages API: Claude
+// behind a gateway or proxy hits the same Anthropic image limits, while
+// non-Claude models sharing that wire API (and non-Anthropic APIs from the
+// same providers) keep their source images untouched.
 const gatewayWide = [{ role: "user", content: [{ type: "image", data: WIDE_PNG, mimeType: "image/png" }] }];
 const gatewayResult = await context(
 	{ messages: gatewayWide },
-	{ model: { provider: "cloudflare-ai-gateway", api: "anthropic-messages" } },
+	{ model: { provider: "cloudflare-ai-gateway", api: "anthropic-messages", id: "claude-fable-5" } },
 );
 assert.match(gatewayResult.messages[0].content[0].text, /original 2001x1, displayed at 2000x1/);
 assert.equal(gatewayResult.messages[0].content[1].type, "image");
-const copilotBmp = [{ role: "user", content: [{ type: "image", data: SMALL_BMP, mimeType: "image/bmp" }] }];
-const copilotResult = await context(
-	{ messages: copilotBmp },
-	{ model: { provider: "github-copilot", api: "anthropic-messages" } },
+const namespacedClaude = [{ role: "user", content: [{ type: "image", data: SMALL_BMP, mimeType: "image/bmp" }] }];
+const namespacedResult = await context(
+	{ messages: namespacedClaude },
+	{ model: { provider: "vercel-ai-gateway", api: "anthropic-messages", id: "anthropic/claude-opus-5" } },
 );
-assert.match(copilotResult.messages[0].content[0].text, /does not support this image type/);
+assert.match(namespacedResult.messages[0].content[0].text, /does not support this image type/);
+const vercelNonClaude = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
+assert.equal(
+	await context(
+		{ messages: vercelNonClaude },
+		{ model: { provider: "vercel-ai-gateway", api: "anthropic-messages", id: "openai/gpt-5.6-sol" } },
+	),
+	undefined,
+	"non-Claude models on the anthropic-messages API must keep source images",
+);
+assert.equal(vercelNonClaude[0].content[0].type, "image");
 const gatewayNonClaude = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
 assert.equal(
 	await context(
 		{ messages: gatewayNonClaude },
-		{ model: { provider: "cloudflare-ai-gateway", api: "openai-completions" } },
+		{ model: { provider: "cloudflare-ai-gateway", api: "openai-completions", id: "gpt-5.6-sol" } },
 	),
 	undefined,
 );
@@ -139,7 +151,7 @@ console.log(
 		unsupportedCustomImage: "omitted",
 		anthropicResizeFailure: "omitted",
 		oversizedSource: "omitted",
-		anthropicApiRoutes: "gateway+proxy guarded, non-anthropic APIs untouched",
+		claudeRoutes: "gateway+namespaced claude guarded, non-claude and non-anthropic APIs untouched",
 		compaction: "cleared",
 	}),
 );

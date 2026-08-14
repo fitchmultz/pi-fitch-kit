@@ -25,10 +25,16 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 	pi.on("session_compact", clearCache);
 
 	pi.on("context", async (event, ctx) => {
-		// Anthropic's image limits are a property of the wire API, not of one
-		// provider name: Claude behind cloudflare-ai-gateway or github-copilot
-		// hits the same constraints as the direct route.
-		if (ctx.model?.api !== "anthropic-messages") return;
+		// Anthropic's image limits follow the model, not one provider name:
+		// Claude behind cloudflare-ai-gateway or github-copilot hits the same
+		// constraints as the direct route. The wire API alone is too broad a
+		// gate, though: vercel-ai-gateway, kimi-coding, minimax, and others
+		// speak anthropic-messages for non-Claude models whose limits differ,
+		// so require a Claude model on that API (vercel namespaces ids as
+		// "anthropic/claude-...", hence includes, not startsWith).
+		if (ctx.model?.api !== "anthropic-messages" || !ctx.model.id.toLowerCase().includes("claude")) {
+			return;
+		}
 
 		let changed = false;
 		let contextImageChars = 0;
