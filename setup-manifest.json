@@ -31,7 +31,7 @@
     "openai/gpt-5.6-sol": 320000,
     "openai/gpt-5.6-luna": 320000
   },
-  "modelContextWindowsNote": "Flat compaction-policy windows, merged per route into models.json as modelOverrides { contextWindow }. Two regimes: on the ~1M-catalog anthropic routes 320000 lowers the window so compaction triggers far earlier; on the 272000-catalog openai and openai-codex gpt-5.6 routes it raises the advertised window, and any request whose input exceeds 272k bills at OpenAI's long-context tier for the entire request. xai/grok-4.6 is absent because it runs as a full custom model definition that already carries a 320k window outside this override merge.",
+  "modelContextWindowsNote": "Flat compaction-policy windows, merged per route into models.json as modelOverrides { contextWindow }. Two regimes: on the ~1M-catalog anthropic routes 320000 lowers the window so compaction triggers far earlier; on the 272000-catalog openai and openai-codex gpt-5.6 routes it raises the advertised window, and any request whose input exceeds 272k bills at OpenAI's long-context tier for the entire request. xai/grok-4.6 is absent because the kit does not manage its window: the owner's own config defines it as a full custom model already at 320k, while a fresh install keeps its catalog window.",
   "kitResources": {
     "extensions": [
       "extensions/anthropic-image-guard.ts",
