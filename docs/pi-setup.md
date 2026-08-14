@@ -160,6 +160,10 @@ Authentication remains user-scoped. The setup process may inspect non-secret con
 
 My personal runtime uses full approvals. MCP transports tool calls; it is not the authorization boundary. The working agreement tells the model when external writes need explicit user direction, but that is policy rather than a per-tool enforcement mechanism. A multi-user product needs its authorization controls in the surrounding identity and execution plane.
 
+## Compaction policy
+
+The settings example pins `compaction.reserveTokens: 64000` with `keepRecentTokens: 40000`, and the manifest's `modelContextWindows` merge flat 320k windows into `models.json` for the managed routes. Together they compact at a 256k threshold with roughly 60k of near-threshold generation runway. The same override means two different things by route family: the ~1M-catalog `anthropic/*` routes compact far earlier than their catalog edge, while the 272k-catalog `openai/*` and `openai-codex/*` gpt-5.6 routes get a raised window, and any request whose input crosses 272k bills at OpenAI's long-context tier for the entire request. That is a deliberate quality-over-cost choice; decline the consent step to keep stock behavior. The kit does not manage `xai/grok-4.6`'s window: my own config defines it as a full custom model already at 320k with its own pricing, while a fresh install keeps its catalog window.
+
 ## Image quality boundary
 
 My safe settings subset is checked in at [`examples/settings.json`](../examples/settings.json). The non-default image choice is intentional:
@@ -219,9 +223,9 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only the selected unpinned sources. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. Agent Browser stays at 0.33.2 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys separately, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources after reload.
+The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only the selected unpinned sources. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. Agent Browser stays at 0.33.2 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys and the context-window overrides as separate consent steps, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources after reload.
 
-`/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, model availability, and consent-gated route state.
+`/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, model availability, consent-gated route state, and `models.json` context-window overrides.
 
 ## Trust and security boundaries
 
