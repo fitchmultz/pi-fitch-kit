@@ -30,7 +30,7 @@ Unless mode is `verify`, ask the user to choose:
 4. Whether to adopt the baseline working-agreement block, the optional process block, both, or neither, from `<package-root>/templates/working-agreement.md`.
 5. Project-trust posture. Show `defaultProjectTrust` and the subagent `projectTrust.childRuns` options (`approve`, `inherit`, `no-approve`) with their tradeoffs. Untrusted repositories should use `no-approve`. Do not silently copy another person's trust settings.
 6. Whether to copy the safe behavioral settings from `<package-root>/examples/settings.json`. Treat each key as optional. In particular, explain that `images.autoResize: false` preserves source image detail globally while the bundled image guard still resizes Claude-bound images on `anthropic-messages` routes to Anthropic's inline limits.
-7. Whether to merge the manifest's `modelContextWindows` into `models.json` as per-route `modelOverrides` `{ "contextWindow": N }` entries. Explain the pairing: with the settings example's `compaction.reserveTokens` of 64000 these windows put the compaction threshold at 256k with roughly 60k of near-threshold generation runway, and without them the same reserve compacts far later on catalog windows. Offer only routes the user actually has; never invent overrides for unlisted routes.
+7. Whether to merge the manifest's `modelContextWindows` into `models.json`, one `providers.<provider>.modelOverrides.<model-id>` entry of `{ "contextWindow": N }` per selected route, stripping the provider prefix from the route id. Explain both regimes before asking: with the settings example's `compaction.reserveTokens` of 64000 the overrides compact at a 256k threshold with roughly 60k of near-threshold generation runway; on the ~1M-catalog `anthropic/*` routes that is far earlier than stock, while on the 272k-catalog `openai/*` and `openai-codex/*` routes it raises the advertised window and requests whose input exceeds 272k bill at OpenAI's long-context tier for the entire request. Offer only routes the user actually has; never invent overrides for unlisted routes. When a route already carries a different `contextWindow`, require an explicit keep-or-overwrite choice; declining this step changes nothing.
 
 ## Preview and apply
 
@@ -41,6 +41,7 @@ Before any write or install, show one complete preview containing:
 - every filesystem path that may change and whether it will be created, merged, symlinked, or left alone;
 - the model mapping from the fourteen specialist profiles in the installed `pi-subagents/agents/` directory;
 - the selected working-agreement and settings keys;
+- the selected context-window override routes with their exact values and any existing values they would replace;
 - package-backed skills that will load and any name collision with an existing user skill;
 - every selected consent-gated data route, its exact destinations, and the exact config path and keys that enable it;
 - the Agent Browser prerequisite sequence from the manifest, if selected: install the exact npm package, then optionally download its browser runtime;
@@ -64,7 +65,7 @@ After resource or configuration changes, tell the user to run `/reload` or start
 
 ## Verify mode and smokes
 
-If mode is `verify`, make no changes, installs, downloads, logins, or repairs. Ask whether to verify complete core or selected components, then report drift against the manifest, including package versions, normalized kit package identity and filters, loaded subagent defaults, extensions, prompts, skills, model availability, consent-gated config state and destinations, and the Agent Browser CLI version.
+If mode is `verify`, make no changes, installs, downloads, logins, or repairs. Ask whether to verify complete core or selected components, then report drift against the manifest, including package versions, normalized kit package identity and filters, loaded subagent defaults, extensions, prompts, skills, model availability, consent-gated config state and destinations, `models.json` context-window overrides against `modelContextWindows`, and the Agent Browser CLI version.
 
 In either mode, verification is read-only after any required reload. Use only harmless documented smokes: version and resource-list checks, local repository search, read-only subagent and intercom checks, a todo-list read, a non-authenticated browser page only if its runtime was approved, deterministic calculator input, and tool or schema discovery for integrations. Confirm `apply_edits` is active and the built-in `edit` and `write` tools are hidden. If a capability has no harmless smoke, report it as manual verification instead of inventing one.
 

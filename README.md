@@ -4,7 +4,7 @@ My real Pi harness, packaged as a versioned, inspectable setup.
 
 This repository shows the composition layer I use every day: public extensions, model-routed subagents, reusable skills, authenticated MCP connections, and a small amount of local policy. It is also a working prototype for a model-agnostic organization harness built on top of [Pi](https://github.com/badlogic/pi-mono), without forking Pi core.
 
-Extension installs follow their package's default channel instead of freezing refs or versions. The current kit targets and pins Pi `0.84.2` on Node.js `>=24.0.0`; Agent Browser 0.33.2 sets the Node floor. The kit is patch-free: it modifies no Pi core files. One accepted gap from that stance: stock Pi 0.84.2 does not classify OpenAI's bare transient `Sorry, something went wrong` response as retryable, so those turns fail instead of recovering; the fix is proposed upstream rather than re-patched here, and no settings knob or extension hook can restore it in the meantime.
+Extension installs follow their package's default channel instead of freezing refs or versions. The current kit targets and pins Pi `0.84.2` on Node.js `>=24.0.0`; Agent Browser 0.33.2 sets the Node floor. The kit is patch-free: it modifies no Pi core files. One accepted gap from that stance: stock Pi 0.84.2 does not classify OpenAI's bare transient `Sorry, something went wrong` response as retryable, so those turns fail instead of recovering. No retry-classification setting exists, and the kit declines to carry an extension shim around message handling, so the fix belongs upstream in pi-ai's retry classification.
 
 ## Start here
 
@@ -188,7 +188,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every package install and file change, and asks which parts to apply. It never reads or copies credentials. Reruns normalize filtered, pinned, or duplicate kit entries to one canonical source. They also preview removal of retired standalone packages, the archived Intercom package, and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. `/fitch-setup verify` reports all drift without changing anything.
+`/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every package install and file change, and asks which parts to apply. It never reads or copies credentials. Reruns normalize filtered, pinned, or duplicate kit entries to one canonical source. A separate consent step merges the manifest's flat context-window overrides into `models.json` per route, keeping existing values unless explicitly overwritten. They also preview removal of retired standalone packages, the archived Intercom package, and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. `/fitch-setup verify` reports all drift without changing anything.
 
 The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.2 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
 
@@ -232,7 +232,7 @@ npm run check
 npm run smoke
 ```
 
-- `npm run check` type-checks and syntax-checks the bundled extensions, exercises the image guard boundary, both fast toggles, and session naming, then validates unpinned package sources, manifest resources, package metadata alignment, and the absence of retired patch and duplicate surfaces.
+- `npm run check` type-checks and syntax-checks the bundled extensions, exercises the image guard boundary, both fast toggles, and session naming, then validates unpinned package sources, manifest resources, package metadata alignment, the absence of retired patch and duplicate surfaces, the settings example's compaction values, and that every manifest context-window override names a manifest-managed route with a sane value.
 - `npm run regression:fast-mode` verifies both toggles at the wire through real pi-ai serialization: `speed` plus fetch-time beta append on direct and gateway Opus routes without dropping existing markers, beta deduplication, prebuilt-client bypass, full-stream option survival, OpenAI priority payloads, off-state passthrough, footer eligibility including proxy exclusion, and watcher cleanup.
 - `npm run regression:session-name` verifies naming, metadata injection, protected identities, and single ownership during standalone-package migration.
 - `npm run smoke` loads the checkout through Pi's real resource loader, renders the compact footer at wide and narrow widths, checks its toggle, and requires the three bundled commands, `name_session`, one provider request hook, four extensions, and two prompts.

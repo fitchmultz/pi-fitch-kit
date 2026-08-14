@@ -14,8 +14,16 @@ const assert = (condition, message) => {
 
 assert(manifest.schemaVersion === 7, "setup manifest schema must match the patch-free context-window shape");
 const manifestModelRoutes = new Set([...manifest.requiredModels, ...manifest.optionalModels]);
-for (const route of Object.keys(manifest.modelContextWindows)) {
+assert(
+  manifest.modelContextWindows && Object.keys(manifest.modelContextWindows).length > 0,
+  "manifest must carry modelContextWindows",
+);
+for (const [route, value] of Object.entries(manifest.modelContextWindows)) {
   assert(manifestModelRoutes.has(route), `modelContextWindows route ${route} must be a manifest-managed model route`);
+  assert(
+    Number.isInteger(value) && value > 0 && value <= 2_000_000,
+    `modelContextWindows value for ${route} must be a sane positive integer`,
+  );
 }
 assert(manifest.runtime.pi === "0.84.2", "the kit must pin the validated Pi runtime");
 const resolvedOrigins = Object.values(packageLock.packages)
@@ -138,6 +146,12 @@ const setupPrompt = readFileSync(join(root, setupPromptPath), "utf-8");
 assert(setupPrompt.includes("setup-manifest.json"), "setup prompt must reference the manifest");
 assert(setupPrompt.includes("pi-subagents"), "setup prompt must name the profile owner");
 assert(setupPrompt.includes("${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"), "setup prompt must honor the active Pi agent directory");
+assert(setupPrompt.includes("modelContextWindows"), "setup prompt must offer the context-window override step");
+assert(setupPrompt.includes("keep-or-overwrite"), "setup prompt must define rerun semantics for existing overrides");
+assert(setupPrompt.includes("long-context tier"), "setup prompt must disclose the OpenAI pricing consequence");
+const settingsExample = JSON.parse(readFileSync(join(root, "examples", "settings.json"), "utf-8"));
+assert(settingsExample.compaction.reserveTokens === 64000, "settings example must carry the 64k compaction reserve");
+assert(settingsExample.compaction.keepRecentTokens === 40000, "settings example must keep 40k recent tokens");
 assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");
 assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
 assert(setupPrompt.includes("consentBehaviors"), "setup prompt must honor consent-gated behavior");
