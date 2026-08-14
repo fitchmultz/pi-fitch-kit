@@ -5,7 +5,7 @@
 - This repo is the public, opinionated composition package for Fitch's active Pi extensions, skills, settings, and setup flow.
 - Canonical sources:
   - `prompts/fitch-setup.md` and `prompts/audit/github-open-issues-prs.md` for the two registered slash commands; other prompt files are retained source material.
-  - `extensions/anthropic-image-guard.ts` for provider-specific image handling when global auto-resize is off.
+  - `extensions/anthropic-image-guard.ts` for Anthropic-API image handling when global auto-resize is off.
   - `extensions/clean-footer.ts` for a compact footer without cumulative token, cache, or cost counters.
   - `extensions/fast-mode.ts` for the shared `/anthropic-fast` and `/codex-fast` toggles.
   - `extensions/session-name.ts` for stable, searchable session naming and protected role identifiers.
@@ -41,7 +41,7 @@
 ## Extension and package work
 
 - Before changing Pi runtime/package behavior, read the installed Pi docs/types for the touched surface, especially `docs/packages.md`, `docs/prompt-templates.md`, and `docs/extensions.md` under the installed Pi root.
-- Keep `extensions/anthropic-image-guard.ts` provider-scoped and based on Pi's native `resizeImage`; preserve its pre-decode source limits and do not reintroduce global resizing logic.
+- Keep `extensions/anthropic-image-guard.ts` scoped to the `anthropic-messages` wire API and based on Pi's native `resizeImage`; preserve its pre-decode source limits and do not reintroduce global resizing logic.
 - Keep `extensions/clean-footer.ts` free of cumulative token, cache, and cost counters; preserve context usage, model details, extension statuses, and wrapping without truncation.
 - Keep `extensions/fast-mode.ts` scoped: OpenAI priority rides `before_provider_request`; Anthropic fast mode owns the `anthropic-messages` override for only the `anthropic` and `cloudflare-ai-gateway` providers, appends the beta at fetch time, and never sends `speed` when the header cannot be attached. Keep the gateway endpoint-placeholder resolution in `fastStream`, the existing state filenames, and the doubled fast cost rates.
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.

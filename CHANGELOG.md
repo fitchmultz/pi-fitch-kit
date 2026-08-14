@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.1 — 14 August 2026
+
+- `anthropic-image-guard` now gates on the `anthropic-messages` wire API instead of the `anthropic` provider name, so Claude behind Cloudflare AI Gateway or proxies such as GitHub Copilot gets the same resize/omission protection as the direct route. Previously a gateway-default setup ran its daily Anthropic models with no image guard at all. Smoke coverage now drives gateway and proxy routes and asserts non-Anthropic APIs from those providers stay untouched.
+
 ## 0.9.0 — 14 August 2026
 
 - Retired the Pi core patch stack. Pi 0.84.2 plus current settings replaced its motivation: the Cloudflare "exceeded request buffer limit while retrying upstream" retry classification landed upstream in pi-ai, and flat 320k `contextWindow` overrides against ~1M catalog windows leave stock post-run compaction roughly 700k tokens of headroom before real overflow, with stock overflow recovery behind it. Deleted the patch artifact and archives, the guarded applicator, the core runbook, and the applicator, retry, and Anthropic-stall regressions. The kit no longer modifies any Pi core file, and the manifest no longer declares `piCorePatch`.

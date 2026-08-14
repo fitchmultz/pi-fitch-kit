@@ -25,7 +25,10 @@ export default function anthropicImageGuard(pi: ExtensionAPI): void {
 	pi.on("session_compact", clearCache);
 
 	pi.on("context", async (event, ctx) => {
-		if (ctx.model?.provider !== "anthropic") return;
+		// Anthropic's image limits are a property of the wire API, not of one
+		// provider name: Claude behind cloudflare-ai-gateway or github-copilot
+		// hits the same constraints as the direct route.
+		if (ctx.model?.api !== "anthropic-messages") return;
 
 		let changed = false;
 		let contextImageChars = 0;

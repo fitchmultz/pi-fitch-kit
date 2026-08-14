@@ -9,6 +9,8 @@ const WIDE_PNG =
 	"iVBORw0KGgoAAAANSUhEUgAAB9EAAAABCAIAAADmXckUAAAAH0lEQVR4nO3CMREAAAwDofdvuhWRFY6uVFVVVVXV/QNsD8mZm8ZR8gAAAABJRU5ErkJggg==";
 const SMALL_BMP = "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAATCwAAEwsAAAAAAAAAAAAAAAD/AA==";
 
+const anthropicModel = { provider: "anthropic", api: "anthropic-messages" };
+
 const handlers = {};
 anthropicImageGuard({
 	on(event, handler) {
@@ -25,22 +27,25 @@ assert.equal(typeof handlers.session_start[0], "function");
 assert.equal(typeof handlers.session_compact[0], "function");
 
 const nonAnthropic = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
-assert.equal(await context({ messages: nonAnthropic }, { model: { provider: "openai" } }), undefined);
+assert.equal(
+	await context({ messages: nonAnthropic }, { model: { provider: "openai", api: "openai-responses" } }),
+	undefined,
+);
 assert.equal(nonAnthropic[0].content[0].type, "image");
 
 const unchanged = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/png" }] }];
-assert.equal(await context({ messages: unchanged }, { model: { provider: "anthropic" } }), undefined);
+assert.equal(await context({ messages: unchanged }, { model: anthropicModel }), undefined);
 assert.equal(unchanged[0].content[0].data, SMALL_PNG);
 
 await runHandlers("session_start", {}, {});
 const mislabeled = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/jpeg" }] }];
-await context({ messages: mislabeled }, { model: { provider: "anthropic" } });
+await context({ messages: mislabeled }, { model: anthropicModel });
 const correctlyLabeled = [{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/png" }] }];
-assert.equal(await context({ messages: correctlyLabeled }, { model: { provider: "anthropic" } }), undefined);
+assert.equal(await context({ messages: correctlyLabeled }, { model: anthropicModel }), undefined);
 assert.equal(correctlyLabeled[0].content[0].mimeType, "image/png");
 
 const wide = [{ role: "user", content: [{ type: "image", data: WIDE_PNG, mimeType: "image/png" }] }];
-const wideResult = await context({ messages: wide }, { model: { provider: "anthropic" } });
+const wideResult = await context({ messages: wide }, { model: anthropicModel });
 assert.match(wideResult.messages[0].content[0].text, /original 2001x1, displayed at 2000x1/);
 assert.equal(wideResult.messages[0].content[1].type, "image");
 assert.notEqual(wideResult.messages[0].content[1].data, WIDE_PNG);
@@ -54,7 +59,7 @@ const custom = [
 		timestamp: 0,
 	},
 ];
-const customResult = await context({ messages: custom }, { model: { provider: "anthropic" } });
+const customResult = await context({ messages: custom }, { model: anthropicModel });
 assert.match(customResult.messages[0].content[0].text, /original 2001x1, displayed at 2000x1/);
 assert.equal(customResult.messages[0].content[1].type, "image");
 
@@ -67,12 +72,12 @@ const customBmp = [
 		timestamp: 0,
 	},
 ];
-const customBmpResult = await context({ messages: customBmp }, { model: { provider: "anthropic" } });
+const customBmpResult = await context({ messages: customBmp }, { model: anthropicModel });
 assert.match(customBmpResult.messages[0].content[0].text, /does not support this image type/);
 assert.equal(customBmpResult.messages[0].content.some(({ type }) => type === "image"), false);
 
 const anthropic = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
-const result = await context({ messages: anthropic }, { model: { provider: "anthropic" } });
+const result = await context({ messages: anthropic }, { model: anthropicModel });
 assert.equal(result.messages[0].content[0].type, "text");
 assert.match(result.messages[0].content[0].text, /Image omitted/);
 
@@ -85,9 +90,33 @@ const oversized = [
 		],
 	},
 ];
-const oversizedResult = await context({ messages: oversized }, { model: { provider: "anthropic" } });
+const oversizedResult = await context({ messages: oversized }, { model: anthropicModel });
 assert.match(oversizedResult.messages[0].content[0].text, /resize safety limit/);
 assert.equal(oversizedResult.messages[0].content[1].type, "image");
+
+// The guard keys on the wire API: Claude behind a gateway or proxy hits the
+// same Anthropic image limits, while non-Anthropic APIs from those providers do not.
+const gatewayWide = [{ role: "user", content: [{ type: "image", data: WIDE_PNG, mimeType: "image/png" }] }];
+const gatewayResult = await context(
+	{ messages: gatewayWide },
+	{ model: { provider: "cloudflare-ai-gateway", api: "anthropic-messages" } },
+);
+assert.match(gatewayResult.messages[0].content[0].text, /original 2001x1, displayed at 2000x1/);
+assert.equal(gatewayResult.messages[0].content[1].type, "image");
+const copilotBmp = [{ role: "user", content: [{ type: "image", data: SMALL_BMP, mimeType: "image/bmp" }] }];
+const copilotResult = await context(
+	{ messages: copilotBmp },
+	{ model: { provider: "github-copilot", api: "anthropic-messages" } },
+);
+assert.match(copilotResult.messages[0].content[0].text, /does not support this image type/);
+const gatewayNonClaude = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
+assert.equal(
+	await context(
+		{ messages: gatewayNonClaude },
+		{ model: { provider: "cloudflare-ai-gateway", api: "openai-completions" } },
+	),
+	undefined,
+);
 
 await runHandlers("session_compact");
 const afterCompaction = [
@@ -96,7 +125,7 @@ const afterCompaction = [
 	{ role: "bashExecution", command: "pwd", output: "/tmp" },
 	{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] },
 ];
-const afterCompactionResult = await context({ messages: afterCompaction }, { model: { provider: "anthropic" } });
+const afterCompactionResult = await context({ messages: afterCompaction }, { model: anthropicModel });
 assert.equal(afterCompactionResult.messages[3].content[0].type, "text");
 
 console.log(
@@ -110,6 +139,7 @@ console.log(
 		unsupportedCustomImage: "omitted",
 		anthropicResizeFailure: "omitted",
 		oversizedSource: "omitted",
+		anthropicApiRoutes: "gateway+proxy guarded, non-anthropic APIs untouched",
 		compaction: "cleared",
 	}),
 );

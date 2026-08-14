@@ -29,7 +29,7 @@ Unless mode is `verify`, ask the user to choose:
 3. Which `optionalIntegrations`, if any, they want to configure through the MCP adapter. Authentication is manual and per-user; do not test it by reading service payloads.
 4. Whether to adopt the baseline working-agreement block, the optional process block, both, or neither, from `<package-root>/templates/working-agreement.md`.
 5. Project-trust posture. Show `defaultProjectTrust` and the subagent `projectTrust.childRuns` options (`approve`, `inherit`, `no-approve`) with their tradeoffs. Untrusted repositories should use `no-approve`. Do not silently copy another person's trust settings.
-6. Whether to copy the safe behavioral settings from `<package-root>/examples/settings.json`. Treat each key as optional. In particular, explain that `images.autoResize: false` preserves source image detail globally while the bundled Anthropic image guard still resizes images for that provider's inline limits.
+6. Whether to copy the safe behavioral settings from `<package-root>/examples/settings.json`. Treat each key as optional. In particular, explain that `images.autoResize: false` preserves source image detail globally while the bundled Anthropic image guard still resizes images on `anthropic-messages` routes to that API's inline limits.
 
 ## Preview and apply
 
