@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.1 — 14 August 2026
+
+- `anthropic-image-guard` now gates on Claude models over the `anthropic-messages` wire API instead of the `anthropic` provider name, so Claude behind Cloudflare AI Gateway or proxies such as GitHub Copilot gets the same resize/omission protection as the direct route. Previously a gateway-default setup ran its daily Claude models with no image guard at all. The API alone would be too broad: providers such as `vercel-ai-gateway`, `kimi-coding`, and `minimax` speak `anthropic-messages` for non-Claude models whose image limits differ, so those keep full-resolution sources (Claude ids are matched anywhere in the id to cover namespaced forms like `anthropic/claude-opus-5`). Smoke coverage drives gateway and namespaced-Claude routes and asserts non-Claude `anthropic-messages` models and non-Anthropic APIs stay untouched.
+
 ## 0.9.0 — 14 August 2026
 
 - Retired the Pi core patch stack. Pi 0.84.2 plus current settings replaced its motivation: the Cloudflare "exceeded request buffer limit while retrying upstream" retry classification landed upstream in pi-ai, and flat 320k `contextWindow` overrides against ~1M catalog windows leave stock post-run compaction roughly 700k tokens of headroom before real overflow, with stock overflow recovery behind it. Deleted the patch artifact and archives, the guarded applicator, the core runbook, and the applicator, retry, and Anthropic-stall regressions. The kit no longer modifies any Pi core file, and the manifest no longer declares `piCorePatch`.
