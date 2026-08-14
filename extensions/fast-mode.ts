@@ -45,6 +45,21 @@ const FULL_STREAM_KEYS = [
 
 const messagesApi = anthropicMessagesApi();
 
+// Faithful port of pi-ai's cloudflare-stream resolveCloudflareModel. The
+// override replaces the gateway provider's cloudflareStreams() wrapper, which
+// is the only place these endpoint placeholders materialize from the resolved
+// provider env, so the same substitution must happen before every dispatch
+// here, fast or not.
+const CLOUDFLARE_ENV_KEYS = ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_GATEWAY_ID"];
+function resolveCloudflareModel(model: Model<Api>, env: Record<string, string> | undefined): Model<Api> {
+	if (!env) return model;
+	let baseUrl = model.baseUrl;
+	for (const key of CLOUDFLARE_ENV_KEYS) {
+		baseUrl = baseUrl.replaceAll(`{${key}}`, env[key] ?? `{${key}}`);
+	}
+	return baseUrl === model.baseUrl ? model : { ...model, baseUrl };
+}
+
 type FastModel = { id?: string; provider?: string } | undefined;
 type FastRates = { input: number; output: number; cacheRead: number; cacheWrite: number };
 
@@ -145,14 +160,15 @@ function fastStream(
 	context: Parameters<typeof messagesApi.streamSimple>[1],
 	options?: SimpleStreamOptions,
 ) {
+	const resolved = resolveCloudflareModel(model, options?.env);
 	// One snapshot per request: a mid-request toggle must not split body and header.
 	// A caller-supplied client bypasses options.fetch in pi-ai, so the mandatory beta header
 	// cannot be attached; never send speed without it.
 	const fast =
 		enabled(ANTHROPIC_TOGGLE.statePath) &&
 		!(options !== undefined && "client" in options) &&
-		anthropicEligible(model);
-	const target = fast ? fastModel(model) : model;
+		anthropicEligible(resolved);
+	const target = fast ? fastModel(resolved) : resolved;
 	const streamOptions = fast ? fastOptions(options) : options;
 	return FULL_STREAM_KEYS.some((key) => options !== undefined && key in options)
 		? messagesApi.stream(target, context, streamOptions)
@@ -181,9 +197,11 @@ function updateFooterStatus(ctx: ExtensionContext): void {
 }
 
 export default function fastMode(pi: ExtensionAPI): void {
-	// Anthropic fast mode: the override receives the auth-resolved model (real
-	// gateway baseUrl, credential headers) and reproduces pi-ai's own dispatch
-	// for anthropic-messages models, so off-state behavior is base-equivalent.
+	// Anthropic fast mode: the override receives auth-resolved options (credential
+	// headers, gateway env) and reproduces pi-ai's own dispatch for
+	// anthropic-messages models, including the gateway endpoint-placeholder
+	// resolution its wrapper would have done, so off-state behavior is
+	// base-equivalent.
 	for (const provider of ANTHROPIC_FAST_PROVIDERS) {
 		pi.registerProvider(provider, { api: "anthropic-messages", streamSimple: fastStream });
 	}

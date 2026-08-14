@@ -57,6 +57,11 @@ const uiCtx = (model: unknown) => ({
 
 // Wire-level capture through real pi-ai serialization: the registered override
 // streams against a fake fetch, proving what an actual request would carry.
+// Gateway fixtures use the real placeholder baseUrl shape plus resolved env,
+// because the override replaces the wrapper that would otherwise resolve it.
+const GATEWAY_PLACEHOLDER_URL =
+	"https://gateway.ai.cloudflare.com/v1/{CLOUDFLARE_ACCOUNT_ID}/{CLOUDFLARE_GATEWAY_ID}/anthropic";
+const GATEWAY_ENV = { CLOUDFLARE_ACCOUNT_ID: "acct-123", CLOUDFLARE_GATEWAY_ID: "gw-456" };
 async function fastRequest(
 	provider: string,
 	id: string,
@@ -65,12 +70,14 @@ async function fastRequest(
 ) {
 	let payload: Record<string, unknown> | undefined;
 	let headers = new Headers();
+	let url: string | undefined;
+	const gateway = provider === "cloudflare-ai-gateway";
 	const stream = providers.get(provider)?.streamSimple(
 		{
 			id,
 			api: "anthropic-messages",
 			provider,
-			baseUrl: "https://example.invalid",
+			baseUrl: gateway ? GATEWAY_PLACEHOLDER_URL : "https://example.invalid",
 			headers: { "anthropic-beta": beta },
 			reasoning: true,
 			input: ["text"],
@@ -82,8 +89,10 @@ async function fastRequest(
 		{
 			apiKey: "test",
 			maxRetries: 0,
+			...(gateway ? { env: GATEWAY_ENV } : {}),
 			...extraOptions,
-			fetch: async (_input: unknown, init: { headers?: HeadersInit; body?: unknown } = {}) => {
+			fetch: async (input: unknown, init: { headers?: HeadersInit; body?: unknown } = {}) => {
+				url = String(input);
 				headers = new Headers(init.headers);
 				payload = JSON.parse(String(init.body));
 				throw new Error("payload captured");
@@ -94,7 +103,15 @@ async function fastRequest(
 		// Drain the capture abort.
 	}
 	// A prebuilt client never reaches the wrapped fetch, which is the point of that case.
-	if (!extraOptions.client) assert.ok(payload, "an Anthropic request must be issued");
+	if (!extraOptions.client) {
+		assert.ok(payload, "an Anthropic request must be issued");
+		if (gateway) {
+			assert.ok(
+				url?.startsWith("https://gateway.ai.cloudflare.com/v1/acct-123/gw-456/anthropic"),
+				`gateway endpoint placeholders must resolve for every request, got ${url}`,
+			);
+		}
+	}
 	return { payload, beta: (headers.get("anthropic-beta") ?? "").split(",") };
 }
 
