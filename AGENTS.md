@@ -43,7 +43,7 @@
 - Before changing Pi runtime/package behavior, read the installed Pi docs/types for the touched surface, especially `docs/packages.md`, `docs/prompt-templates.md`, and `docs/extensions.md` under the installed Pi root.
 - Keep `extensions/anthropic-image-guard.ts` provider-scoped and based on Pi's native `resizeImage`; preserve its pre-decode source limits and do not reintroduce global resizing logic.
 - Keep `extensions/clean-footer.ts` free of cumulative token, cache, and cost counters; preserve context usage, model details, extension statuses, and wrapping without truncation.
-- Keep `extensions/fast-mode.ts` hook-only on `before_provider_request` and `before_provider_headers`; never register provider overrides, keep the existing state filenames, and keep eligibility scoped to Anthropic-messages Opus routes and the OpenAI providers.
+- Keep `extensions/fast-mode.ts` scoped: OpenAI priority rides `before_provider_request`; Anthropic fast mode owns the `anthropic-messages` override for only the `anthropic` and `cloudflare-ai-gateway` providers, appends the beta at fetch time, and never sends `speed` when the header cannot be attached. Keep the existing state filenames and the doubled fast cost rates.
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's tested compatibility baseline.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.

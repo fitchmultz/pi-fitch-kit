@@ -25,7 +25,7 @@ Require the manifest's Node and Pi versions and every route in `requiredModels`.
 Unless mode is `verify`, ask the user to choose:
 
 1. Complete core, meaning every `corePackages` install plus the kit's bundled extensions, prompts, and package-backed skills. The `pi-subagents` package includes the fourteen specialist profiles and its general-purpose `delegate`. Otherwise choose a component selection from the manifest.
-2. For each `consentBehaviors[].consent.required` behavior, ask whether to **enable, disable, or keep** the current state. Enable writes the manifest's exact `config`; disable writes the exact `disabledConfig` while preserving unrelated keys; keep makes no change. Missing config is already disabled. A rerun answer of “do not enable” is not permission to preserve an existing true value: require the explicit keep-or-disable choice.
+2. For each `consentBehaviors[].consent.required` behavior, ask whether to **enable, disable, or keep** the current state. Enable writes the manifest's exact `config`; disable writes the exact `disabledConfig` while preserving unrelated keys; keep makes no change. Missing config is already disabled. A rerun answer of “do not enable” is not permission to preserve an existing true value: require the explicit keep-or-disable choice. Skip this step silently when the manifest lists no such behaviors.
 3. Which `optionalIntegrations`, if any, they want to configure through the MCP adapter. Authentication is manual and per-user; do not test it by reading service payloads.
 4. Whether to adopt the baseline working-agreement block, the optional process block, both, or neither, from `<package-root>/templates/working-agreement.md`.
 5. Project-trust posture. Show `defaultProjectTrust` and the subagent `projectTrust.childRuns` options (`approve`, `inherit`, `no-approve`) with their tradeoffs. Untrusted repositories should use `no-approve`. Do not silently copy another person's trust settings.
@@ -57,9 +57,9 @@ Agent Browser has one prerequisite outside Pi package installation. Run the mani
 
 For integrations, install only the MCP adapter from the manifest and follow its current docs. Configure only selected `optionalIntegrations`; do not add unrelated presets. Preview the exact config path and shape, then stop for user authentication or organization-specific values. Never persist a mutable npm distribution tag; if a user separately requests a local stdio MCP server, resolve and preview an exact version first. Do not infer endpoints, inspect credentials, invoke service reads as a smoke, or make service writes.
 
-Execute the confirmed plan sequentially and stop immediately on the first failed command. Do not run later installs, config writes, patch mutation, or smokes after a failure. Report commands and writes already completed, the failed step, and every remaining step so rerunning is unambiguous.
+Execute the confirmed plan sequentially and stop immediately on the first failed command. Do not run later installs, config writes, or smokes after a failure. Report commands and writes already completed, the failed step, and every remaining step so rerunning is unambiguous.
 
-After resource or configuration changes, tell the user to run `/reload` or start a fresh session before in-session verification. The kit's extensions are hook-only and register no provider overrides, so `/reload` is sufficient for them.
+After resource or configuration changes, tell the user to run `/reload` or start a fresh session before in-session verification. If `fast-mode` was disabled or removed, require a full process restart because `/reload` does not clear its model-runtime provider overrides.
 
 ## Verify mode and smokes
 

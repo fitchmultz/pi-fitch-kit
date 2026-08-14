@@ -1,17 +1,52 @@
 import { mkdirSync, readFileSync, unwatchFile, watchFile, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import {
+	type Api,
+	anthropicMessagesApi,
+	type Model,
+	type SimpleStreamOptions,
+} from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
 // Anthropic's fast-mode research preview bills double and rejects the `speed`
-// field without its beta header, so payload and header travel together.
+// field without its beta header, so payload and header must travel together.
+// pi-ai assembles `anthropic-beta` (OAuth identity and feature markers) inside
+// its client, after every extension header hook has run, and merges header
+// sources last-write-wins. The only safe place to append the fast beta is a
+// fetch wrapper on the finished request, which requires owning the provider's
+// stream callback for the exact providers we vouch for.
 const ANTHROPIC_FAST_BETA = "fast-mode-2026-02-01";
 const ANTHROPIC_FAST_MODEL_PREFIXES = ["claude-opus-5", "claude-opus-4-8"];
+// Only routes known to reach Anthropic's entitlement-gated preview: the direct
+// route and this setup's Cloudflare AI Gateway passthrough. Proxies such as
+// github-copilot or opencode also serve Opus over anthropic-messages but are
+// not overridden and stay stock.
+const ANTHROPIC_FAST_PROVIDERS = ["anthropic", "cloudflare-ai-gateway"];
 // service_tier is an OpenAI platform feature; gate by provider so other
 // OpenAI-compatible endpoints (xai, proxies) never receive it.
 const OPENAI_PROVIDERS = new Set(["openai", "openai-codex"]);
 
-type FastModel = { id?: string; provider?: string; api?: string } | undefined;
+// Anthropic-native options a simple caller cannot express. Pi's composer collapses
+// Provider.stream() and Provider.streamSimple() into one extension callback and drops the
+// provenance, and streamSimple() keeps only a fixed field list, so any of these keys means
+// the call must stay on the full API. A future Anthropic-only key would not be listed here
+// and would be routed to the simple path, which loses it; that is the known cost of owning
+// this callback at all, and it is why the list must be updated when pi-ai adds options.
+const FULL_STREAM_KEYS = [
+	"thinkingEnabled",
+	"thinkingBudgetTokens",
+	"effort",
+	"thinkingDisplay",
+	"interleavedThinking",
+	"toolChoice",
+	"client",
+];
+
+const messagesApi = anthropicMessagesApi();
+
+type FastModel = { id?: string; provider?: string } | undefined;
+type FastRates = { input: number; output: number; cacheRead: number; cacheWrite: number };
 
 type Toggle = {
 	/** Slash command name and footer status key. */
@@ -23,14 +58,11 @@ type Toggle = {
 	statePath: string;
 	/** Whether the active model honors this toggle at all. */
 	eligible: (model: FastModel) => boolean;
-	/** Payload addition applied while the toggle is on. */
-	fastPayload: (payload: Record<string, unknown>) => Record<string, unknown>;
 };
 
-// Eligibility is by wire API, not provider, so Claude Opus through a gateway
-// such as cloudflare-ai-gateway gets the same toggle as the direct route.
 const anthropicEligible = (model: FastModel): boolean =>
-	model?.api === "anthropic-messages" &&
+	model?.provider !== undefined &&
+	ANTHROPIC_FAST_PROVIDERS.includes(model.provider) &&
 	ANTHROPIC_FAST_MODEL_PREFIXES.some((prefix) => model.id?.startsWith(prefix) === true);
 
 const ANTHROPIC_TOGGLE: Toggle = {
@@ -39,7 +71,6 @@ const ANTHROPIC_TOGGLE: Toggle = {
 	description: "Toggle Anthropic Opus fast mode (2x token price)",
 	statePath: join(getAgentDir(), "anthropic-fast.json"),
 	eligible: anthropicEligible,
-	fastPayload: (payload) => ({ ...payload, speed: "fast" }),
 };
 
 const OPENAI_TOGGLE: Toggle = {
@@ -48,7 +79,6 @@ const OPENAI_TOGGLE: Toggle = {
 	description: "Toggle OpenAI priority/fast mode",
 	statePath: join(getAgentDir(), "openai-codex-fast.json"),
 	eligible: (model) => model?.provider !== undefined && OPENAI_PROVIDERS.has(model.provider),
-	fastPayload: (payload) => ({ ...payload, service_tier: "priority" }),
 };
 
 const TOGGLES = [ANTHROPIC_TOGGLE, OPENAI_TOGGLE];
@@ -64,6 +94,69 @@ function enabled(statePath: string): boolean {
 function writeEnabled(statePath: string, value: boolean): void {
 	mkdirSync(dirname(statePath), { recursive: true });
 	writeFileSync(statePath, `${JSON.stringify({ enabled: value })}\n`);
+}
+
+/** Fast mode bills double, so reported usage has to double with it. */
+export function fastRates<T extends FastRates>(rates: T): T {
+	return {
+		...rates,
+		input: rates.input * 2,
+		output: rates.output * 2,
+		cacheRead: rates.cacheRead * 2,
+		cacheWrite: rates.cacheWrite * 2,
+	};
+}
+
+function fastModel(model: Model<Api>): Model<Api> {
+	return {
+		...model,
+		cost: { ...fastRates(model.cost), tiers: model.cost.tiers?.map(fastRates) },
+	};
+}
+
+function fastOptions(options: SimpleStreamOptions | undefined): SimpleStreamOptions {
+	const baseFetch = options?.fetch ?? globalThis.fetch;
+	return {
+		...options,
+		// ponytail: append at fetch time because pi-ai builds anthropic-beta (including OAuth markers) after option headers, so setting it earlier would drop them.
+		fetch: (input, init) => {
+			const headers = new Headers(init?.headers);
+			const betas =
+				headers
+					.get("anthropic-beta")
+					?.split(",")
+					.map((beta) => beta.trim())
+					.filter(Boolean) ?? [];
+			if (!betas.includes(ANTHROPIC_FAST_BETA)) {
+				headers.set("anthropic-beta", [...betas, ANTHROPIC_FAST_BETA].join(","));
+			}
+			return baseFetch(input, { ...init, headers });
+		},
+		onPayload: async (payload, requestModel) => {
+			const replaced = await options?.onPayload?.(payload, requestModel);
+			const body = replaced === undefined ? payload : replaced;
+			return { ...(body as Record<string, unknown>), speed: "fast" };
+		},
+	};
+}
+
+function fastStream(
+	model: Model<Api>,
+	context: Parameters<typeof messagesApi.streamSimple>[1],
+	options?: SimpleStreamOptions,
+) {
+	// One snapshot per request: a mid-request toggle must not split body and header.
+	// A caller-supplied client bypasses options.fetch in pi-ai, so the mandatory beta header
+	// cannot be attached; never send speed without it.
+	const fast =
+		enabled(ANTHROPIC_TOGGLE.statePath) &&
+		!(options !== undefined && "client" in options) &&
+		anthropicEligible(model);
+	const target = fast ? fastModel(model) : model;
+	const streamOptions = fast ? fastOptions(options) : options;
+	return FULL_STREAM_KEYS.some((key) => options !== undefined && key in options)
+		? messagesApi.stream(target, context, streamOptions)
+		: messagesApi.streamSimple(target, context, streamOptions);
 }
 
 // Mirrors the per-request gates, so the footer never claims fast mode on a
@@ -88,32 +181,19 @@ function updateFooterStatus(ctx: ExtensionContext): void {
 }
 
 export default function fastMode(pi: ExtensionAPI): void {
-	// ponytail: the header and payload hooks read toggle state independently; a
-	// toggle racing between them can skew one request, which self-heals on the next.
+	// Anthropic fast mode: the override receives the auth-resolved model (real
+	// gateway baseUrl, credential headers) and reproduces pi-ai's own dispatch
+	// for anthropic-messages models, so off-state behavior is base-equivalent.
+	for (const provider of ANTHROPIC_FAST_PROVIDERS) {
+		pi.registerProvider(provider, { api: "anthropic-messages", streamSimple: fastStream });
+	}
+
+	// OpenAI priority mode is a plain payload field, so the stock hook suffices.
 	pi.on("before_provider_request", (event, ctx) => {
-		const toggle = TOGGLES.find((candidate) => candidate.eligible(ctx.model));
-		if (!toggle || !enabled(toggle.statePath)) return;
+		if (!OPENAI_TOGGLE.eligible(ctx.model) || !enabled(OPENAI_TOGGLE.statePath)) return;
 		const payload = event.payload;
 		if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return;
-		return toggle.fastPayload(payload as Record<string, unknown>);
-	});
-
-	pi.on("before_provider_headers", (event, ctx) => {
-		if (!ANTHROPIC_TOGGLE.eligible(ctx.model) || !enabled(ANTHROPIC_TOGGLE.statePath)) return;
-		// This hook fires after Pi assembles every header, including its own
-		// anthropic-beta markers, so appending here preserves them. A null value
-		// is Pi's header-deletion marker; treat it as absent.
-		const existing = event.headers["anthropic-beta"];
-		const betas =
-			typeof existing === "string"
-				? existing
-						.split(",")
-						.map((beta) => beta.trim())
-						.filter(Boolean)
-				: [];
-		if (!betas.includes(ANTHROPIC_FAST_BETA)) {
-			event.headers["anthropic-beta"] = [...betas, ANTHROPIC_FAST_BETA].join(",");
-		}
+		return { ...(payload as Record<string, unknown>), service_tier: "priority" };
 	});
 
 	// The state files are shared by every session, so watch them rather than

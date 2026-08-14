@@ -98,7 +98,7 @@ assert(
   "agent-skills must use its public source",
 );
 
-assert(!manifest.corePackages.some(({ id }) => id === "codex-context"), "codex-context now belongs to the kit");
+assert(!manifest.corePackages.some(({ id }) => id === "codex-context"), "codex-context is retired, not a core package");
 assert(!manifest.corePackages.some(({ id }) => id === "session-name"), "session-name now belongs to the kit");
 for (const source of [
   "git:github.com/fitchmultz/pi-codex-context",

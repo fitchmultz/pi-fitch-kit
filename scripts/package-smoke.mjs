@@ -223,7 +223,7 @@ try {
 	if (JSON.stringify(commandNames) !== JSON.stringify(expectedCommands)) {
 		throw new Error(`Expected ${JSON.stringify(expectedCommands)}, got ${JSON.stringify(commandNames)}`);
 	}
-	for (const event of ["before_provider_request", "before_provider_headers"]) {
+	for (const event of ["before_provider_request"]) {
 		const count = extensions.extensions.reduce(
 			(total, extension) => total + (extension.handlers.get(event)?.length ?? 0),
 			0,
