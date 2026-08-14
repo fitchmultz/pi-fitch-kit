@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.2 — 14 August 2026
+
+- Aligned the shipped compaction policy with the config it was derived from. `examples/settings.json` now carries `compaction.reserveTokens: 64000` (it had drifted to the stock 16384 while the real subset it mirrors uses 64000), and the setup manifest gains `modelContextWindows` (schema 7): flat 320k `contextWindow` overrides for the manifest-managed codex, anthropic, and openai fallback routes, merged narrowly into `models.json` as a new `/fitch-setup` consent step. Together they encode the intended 256k compaction threshold with ~60k near-threshold generation runway; previously a fresh setup silently got the stock 16k reserve against catalog windows. `xai/grok-4.6` is intentionally excluded, and validation now pins every override route to a manifest-managed model.
+- Documented the one accepted gap from the v0.9.0 patch retirement: stock Pi 0.84.2 does not classify OpenAI's bare transient `Sorry, something went wrong` response as retryable, no settings knob or extension hook can add that classification, and the kit will not re-patch core for it. The fix is proposed upstream; until it lands those turns fail instead of silently recovering.
+
 ## 0.9.1 — 14 August 2026
 
 - `anthropic-image-guard` now gates on Claude models over the `anthropic-messages` wire API instead of the `anthropic` provider name, so Claude behind Cloudflare AI Gateway or proxies such as GitHub Copilot gets the same resize/omission protection as the direct route. Previously a gateway-default setup ran its daily Claude models with no image guard at all. The API alone would be too broad: providers such as `vercel-ai-gateway`, `kimi-coding`, and `minimax` speak `anthropic-messages` for non-Claude models whose image limits differ, so those keep full-resolution sources (Claude ids are matched anywhere in the id to cover namespaced forms like `anthropic/claude-opus-5`). Smoke coverage drives gateway and namespaced-Claude routes and asserts non-Claude `anthropic-messages` models and non-Anthropic APIs stay untouched.

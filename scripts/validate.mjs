@@ -12,7 +12,11 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-assert(manifest.schemaVersion === 6, "setup manifest schema must match the patch-free revocable-consent shape");
+assert(manifest.schemaVersion === 7, "setup manifest schema must match the patch-free context-window shape");
+const manifestModelRoutes = new Set([...manifest.requiredModels, ...manifest.optionalModels]);
+for (const route of Object.keys(manifest.modelContextWindows)) {
+  assert(manifestModelRoutes.has(route), `modelContextWindows route ${route} must be a manifest-managed model route`);
+}
 assert(manifest.runtime.pi === "0.84.2", "the kit must pin the validated Pi runtime");
 const resolvedOrigins = Object.values(packageLock.packages)
   .map((entry) => entry.resolved)

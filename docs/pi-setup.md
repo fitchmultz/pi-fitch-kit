@@ -162,7 +162,7 @@ My personal runtime uses full approvals. MCP transports tool calls; it is not th
 
 ## Image quality boundary
 
-My safe settings subset is checked in at [`examples/settings.json`](../examples/settings.json). The non-default image choice is intentional:
+My safe settings subset is checked in at [`examples/settings.json`](../examples/settings.json). The compaction keys are half of a deliberate pairing: `reserveTokens: 64000` plus the manifest's flat 320k `modelContextWindows` overrides compact at a 256k threshold with roughly 60k of generation runway, instead of running to a catalog window's edge with the stock 16k reserve. The non-default image choice is intentional:
 
 ```json
 {

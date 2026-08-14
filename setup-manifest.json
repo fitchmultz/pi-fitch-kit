@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "runtime": {
     "pi": "0.84.2",
     "node": ">=24.0.0"
@@ -22,6 +22,16 @@
     "openai/gpt-5.6-luna"
   ],
   "optionalModelsNote": "Fallback-only routes. The openai/* routes need an OpenAI API key; missing them only removes those fallbacks.",
+  "modelContextWindows": {
+    "openai-codex/gpt-5.6-sol": 320000,
+    "openai-codex/gpt-5.6-terra": 320000,
+    "openai-codex/gpt-5.6-luna": 320000,
+    "anthropic/claude-fable-5": 320000,
+    "anthropic/claude-opus-5": 320000,
+    "openai/gpt-5.6-sol": 320000,
+    "openai/gpt-5.6-luna": 320000
+  },
+  "modelContextWindowsNote": "Flat compaction-policy windows, merged per route into models.json as modelOverrides { contextWindow }. Paired with the settings example's compaction.reserveTokens 64000 they put the compaction threshold at 256k with ~60k near-threshold generation runway. Only routes verified to accept this input size are listed; xai/grok-4.6 is intentionally absent.",
   "kitResources": {
     "extensions": [
       "extensions/anthropic-image-guard.ts",
