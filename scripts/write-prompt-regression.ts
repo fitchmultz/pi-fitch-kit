@@ -66,7 +66,6 @@ assert.match(JSON.stringify(flat[1]), /read result/);
 
 const commands: Record<string, { handler: (args: string, ctx: never) => Promise<void> }> = {};
 let sent: string | undefined;
-const defaultTools = [{ name: "read", description: "Read a file", parameters: { type: "object" } }];
 writePrompt({
 	registerCommand(name: string, config: { handler: (args: string, ctx: never) => Promise<void> }) {
 		commands[name] = config;
@@ -74,8 +73,6 @@ writePrompt({
 	sendUserMessage(content: string) {
 		sent = content;
 	},
-	getActiveTools: () => ["read"],
-	getAllTools: () => defaultTools,
 } as never);
 assert.equal(typeof commands["draft"]?.handler, "function");
 assert.equal(typeof commands["side-question"]?.handler, "function");
