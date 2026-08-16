@@ -1,6 +1,6 @@
 {
   "name": "@fitch/pi-kit",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -10,10 +10,11 @@
   "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node --check extensions/clean-footer.ts && node --check extensions/fast-mode.ts && node --check extensions/session-name.ts && node --check scripts/fast-mode-regression.ts && node --check scripts/session-name-regression.ts && node --check scripts/setup-lifecycle-smoke.mjs && node scripts/image-guard-smoke.mjs && npm run regression:fast-mode && npm run regression:session-name && npm run smoke:lifecycle && node scripts/validate.mjs",
+    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node --check extensions/clean-footer.ts && node --check extensions/fast-mode.ts && node --check extensions/session-name.ts && node --check extensions/write-prompt.ts && node --check scripts/fast-mode-regression.ts && node --check scripts/session-name-regression.ts && node --check scripts/write-prompt-regression.ts && node --check scripts/setup-lifecycle-smoke.mjs && node scripts/image-guard-smoke.mjs && npm run regression:fast-mode && npm run regression:session-name && npm run regression:write-prompt && npm run smoke:lifecycle && node scripts/validate.mjs",
     "typecheck": "tsc --noEmit",
     "regression:fast-mode": "node --experimental-strip-types scripts/fast-mode-regression.ts",
     "regression:session-name": "node --experimental-strip-types scripts/session-name-regression.ts",
+    "regression:write-prompt": "node --experimental-strip-types scripts/write-prompt-regression.ts",
     "smoke": "node scripts/package-smoke.mjs",
     "smoke:lifecycle": "node scripts/setup-lifecycle-smoke.mjs"
   },
@@ -25,7 +26,8 @@
       "./extensions/anthropic-image-guard.ts",
       "./extensions/clean-footer.ts",
       "./extensions/fast-mode.ts",
-      "./extensions/session-name.ts"
+      "./extensions/session-name.ts",
+      "./extensions/write-prompt.ts"
     ],
     "prompts": [
       "./prompts/fitch-setup.md",
