@@ -3,18 +3,27 @@ import { join } from "node:path";
 import { contentText, uuidv7, type Message, type UserMessage } from "@earendil-works/pi-ai";
 import {
 	BorderedLoader,
+	buildSessionContext,
+	convertToLlm,
 	copyToClipboard,
+	DynamicBorder,
 	getAgentDir,
+	keyHint,
+	rawKeyHint,
 	type ExtensionAPI,
 	type ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
+import { Container, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
+import { prepareClaudeImages } from "./anthropic-image-guard.ts";
 
 export const WRITE_PROMPT_FILE = "write-prompt.json";
 export const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Deny"] as const;
 
-const SYSTEM_PROMPT = `Rewrite the user's text into a better prompt for a coding agent.
-Output only the rewritten prompt. No preamble, quotes, or explanation.
-Preserve intent. Make the request specific, complete, and actionable.`;
+const OUTPUT_RULES = `Output only the rewritten prompt. No preamble, quotes, or explanation.
+Preserve intent. Make the request specific, complete, and actionable.
+Do not call tools.`;
+const REWRITE_RULES = `Rewrite the following into a better prompt for a coding agent.
+${OUTPUT_RULES}`;
 
 export function parseModelRef(ref: string): { provider: string; id: string } | undefined {
 	const trimmed = ref.trim();
@@ -57,9 +66,34 @@ function resolveWriterModel(ctx: ExtensionCommandContext) {
 	return ctx.model;
 }
 
+function sessionPrefix(ctx: ExtensionCommandContext): Message[] {
+	return convertToLlm(
+		buildSessionContext(ctx.sessionManager.getEntries(), ctx.sessionManager.getLeafId()).messages,
+	);
+}
+
+function writerTools(pi: ExtensionAPI, messages: Message[]) {
+	const byName = new Map(pi.getAllTools().map((tool) => [tool.name, tool]));
+	const names = new Set(pi.getActiveTools());
+	for (const message of messages) {
+		if (!("content" in message) || !Array.isArray(message.content)) continue;
+		for (const part of message.content) {
+			if (part && typeof part === "object" && "type" in part && part.type === "toolCall" && "name" in part) {
+				names.add(String(part.name));
+			}
+		}
+	}
+	return [...names].flatMap((name) => {
+		const tool = byName.get(name);
+		return tool ? [{ name: tool.name, description: tool.description, parameters: tool.parameters }] : [];
+	});
+}
+
 async function completeRewrite(
 	ctx: ExtensionCommandContext,
+	pi: ExtensionAPI,
 	model: NonNullable<ExtensionCommandContext["model"]>,
+	systemPrompt: string,
 	messages: Message[],
 	userText: string,
 	sessionId: string,
@@ -70,10 +104,13 @@ async function completeRewrite(
 		content: [{ type: "text", text: userText }],
 		timestamp: Date.now(),
 	};
+	const outgoing = structuredClone([...messages, pending]);
+	await prepareClaudeImages(model, outgoing);
+	const tools = writerTools(pi, outgoing);
 	const response = await ctx.modelRegistry.complete(
 		model,
-		{ systemPrompt: SYSTEM_PROMPT, messages: [...messages, pending] },
-		{ signal, cacheRetention: "none", sessionId },
+		{ systemPrompt, messages: outgoing, ...(tools.length ? { tools } : {}) },
+		{ signal, cacheRetention: "short", sessionId },
 	);
 	if (response.stopReason === "aborted") return undefined;
 	if (response.stopReason !== "stop") {
@@ -91,7 +128,9 @@ async function completeRewrite(
 
 async function rewrite(
 	ctx: ExtensionCommandContext,
+	pi: ExtensionAPI,
 	model: NonNullable<ExtensionCommandContext["model"]>,
+	systemPrompt: string,
 	messages: Message[],
 	userText: string,
 	sessionId: string,
@@ -100,7 +139,7 @@ async function rewrite(
 		return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
 			const loader = new BorderedLoader(tui, theme, "Rewriting prompt...");
 			loader.onAbort = () => done(undefined);
-			completeRewrite(ctx, model, messages, userText, sessionId, loader.signal)
+			completeRewrite(ctx, pi, model, systemPrompt, messages, userText, sessionId, loader.signal)
 				.then(done)
 				.catch((error: unknown) => {
 					ctx.ui.notify(error instanceof Error ? error.message : "Rewrite failed", "error");
@@ -110,11 +149,56 @@ async function rewrite(
 		});
 	}
 	try {
-		return await completeRewrite(ctx, model, messages, userText, sessionId, ctx.signal);
+		return await completeRewrite(ctx, pi, model, systemPrompt, messages, userText, sessionId, ctx.signal);
 	} catch (error) {
 		ctx.ui.notify(error instanceof Error ? error.message : "Rewrite failed", "error");
 		return undefined;
 	}
+}
+
+function pickAction(ctx: ExtensionCommandContext, draft: string) {
+	if (ctx.mode !== "tui") return ctx.ui.select(draft, [...WRITE_PROMPT_ACTIONS]);
+	return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
+		const root = new Container();
+		root.addChild(new DynamicBorder((s) => theme.fg("border", s)));
+		root.addChild(new Text(theme.fg("text", draft), 1, 0));
+		root.addChild(new Spacer(1));
+		const list = new SelectList(
+			WRITE_PROMPT_ACTIONS.map((value) => ({ value, label: value })),
+			WRITE_PROMPT_ACTIONS.length,
+			{
+				selectedPrefix: (text) => theme.fg("accent", text),
+				selectedText: (text) => theme.fg("accent", text),
+				description: (text) => theme.fg("muted", text),
+				scrollInfo: (text) => theme.fg("muted", text),
+				noMatch: (text) => theme.fg("muted", text),
+			},
+		);
+		list.onSelect = (item) => done(item.value);
+		list.onCancel = () => done(undefined);
+		root.addChild(list);
+		root.addChild(new Spacer(1));
+		root.addChild(
+			new Text(
+				rawKeyHint("↑↓", "navigate") +
+					"  " +
+					keyHint("tui.select.confirm", "select") +
+					"  " +
+					keyHint("tui.select.cancel", "cancel"),
+				1,
+				0,
+			),
+		);
+		root.addChild(new DynamicBorder((s) => theme.fg("border", s)));
+		return {
+			render: (width) => root.render(width),
+			invalidate: () => root.invalidate(),
+			handleInput: (data) => {
+				list.handleInput(data);
+				tui.requestRender();
+			},
+		};
+	});
 }
 
 export default function writePrompt(pi: ExtensionAPI): void {
@@ -140,13 +224,14 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				return;
 			}
 
-			const messages: Message[] = [];
+			const messages = sessionPrefix(ctx);
+			const systemPrompt = ctx.getSystemPrompt();
 			const sessionId = uuidv7();
-			let draft = await rewrite(ctx, model, messages, source, sessionId);
+			let draft = await rewrite(ctx, pi, model, systemPrompt, messages, `${REWRITE_RULES}\n\n${source}`, sessionId);
 			if (!draft) return;
 
 			while (true) {
-				const action = await ctx.ui.select(draft, [...WRITE_PROMPT_ACTIONS]);
+				const action = await pickAction(ctx, draft);
 				if (!action || action === "Deny") {
 					ctx.ui.notify("Denied", "info");
 					return;
@@ -171,7 +256,15 @@ export default function writePrompt(pi: ExtensionAPI): void {
 
 				const notes = await ctx.ui.editor("Tweak notes");
 				if (!notes?.trim()) continue;
-				const next = await rewrite(ctx, model, messages, notes.trim(), sessionId);
+				const next = await rewrite(
+					ctx,
+					pi,
+					model,
+					systemPrompt,
+					messages,
+					`Revise the previous rewritten prompt using these notes.\n${OUTPUT_RULES}\n\n${notes.trim()}`,
+					sessionId,
+				);
 				if (!next) continue;
 				draft = next;
 			}
