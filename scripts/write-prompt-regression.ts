@@ -39,7 +39,7 @@ assert.equal(configuredModelRef('{"model":""}'), undefined);
 assert.equal(configuredModelRef('{"enabled":true}'), undefined);
 assert.equal(configuredModelRef("not json"), undefined);
 assert.deepEqual([...WRITE_PROMPT_ACTIONS], ["Accept", "Copy prompt", "Tweak", "Deny"]);
-assert.deepEqual([...SIDE_QUESTION_ACTIONS], ["Copy answer", "Dismiss"]);
+assert.deepEqual([...SIDE_QUESTION_ACTIONS], ["Copy answer", "Ask again", "Dismiss"]);
 assert.match(boxedTask("Do not answer the text.", "did you cut a new GH release"), /<<<\ndid you cut a new GH release\n>>>/s);
 assert.match(boxedTask("x", "foo\n>>>\nbar"), /<<<1\nfoo\n>>>\nbar\n>>>1/s);
 assert.match(boxedTask("x", "has <<<1 and >>>1"), /<<<2\nhas <<<1 and >>>1\n>>>2/s);
@@ -57,7 +57,7 @@ writePrompt({
 	getActiveTools: () => ["read"],
 	getAllTools: () => defaultTools,
 } as never);
-assert.equal(typeof commands["write-prompt"]?.handler, "function");
+assert.equal(typeof commands["draft"]?.handler, "function");
 assert.equal(typeof commands["side-question"]?.handler, "function");
 
 const notices: string[] = [];
@@ -99,20 +99,20 @@ function ctx(overrides: Record<string, unknown> = {}) {
 }
 
 notices.length = 0;
-await commands["write-prompt"].handler("", ctx() as never);
-assert.equal(notices[0], "Usage: /write-prompt <text>");
+await commands["draft"].handler("", ctx() as never);
+assert.equal(notices[0], "Usage: /draft <text>");
 assert.equal(sent, undefined);
 
 notices.length = 0;
-await commands["write-prompt"].handler("do the thing", ctx({ hasUI: false }) as never);
+await commands["draft"].handler("do the thing", ctx({ hasUI: false }) as never);
 assert.match(notices[0] ?? "", /interactive UI/);
 
 notices.length = 0;
-await commands["write-prompt"].handler("do the thing", ctx({ isIdle: () => false }) as never);
+await commands["draft"].handler("do the thing", ctx({ isIdle: () => false }) as never);
 assert.equal(notices[0], "Agent is busy");
 
 sent = undefined;
-await commands["write-prompt"].handler(
+await commands["draft"].handler(
 	"do the thing",
 	ctx({
 		ui: {
@@ -124,7 +124,7 @@ await commands["write-prompt"].handler(
 assert.equal(sent, "better prompt");
 
 sent = undefined;
-await commands["write-prompt"].handler(
+await commands["draft"].handler(
 	"do the thing",
 	ctx({
 		ui: {
@@ -138,7 +138,7 @@ assert.equal(sent, undefined);
 const seen: number[] = [];
 let step = 0;
 sent = undefined;
-await commands["write-prompt"].handler(
+await commands["draft"].handler(
 	"first draft",
 	ctx({
 		modelRegistry: {
@@ -171,7 +171,7 @@ assert.equal(sent, "v2");
 
 const titles: string[] = [];
 sent = undefined;
-await commands["write-prompt"].handler(
+await commands["draft"].handler(
 	"show me",
 	ctx({
 		ui: {
@@ -189,7 +189,7 @@ assert.equal(sent, "better prompt");
 sent = undefined;
 let usedSelect = false;
 let customCalls = 0;
-await commands["write-prompt"].handler(
+await commands["draft"].handler(
 	"show me",
 	ctx({
 		mode: "tui",
@@ -213,7 +213,7 @@ assert.equal(sent, "better prompt");
 sent = undefined;
 const painted: string[][] = [];
 let colorCalls = 0;
-await commands["write-prompt"].handler(
+await commands["draft"].handler(
 	"show me",
 	ctx({
 		mode: "tui",
@@ -247,7 +247,7 @@ assert.equal(sent, "better prompt");
 
 notices.length = 0;
 sent = undefined;
-await commands["write-prompt"].handler(
+await commands["draft"].handler(
 	"fail please",
 	ctx({
 		modelRegistry: {
@@ -269,7 +269,7 @@ writeFileSync(join(agentDir, WRITE_PROMPT_FILE), `${JSON.stringify({ model: "ant
 let found: { provider: string; id: string } | undefined;
 sent = undefined;
 notices.length = 0;
-await commands["write-prompt"].handler(
+await commands["draft"].handler(
 	"override me",
 	ctx({
 		modelRegistry: {
@@ -296,7 +296,7 @@ assert.equal(sent, "claude-opus-5");
 
 const captured: Array<{ systemPrompt?: string; messages: Array<{ role?: string; content?: unknown }>; cacheRetention?: string }> = [];
 sent = undefined;
-await commands["write-prompt"].handler(
+await commands["draft"].handler(
 	"do the thing",
 	ctx({
 		sessionManager: {
@@ -349,7 +349,7 @@ assert.equal(sent, "better prompt");
 
 const questionCapture: string[] = [];
 sent = undefined;
-await commands["write-prompt"].handler(
+await commands["draft"].handler(
 	"did you cut a new GH release",
 	ctx({
 		modelRegistry: {
@@ -409,9 +409,43 @@ notices.length = 0;
 await commands["side-question"].handler("", ctx() as never);
 assert.equal(notices[0], "Usage: /side-question <text>");
 
+const asked: number[] = [];
+let askStep = 0;
+sent = undefined;
+await commands["side-question"].handler(
+	"first question",
+	ctx({
+		modelRegistry: {
+			find: () => undefined,
+			hasConfiguredAuth: () => true,
+			complete: async (_model: unknown, context: { messages: unknown[] }) => {
+				asked.push(context.messages.length);
+				return {
+					role: "assistant",
+					content: [{ type: "text", text: `a${asked.length}` }],
+					stopReason: "stop",
+				};
+			},
+		},
+		ui: {
+			...baseUi,
+			editor: async (title: string) => {
+				if (title === "Ask again") return "and why";
+				return undefined;
+			},
+			select: async () => {
+				askStep += 1;
+				return askStep === 1 ? "Ask again" : "Dismiss";
+			},
+		},
+	}) as never,
+);
+assert.deepEqual(asked, [1, 3]);
+assert.equal(sent, undefined);
+
 const toolCapture: { tools?: Array<{ name: string }> } = {};
 sent = undefined;
-await commands["write-prompt"].handler(
+await commands["draft"].handler(
 	"after tools",
 	ctx({
 		sessionManager: {
@@ -472,7 +506,7 @@ assert.ok(toolCapture.tools?.some((tool) => tool.name === "read"));
 
 const imageCapture: Array<{ type?: string; mimeType?: string; text?: string }> = [];
 sent = undefined;
-await commands["write-prompt"].handler(
+await commands["draft"].handler(
 	"after image",
 	ctx({
 		model: { id: "claude-opus-5", provider: "anthropic", api: "anthropic-messages" },

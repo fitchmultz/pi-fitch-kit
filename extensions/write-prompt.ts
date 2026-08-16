@@ -18,7 +18,7 @@ import { prepareClaudeImages } from "./anthropic-image-guard.ts";
 
 export const WRITE_PROMPT_FILE = "write-prompt.json";
 export const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Deny"] as const;
-export const SIDE_QUESTION_ACTIONS = ["Copy answer", "Dismiss"] as const;
+export const SIDE_QUESTION_ACTIONS = ["Copy answer", "Ask again", "Dismiss"] as const;
 
 const OUTPUT_RULES = `Output only the rewritten prompt. No preamble, quotes, or explanation.
 Preserve intent. Make the request specific, complete, and actionable.
@@ -28,6 +28,8 @@ ${OUTPUT_RULES}`;
 const TWEAK_INSTRUCTION = `Revise the previous rewritten prompt using these notes. Do not answer the notes.
 ${OUTPUT_RULES}`;
 const QUESTION_INSTRUCTION = `Answer the boxed question using the session. Do not rewrite it into a prompt.
+Output only the answer. Do not call tools.`;
+const ASK_AGAIN_INSTRUCTION = `Answer the boxed follow-up using the session and the previous answer. Do not rewrite it into a prompt.
 Output only the answer. Do not call tools.`;
 
 export function boxedTask(instruction: string, source: string): string {
@@ -240,12 +242,12 @@ function prepare(ctx: ExtensionCommandContext) {
 }
 
 export default function writePrompt(pi: ExtensionAPI): void {
-	pi.registerCommand("write-prompt", {
-		description: "Rewrite text into a better agent prompt, then accept, copy, tweak, or deny",
+	pi.registerCommand("draft", {
+		description: "Rewrite text into a better agent request, then accept, copy, tweak, or deny",
 		handler: async (args, ctx) => {
 			const source = args.trim();
 			if (!source) {
-				ctx.ui.notify("Usage: /write-prompt <text>", "warning");
+				ctx.ui.notify("Usage: /draft <text>", "warning");
 				return;
 			}
 			const ready = prepare(ctx);
@@ -259,8 +261,8 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				messages,
 				boxedTask(REWRITE_INSTRUCTION, source),
 				sessionId,
-				"Rewriting prompt...",
-				"Rewrite failed",
+				"Drafting...",
+				"Draft failed",
 			);
 			if (!draft) return;
 
@@ -298,8 +300,8 @@ export default function writePrompt(pi: ExtensionAPI): void {
 					messages,
 					boxedTask(TWEAK_INSTRUCTION, notes.trim()),
 					sessionId,
-					"Rewriting prompt...",
-					"Rewrite failed",
+					"Drafting...",
+					"Draft failed",
 				);
 				if (!next) continue;
 				draft = next;
@@ -308,7 +310,7 @@ export default function writePrompt(pi: ExtensionAPI): void {
 	});
 
 	pi.registerCommand("side-question", {
-		description: "Ask a question off-transcript using the current session, then copy or dismiss",
+		description: "Ask a question off-transcript using the current session, then copy, ask again, or dismiss",
 		handler: async (args, ctx) => {
 			const source = args.trim();
 			if (!source) {
@@ -318,7 +320,7 @@ export default function writePrompt(pi: ExtensionAPI): void {
 			const ready = prepare(ctx);
 			if (!ready) return;
 			const { model, messages, systemPrompt, sessionId } = ready;
-			const answer = await runWriter(
+			let answer = await runWriter(
 				ctx,
 				pi,
 				model,
@@ -337,12 +339,30 @@ export default function writePrompt(pi: ExtensionAPI): void {
 					ctx.ui.notify("Dismissed", "info");
 					return;
 				}
-				try {
-					await copyToClipboard(answer);
-					ctx.ui.notify("Copied answer", "info");
-				} catch (error) {
-					ctx.ui.notify(error instanceof Error ? error.message : "Copy failed", "error");
+				if (action === "Copy answer") {
+					try {
+						await copyToClipboard(answer);
+						ctx.ui.notify("Copied answer", "info");
+					} catch (error) {
+						ctx.ui.notify(error instanceof Error ? error.message : "Copy failed", "error");
+					}
+					continue;
 				}
+				const notes = await ctx.ui.editor("Ask again");
+				if (!notes?.trim()) continue;
+				const next = await runWriter(
+					ctx,
+					pi,
+					model,
+					systemPrompt,
+					messages,
+					boxedTask(ASK_AGAIN_INSTRUCTION, notes.trim()),
+					sessionId,
+					"Answering...",
+					"Answer failed",
+				);
+				if (!next) continue;
+				answer = next;
 			}
 		},
 	});

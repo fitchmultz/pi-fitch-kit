@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.8 — 16 August 2026
+
+- Renamed `/write-prompt` to `/draft`. `/side-question` can Ask again on the same writer.
+
 ## 0.9.7 — 16 August 2026
 
 - `/write-prompt` boxes source with a fence that cannot appear in the text. `/side-question` exits with Dismiss. An override model notifies `Using provider/id` for both commands.
