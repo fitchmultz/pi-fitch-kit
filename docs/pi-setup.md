@@ -87,7 +87,7 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - repository work: `pi-fff`, `pi-apply-edits`;
 - task control: structured questions, persistent todos, session naming, and working-directory changes;
 - deterministic support: calculator, tool duration, verbosity, session editing, stash, and raw message copy;
-- kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, shared fast-mode toggles for Anthropic Opus and OpenAI routes, and `/write-prompt`, while `pi-subagents` owns its profile defaults.
+- kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, shared fast-mode toggles for Anthropic Opus and OpenAI routes, `/write-prompt`, and `/side-question`, while `pi-subagents` owns its profile defaults.
 
 Most reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.6 — 16 August 2026
+
+- `/write-prompt` wraps the source and says do not answer it, so a question-shaped input is rewritten instead of answered. `/side-question` uses the same session snapshot to answer off-transcript; Copy answer never sends to the agent.
+
 ## 0.9.5 — 16 August 2026
 
 - `/write-prompt` rewrites against a snapshot of the current session: same system prompt and conversation prefix, rewrite instructions as the last user turn, `cacheRetention: "short"`, and a fresh nested session id. Tool-bearing history includes the matching tool defs so Anthropic does not 400. Claude-bound images go through the same resize/omit path as the main turn. The draft on the action screen uses the theme body text color instead of the selector accent.
