@@ -374,7 +374,6 @@ assert.equal(sent, "better prompt");
 const sideCapture: string[] = [];
 sent = undefined;
 notices.length = 0;
-let sideStep = 0;
 await commands["side-question"].handler(
 	"is that the best fix?",
 	ctx({
@@ -392,10 +391,7 @@ await commands["side-question"].handler(
 		},
 		ui: {
 			...baseUi,
-			select: async () => {
-				sideStep += 1;
-				return sideStep === 1 ? "Copy answer" : "Deny";
-			},
+			select: async () => "Deny",
 		},
 	}) as never,
 );
