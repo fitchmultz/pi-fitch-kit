@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { contentText } from "@earendil-works/pi-ai";
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-write-prompt-"));
 process.on("exit", () => rmSync(agentDir, { recursive: true, force: true }));
@@ -163,17 +164,8 @@ await commands["write-prompt"].handler(
 		modelRegistry: {
 			find: () => undefined,
 			hasConfiguredAuth: () => true,
-			complete: async (_model: unknown, context: { messages: Array<{ role?: string; content: unknown }> }) => {
-				tweakHistory.push(
-					context.messages.map((message) => {
-						const content = message.content;
-						if (!Array.isArray(content)) return String(content);
-						return content
-							.filter((block) => block && typeof block === "object" && "text" in block)
-							.map((block) => String((block as { text: string }).text))
-							.join("");
-					}),
-				);
+			complete: async (_model: unknown, context: { messages: Array<{ content: string | readonly { type?: string; text?: string }[] }> }) => {
+				tweakHistory.push(context.messages.map((message) => contentText(message.content)));
 				return {
 					role: "assistant",
 					content: [{ type: "text", text: `v${tweakHistory.length}` }],
