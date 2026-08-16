@@ -37,7 +37,8 @@
       "extensions/anthropic-image-guard.ts",
       "extensions/clean-footer.ts",
       "extensions/fast-mode.ts",
-      "extensions/session-name.ts"
+      "extensions/session-name.ts",
+      "extensions/write-prompt.ts"
     ],
     "prompts": [
       "prompts/fitch-setup.md",

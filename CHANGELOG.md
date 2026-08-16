@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.3 — 16 August 2026
+
+- Added `/write-prompt <text>`: a nested writer rewrites the text off-transcript, then Accept sends it, Copy prompt puts it on the clipboard without touching the editor, Tweak continues the same writer, and Deny discards it. Optional writer model lives in `~/.pi/agent/write-prompt.json` as `{ "model": "provider/id" }`; missing or invalid config uses the active session model. Print and JSON modes refuse rather than auto-send.
+
 ## 0.9.2 — 14 August 2026
 
 - Aligned the shipped compaction policy with the config it was derived from. `examples/settings.json` now carries `compaction.reserveTokens: 64000` (it had drifted to the stock 16384 while the real subset it mirrors uses 64000), and the setup manifest gains `modelContextWindows` (schema 7): flat 320k `contextWindow` overrides for the manifest-managed codex, anthropic, and openai fallback routes, merged narrowly into `models.json` as a new `/fitch-setup` consent step with keep-or-overwrite rerun semantics, preview disclosure, and verify-mode drift coverage. Paired with the 64k reserve the overrides compact at a 256k threshold with roughly 60k of near-threshold generation runway. The override means two things by route family: on the ~1M-catalog anthropic routes it compacts far earlier than the catalog edge (the regime the 0.9.0 rationale described), while on the 272k-catalog openai and openai-codex gpt-5.6 routes it raises the advertised window and requests whose input exceeds 272k bill at OpenAI's long-context tier for the entire request, a deliberate quality-over-cost choice the consent step now discloses. `xai/grok-4.6` is absent because it runs as a full custom model definition already carrying a 320k window. Validation pins the settings example's compaction values, requires every override route to be manifest-managed with a sane positive integer, and asserts the prompt carries the new consent step.

@@ -18,7 +18,7 @@ Pi core
   └─ user-authenticated MCP services
 ```
 
-[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: four bundled extensions, a safe settings example, unpinned package sources, and a setup prompt. The fourteen specialist profiles now ship with [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) instead of being duplicated here. Most reusable extensions and all skill packages remain independent public repositories; the kit directly owns only its harness-coupled runtime.
+[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: five bundled extensions, a safe settings example, unpinned package sources, and a setup prompt. The fourteen specialist profiles now ship with [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) instead of being duplicated here. Most reusable extensions and all skill packages remain independent public repositories; the kit directly owns only its harness-coupled runtime.
 
 ## A representative task
 
@@ -87,7 +87,7 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - repository work: `pi-fff`, `pi-apply-edits`;
 - task control: structured questions, persistent todos, session naming, and working-directory changes;
 - deterministic support: calculator, tool duration, verbosity, session editing, stash, and raw message copy;
-- kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, and shared fast-mode toggles for Anthropic Opus and OpenAI routes, while `pi-subagents` owns its profile defaults.
+- kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, shared fast-mode toggles for Anthropic Opus and OpenAI routes, and `/write-prompt`, while `pi-subagents` owns its profile defaults.
 
 Most reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
 

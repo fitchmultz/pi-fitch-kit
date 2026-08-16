@@ -9,6 +9,7 @@
   - `extensions/clean-footer.ts` for a compact footer without cumulative token, cache, or cost counters.
   - `extensions/fast-mode.ts` for the shared `/anthropic-fast` and `/codex-fast` toggles.
   - `extensions/session-name.ts` for stable, searchable session naming and protected role identifiers.
+  - `extensions/write-prompt.ts` for `/write-prompt` rewrite, accept/copy/tweak/deny, and `write-prompt.json` model override.
   - `examples/settings.json` for the safe, non-secret behavioral settings subset.
   - `setup-manifest.json` for unpinned package sources, required model routes, and kit resources.
   - `templates/working-agreement.md` for the optional managed working-agreement blocks.
@@ -45,6 +46,7 @@
 - Keep `extensions/clean-footer.ts` free of cumulative token, cache, and cost counters; preserve context usage, model details, extension statuses, and wrapping without truncation.
 - Keep `extensions/fast-mode.ts` scoped: OpenAI priority rides `before_provider_request`; Anthropic fast mode owns the `anthropic-messages` override for only the `anthropic` and `cloudflare-ai-gateway` providers, appends the beta at fetch time, and never sends `speed` when the header cannot be attached. Keep the gateway endpoint-placeholder resolution in `fastStream`, the existing state filenames, and the doubled fast cost rates.
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
+- Keep `extensions/write-prompt.ts` off the main transcript: `modelRegistry.complete`, built-in dialogs, `copyToClipboard` for Copy, and `sendUserMessage` only on Accept.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's tested compatibility baseline.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.
 
@@ -53,5 +55,6 @@
 - Run `npm run check` after edits to `package.json`, `setup-manifest.json`, `extensions/`, `scripts/`, or registered prompts; add `npm run smoke` when package resources changed.
 - Run `npm run regression:fast-mode` after changing fast-mode toggles, eligibility, payload or header injection, or state handling.
 - Run `npm run regression:session-name` after changing naming guidance, metadata injection, protected identities, or its migration gate.
+- Run `npm run regression:write-prompt` after changing `/write-prompt` config parsing, writer history, or accept/copy/tweak/deny behavior.
 - For runtime-facing changes, also verify Pi loads the package through `pi install ...` plus `/reload` or a fresh Pi session when practical.
 - Keep this file short and project-specific; point to `README.md` or Pi docs instead of copying generic coding rules.
