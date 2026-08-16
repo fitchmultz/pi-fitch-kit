@@ -20,7 +20,7 @@ export const WRITE_PROMPT_FILE = "write-prompt.json";
 export const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Deny"] as const;
 export const SIDE_QUESTION_ACTIONS = ["Copy answer", "Ask again", "Dismiss"] as const;
 
-const OUTPUT_RULES = `Output only the rewritten prompt. No preamble, quotes, or explanation.
+const OUTPUT_RULES = `You are not the session agent. Output only the rewritten prompt. No preamble, quotes, or explanation.
 Preserve intent. Make the request specific, complete, and actionable.
 Do not call tools.`;
 const REWRITE_INSTRUCTION = `Rewrite the boxed text into a better coding-agent prompt. Do not answer the text.
@@ -88,26 +88,41 @@ function sessionPrefix(ctx: ExtensionCommandContext): Message[] {
 	);
 }
 
-function writerTools(pi: ExtensionAPI, messages: Message[]) {
-	const byName = new Map(pi.getAllTools().map((tool) => [tool.name, tool]));
-	const names = new Set(pi.getActiveTools());
+export function flattenToolHistory(messages: Message[]): Message[] {
+	const out: Message[] = [];
 	for (const message of messages) {
-		if (!("content" in message) || !Array.isArray(message.content)) continue;
-		for (const part of message.content) {
-			if (part && typeof part === "object" && "type" in part && part.type === "toolCall" && "name" in part) {
-				names.add(String(part.name));
-			}
+		if (message.role === "toolResult") {
+			const label = message.isError ? `${message.toolName} error` : `${message.toolName} result`;
+			out.push({
+				role: "user",
+				content: [{ type: "text", text: `[${label}]\n${contentText(message.content)}` }],
+				timestamp: message.timestamp,
+			});
+			continue;
 		}
+		if (message.role === "assistant" && Array.isArray(message.content)) {
+			const parts = message.content.filter((part) => part.type !== "toolCall");
+			const calls = message.content
+				.filter((part) => part.type === "toolCall")
+				.map((part) => {
+					const args = part.arguments;
+					const extra = args && Object.keys(args).length ? ` ${JSON.stringify(args)}` : "";
+					return `${part.name}${extra}`;
+				});
+			if (calls.length) parts.push({ type: "text", text: `[called ${calls.join(", ")}]` });
+			out.push({
+				...message,
+				content: parts.length ? parts : [{ type: "text", text: "[empty]" }],
+			});
+			continue;
+		}
+		out.push(message);
 	}
-	return [...names].flatMap((name) => {
-		const tool = byName.get(name);
-		return tool ? [{ name: tool.name, description: tool.description, parameters: tool.parameters }] : [];
-	});
+	return out;
 }
 
 async function completeWriter(
 	ctx: ExtensionCommandContext,
-	pi: ExtensionAPI,
 	model: NonNullable<ExtensionCommandContext["model"]>,
 	systemPrompt: string,
 	messages: Message[],
@@ -120,12 +135,11 @@ async function completeWriter(
 		content: [{ type: "text", text: userText }],
 		timestamp: Date.now(),
 	};
-	const outgoing = structuredClone([...messages, pending]);
+	const outgoing = flattenToolHistory(structuredClone([...messages, pending]));
 	await prepareClaudeImages(model, outgoing);
-	const tools = writerTools(pi, outgoing);
 	const response = await ctx.modelRegistry.complete(
 		model,
-		{ systemPrompt, messages: outgoing, ...(tools.length ? { tools } : {}) },
+		{ systemPrompt, messages: outgoing },
 		{ signal, cacheRetention: "short", sessionId },
 	);
 	if (response.stopReason === "aborted") return undefined;
@@ -144,7 +158,6 @@ async function completeWriter(
 
 async function runWriter(
 	ctx: ExtensionCommandContext,
-	pi: ExtensionAPI,
 	model: NonNullable<ExtensionCommandContext["model"]>,
 	systemPrompt: string,
 	messages: Message[],
@@ -157,7 +170,7 @@ async function runWriter(
 		return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
 			const view = new BorderedLoader(tui, theme, loader);
 			view.onAbort = () => done(undefined);
-			completeWriter(ctx, pi, model, systemPrompt, messages, userText, sessionId, view.signal)
+			completeWriter(ctx, model, systemPrompt, messages, userText, sessionId, view.signal)
 				.then(done)
 				.catch((error: unknown) => {
 					ctx.ui.notify(error instanceof Error ? error.message : failed, "error");
@@ -167,7 +180,7 @@ async function runWriter(
 		});
 	}
 	try {
-		return await completeWriter(ctx, pi, model, systemPrompt, messages, userText, sessionId, ctx.signal);
+		return await completeWriter(ctx, model, systemPrompt, messages, userText, sessionId, ctx.signal);
 	} catch (error) {
 		ctx.ui.notify(error instanceof Error ? error.message : failed, "error");
 		return undefined;
@@ -255,7 +268,6 @@ export default function writePrompt(pi: ExtensionAPI): void {
 			const { model, messages, systemPrompt, sessionId } = ready;
 			let draft = await runWriter(
 				ctx,
-				pi,
 				model,
 				systemPrompt,
 				messages,
@@ -294,7 +306,6 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				if (!notes?.trim()) continue;
 				const next = await runWriter(
 					ctx,
-					pi,
 					model,
 					systemPrompt,
 					messages,
@@ -322,7 +333,6 @@ export default function writePrompt(pi: ExtensionAPI): void {
 			const { model, messages, systemPrompt, sessionId } = ready;
 			let answer = await runWriter(
 				ctx,
-				pi,
 				model,
 				systemPrompt,
 				messages,
@@ -352,7 +362,6 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				if (!notes?.trim()) continue;
 				const next = await runWriter(
 					ctx,
-					pi,
 					model,
 					systemPrompt,
 					messages,

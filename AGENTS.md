@@ -46,7 +46,7 @@
 - Keep `extensions/clean-footer.ts` free of cumulative token, cache, and cost counters; preserve context usage, model details, extension statuses, and wrapping without truncation.
 - Keep `extensions/fast-mode.ts` scoped: OpenAI priority rides `before_provider_request`; Anthropic fast mode owns the `anthropic-messages` override for only the `anthropic` and `cloudflare-ai-gateway` providers, appends the beta at fetch time, and never sends `speed` when the header cannot be attached. Keep the gateway endpoint-placeholder resolution in `fastStream`, the existing state filenames, and the doubled fast cost rates.
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
-- Keep `extensions/write-prompt.ts` off the main transcript: `modelRegistry.complete`, built-in dialogs, `copyToClipboard` for Copy, and `sendUserMessage` only on `/draft` Accept. `/side-question` never sends.
+- Keep `extensions/write-prompt.ts` off the main transcript: `modelRegistry.complete` without tools, flatten tool history to text, built-in dialogs, `copyToClipboard` for Copy, and `sendUserMessage` only on `/draft` Accept. `/side-question` never sends.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's tested compatibility baseline.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.
 
