@@ -18,12 +18,21 @@ import { prepareClaudeImages } from "./anthropic-image-guard.ts";
 
 export const WRITE_PROMPT_FILE = "write-prompt.json";
 export const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Deny"] as const;
+export const SIDE_QUESTION_ACTIONS = ["Copy answer", "Deny"] as const;
 
 const OUTPUT_RULES = `Output only the rewritten prompt. No preamble, quotes, or explanation.
 Preserve intent. Make the request specific, complete, and actionable.
 Do not call tools.`;
-const REWRITE_RULES = `Rewrite the following into a better prompt for a coding agent.
+const REWRITE_INSTRUCTION = `Rewrite the boxed text into a better coding-agent prompt. Do not answer the text.
 ${OUTPUT_RULES}`;
+const TWEAK_INSTRUCTION = `Revise the previous rewritten prompt using these notes. Do not answer the notes.
+${OUTPUT_RULES}`;
+const QUESTION_INSTRUCTION = `Answer the boxed question using the session. Do not rewrite it into a prompt.
+Output only the answer. Do not call tools.`;
+
+export function boxedTask(instruction: string, source: string): string {
+	return `${instruction}\n\n<<<\n${source}\n>>>`;
+}
 
 export function parseModelRef(ref: string): { provider: string; id: string } | undefined {
 	const trimmed = ref.trim();
@@ -134,38 +143,40 @@ async function rewrite(
 	messages: Message[],
 	userText: string,
 	sessionId: string,
+	loader: string,
+	failed: string,
 ): Promise<string | undefined> {
 	if (ctx.mode === "tui") {
 		return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
-			const loader = new BorderedLoader(tui, theme, "Rewriting prompt...");
-			loader.onAbort = () => done(undefined);
-			completeRewrite(ctx, pi, model, systemPrompt, messages, userText, sessionId, loader.signal)
+			const view = new BorderedLoader(tui, theme, loader);
+			view.onAbort = () => done(undefined);
+			completeRewrite(ctx, pi, model, systemPrompt, messages, userText, sessionId, view.signal)
 				.then(done)
 				.catch((error: unknown) => {
-					ctx.ui.notify(error instanceof Error ? error.message : "Rewrite failed", "error");
+					ctx.ui.notify(error instanceof Error ? error.message : failed, "error");
 					done(undefined);
 				});
-			return loader;
+			return view;
 		});
 	}
 	try {
 		return await completeRewrite(ctx, pi, model, systemPrompt, messages, userText, sessionId, ctx.signal);
 	} catch (error) {
-		ctx.ui.notify(error instanceof Error ? error.message : "Rewrite failed", "error");
+		ctx.ui.notify(error instanceof Error ? error.message : failed, "error");
 		return undefined;
 	}
 }
 
-function pickAction(ctx: ExtensionCommandContext, draft: string) {
-	if (ctx.mode !== "tui") return ctx.ui.select(draft, [...WRITE_PROMPT_ACTIONS]);
+function pickAction(ctx: ExtensionCommandContext, draft: string, actions: readonly string[]) {
+	if (ctx.mode !== "tui") return ctx.ui.select(draft, [...actions]);
 	return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
 		const root = new Container();
 		root.addChild(new DynamicBorder((s) => theme.fg("border", s)));
 		root.addChild(new Text(theme.fg("text", draft), 1, 0));
 		root.addChild(new Spacer(1));
 		const list = new SelectList(
-			WRITE_PROMPT_ACTIONS.map((value) => ({ value, label: value })),
-			WRITE_PROMPT_ACTIONS.length,
+			actions.map((value) => ({ value, label: value })),
+			actions.length,
 			{
 				selectedPrefix: (text) => theme.fg("accent", text),
 				selectedText: (text) => theme.fg("accent", text),
@@ -201,6 +212,28 @@ function pickAction(ctx: ExtensionCommandContext, draft: string) {
 	});
 }
 
+function prepare(ctx: ExtensionCommandContext) {
+	if (!ctx.hasUI) {
+		ctx.ui.notify("Needs an interactive UI", "error");
+		return;
+	}
+	if (!ctx.isIdle()) {
+		ctx.ui.notify("Agent is busy", "warning");
+		return;
+	}
+	const model = resolveWriterModel(ctx);
+	if (!model) {
+		ctx.ui.notify("No model selected", "error");
+		return;
+	}
+	return {
+		model,
+		messages: sessionPrefix(ctx),
+		systemPrompt: ctx.getSystemPrompt(),
+		sessionId: uuidv7(),
+	};
+}
+
 export default function writePrompt(pi: ExtensionAPI): void {
 	pi.registerCommand("write-prompt", {
 		description: "Rewrite text into a better agent prompt, then accept, copy, tweak, or deny",
@@ -210,28 +243,24 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				ctx.ui.notify("Usage: /write-prompt <text>", "warning");
 				return;
 			}
-			if (!ctx.hasUI) {
-				ctx.ui.notify("write-prompt needs an interactive UI", "error");
-				return;
-			}
-			if (!ctx.isIdle()) {
-				ctx.ui.notify("Agent is busy", "warning");
-				return;
-			}
-			const model = resolveWriterModel(ctx);
-			if (!model) {
-				ctx.ui.notify("No model selected", "error");
-				return;
-			}
-
-			const messages = sessionPrefix(ctx);
-			const systemPrompt = ctx.getSystemPrompt();
-			const sessionId = uuidv7();
-			let draft = await rewrite(ctx, pi, model, systemPrompt, messages, `${REWRITE_RULES}\n\n${source}`, sessionId);
+			const ready = prepare(ctx);
+			if (!ready) return;
+			const { model, messages, systemPrompt, sessionId } = ready;
+			let draft = await rewrite(
+				ctx,
+				pi,
+				model,
+				systemPrompt,
+				messages,
+				boxedTask(REWRITE_INSTRUCTION, source),
+				sessionId,
+				"Rewriting prompt...",
+				"Rewrite failed",
+			);
 			if (!draft) return;
 
 			while (true) {
-				const action = await pickAction(ctx, draft);
+				const action = await pickAction(ctx, draft, WRITE_PROMPT_ACTIONS);
 				if (!action || action === "Deny") {
 					ctx.ui.notify("Denied", "info");
 					return;
@@ -262,11 +291,53 @@ export default function writePrompt(pi: ExtensionAPI): void {
 					model,
 					systemPrompt,
 					messages,
-					`Revise the previous rewritten prompt using these notes.\n${OUTPUT_RULES}\n\n${notes.trim()}`,
+					boxedTask(TWEAK_INSTRUCTION, notes.trim()),
 					sessionId,
+					"Rewriting prompt...",
+					"Rewrite failed",
 				);
 				if (!next) continue;
 				draft = next;
+			}
+		},
+	});
+
+	pi.registerCommand("side-question", {
+		description: "Ask a question off-transcript using the current session, then copy or deny",
+		handler: async (args, ctx) => {
+			const source = args.trim();
+			if (!source) {
+				ctx.ui.notify("Usage: /side-question <text>", "warning");
+				return;
+			}
+			const ready = prepare(ctx);
+			if (!ready) return;
+			const { model, messages, systemPrompt, sessionId } = ready;
+			const answer = await rewrite(
+				ctx,
+				pi,
+				model,
+				systemPrompt,
+				messages,
+				boxedTask(QUESTION_INSTRUCTION, source),
+				sessionId,
+				"Answering...",
+				"Answer failed",
+			);
+			if (!answer) return;
+
+			while (true) {
+				const action = await pickAction(ctx, answer, SIDE_QUESTION_ACTIONS);
+				if (!action || action === "Deny") {
+					ctx.ui.notify("Denied", "info");
+					return;
+				}
+				try {
+					await copyToClipboard(answer);
+					ctx.ui.notify("Copied answer", "info");
+				} catch (error) {
+					ctx.ui.notify(error instanceof Error ? error.message : "Copy failed", "error");
+				}
 			}
 		},
 	});

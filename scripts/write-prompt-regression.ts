@@ -11,7 +11,9 @@ const {
 	default: writePrompt,
 	parseModelRef,
 	configuredModelRef,
+	boxedTask,
 	WRITE_PROMPT_ACTIONS,
+	SIDE_QUESTION_ACTIONS,
 	WRITE_PROMPT_FILE,
 } = await import("../extensions/write-prompt.ts");
 
@@ -37,6 +39,8 @@ assert.equal(configuredModelRef('{"model":""}'), undefined);
 assert.equal(configuredModelRef('{"enabled":true}'), undefined);
 assert.equal(configuredModelRef("not json"), undefined);
 assert.deepEqual([...WRITE_PROMPT_ACTIONS], ["Accept", "Copy prompt", "Tweak", "Deny"]);
+assert.deepEqual([...SIDE_QUESTION_ACTIONS], ["Copy answer", "Deny"]);
+assert.match(boxedTask("Do not answer the text.", "did you cut a new GH release"), /<<<\ndid you cut a new GH release\n>>>/s);
 
 const commands: Record<string, { handler: (args: string, ctx: never) => Promise<void> }> = {};
 let sent: string | undefined;
@@ -52,6 +56,7 @@ writePrompt({
 	getAllTools: () => defaultTools,
 } as never);
 assert.equal(typeof commands["write-prompt"]?.handler, "function");
+assert.equal(typeof commands["side-question"]?.handler, "function");
 
 const notices: string[] = [];
 const baseUi = {
@@ -334,7 +339,74 @@ assert.equal(captured[0]?.messages.length, 3);
 assert.equal((captured[0]?.messages[0] as { role: string }).role, "user");
 assert.equal((captured[0]?.messages[1] as { role: string }).role, "assistant");
 assert.match(JSON.stringify(captured[0]?.messages[2]), /do the thing/);
+assert.match(JSON.stringify(captured[0]?.messages[2]), /Do not answer the text/);
+assert.match(JSON.stringify(captured[0]?.messages[2]), /<<<\\ndo the thing\\n>>>/);
 assert.equal(sent, "better prompt");
+
+const questionCapture: string[] = [];
+sent = undefined;
+await commands["write-prompt"].handler(
+	"did you cut a new GH release",
+	ctx({
+		modelRegistry: {
+			find: () => undefined,
+			hasConfiguredAuth: () => true,
+			complete: async (_model: unknown, context: { messages: Array<{ content?: Array<{ text?: string }> }> }) => {
+				questionCapture.push(context.messages.at(-1)?.content?.[0]?.text ?? "");
+				return {
+					role: "assistant",
+					content: [{ type: "text", text: "better prompt" }],
+					stopReason: "stop",
+				};
+			},
+		},
+		ui: {
+			...baseUi,
+			select: async () => "Accept",
+		},
+	}) as never,
+);
+assert.match(questionCapture[0] ?? "", /Do not answer the text/);
+assert.match(questionCapture[0] ?? "", /<<<\ndid you cut a new GH release\n>>>/s);
+assert.equal((questionCapture[0] ?? "").trim().startsWith("did you cut"), false);
+assert.equal(sent, "better prompt");
+
+const sideCapture: string[] = [];
+sent = undefined;
+notices.length = 0;
+let sideStep = 0;
+await commands["side-question"].handler(
+	"is that the best fix?",
+	ctx({
+		modelRegistry: {
+			find: () => undefined,
+			hasConfiguredAuth: () => true,
+			complete: async (_model: unknown, context: { messages: Array<{ content?: Array<{ text?: string }> }> }) => {
+				sideCapture.push(context.messages.at(-1)?.content?.[0]?.text ?? "");
+				return {
+					role: "assistant",
+					content: [{ type: "text", text: "yes, wrap it" }],
+					stopReason: "stop",
+				};
+			},
+		},
+		ui: {
+			...baseUi,
+			select: async () => {
+				sideStep += 1;
+				return sideStep === 1 ? "Copy answer" : "Deny";
+			},
+		},
+	}) as never,
+);
+assert.equal(sent, undefined);
+assert.match(sideCapture[0] ?? "", /Answer the boxed question/);
+assert.match(sideCapture[0] ?? "", /<<<\nis that the best fix\?\n>>>/s);
+assert.equal(sideCapture[0]?.includes("Do not rewrite it into a prompt"), true);
+
+notices.length = 0;
+await commands["side-question"].handler("", ctx() as never);
+assert.equal(notices[0], "Usage: /side-question <text>");
 
 const toolCapture: { tools?: Array<{ name: string }> } = {};
 sent = undefined;
