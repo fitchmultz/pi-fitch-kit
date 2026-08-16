@@ -32,6 +32,13 @@ export function configuredModelRef(raw: string): string | undefined {
 	}
 }
 
+function syncDraft(messages: Message[], draft: string): void {
+	const last = messages.at(-1);
+	if (!last || last.role !== "assistant") return;
+	if (contentText(last.content).trim() === draft) return;
+	last.content = [{ type: "text", text: draft }];
+}
+
 function readConfiguredModel(): string | undefined {
 	try {
 		return configuredModelRef(readFileSync(join(getAgentDir(), WRITE_PROMPT_FILE), "utf8"));
@@ -45,7 +52,10 @@ function resolveWriterModel(ctx: ExtensionCommandContext) {
 	if (ref) {
 		const parsed = parseModelRef(ref);
 		const found = parsed && ctx.modelRegistry.find(parsed.provider, parsed.id);
-		if (found && ctx.modelRegistry.hasConfiguredAuth(found)) return found;
+		if (found && ctx.modelRegistry.hasConfiguredAuth(found)) {
+			ctx.ui.notify(`Writing with ${ref}`, "info");
+			return found;
+		}
 		ctx.ui.notify(
 			found ? `No auth for ${ref}; using session model` : `Unknown model ${ref}; using session model`,
 			"warning",
@@ -73,9 +83,13 @@ async function completeRewrite(
 		{ signal, cacheRetention: "none", sessionId },
 	);
 	if (response.stopReason === "aborted") return undefined;
+	if (response.stopReason !== "stop") {
+		ctx.ui.notify(response.errorMessage ?? `Writer stopped (${response.stopReason})`, "error");
+		return undefined;
+	}
 	const text = contentText(response.content).trim();
 	if (!text) {
-		ctx.ui.notify(response.errorMessage ?? "Writer returned no text", "error");
+		ctx.ui.notify("Writer returned no text", "error");
 		return undefined;
 	}
 	messages.push(pending, response);
@@ -89,20 +103,25 @@ async function rewrite(
 	userText: string,
 	sessionId: string,
 ): Promise<string | undefined> {
-	if (ctx.mode !== "tui") {
-		return completeRewrite(ctx, model, messages, userText, sessionId, ctx.signal);
+	if (ctx.mode === "tui") {
+		return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
+			const loader = new BorderedLoader(tui, theme, "Rewriting prompt...");
+			loader.onAbort = () => done(undefined);
+			completeRewrite(ctx, model, messages, userText, sessionId, loader.signal)
+				.then(done)
+				.catch((error: unknown) => {
+					ctx.ui.notify(error instanceof Error ? error.message : "Rewrite failed", "error");
+					done(undefined);
+				});
+			return loader;
+		});
 	}
-	return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
-		const loader = new BorderedLoader(tui, theme, "Rewriting prompt...");
-		loader.onAbort = () => done(undefined);
-		completeRewrite(ctx, model, messages, userText, sessionId, loader.signal)
-			.then(done)
-			.catch((error: unknown) => {
-				ctx.ui.notify(error instanceof Error ? error.message : "Rewrite failed", "error");
-				done(undefined);
-			});
-		return loader;
-	});
+	try {
+		return await completeRewrite(ctx, model, messages, userText, sessionId, ctx.signal);
+	} catch (error) {
+		ctx.ui.notify(error instanceof Error ? error.message : "Rewrite failed", "error");
+		return undefined;
+	}
 }
 
 export default function writePrompt(pi: ExtensionAPI): void {
@@ -141,11 +160,12 @@ export default function writePrompt(pi: ExtensionAPI): void {
 						ctx.ui.notify("Denied", "info");
 						return;
 					}
-					draft = edited.trim();
-					if (!draft) {
+					const nextDraft = edited.trim();
+					if (!nextDraft) {
 						ctx.ui.notify("Prompt is empty", "warning");
 						continue;
 					}
+					draft = nextDraft;
 					review = false;
 				}
 
@@ -174,6 +194,7 @@ export default function writePrompt(pi: ExtensionAPI): void {
 
 				const notes = await ctx.ui.editor("Tweak notes");
 				if (!notes?.trim()) continue;
+				syncDraft(messages, draft);
 				const next = await rewrite(ctx, model, messages, notes.trim(), sessionId);
 				if (!next) continue;
 				draft = next;

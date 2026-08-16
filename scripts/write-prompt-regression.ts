@@ -154,6 +154,88 @@ await commands["write-prompt"].handler(
 assert.deepEqual(seen, [1, 3]);
 assert.equal(sent, "v2");
 
+const tweakHistory: string[][] = [];
+step = 0;
+sent = undefined;
+await commands["write-prompt"].handler(
+	"first draft",
+	ctx({
+		modelRegistry: {
+			find: () => undefined,
+			hasConfiguredAuth: () => true,
+			complete: async (_model: unknown, context: { messages: Array<{ role?: string; content: unknown }> }) => {
+				tweakHistory.push(
+					context.messages.map((message) => {
+						const content = message.content;
+						if (!Array.isArray(content)) return String(content);
+						return content
+							.filter((block) => block && typeof block === "object" && "text" in block)
+							.map((block) => String((block as { text: string }).text))
+							.join("");
+					}),
+				);
+				return {
+					role: "assistant",
+					content: [{ type: "text", text: `v${tweakHistory.length}` }],
+					stopReason: "stop",
+				};
+			},
+		},
+		ui: {
+			...baseUi,
+			editor: async (title: string, prefill?: string) => {
+				if (title === "Tweak notes") return "shorter";
+				if (title === "Rewritten prompt" && prefill === "v1") return "edited draft";
+				return prefill;
+			},
+			select: async () => {
+				step += 1;
+				return step === 1 ? "Tweak" : "Accept";
+			},
+		},
+	}) as never,
+);
+assert.deepEqual(tweakHistory[1], ["first draft", "edited draft", "shorter"]);
+assert.equal(sent, "v2");
+
+let emptyEditor = 0;
+sent = undefined;
+await commands["write-prompt"].handler(
+	"keep me",
+	ctx({
+		ui: {
+			...baseUi,
+			editor: async (_title: string, prefill?: string) => {
+				emptyEditor += 1;
+				return emptyEditor === 1 ? "   " : prefill;
+			},
+			select: async () => "Accept",
+		},
+	}) as never,
+);
+assert.equal(emptyEditor, 2);
+assert.equal(sent, "better prompt");
+
+notices.length = 0;
+sent = undefined;
+await commands["write-prompt"].handler(
+	"fail please",
+	ctx({
+		modelRegistry: {
+			find: () => undefined,
+			hasConfiguredAuth: () => true,
+			complete: async () => ({
+				role: "assistant",
+				content: [{ type: "text", text: "partial" }],
+				stopReason: "error",
+				errorMessage: "boom",
+			}),
+		},
+	}) as never,
+);
+assert.equal(sent, undefined);
+assert.equal(notices.at(-1), "boom");
+
 writeFileSync(join(agentDir, WRITE_PROMPT_FILE), `${JSON.stringify({ model: "anthropic/claude-opus-5" })}\n`);
 let found: { provider: string; id: string } | undefined;
 sent = undefined;
