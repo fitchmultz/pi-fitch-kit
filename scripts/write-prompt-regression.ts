@@ -61,6 +61,7 @@ const flat = flattenToolHistory([
 ]);
 assert.equal(flat.some((message) => message.role === "toolResult"), false);
 assert.match(JSON.stringify(flat[0]), /called read/);
+assert.match(JSON.stringify(flat[0]), /a\.ts/);
 assert.match(JSON.stringify(flat[1]), /read result/);
 
 const commands: Record<string, { handler: (args: string, ctx: never) => Promise<void> }> = {};
@@ -527,6 +528,7 @@ await commands["draft"].handler(
 assert.equal(toolCapture.tools, undefined);
 assert.equal(toolCapture.roles?.includes("toolResult"), false);
 assert.match(toolCapture.blob ?? "", /called read/);
+assert.match(toolCapture.blob ?? "", /a\.ts/);
 assert.match(toolCapture.blob ?? "", /read result/);
 
 const imageCapture: Array<{ type?: string; mimeType?: string; text?: string }> = [];

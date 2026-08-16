@@ -102,11 +102,17 @@ export function flattenToolHistory(messages: Message[]): Message[] {
 		}
 		if (message.role === "assistant" && Array.isArray(message.content)) {
 			const parts = message.content.filter((part) => part.type !== "toolCall");
-			const calls = message.content.filter((part) => part.type === "toolCall").map((part) => part.name);
+			const calls = message.content
+				.filter((part) => part.type === "toolCall")
+				.map((part) => {
+					const args = part.arguments;
+					const extra = args && Object.keys(args).length ? ` ${JSON.stringify(args)}` : "";
+					return `${part.name}${extra}`;
+				});
 			if (calls.length) parts.push({ type: "text", text: `[called ${calls.join(", ")}]` });
 			out.push({
 				...message,
-				content: parts.length ? parts : [{ type: "text", text: "[tool call]" }],
+				content: parts.length ? parts : [{ type: "text", text: "[empty]" }],
 			});
 			continue;
 		}
