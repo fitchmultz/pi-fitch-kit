@@ -40,6 +40,7 @@ assert.deepEqual([...WRITE_PROMPT_ACTIONS], ["Accept", "Copy prompt", "Tweak", "
 
 const commands: Record<string, { handler: (args: string, ctx: never) => Promise<void> }> = {};
 let sent: string | undefined;
+const defaultTools = [{ name: "read", description: "Read a file", parameters: { type: "object" } }];
 writePrompt({
 	registerCommand(name: string, config: { handler: (args: string, ctx: never) => Promise<void> }) {
 		commands[name] = config;
@@ -47,6 +48,8 @@ writePrompt({
 	sendUserMessage(content: string) {
 		sent = content;
 	},
+	getActiveTools: () => ["read"],
+	getAllTools: () => defaultTools,
 } as never);
 assert.equal(typeof commands["write-prompt"]?.handler, "function");
 
@@ -200,6 +203,41 @@ assert.equal(usedSelect, false);
 assert.equal(customCalls, 2);
 assert.equal(sent, "better prompt");
 
+sent = undefined;
+const painted: string[][] = [];
+let colorCalls = 0;
+await commands["write-prompt"].handler(
+	"show me",
+	ctx({
+		mode: "tui",
+		ui: {
+			...baseUi,
+			custom: async (factory?: (tui: { requestRender: () => void }, theme: { fg: (color: string, text: string) => string }, kb: unknown, done: (value: string) => void) => unknown) => {
+				colorCalls += 1;
+				if (colorCalls === 1 || !factory) return colorCalls === 1 ? "better prompt" : "Accept";
+				try {
+					factory(
+						{ requestRender() {} },
+						{
+							fg(color: string, text: string) {
+								painted.push([color, text]);
+								return text;
+							},
+						},
+						{},
+						() => {},
+					);
+				} catch {
+					// keyHint uses the live TUI theme; the draft color is painted first
+				}
+				return "Accept";
+			},
+		},
+	}) as never,
+);
+assert.ok(painted.some(([color, text]) => color === "text" && text === "better prompt"));
+assert.equal(sent, "better prompt");
+
 notices.length = 0;
 sent = undefined;
 await commands["write-prompt"].handler(
@@ -297,5 +335,115 @@ assert.equal((captured[0]?.messages[0] as { role: string }).role, "user");
 assert.equal((captured[0]?.messages[1] as { role: string }).role, "assistant");
 assert.match(JSON.stringify(captured[0]?.messages[2]), /do the thing/);
 assert.equal(sent, "better prompt");
+
+const toolCapture: { tools?: Array<{ name: string }> } = {};
+sent = undefined;
+await commands["write-prompt"].handler(
+	"after tools",
+	ctx({
+		sessionManager: {
+			getEntries: () => [
+				{
+					type: "message",
+					id: "u1",
+					parentId: null,
+					timestamp: "2026-01-01T00:00:00.000Z",
+					message: { role: "user", content: [{ type: "text", text: "read it" }], timestamp: 1 },
+				},
+				{
+					type: "message",
+					id: "a1",
+					parentId: "u1",
+					timestamp: "2026-01-01T00:00:01.000Z",
+					message: {
+						role: "assistant",
+						content: [{ type: "toolCall", id: "c1", name: "read", arguments: { path: "a.ts" } }],
+						timestamp: 2,
+					},
+				},
+				{
+					type: "message",
+					id: "t1",
+					parentId: "a1",
+					timestamp: "2026-01-01T00:00:02.000Z",
+					message: {
+						role: "toolResult",
+						toolCallId: "c1",
+						toolName: "read",
+						content: [{ type: "text", text: "ok" }],
+						timestamp: 3,
+					},
+				},
+			],
+			getLeafId: () => "t1",
+		},
+		modelRegistry: {
+			find: () => undefined,
+			hasConfiguredAuth: () => true,
+			complete: async (_model: unknown, context: { tools?: Array<{ name: string }> }) => {
+				toolCapture.tools = context.tools;
+				return {
+					role: "assistant",
+					content: [{ type: "text", text: "better prompt" }],
+					stopReason: "stop",
+				};
+			},
+		},
+		ui: {
+			...baseUi,
+			select: async () => "Accept",
+		},
+	}) as never,
+);
+assert.ok(toolCapture.tools?.some((tool) => tool.name === "read"));
+
+const imageCapture: Array<{ type?: string; mimeType?: string; text?: string }> = [];
+sent = undefined;
+await commands["write-prompt"].handler(
+	"after image",
+	ctx({
+		model: { id: "claude-opus-5", provider: "anthropic", api: "anthropic-messages" },
+		sessionManager: {
+			getEntries: () => [
+				{
+					type: "message",
+					id: "u1",
+					parentId: null,
+					timestamp: "2026-01-01T00:00:00.000Z",
+					message: {
+						role: "user",
+						content: [
+							{
+								type: "image",
+								data: "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAATCwAAEwsAAAAAAAAAAAAAAAD/AA==",
+								mimeType: "image/bmp",
+							},
+						],
+						timestamp: 1,
+					},
+				},
+			],
+			getLeafId: () => "u1",
+		},
+		modelRegistry: {
+			find: () => undefined,
+			hasConfiguredAuth: () => true,
+			complete: async (_model: unknown, context: { messages: Array<{ content?: Array<{ type?: string; mimeType?: string; text?: string }> }> }) => {
+				imageCapture.push(...(context.messages[0]?.content ?? []));
+				return {
+					role: "assistant",
+					content: [{ type: "text", text: "better prompt" }],
+					stopReason: "stop",
+				};
+			},
+		},
+		ui: {
+			...baseUi,
+			select: async () => "Accept",
+		},
+	}) as never,
+);
+assert.equal(imageCapture.some((part) => part.type === "image"), false);
+assert.match(imageCapture.find((part) => part.type === "text")?.text ?? "", /does not support this image type/);
 
 console.log("write-prompt regression ok");

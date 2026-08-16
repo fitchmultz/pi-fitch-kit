@@ -63,7 +63,7 @@ Accepted caveats of owning that callback: do not combine it with another Anthrop
 
 [`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other models while resizing only Claude-bound images to Anthropic's inline limits, on every route that speaks `anthropic-messages` (direct, Cloudflare AI Gateway, proxies such as GitHub Copilot). Non-Claude models sharing that wire API keep their source images.
 
-[`write-prompt`](extensions/write-prompt.ts) adds `/write-prompt <text>`. A nested writer rewrites the text off-transcript using the current session system prompt and conversation, then shows the draft with Accept, Copy prompt, Tweak, and Deny on one screen. Copy does not touch the editor. Tweak notes go back to the same writer. It uses the active session model unless `~/.pi/agent/write-prompt.json` sets `{ "model": "provider/id" }`.
+[`write-prompt`](extensions/write-prompt.ts) adds `/write-prompt <text>`. A nested writer rewrites the text off-transcript using the current session system prompt and conversation, then shows the draft with Accept, Copy prompt, Tweak, and Deny on one screen. Copy does not touch the editor. Tweak notes go back to the same writer. It uses the active session model unless `~/.pi/agent/write-prompt.json` sets `{ "model": "provider/id" }`. That writer, including an override model, receives the current session context.
 
 ### Selective experimental extension
 
