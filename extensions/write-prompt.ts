@@ -18,7 +18,7 @@ import { prepareClaudeImages } from "./anthropic-image-guard.ts";
 
 export const WRITE_PROMPT_FILE = "write-prompt.json";
 export const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Deny"] as const;
-export const SIDE_QUESTION_ACTIONS = ["Copy answer", "Deny"] as const;
+export const SIDE_QUESTION_ACTIONS = ["Copy answer", "Dismiss"] as const;
 
 const OUTPUT_RULES = `Output only the rewritten prompt. No preamble, quotes, or explanation.
 Preserve intent. Make the request specific, complete, and actionable.
@@ -31,7 +31,11 @@ const QUESTION_INSTRUCTION = `Answer the boxed question using the session. Do no
 Output only the answer. Do not call tools.`;
 
 export function boxedTask(instruction: string, source: string): string {
-	return `${instruction}\n\n<<<\n${source}\n>>>`;
+	let mark = "";
+	while (source.includes(`<<<${mark}`) || source.includes(`>>>${mark}`)) {
+		mark = String((Number(mark) || 0) + 1);
+	}
+	return `${instruction}\n\n<<<${mark}\n${source}\n>>>${mark}`;
 }
 
 export function parseModelRef(ref: string): { provider: string; id: string } | undefined {
@@ -64,7 +68,7 @@ function resolveWriterModel(ctx: ExtensionCommandContext) {
 		const parsed = parseModelRef(ref);
 		const found = parsed && ctx.modelRegistry.find(parsed.provider, parsed.id);
 		if (found && ctx.modelRegistry.hasConfiguredAuth(found)) {
-			ctx.ui.notify(`Writing with ${ref}`, "info");
+			ctx.ui.notify(`Using ${ref}`, "info");
 			return found;
 		}
 		ctx.ui.notify(
@@ -98,7 +102,7 @@ function writerTools(pi: ExtensionAPI, messages: Message[]) {
 	});
 }
 
-async function completeRewrite(
+async function completeWriter(
 	ctx: ExtensionCommandContext,
 	pi: ExtensionAPI,
 	model: NonNullable<ExtensionCommandContext["model"]>,
@@ -135,7 +139,7 @@ async function completeRewrite(
 	return text;
 }
 
-async function rewrite(
+async function runWriter(
 	ctx: ExtensionCommandContext,
 	pi: ExtensionAPI,
 	model: NonNullable<ExtensionCommandContext["model"]>,
@@ -150,7 +154,7 @@ async function rewrite(
 		return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
 			const view = new BorderedLoader(tui, theme, loader);
 			view.onAbort = () => done(undefined);
-			completeRewrite(ctx, pi, model, systemPrompt, messages, userText, sessionId, view.signal)
+			completeWriter(ctx, pi, model, systemPrompt, messages, userText, sessionId, view.signal)
 				.then(done)
 				.catch((error: unknown) => {
 					ctx.ui.notify(error instanceof Error ? error.message : failed, "error");
@@ -160,7 +164,7 @@ async function rewrite(
 		});
 	}
 	try {
-		return await completeRewrite(ctx, pi, model, systemPrompt, messages, userText, sessionId, ctx.signal);
+		return await completeWriter(ctx, pi, model, systemPrompt, messages, userText, sessionId, ctx.signal);
 	} catch (error) {
 		ctx.ui.notify(error instanceof Error ? error.message : failed, "error");
 		return undefined;
@@ -246,7 +250,7 @@ export default function writePrompt(pi: ExtensionAPI): void {
 			const ready = prepare(ctx);
 			if (!ready) return;
 			const { model, messages, systemPrompt, sessionId } = ready;
-			let draft = await rewrite(
+			let draft = await runWriter(
 				ctx,
 				pi,
 				model,
@@ -285,7 +289,7 @@ export default function writePrompt(pi: ExtensionAPI): void {
 
 				const notes = await ctx.ui.editor("Tweak notes");
 				if (!notes?.trim()) continue;
-				const next = await rewrite(
+				const next = await runWriter(
 					ctx,
 					pi,
 					model,
@@ -303,7 +307,7 @@ export default function writePrompt(pi: ExtensionAPI): void {
 	});
 
 	pi.registerCommand("side-question", {
-		description: "Ask a question off-transcript using the current session, then copy or deny",
+		description: "Ask a question off-transcript using the current session, then copy or dismiss",
 		handler: async (args, ctx) => {
 			const source = args.trim();
 			if (!source) {
@@ -313,7 +317,7 @@ export default function writePrompt(pi: ExtensionAPI): void {
 			const ready = prepare(ctx);
 			if (!ready) return;
 			const { model, messages, systemPrompt, sessionId } = ready;
-			const answer = await rewrite(
+			const answer = await runWriter(
 				ctx,
 				pi,
 				model,
@@ -328,8 +332,8 @@ export default function writePrompt(pi: ExtensionAPI): void {
 
 			while (true) {
 				const action = await pickAction(ctx, answer, SIDE_QUESTION_ACTIONS);
-				if (!action || action === "Deny") {
-					ctx.ui.notify("Denied", "info");
+				if (!action || action === "Dismiss") {
+					ctx.ui.notify("Dismissed", "info");
 					return;
 				}
 				try {
