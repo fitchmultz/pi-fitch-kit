@@ -31,9 +31,10 @@ const QUESTION_INSTRUCTION = `Answer the boxed question using the session. Do no
 Output only the answer. Do not call tools.`;
 
 export function boxedTask(instruction: string, source: string): string {
+	let n = 0;
 	let mark = "";
 	while (source.includes(`<<<${mark}`) || source.includes(`>>>${mark}`)) {
-		mark = String((Number(mark) || 0) + 1);
+		mark = String(++n);
 	}
 	return `${instruction}\n\n<<<${mark}\n${source}\n>>>${mark}`;
 }
