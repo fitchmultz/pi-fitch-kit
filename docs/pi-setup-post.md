@@ -23,7 +23,7 @@ The normal path includes:
 - small public tools for structured questions, persistent todos, working-directory changes, deterministic math, timing, verbosity, stash, session editing, and raw message copy;
 - [`ponytail`](https://github.com/DietrichGebert/ponytail) to keep the code path boring and small.
 
-The kit itself bundles stable session naming, the Claude image boundary, shared fast-mode toggles for Anthropic Opus and OpenAI routes, `/write-prompt`, and `/side-question`. The profiles ship directly with `pi-subagents`, so there is no second copy or sync layer.
+The kit itself bundles stable session naming, the Claude image boundary, shared fast-mode toggles for Anthropic Opus and OpenAI routes, `/draft`, and `/side-question`. The profiles ship directly with `pi-subagents`, so there is no second copy or sync layer.
 
 For native macOS automation, [`macuse`](https://github.com/fitchmultz/macuse) is a selective experimental add-on. I enable it only when browser DOM and CLI tools are insufficient; Codex app updates can break its integration surface.
 
