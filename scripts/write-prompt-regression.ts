@@ -12,6 +12,7 @@ const {
 	parseModelRef,
 	configuredModelRef,
 	boxedTask,
+	flattenToolHistory,
 	WRITE_PROMPT_ACTIONS,
 	SIDE_QUESTION_ACTIONS,
 	WRITE_PROMPT_FILE,
@@ -43,6 +44,24 @@ assert.deepEqual([...SIDE_QUESTION_ACTIONS], ["Copy answer", "Ask again", "Dismi
 assert.match(boxedTask("Do not answer the text.", "did you cut a new GH release"), /<<<\ndid you cut a new GH release\n>>>/s);
 assert.match(boxedTask("x", "foo\n>>>\nbar"), /<<<1\nfoo\n>>>\nbar\n>>>1/s);
 assert.match(boxedTask("x", "has <<<1 and >>>1"), /<<<2\nhas <<<1 and >>>1\n>>>2/s);
+const flat = flattenToolHistory([
+	{
+		role: "assistant",
+		content: [{ type: "toolCall", id: "c1", name: "read", arguments: { path: "a.ts" } }],
+		timestamp: 1,
+	} as never,
+	{
+		role: "toolResult",
+		toolCallId: "c1",
+		toolName: "read",
+		content: [{ type: "text", text: "ok" }],
+		isError: false,
+		timestamp: 2,
+	},
+]);
+assert.equal(flat.some((message) => message.role === "toolResult"), false);
+assert.match(JSON.stringify(flat[0]), /called read/);
+assert.match(JSON.stringify(flat[1]), /read result/);
 
 const commands: Record<string, { handler: (args: string, ctx: never) => Promise<void> }> = {};
 let sent: string | undefined;
@@ -371,6 +390,7 @@ await commands["draft"].handler(
 	}) as never,
 );
 assert.match(questionCapture[0] ?? "", /Do not answer the text/);
+assert.match(questionCapture[0] ?? "", /not the session agent/);
 assert.match(questionCapture[0] ?? "", /<<<\ndid you cut a new GH release\n>>>/s);
 assert.equal((questionCapture[0] ?? "").trim().startsWith("did you cut"), false);
 assert.equal(sent, "better prompt");
@@ -443,7 +463,7 @@ await commands["side-question"].handler(
 assert.deepEqual(asked, [1, 3]);
 assert.equal(sent, undefined);
 
-const toolCapture: { tools?: Array<{ name: string }> } = {};
+const toolCapture: { tools?: Array<{ name: string }>; roles?: Array<string | undefined>; blob?: string } = {};
 sent = undefined;
 await commands["draft"].handler(
 	"after tools",
@@ -487,8 +507,10 @@ await commands["draft"].handler(
 		modelRegistry: {
 			find: () => undefined,
 			hasConfiguredAuth: () => true,
-			complete: async (_model: unknown, context: { tools?: Array<{ name: string }> }) => {
+			complete: async (_model: unknown, context: { tools?: Array<{ name: string }>; messages: Array<{ role?: string; content?: unknown }> }) => {
 				toolCapture.tools = context.tools;
+				toolCapture.roles = context.messages.map((message) => message.role);
+				toolCapture.blob = JSON.stringify(context.messages);
 				return {
 					role: "assistant",
 					content: [{ type: "text", text: "better prompt" }],
@@ -502,7 +524,10 @@ await commands["draft"].handler(
 		},
 	}) as never,
 );
-assert.ok(toolCapture.tools?.some((tool) => tool.name === "read"));
+assert.equal(toolCapture.tools, undefined);
+assert.equal(toolCapture.roles?.includes("toolResult"), false);
+assert.match(toolCapture.blob ?? "", /called read/);
+assert.match(toolCapture.blob ?? "", /read result/);
 
 const imageCapture: Array<{ type?: string; mimeType?: string; text?: string }> = [];
 sent = undefined;

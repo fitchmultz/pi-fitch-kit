@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.9 — 16 August 2026
+
+- `/draft` no longer sends tools to the nested writer. Tool history is flattened to text so the writer cannot stop on `toolUse`. The rewrite instruction now says it is not the session agent.
+
 ## 0.9.8 — 16 August 2026
 
 - Renamed `/write-prompt` to `/draft`. `/side-question` can Ask again on the same writer.
