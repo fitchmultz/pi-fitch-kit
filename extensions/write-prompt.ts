@@ -32,13 +32,6 @@ export function configuredModelRef(raw: string): string | undefined {
 	}
 }
 
-function syncDraft(messages: Message[], draft: string): void {
-	const last = messages.at(-1);
-	if (!last || last.role !== "assistant") return;
-	if (contentText(last.content).trim() === draft) return;
-	last.content = [{ type: "text", text: draft }];
-}
-
 function readConfiguredModel(): string | undefined {
 	try {
 		return configuredModelRef(readFileSync(join(getAgentDir(), WRITE_PROMPT_FILE), "utf8"));
@@ -152,24 +145,8 @@ export default function writePrompt(pi: ExtensionAPI): void {
 			let draft = await rewrite(ctx, model, messages, source, sessionId);
 			if (!draft) return;
 
-			let review = true;
 			while (true) {
-				if (review) {
-					const edited = await ctx.ui.editor("Rewritten prompt", draft);
-					if (edited === undefined) {
-						ctx.ui.notify("Denied", "info");
-						return;
-					}
-					const nextDraft = edited.trim();
-					if (!nextDraft) {
-						ctx.ui.notify("Prompt is empty", "warning");
-						continue;
-					}
-					draft = nextDraft;
-					review = false;
-				}
-
-				const action = await ctx.ui.select("Write prompt", [...WRITE_PROMPT_ACTIONS]);
+				const action = await ctx.ui.select(draft, [...WRITE_PROMPT_ACTIONS]);
 				if (!action || action === "Deny") {
 					ctx.ui.notify("Denied", "info");
 					return;
@@ -194,11 +171,9 @@ export default function writePrompt(pi: ExtensionAPI): void {
 
 				const notes = await ctx.ui.editor("Tweak notes");
 				if (!notes?.trim()) continue;
-				syncDraft(messages, draft);
 				const next = await rewrite(ctx, model, messages, notes.trim(), sessionId);
 				if (!next) continue;
 				draft = next;
-				review = true;
 			}
 		},
 	});
