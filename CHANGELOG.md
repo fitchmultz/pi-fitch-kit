@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.4 — 16 August 2026
+
+- `/write-prompt` shows the rewritten prompt and Accept / Copy prompt / Tweak / Deny on one screen. The extra editor confirm before choosing an action is gone.
+
 ## 0.9.3 — 16 August 2026
 
 - Added `/write-prompt <text>`: a nested writer rewrites the text off-transcript, then Accept sends it, Copy prompt puts it on the clipboard without touching the editor, Tweak continues the same writer, and Deny discards it. Optional writer model lives in `~/.pi/agent/write-prompt.json` as `{ "model": "provider/id" }`; missing or invalid config uses the active session model. Print and JSON modes refuse rather than auto-send.

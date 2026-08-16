@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { contentText } from "@earendil-works/pi-ai";
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-write-prompt-"));
 process.on("exit", () => rmSync(agentDir, { recursive: true, force: true }));
@@ -141,9 +140,9 @@ await commands["write-prompt"].handler(
 		},
 		ui: {
 			...baseUi,
-			editor: async (title: string, prefill?: string) => {
+			editor: async (title: string) => {
 				if (title === "Tweak notes") return "shorter";
-				return prefill;
+				return undefined;
 			},
 			select: async () => {
 				step += 1;
@@ -155,57 +154,21 @@ await commands["write-prompt"].handler(
 assert.deepEqual(seen, [1, 3]);
 assert.equal(sent, "v2");
 
-const tweakHistory: string[][] = [];
-step = 0;
+const titles: string[] = [];
 sent = undefined;
 await commands["write-prompt"].handler(
-	"first draft",
+	"show me",
 	ctx({
-		modelRegistry: {
-			find: () => undefined,
-			hasConfiguredAuth: () => true,
-			complete: async (_model: unknown, context: { messages: Array<{ content: string | readonly { type?: string; text?: string }[] }> }) => {
-				tweakHistory.push(context.messages.map((message) => contentText(message.content)));
-				return {
-					role: "assistant",
-					content: [{ type: "text", text: `v${tweakHistory.length}` }],
-					stopReason: "stop",
-				};
-			},
-		},
 		ui: {
 			...baseUi,
-			editor: async (title: string, prefill?: string) => {
-				if (title === "Tweak notes") return "shorter";
-				if (title === "Rewritten prompt" && prefill === "v1") return "edited draft";
-				return prefill;
-			},
-			select: async () => {
-				step += 1;
-				return step === 1 ? "Tweak" : "Accept";
+			select: async (title: string) => {
+				titles.push(title);
+				return "Accept";
 			},
 		},
 	}) as never,
 );
-assert.deepEqual(tweakHistory[1], ["first draft", "edited draft", "shorter"]);
-assert.equal(sent, "v2");
-
-let emptyEditor = 0;
-sent = undefined;
-await commands["write-prompt"].handler(
-	"keep me",
-	ctx({
-		ui: {
-			...baseUi,
-			editor: async (_title: string, prefill?: string) => {
-				emptyEditor += 1;
-				return emptyEditor === 1 ? "   " : prefill;
-			},
-			select: async () => "Accept",
-		},
-	}) as never,
-);
-assert.equal(emptyEditor, 2);
+assert.deepEqual(titles, ["better prompt"]);
 assert.equal(sent, "better prompt");
 
 notices.length = 0;
