@@ -63,7 +63,7 @@ Accepted caveats of owning that callback: do not combine it with another Anthrop
 
 [`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other models while resizing only Claude-bound images to Anthropic's inline limits, on every route that speaks `anthropic-messages` (direct, Cloudflare AI Gateway, proxies such as GitHub Copilot). Non-Claude models sharing that wire API keep their source images.
 
-[`write-prompt`](extensions/write-prompt.ts) adds `/write-prompt <text>`. A nested writer rewrites the text off-transcript and shows the draft with Accept, Copy prompt, Tweak, and Deny on one screen. Copy does not touch the editor. Tweak notes go back to the same writer. It uses the active session model unless `~/.pi/agent/write-prompt.json` sets `{ "model": "provider/id" }`.
+[`write-prompt`](extensions/write-prompt.ts) adds `/write-prompt <text>`. A nested writer rewrites the text off-transcript using the current session system prompt and conversation, then shows the draft with Accept, Copy prompt, Tweak, and Deny on one screen. Copy does not touch the editor. Tweak notes go back to the same writer. It uses the active session model unless `~/.pi/agent/write-prompt.json` sets `{ "model": "provider/id" }`.
 
 ### Selective experimental extension
 
@@ -237,7 +237,7 @@ npm run smoke
 - `npm run check` type-checks and syntax-checks the bundled extensions, exercises the image guard boundary, both fast toggles, session naming, and `/write-prompt`, then validates unpinned package sources, manifest resources, package metadata alignment, the absence of retired patch and duplicate surfaces, the settings example's compaction values, and that every manifest context-window override names a manifest-managed route with a sane value.
 - `npm run regression:fast-mode` verifies both toggles at the wire through real pi-ai serialization: `speed` plus fetch-time beta append on direct and gateway Opus routes without dropping existing markers, beta deduplication, prebuilt-client bypass, full-stream option survival, OpenAI priority payloads, off-state passthrough, footer eligibility including proxy exclusion, and watcher cleanup.
 - `npm run regression:session-name` verifies naming, metadata injection, protected identities, and single ownership during standalone-package migration.
-- `npm run regression:write-prompt` verifies model-override parsing, accept/deny, and that tweak rounds reuse the same writer history.
+- `npm run regression:write-prompt` verifies model-override parsing, accept/deny, session-prefix rewriting, and that tweak rounds reuse the same writer history.
 - `npm run smoke` loads the checkout through Pi's real resource loader, renders the compact footer at wide and narrow widths, checks its toggle, and requires the four bundled commands, `name_session`, one provider request hook, five extensions, and two prompts.
 - `npm run smoke:lifecycle` uses an isolated Pi agent dir for real install, stale-filter and duplicate-identity normalization, and resource reload.
 

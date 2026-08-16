@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.5 — 16 August 2026
+
+- `/write-prompt` rewrites against a snapshot of the current session: same system prompt and conversation prefix, rewrite instructions as the last user turn, `cacheRetention: "short"`, and a fresh nested session id. The draft on the action screen uses the theme body text color instead of the selector accent.
+
 ## 0.9.4 — 16 August 2026
 
 - `/write-prompt` shows the rewritten prompt and Accept / Copy prompt / Tweak / Deny on one screen. The extra editor confirm before choosing an action is gone.

@@ -68,6 +68,11 @@ function ctx(overrides: Record<string, unknown> = {}) {
 		mode: "rpc",
 		isIdle: () => true,
 		model: { id: "grok-4.6", provider: "xai" },
+		getSystemPrompt: () => "session system",
+		sessionManager: {
+			getEntries: () => [],
+			getLeafId: () => null,
+		},
 		modelRegistry: {
 			find: () => undefined,
 			hasConfiguredAuth: () => true,
@@ -171,6 +176,30 @@ await commands["write-prompt"].handler(
 assert.deepEqual(titles, ["better prompt"]);
 assert.equal(sent, "better prompt");
 
+sent = undefined;
+let usedSelect = false;
+let customCalls = 0;
+await commands["write-prompt"].handler(
+	"show me",
+	ctx({
+		mode: "tui",
+		ui: {
+			...baseUi,
+			custom: async () => {
+				customCalls += 1;
+				return customCalls === 1 ? "better prompt" : "Accept";
+			},
+			select: async () => {
+				usedSelect = true;
+				return "Accept";
+			},
+		},
+	}) as never,
+);
+assert.equal(usedSelect, false);
+assert.equal(customCalls, 2);
+assert.equal(sent, "better prompt");
+
 notices.length = 0;
 sent = undefined;
 await commands["write-prompt"].handler(
@@ -217,5 +246,56 @@ await commands["write-prompt"].handler(
 );
 assert.deepEqual(found, { provider: "anthropic", id: "claude-opus-5" });
 assert.equal(sent, "claude-opus-5");
+
+const captured: Array<{ systemPrompt?: string; messages: Array<{ role?: string; content?: unknown }>; cacheRetention?: string }> = [];
+sent = undefined;
+await commands["write-prompt"].handler(
+	"do the thing",
+	ctx({
+		sessionManager: {
+			getEntries: () => [
+				{
+					type: "message",
+					id: "u1",
+					parentId: null,
+					timestamp: "2026-01-01T00:00:00.000Z",
+					message: { role: "user", content: [{ type: "text", text: "hi" }], timestamp: 1 },
+				},
+				{
+					type: "message",
+					id: "a1",
+					parentId: "u1",
+					timestamp: "2026-01-01T00:00:01.000Z",
+					message: { role: "assistant", content: [{ type: "text", text: "yo" }], timestamp: 2 },
+				},
+			],
+			getLeafId: () => "a1",
+		},
+		modelRegistry: {
+			find: () => undefined,
+			hasConfiguredAuth: () => true,
+			complete: async (_model: unknown, context: { systemPrompt?: string; messages: Array<{ role?: string; content?: unknown }> }, options?: { cacheRetention?: string }) => {
+				captured.push({ systemPrompt: context.systemPrompt, messages: context.messages, cacheRetention: options?.cacheRetention });
+				return {
+					role: "assistant",
+					content: [{ type: "text", text: "better prompt" }],
+					stopReason: "stop",
+				};
+			},
+		},
+		ui: {
+			...baseUi,
+			select: async () => "Accept",
+		},
+	}) as never,
+);
+assert.equal(captured.length, 1);
+assert.equal(captured[0]?.systemPrompt, "session system");
+assert.equal(captured[0]?.cacheRetention, "short");
+assert.equal(captured[0]?.messages.length, 3);
+assert.equal((captured[0]?.messages[0] as { role: string }).role, "user");
+assert.equal((captured[0]?.messages[1] as { role: string }).role, "assistant");
+assert.match(JSON.stringify(captured[0]?.messages[2]), /do the thing/);
+assert.equal(sent, "better prompt");
 
 console.log("write-prompt regression ok");
