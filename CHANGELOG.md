@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.7 — 16 August 2026
+
+- `/write-prompt` boxes source with a fence that cannot appear in the text. `/side-question` exits with Dismiss. An override model notifies `Using provider/id` for both commands.
+
 ## 0.9.6 — 16 August 2026
 
 - `/write-prompt` wraps the source and says do not answer it, so a question-shaped input is rewritten instead of answered. `/side-question` uses the same session snapshot to answer off-transcript; Copy answer never sends to the agent.

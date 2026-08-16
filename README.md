@@ -63,7 +63,7 @@ Accepted caveats of owning that callback: do not combine it with another Anthrop
 
 [`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other models while resizing only Claude-bound images to Anthropic's inline limits, on every route that speaks `anthropic-messages` (direct, Cloudflare AI Gateway, proxies such as GitHub Copilot). Non-Claude models sharing that wire API keep their source images.
 
-[`write-prompt`](extensions/write-prompt.ts) adds `/write-prompt <text>` and `/side-question <text>`. Both use the current session system prompt and conversation off-transcript. `/write-prompt` wraps the source and rewrites it into a prompt (it does not answer the text), then Accept, Copy prompt, Tweak, or Deny. `/side-question` answers the question and only offers Copy answer or Deny; it never sends to the agent. Copy does not touch the editor. Both use the active session model unless `~/.pi/agent/write-prompt.json` sets `{ "model": "provider/id" }`. That writer, including an override model, receives the current session context.
+[`write-prompt`](extensions/write-prompt.ts) adds `/write-prompt <text>` and `/side-question <text>`. Both use the current session system prompt and conversation off-transcript. `/write-prompt` wraps the source and rewrites it into a prompt (it does not answer the text), then Accept, Copy prompt, Tweak, or Deny. `/side-question` answers the question and only offers Copy answer or Dismiss; it never sends to the agent. Copy does not touch the editor. Both use the active session model unless `~/.pi/agent/write-prompt.json` sets `{ "model": "provider/id" }`. That writer, including an override model, receives the current session context.
 
 ### Selective experimental extension
 

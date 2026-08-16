@@ -39,8 +39,10 @@ assert.equal(configuredModelRef('{"model":""}'), undefined);
 assert.equal(configuredModelRef('{"enabled":true}'), undefined);
 assert.equal(configuredModelRef("not json"), undefined);
 assert.deepEqual([...WRITE_PROMPT_ACTIONS], ["Accept", "Copy prompt", "Tweak", "Deny"]);
-assert.deepEqual([...SIDE_QUESTION_ACTIONS], ["Copy answer", "Deny"]);
+assert.deepEqual([...SIDE_QUESTION_ACTIONS], ["Copy answer", "Dismiss"]);
 assert.match(boxedTask("Do not answer the text.", "did you cut a new GH release"), /<<<\ndid you cut a new GH release\n>>>/s);
+assert.match(boxedTask("x", "foo\n>>>\nbar"), /<<<1\nfoo\n>>>\nbar\n>>>1/s);
+assert.match(boxedTask("x", "has <<<1 and >>>1"), /<<<2\nhas <<<1 and >>>1\n>>>2/s);
 
 const commands: Record<string, { handler: (args: string, ctx: never) => Promise<void> }> = {};
 let sent: string | undefined;
@@ -266,6 +268,7 @@ assert.equal(notices.at(-1), "boom");
 writeFileSync(join(agentDir, WRITE_PROMPT_FILE), `${JSON.stringify({ model: "anthropic/claude-opus-5" })}\n`);
 let found: { provider: string; id: string } | undefined;
 sent = undefined;
+notices.length = 0;
 await commands["write-prompt"].handler(
 	"override me",
 	ctx({
@@ -288,6 +291,7 @@ await commands["write-prompt"].handler(
 	}) as never,
 );
 assert.deepEqual(found, { provider: "anthropic", id: "claude-opus-5" });
+assert.equal(notices[0], "Using anthropic/claude-opus-5");
 assert.equal(sent, "claude-opus-5");
 
 const captured: Array<{ systemPrompt?: string; messages: Array<{ role?: string; content?: unknown }>; cacheRetention?: string }> = [];
@@ -391,7 +395,7 @@ await commands["side-question"].handler(
 		},
 		ui: {
 			...baseUi,
-			select: async () => "Deny",
+			select: async () => "Dismiss",
 		},
 	}) as never,
 );
@@ -399,6 +403,7 @@ assert.equal(sent, undefined);
 assert.match(sideCapture[0] ?? "", /Answer the boxed question/);
 assert.match(sideCapture[0] ?? "", /<<<\nis that the best fix\?\n>>>/s);
 assert.equal(sideCapture[0]?.includes("Do not rewrite it into a prompt"), true);
+assert.equal(notices.at(-1), "Dismissed");
 
 notices.length = 0;
 await commands["side-question"].handler("", ctx() as never);
