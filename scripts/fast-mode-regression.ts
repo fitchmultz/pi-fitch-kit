@@ -35,7 +35,7 @@ for (const provider of providers.values()) {
 	assert.equal(typeof provider.streamSimple, "function");
 }
 assert.equal(typeof handlers.before_provider_request?.[0], "function");
-assert.deepEqual(Object.keys(commands).sort(), ["anthropic-fast", "codex-fast"]);
+assert.deepEqual(Object.keys(commands).sort(), ["anthropic-fast", "codex-fast", "xai-fast"]);
 
 assert.deepEqual(
 	fastRates({ input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 }),
@@ -195,12 +195,19 @@ for (const model of [MODELS.openai, MODELS.codex]) {
 	assert.equal(fast.model, "m", "payload fields must survive");
 }
 assert.equal(await requestPayload(MODELS.anthropicOpus), undefined, "codex toggle must not touch Anthropic requests");
-assert.equal(await requestPayload(MODELS.xai), undefined, "service_tier must stay off OpenAI-compatible providers");
+assert.equal(await requestPayload(MODELS.xai), undefined, "codex toggle must not touch xAI requests");
 assert.equal(await requestPayload(MODELS.openai, "raw"), undefined, "non-object payloads pass through");
 
 // Command verbs: toggle flips, status reports, invalid warns without a write.
 await commands["codex-fast"].handler("toggle", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI fast mode OFF");
+await commands["xai-fast"].handler("on", uiCtx(MODELS.xai));
+assert.equal(notices.at(-1), "xAI fast mode ON");
+const xaiFast = (await requestPayload(MODELS.xai)) as Record<string, unknown>;
+assert.equal(xaiFast.service_tier, "priority", "xai must request priority");
+assert.equal(xaiFast.model, "m", "payload fields must survive");
+assert.equal(await requestPayload(MODELS.openai), undefined, "xai toggle must not touch OpenAI requests");
+await commands["xai-fast"].handler("off", uiCtx(MODELS.xai));
 await commands["codex-fast"].handler("status", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI fast mode OFF");
 const codexState = readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8");
@@ -227,8 +234,10 @@ assert.equal(status.get("anthropic-fast"), undefined, "no footer on Opus routes 
 await runHandlers("model_select", {}, uiCtx(MODELS.openai));
 assert.equal(status.get("anthropic-fast"), undefined);
 assert.equal(status.get("codex-fast"), "muted:fast:off");
+assert.equal(status.get("xai-fast"), undefined);
 await runHandlers("model_select", {}, uiCtx(MODELS.xai));
 assert.equal(status.get("codex-fast"), undefined);
+assert.equal(status.get("xai-fast"), "muted:fast:off");
 
 // A second start must not stack watchers: one shutdown has to release everything.
 await runHandlers("session_start", {}, uiCtx(gatewayOpus));
@@ -242,6 +251,7 @@ console.log(
 		betaHeader: "fetch-time append preserves existing markers",
 		prebuiltClient: "stays standard speed",
 		openaiFast: "provider-gated priority",
+		xaiFast: "provider-gated priority",
 		footer: "eligibility-scoped incl. proxy exclusion",
 		watchers: "released",
 	}),
