@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.11 — 18 August 2026
+
+- The fast-mode footer shows `fast` only while a toggle is on, instead of a permanent muted `fast:off` whenever an eligible model is selected. Off and ineligible models show nothing, identically across the Anthropic, OpenAI/Codex, and xAI toggles.
+
 ## 0.9.10 — 17 August 2026
 
 - `/xai-fast [on|off|toggle|status]` requests xAI Priority Processing (`service_tier: "priority"`) on the `xai` provider through the same `before_provider_request` hook as `/codex-fast`. State lives in `xai-fast.json`. Reported cost is not request-doubled: Pi already applies the 2x Responses multiplier when the response confirms priority, and Completions accounting stays on catalog rates.
