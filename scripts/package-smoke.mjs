@@ -221,7 +221,7 @@ try {
 	const commandNames = extensions.extensions
 		.flatMap(({ commands }) => [...commands.keys()])
 		.sort();
-	const expectedCommands = ["anthropic-fast", "clean-footer", "codex-fast", "draft", "side-question"];
+	const expectedCommands = ["anthropic-fast", "clean-footer", "codex-fast", "draft", "side-question", "xai-fast"];
 	if (JSON.stringify(commandNames) !== JSON.stringify(expectedCommands)) {
 		throw new Error(`Expected ${JSON.stringify(expectedCommands)}, got ${JSON.stringify(commandNames)}`);
 	}

@@ -72,7 +72,7 @@ for (const resource of [
 
 assert(!existsSync(join(root, "agents")), "agent profiles belong to pi-subagents, not the kit");
 assert(!existsSync(join(root, "extensions", "sync-agents.ts")), "sync-agents is redundant with pi-subagents defaults");
-assert(!existsSync(join(root, "extensions", "codex-context.ts")), "codex-context is retired; fast-mode owns both fast toggles");
+assert(!existsSync(join(root, "extensions", "codex-context.ts")), "codex-context is retired; fast-mode owns the fast toggles");
 assert(
   JSON.stringify(manifest.kitResources.extensions) ===
     JSON.stringify([

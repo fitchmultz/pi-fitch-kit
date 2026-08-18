@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.10 — 17 August 2026
+
+- `/xai-fast [on|off|toggle|status]` requests xAI Priority Processing (`service_tier: "priority"`) on the `xai` provider through the same `before_provider_request` hook as `/codex-fast`. State lives in `xai-fast.json`. Reported cost is not request-doubled: Pi already applies the 2x Responses multiplier when the response confirms priority, and Completions accounting stays on catalog rates.
+
 ## 0.9.9 — 16 August 2026
 
 - `/draft` no longer sends tools to the nested writer. Tool history is flattened to text so the writer cannot stop on `toolUse`. The rewrite instruction now says it is not the session agent.
