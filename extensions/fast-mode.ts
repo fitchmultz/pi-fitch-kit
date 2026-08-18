@@ -187,16 +187,11 @@ function fastStream(
 function updateFooterStatus(ctx: ExtensionContext): void {
 	for (const toggle of TOGGLES) {
 		try {
-			if (!toggle.eligible(ctx.model)) {
+			if (!toggle.eligible(ctx.model) || !enabled(toggle.statePath)) {
 				ctx.ui.setStatus(toggle.name, undefined);
 				continue;
 			}
-			const fast = enabled(toggle.statePath);
-			const label = `fast:${fast ? "on" : "off"}`;
-			ctx.ui.setStatus(
-				toggle.name,
-				ctx.hasUI ? ctx.ui.theme.fg(fast ? "accent" : "muted", label) : label,
-			);
+			ctx.ui.setStatus(toggle.name, ctx.hasUI ? ctx.ui.theme.fg("accent", "fast") : "fast");
 		} catch {
 			// Headless hosts do not expose a footer.
 		}

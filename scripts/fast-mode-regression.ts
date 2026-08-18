@@ -220,8 +220,8 @@ await commands["codex-fast"].handler("bogus", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "Usage: /codex-fast [on|off|toggle|status]");
 assert.equal(readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8"), codexState);
 
-// Footer: one status per eligible model family, colored by state, cleared on
-// models fast mode ignores, including non-overridden Opus proxies.
+// Footer: `fast` only while enabled on an eligible model family, cleared while
+// off and on models fast mode ignores, including non-overridden Opus proxies.
 const statWatchers = () =>
 	process.getActiveResourcesInfo().filter((resource) => resource === "StatWatcher").length;
 const watcherBaseline = statWatchers();
@@ -230,19 +230,19 @@ const runHandlers = async (event: string, ...args: [Record<string, unknown>, unk
 };
 const gatewayOpus = { provider: "cloudflare-ai-gateway", id: "claude-opus-5", api: "anthropic-messages" };
 await runHandlers("session_start", {}, uiCtx(gatewayOpus));
-assert.equal(status.get("anthropic-fast"), "muted:fast:off");
+assert.equal(status.get("anthropic-fast"), undefined, "no footer while off");
 assert.equal(status.get("codex-fast"), undefined);
 await commands["anthropic-fast"].handler("on", uiCtx(gatewayOpus));
-assert.equal(status.get("anthropic-fast"), "accent:fast:on");
+assert.equal(status.get("anthropic-fast"), "accent:fast");
 await runHandlers("model_select", {}, uiCtx(MODELS.copilotOpus));
 assert.equal(status.get("anthropic-fast"), undefined, "no footer on Opus routes the override does not cover");
 await runHandlers("model_select", {}, uiCtx(MODELS.openai));
 assert.equal(status.get("anthropic-fast"), undefined);
-assert.equal(status.get("codex-fast"), "muted:fast:off");
+assert.equal(status.get("codex-fast"), undefined);
 assert.equal(status.get("xai-fast"), undefined);
 await runHandlers("model_select", {}, uiCtx(MODELS.xai));
 assert.equal(status.get("codex-fast"), undefined);
-assert.equal(status.get("xai-fast"), "muted:fast:off");
+assert.equal(status.get("xai-fast"), undefined);
 
 // A second start must not stack watchers: one shutdown has to release everything.
 await runHandlers("session_start", {}, uiCtx(gatewayOpus));
