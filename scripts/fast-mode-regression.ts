@@ -197,10 +197,9 @@ for (const model of [MODELS.openai, MODELS.codex]) {
 assert.equal(await requestPayload(MODELS.anthropicOpus), undefined, "codex toggle must not touch Anthropic requests");
 assert.equal(await requestPayload(MODELS.xai), undefined, "codex toggle must not touch xAI requests");
 assert.equal(await requestPayload(MODELS.openai, "raw"), undefined, "non-object payloads pass through");
-
-// Command verbs: toggle flips, status reports, invalid warns without a write.
-await commands["codex-fast"].handler("toggle", uiCtx(MODELS.openai));
+await commands["codex-fast"].handler("off", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI fast mode OFF");
+
 await commands["xai-fast"].handler("on", uiCtx(MODELS.xai));
 assert.equal(notices.at(-1), "xAI fast mode ON");
 const xaiFast = (await requestPayload(MODELS.xai)) as Record<string, unknown>;
@@ -208,6 +207,12 @@ assert.equal(xaiFast.service_tier, "priority", "xai must request priority");
 assert.equal(xaiFast.model, "m", "payload fields must survive");
 assert.equal(await requestPayload(MODELS.openai), undefined, "xai toggle must not touch OpenAI requests");
 await commands["xai-fast"].handler("off", uiCtx(MODELS.xai));
+
+// Command verbs: toggle flips, status reports, invalid warns without a write.
+await commands["codex-fast"].handler("toggle", uiCtx(MODELS.openai));
+assert.equal(notices.at(-1), "OpenAI fast mode ON");
+await commands["codex-fast"].handler("toggle", uiCtx(MODELS.openai));
+assert.equal(notices.at(-1), "OpenAI fast mode OFF");
 await commands["codex-fast"].handler("status", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI fast mode OFF");
 const codexState = readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8");

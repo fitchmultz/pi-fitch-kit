@@ -23,8 +23,6 @@ const ANTHROPIC_FAST_MODEL_PREFIXES = ["claude-opus-5", "claude-opus-4-8"];
 // github-copilot or opencode also serve Opus over anthropic-messages but are
 // not overridden and stay stock.
 const ANTHROPIC_FAST_PROVIDERS = ["anthropic", "cloudflare-ai-gateway"];
-// service_tier is OpenAI/xAI priority; gate by provider so other
-// OpenAI-compatible endpoints never receive it.
 const OPENAI_PROVIDERS = new Set(["openai", "openai-codex"]);
 
 // Anthropic-native options a simple caller cannot express. Pi's composer collapses
@@ -105,6 +103,7 @@ const XAI_TOGGLE: Toggle = {
 };
 
 const TOGGLES = [ANTHROPIC_TOGGLE, OPENAI_TOGGLE, XAI_TOGGLE];
+const PRIORITY_TOGGLES = [OPENAI_TOGGLE, XAI_TOGGLE];
 
 function enabled(statePath: string): boolean {
 	try {
@@ -119,7 +118,7 @@ function writeEnabled(statePath: string, value: boolean): void {
 	writeFileSync(statePath, `${JSON.stringify({ enabled: value })}\n`);
 }
 
-/** Fast mode bills double, so reported usage has to double with it. */
+/** Anthropic fast mode bills double, so reported usage has to double with it. */
 export function fastRates<T extends FastRates>(rates: T): T {
 	return {
 		...rates,
@@ -214,13 +213,10 @@ export default function fastMode(pi: ExtensionAPI): void {
 		pi.registerProvider(provider, { api: "anthropic-messages", streamSimple: fastStream });
 	}
 
-	// OpenAI and xAI priority are the same payload field, so the stock hook suffices.
+	// service_tier is OpenAI/xAI priority; gate by provider so other
+	// OpenAI-compatible endpoints never receive it.
 	pi.on("before_provider_request", (event, ctx) => {
-		const toggle = OPENAI_TOGGLE.eligible(ctx.model)
-			? OPENAI_TOGGLE
-			: XAI_TOGGLE.eligible(ctx.model)
-				? XAI_TOGGLE
-				: undefined;
+		const toggle = PRIORITY_TOGGLES.find((t) => t.eligible(ctx.model));
 		if (!toggle || !enabled(toggle.statePath)) return;
 		const payload = event.payload;
 		if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return;
