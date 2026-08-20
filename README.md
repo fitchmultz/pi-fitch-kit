@@ -70,7 +70,7 @@ Accepted caveats of owning that callback: do not combine it with another Anthrop
 
 ### User-local extensions
 
-Two loaded extensions remain intentionally outside Complete core. `nested-agents.ts` appends `<cwd>/.pi/agent/AGENTS.md`; I use it only in explicitly trusted repositories because it is personal repository policy, not portable kit behavior. `gpt-5-6-sol-pro.ts` adds `reasoning.mode: "pro"` when I select a user-managed `openai/gpt-5.6-sol-pro` alias. That alias advertises a 500k context window but is not in `enabledModels`, so it does not change the active ten-route 320k policy. Neither extension is installed by this kit.
+One loaded extension and one disabled local extension remain intentionally outside Complete core. `nested-agents.ts` is present but force-disabled in my settings; when enabled, it appends repository-controlled `<cwd>/.pi/agent/AGENTS.md` instructions, so I keep it off rather than expose an untrusted-repository prompt-injection path. The loaded `gpt-5-6-sol-pro.ts` adds `reasoning.mode: "pro"` when I select a user-managed `openai/gpt-5.6-sol-pro` alias. That alias advertises a 500k context window but is not in `enabledModels`, so it does not change the active ten-route 320k policy. Neither extension is installed by this kit.
 
 ### Why the image guard exists
 

@@ -88,7 +88,7 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - task control: clarification guidance, persistent todos, session naming, and working-directory changes;
 - deterministic support: calculator, `/ctx` context inspection, tool duration, verbosity, session editing, stash, and raw message copy;
 - kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, and `/side-question`, while `pi-subagents` owns its profile defaults;
-- user-local only: `nested-agents.ts` repository policy and a dormant 500k Sol Pro alias, both documented in the README but excluded from Complete core.
+- user-local only: a force-disabled `nested-agents.ts` file and the loaded 500k Sol Pro alias outside the enabled model cycle, both documented in the README but excluded from Complete core.
 
 Most reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
 

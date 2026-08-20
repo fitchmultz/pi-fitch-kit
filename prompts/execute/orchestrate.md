@@ -37,23 +37,26 @@ Do not spawn child agents by shelling out to `pi`, `codex`, `claude`, `cursor-ag
 </setup>
 
 <agent_selection>
-Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`. Use configured model and thinking defaults unless a concrete routing requirement justifies an override. Treat `anthropic/*` as this environment's subagents-only Claude Code CLI route, not a global Pi provider model.
+Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`. Use configured model and thinking defaults unless a concrete routing requirement justifies an override. Treat direct `anthropic/*` fallbacks as provider-diversity routes for fresh children; do not use them for forked invocations.
 
 - `scout`: fast read-only code mapping, relevant files, existing patterns, and risk discovery.
 - `context-builder`: larger local context pack or downstream handoff when the repo surface is broad.
 - `researcher`: focused external docs/web/API facts with source URLs.
+- `watcher`: read-only monitoring of changing external state with an explicit terminal condition.
 - `planner`: concrete implementation plan when broad decomposition, fresh-context isolation, or an independent planning pass matters; do not use it for routine extra thinking.
 - `debugger`: read-only reproduction and root-cause diagnosis before remediation.
 - `worker`: generic execution, implementation, or multi-file changes.
 - `fixer`: bounded remediation from explicit findings only.
-- `reviewer`: GPT-backed general reviewer for routine checks.
+- `reviewer`: general implementation reviewer for routine checks.
 - `reviewer-claude`: Claude-backed independent cross-model review for hidden assumptions, edge cases, and product risk; add alongside `reviewer-gpt` only when a change warrants cross-model coverage.
 - `reviewer-gpt`: GPT-backed strict maintainability and correctness gate; the default review gate.
+- `reviewer-security`: security and data-safety review for changed trust boundaries.
+- `reviewer-ponytail`: over-engineering and deletion-focused review that preserves intended behavior.
 - `ui-designer`: rendered UI/UX, visual hierarchy, accessibility, responsive layout, and polish.
 - `writer`: human-facing documentation, guides, announcements, and polished copy.
 - `oracle`: second opinion, drift check, or high-level design critique.
 
-Do not choose `delegate`; this kit intentionally removed its custom profile. For tiny tasks, do the work directly. For generic child execution, use `worker`.
+Use `delegate` only for truly generic work when no specialist or `worker` fits. For tiny tasks, do the work directly.
 If an exact specialist is absent, choose the nearest listed agent and narrow the brief. If no suitable implementation-capable agent exists, report the blocker and do only safe planning/verification.
 </agent_selection>
 
@@ -154,7 +157,7 @@ Before claiming done:
 - If parallel worktree isolation was used, inspect the per-child diff stats and patch artifacts, apply/merge the intended changes into the main working branch, resolve conflicts there, and verify the merged result. Do not assume `worktree: true` auto-lands changes in the parent checkout.
 - Clean or explicitly report temporary plan/review/context artifacts, worktree patch artifacts, preserved worktrees, and temporary branches. Run `git worktree prune` and delete/prune child branches when no longer needed.
 - Run final relevant checks.
-- If a Pi goal is active, map every explicit requirement to evidence before `update_goal({ status: "complete" })`.
+- If durable work tracking is active, map every explicit requirement to evidence before completing the corresponding `todo_list` items.
 </workflow>
 
 <tool_patterns>

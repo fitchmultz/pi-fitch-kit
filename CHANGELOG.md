@@ -6,7 +6,7 @@
 - Replaced stale Luna/Terra model requirements with the current direct fallback baseline and optional gateway, Codex, xAI, Fireworks, and cf-google routes. The context-window merge now covers only routes the kit can safely reproduce; private custom model definitions remain user-managed.
 - Updated setup guidance and docs from fourteen stale Grok/Codex-heavy roles to the current sixteen-profile OpenAI, gateway Claude, and Kimi routing, including `watcher` and `reviewer-ponytail`.
 - Added `pi-ctx-info` to the core extension set, and retired the disabled `pi-ask-question` and `pi-fff` packages in favor of the clarification skill and native repository search.
-- Documented the two loaded user-local extensions kept outside Complete core: trusted-repository nested instructions and a 500k Sol Pro alias that is not in the enabled model cycle.
+- Documented the user-local extension exceptions kept outside Complete core: force-disabled nested repository instructions and a loaded 500k Sol Pro alias that is not in the enabled model cycle.
 
 ## 0.9.11 — 18 August 2026
 

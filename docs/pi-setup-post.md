@@ -31,7 +31,7 @@ I keep `images.autoResize` off so agents can inspect original image detail. Anth
 
 ## Subagents
 
-The sixteen `pi-subagents` specialist profiles cover scouting, context assembly, debugging, research, planning, monitoring, bounded implementation, focused fixes, GPT review, Claude review, security review, over-engineering review, UI review, oracle decisions, and writing. Its general-purpose `delegate` remains available beside them.
+The sixteen `pi-subagents` specialist profiles cover scouting, context assembly, debugging, research, planning, monitoring, bounded implementation, focused fixes, general review, GPT review, Claude review, security review, over-engineering review, UI review, oracle decisions, and writing. Its general-purpose `delegate` remains available beside them.
 
 Gateway Opus handles the Claude-heavy analysis and review roles. Direct OpenAI Sol handles scouting, research, implementation, monitoring, and the GPT path. Kimi Fast handles security and over-engineering review, while Gateway Fable handles writing. Direct Anthropic and Codex routes remain fallbacks when the owner-specific gateway or router configuration is unavailable.
 
