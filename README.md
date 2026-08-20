@@ -68,6 +68,10 @@ Accepted caveats of owning that callback: do not combine it with another Anthrop
 
 [`macuse`](https://github.com/fitchmultz/macuse) adds native macOS application inspection and control when a browser DOM or CLI is not enough. I enable it only for tasks that need native app automation. It is intentionally marked experimental because Codex app updates can break the integration surface.
 
+### User-local extensions
+
+Two loaded extensions remain intentionally outside Complete core. `nested-agents.ts` appends `<cwd>/.pi/agent/AGENTS.md`; I use it only in explicitly trusted repositories because it is personal repository policy, not portable kit behavior. `gpt-5-6-sol-pro.ts` adds `reasoning.mode: "pro"` when I select a user-managed `openai/gpt-5.6-sol-pro` alias. That alias advertises a 500k context window but is not in `enabledModels`, so it does not change the active ten-route 320k policy. Neither extension is installed by this kit.
+
 ### Why the image guard exists
 
 Pi defaults `images.autoResize` to `true`, which protects provider limits by shrinking every image to at most 2000×2000. I disable it globally so vision-capable agents can inspect the original detail:
@@ -133,7 +137,7 @@ Companion skills ship beside their extensions:
 |---|---|
 | [`pi-subagents`](https://github.com/fitchmultz/pi-subagents/tree/main/skills) | `pi-subagents` orchestration and `pi-intercom` coordination guidance |
 | [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/main/skills/mcp-scripting) | `mcp-scripting` for discovering and composing MCP calls |
-| [`ponytail`](https://github.com/DietrichGebert/ponytail/tree/main/skills) | `ponytail`, `ponytail-review` (the audit, debt, gain, and help variants are filtered) |
+| [`ponytail`](https://github.com/DietrichGebert/ponytail/tree/main/skills) | `ponytail`, `ponytail-review` (my runtime filters the audit, debt, gain, and help variants) |
 
 `bro` is intentionally user-invoked only. My runtime filters the packaged `handoff` skill because subagent artifacts and Intercom cover that path; unfiltered `pi-agent-skills` installs still include it. The rest are selected by task fit rather than loaded into every prompt.
 
