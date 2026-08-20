@@ -111,11 +111,18 @@ assert(
   "agent-skills must use its public source",
 );
 
+const ctxInfo = manifest.corePackages.find(({ id }) => id === "ctx-info");
+assert(ctxInfo?.source === "git:github.com/fitchmultz/pi-ctx-info", "ctx-info must follow its public source");
+
 assert(!manifest.corePackages.some(({ id }) => id === "codex-context"), "codex-context is retired, not a core package");
 assert(!manifest.corePackages.some(({ id }) => id === "session-name"), "session-name now belongs to the kit");
+assert(!manifest.corePackages.some(({ id }) => id === "ask-question"), "ask-question is retired in favor of the clarification skill");
+assert(!manifest.corePackages.some(({ id }) => id === "fff"), "fff is retired in favor of native repository search");
 for (const source of [
   "git:github.com/fitchmultz/pi-codex-context",
   "git:github.com/fitchmultz/pi-session-name",
+  "git:github.com/fitchmultz/pi-ask-question",
+  "npm:@ff-labs/pi-fff",
 ]) {
   assert(
     manifest.retiredPackageSources.includes(source),
@@ -146,11 +153,22 @@ assert(setupPromptPath, "manifest must include prompts/fitch-setup.md");
 const setupPrompt = readFileSync(join(root, setupPromptPath), "utf-8");
 assert(setupPrompt.includes("setup-manifest.json"), "setup prompt must reference the manifest");
 assert(setupPrompt.includes("pi-subagents"), "setup prompt must name the profile owner");
+assert(setupPrompt.includes("sixteen specialist"), "setup prompt must describe the current specialist count");
+assert(!setupPrompt.includes("fourteen specialist"), "setup prompt must not keep the retired specialist count");
 assert(setupPrompt.includes("${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"), "setup prompt must honor the active Pi agent directory");
 assert(setupPrompt.includes("modelContextWindows"), "setup prompt must offer the context-window override step");
 assert(setupPrompt.includes("keep-or-overwrite"), "setup prompt must define rerun semantics for existing overrides");
 assert(setupPrompt.includes("long-context tier"), "setup prompt must disclose the OpenAI pricing consequence");
 const settingsExample = JSON.parse(readFileSync(join(root, "examples", "settings.json"), "utf-8"));
+assert(settingsExample.defaultProvider === "openai", "settings example must default to direct OpenAI");
+assert(settingsExample.defaultModel === "gpt-5.6-sol", "settings example must default to GPT-5.6 Sol");
+assert(settingsExample.defaultThinkingLevel === "max", "settings example must default to max thinking");
+assert(new Set(settingsExample.enabledModels).size === settingsExample.enabledModels.length, "settings enabledModels must be unique");
+for (const route of settingsExample.enabledModels) {
+  assert(manifestModelRoutes.has(route), `settings enabled model ${route} must be a manifest-managed route`);
+}
+assert(settingsExample.retry?.maxRetries === 5, "settings example must carry the active retry budget");
+assert(settingsExample.retry?.provider?.timeoutMs === 120000, "settings example must carry the active provider timeout");
 assert(settingsExample.compaction.reserveTokens === 64000, "settings example must carry the 64k compaction reserve");
 assert(settingsExample.compaction.keepRecentTokens === 40000, "settings example must keep 40k recent tokens");
 assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");

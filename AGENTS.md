@@ -14,7 +14,7 @@
   - `setup-manifest.json` for unpinned package sources, required model routes, and kit resources.
   - `templates/working-agreement.md` for the optional managed working-agreement blocks.
   - `package.json#pi` for the resources Pi loads from this package.
-- The `pi-subagents` package owns the fourteen specialist profiles and model routing. Do not copy them back into this kit or restore agent-sync code.
+- The `pi-subagents` package owns the sixteen specialist profiles and model routing. Do not copy them back into this kit or restore agent-sync code.
 - Keep `README.md`, `setup-manifest.json`, and `docs/pi-setup.md` aligned when prompts, packages, models, install flow, or source-of-truth rules change.
 
 ## Commands

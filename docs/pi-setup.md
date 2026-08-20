@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Updated 14 August 2026 for Pi 0.84.2 on Node.js 24 or newer._
+_Updated 20 August 2026 for Pi 0.84.2 on Node.js 24 or newer._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 
@@ -18,7 +18,7 @@ Pi core
   └─ user-authenticated MCP services
 ```
 
-[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: five bundled extensions, a safe settings example, unpinned package sources, and a setup prompt. The fourteen specialist profiles now ship with [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) instead of being duplicated here. Most reusable extensions and all skill packages remain independent public repositories; the kit directly owns only its harness-coupled runtime.
+[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: five bundled extensions, a safe settings example, unpinned package sources, and a setup prompt. The sixteen specialist profiles now ship with [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) instead of being duplicated here. Most reusable extensions and all skill packages remain independent public repositories; the kit directly owns only its harness-coupled runtime.
 
 ## A representative task
 
@@ -40,7 +40,7 @@ Every person authenticates their own connections. The kit contains service names
 
 ### 3. It maps the code before editing
 
-FFF provides fast path and content search. The main session traces callers, tests, data boundaries, and repository conventions before it chooses where to change code.
+Native repository search provides path and content discovery. The main session traces callers, tests, data boundaries, and repository conventions before it chooses where to change code.
 
 For an unfamiliar or broad surface it may launch fresh specialists in parallel:
 
@@ -84,10 +84,11 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 
 - orchestration and communication: `pi-subagents`, including its bundled Intercom runtime;
 - connected work: `pi-mcp-adapter`, `pi-agent-browser-native`;
-- repository work: `pi-fff`, `pi-apply-edits`;
-- task control: structured questions, persistent todos, session naming, and working-directory changes;
-- deterministic support: calculator, tool duration, verbosity, session editing, stash, and raw message copy;
-- kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, and `/side-question`, while `pi-subagents` owns its profile defaults.
+- repository work: native search plus `pi-apply-edits`;
+- task control: clarification guidance, persistent todos, session naming, and working-directory changes;
+- deterministic support: calculator, `/ctx` context inspection, tool duration, verbosity, session editing, stash, and raw message copy;
+- kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, and `/side-question`, while `pi-subagents` owns its profile defaults;
+- user-local only: a force-disabled `nested-agents.ts` file and the loaded 500k Sol Pro alias outside the enabled model cycle, both documented in the README but excluded from Complete core.
 
 Most reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
 
@@ -99,34 +100,36 @@ The agent files are the runtime source of truth. Models, fallbacks, effort, and 
 
 | Agent | Primary | Fallbacks | Thinking | Context |
 |---|---|---|---|---|
-| `scout` | `xai/grok-4.6` | Codex Luna, OpenAI Luna | high | fresh |
-| `context-builder` | `xai/grok-4.6` | Codex Sol, OpenAI Sol | high | fresh |
-| `debugger` | Codex Sol | Fable 5, OpenAI Sol | high | fresh |
-| `researcher` | Codex Sol | OpenAI Sol, Opus 5 | xhigh | fresh |
-| `planner` | Codex Sol | Fable 5, OpenAI Sol | xhigh | fresh |
-| `worker` | `xai/grok-4.6` | Codex Sol, OpenAI Sol, Opus 5 | high | fresh |
-| `fixer` | `xai/grok-4.6` | Codex Sol, OpenAI Sol, Opus 5 | high | fresh |
-| `reviewer` | Codex Sol | OpenAI Sol, Codex Terra | high | fresh |
-| `reviewer-gpt` | Codex Sol | OpenAI Sol, Codex Terra | xhigh | fresh |
-| `reviewer-claude` | Fable 5 | Opus 5, `xai/grok-4.6` | xhigh | fresh |
-| `reviewer-security` | Codex Sol | `xai/grok-4.6`, OpenAI Sol | xhigh | fresh |
-| `oracle` | Codex Sol | OpenAI Sol | xhigh | fork |
-| `ui-designer` | Fable 5 | Opus 5, Codex Sol, OpenAI Sol | xhigh | fresh |
-| `writer` | Fable 5 | Opus 5 | high | fresh |
+| `scout` | OpenAI Sol | Codex Sol | high | fresh |
+| `context-builder` | Gateway Opus | Direct Opus, Gateway Fable, OpenAI Sol | xhigh | fresh |
+| `debugger` | Gateway Opus | Direct Opus, OpenAI Sol, Codex Sol | max | fresh |
+| `researcher` | OpenAI Sol | Codex Sol | xhigh | fresh |
+| `planner` | Gateway Opus | Direct Opus, Gateway Fable, OpenAI Sol | xhigh | fresh |
+| `worker` | OpenAI Sol | Gateway Opus, Codex Sol | xhigh | fresh |
+| `fixer` | Gateway Opus | Direct Opus, OpenAI Sol, Codex Sol | max | fresh |
+| `reviewer` | Gateway Opus | Direct Opus, OpenAI Sol, Gateway Fable | max | fresh |
+| `reviewer-gpt` | OpenAI Sol | Codex Sol | xhigh | fresh |
+| `reviewer-claude` | Gateway Opus | Direct Opus, Gateway Fable | max | fresh |
+| `reviewer-security` | Kimi Fast | OpenAI Sol, Codex Sol | max | fresh |
+| `reviewer-ponytail` | Kimi Fast | Direct Fable | max | fresh |
+| `oracle` | OpenAI Sol | Codex Sol | xhigh | fork |
+| `ui-designer` | Gateway Opus | Direct Opus, Gateway Fable, Codex Sol | xhigh | fresh |
+| `writer` | Gateway Fable | Direct Fable, Gateway Opus | high | fresh |
+| `watcher` | OpenAI Sol | Kimi Fast | high | fresh |
 
-Full model identifiers are in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/main/agents) directory. The compact names above mean:
+`delegate` inherits the parent model. Full model identifiers are in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/main/agents):
 
-- Codex Sol: `openai-codex/gpt-5.6-sol`
+- Gateway Opus: `cloudflare-ai-gateway/claude-opus-5`
+- Gateway Fable: `cloudflare-ai-gateway/claude-fable-5`
+- Direct Opus: `anthropic/claude-opus-5`
+- Direct Fable: `anthropic/claude-fable-5`
 - OpenAI Sol: `openai/gpt-5.6-sol`
-- Codex Luna: `openai-codex/gpt-5.6-luna`
-- OpenAI Luna: `openai/gpt-5.6-luna`
-- Codex Terra: `openai-codex/gpt-5.6-terra`
-- Fable 5: `anthropic/claude-fable-5`
-- Opus 5: `anthropic/claude-opus-5`
+- Codex Sol: `openai-codex/gpt-5.6-sol`
+- Kimi Fast: `fireworks/accounts/fireworks/routers/kimi-k3-fast`
 
-The routing is not variety for its own sake. Grok handles fast work under a smart parent. Sol handles consequential reasoning and the GPT review path. Fable supplies an independent model family for writing, UI judgment, and cross-model review. Opus is the stronger Anthropic fallback.
+Gateway Opus handles the Claude-heavy analysis and review roles. OpenAI Sol handles fast reconnaissance, implementation, monitoring, and the GPT path. Kimi supplies focused security and deletion-oriented review. Gateway Fable handles writing. Direct Anthropic and Codex routes preserve portable fallbacks when the owner-specific gateway and router configuration is unavailable. Grok, GLM, and Gemini remain available in the main session's model cycle but are not current subagent primaries.
 
-Every profile is a leaf. `oracle` is the only fork-context role because its job is to compare a direction against the parent conversation; other roles receive fresh briefs and inspect current evidence.
+Every specialist is a leaf. `oracle` is the only fork-context role because its job is to compare a direction against the parent conversation; other roles receive fresh briefs and inspect current evidence.
 
 Benchmark rationale and the 26 July 2026 Artificial Analysis plus CursorBench snapshot are available as [PDF](./Model_Reference_Sheet_Artificial_Analysis_2026-07-26.pdf) and [DOCX](./Model_Reference_Sheet_Artificial_Analysis_2026-07-26.docx).
 
@@ -134,11 +137,11 @@ Benchmark rationale and the 26 July 2026 Artificial Analysis plus CursorBench sn
 
 The public skills are source-managed rather than copied through a home directory:
 
-- [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries clarification, dogfooding, handoffs, TDD, extension development, end-to-end shipping, completion verification, and strict review modes. Its [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) skill produces editable D2 plus SVG/PNG architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with generated review images.
+- [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries clarification, dogfooding, TDD, extension development, end-to-end shipping, UX review, completion verification, and strict review modes. Its [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) skill produces editable D2 plus SVG/PNG architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with generated review images.
 - `pi-subagents` ships both orchestration and Intercom usage skills; `pi-mcp-adapter` ships its scripting skill.
-- [`ponytail`](https://github.com/DietrichGebert/ponytail) supplies the minimalism mode and its audit/review helpers.
+- [`ponytail`](https://github.com/DietrichGebert/ponytail) supplies the active minimalism mode and focused review skill; my runtime filters its audit, debt, gain, and help variants.
 
-Pi loads a skill only when the task matches. This keeps the default prompt small while giving specialized work an explicit procedure.
+Pi loads a skill only when the task matches. This keeps the default prompt small while giving specialized work an explicit procedure. My runtime filters the packaged `handoff` skill because subagent artifacts and Intercom cover that path.
 
 ## MCP and authenticated context
 
@@ -162,7 +165,7 @@ My personal runtime uses full approvals. MCP transports tool calls; it is not th
 
 ## Compaction policy
 
-The settings example pins `compaction.reserveTokens: 64000` with `keepRecentTokens: 40000`, and the manifest's `modelContextWindows` merge flat 320k windows into `models.json` for the managed routes. Together they compact at a 256k threshold with roughly 60k of near-threshold generation runway. The same override means two different things by route family: the ~1M-catalog `anthropic/*` routes compact far earlier than their catalog edge, while the 272k-catalog `openai/*` and `openai-codex/*` gpt-5.6 routes get a raised window, and any request whose input crosses 272k bills at OpenAI's long-context tier for the entire request. That is a deliberate quality-over-cost choice; decline the consent step to keep stock behavior. The kit does not manage `xai/grok-4.6`'s window: my own config defines it as a full custom model already at 320k with its own pricing, while a fresh install keeps its catalog window.
+The settings example pins `compaction.reserveTokens: 64000` with `keepRecentTokens: 40000`, and the manifest's `modelContextWindows` merge flat 320k windows into `models.json` for the managed routes. Together they compact at a 256k threshold with roughly 60k of near-threshold generation runway. The override lowers the ~1M direct Anthropic routes, raises the 272k direct OpenAI and Codex routes, and pins the verified Claude gateway routes to the same policy. Any direct OpenAI request whose input crosses 272k bills at the long-context tier for the entire request. That is a deliberate quality-over-cost choice; decline the consent step to keep stock behavior. Gateway Grok, xAI Grok, Fireworks, and cf-google are full user-managed model definitions in my setup and already declare 320k; the public kit does not copy their private endpoints or pricing metadata.
 
 ## Image quality boundary
 
@@ -207,7 +210,7 @@ In a sample of 139 top-level sessions from 8–15 July 2026, counted from aggreg
 | File edits or writes | 79 | 57% |
 | Fresh reviewer profiles | 72 | 52% |
 | Browser automation or web search | 63 | 45% |
-| FFF repository search | 61 | 44% |
+| Repository search through FFF (sample period) | 61 | 44% |
 | Worker or fixer profiles | 9 | 6% |
 
 The contrast is the point: the main session usually implements, while specialists most often provide reconnaissance and independent review. Connected services, browser work, and repository search are ordinary workflow, not demo features.
