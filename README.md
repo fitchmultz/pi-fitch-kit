@@ -133,7 +133,7 @@ Companion skills ship beside their extensions:
 |---|---|
 | [`pi-subagents`](https://github.com/fitchmultz/pi-subagents/tree/main/skills) | `pi-subagents` orchestration and `pi-intercom` coordination guidance |
 | [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/main/skills/mcp-scripting) | `mcp-scripting` for discovering and composing MCP calls |
-| [`ponytail`](https://github.com/DietrichGebert/ponytail/tree/main/skills) | `ponytail`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help`, `ponytail-review` |
+| [`ponytail`](https://github.com/DietrichGebert/ponytail/tree/main/skills) | `ponytail`, `ponytail-review` (the audit, debt, gain, and help variants are filtered) |
 
 `bro` is intentionally user-invoked only. My runtime filters the packaged `handoff` skill because subagent artifacts and Intercom cover that path; unfiltered `pi-agent-skills` installs still include it. The rest are selected by task fit rather than loaded into every prompt.
 

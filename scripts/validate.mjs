@@ -167,8 +167,8 @@ assert(new Set(settingsExample.enabledModels).size === settingsExample.enabledMo
 for (const route of settingsExample.enabledModels) {
   assert(manifestModelRoutes.has(route), `settings enabled model ${route} must be a manifest-managed route`);
 }
-assert(settingsExample.retry.maxRetries === 5, "settings example must carry the active retry budget");
-assert(settingsExample.retry.provider.timeoutMs === 120000, "settings example must carry the active provider timeout");
+assert(settingsExample.retry?.maxRetries === 5, "settings example must carry the active retry budget");
+assert(settingsExample.retry?.provider?.timeoutMs === 120000, "settings example must carry the active provider timeout");
 assert(settingsExample.compaction.reserveTokens === 64000, "settings example must carry the 64k compaction reserve");
 assert(settingsExample.compaction.keepRecentTokens === 40000, "settings example must keep 40k recent tokens");
 assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");

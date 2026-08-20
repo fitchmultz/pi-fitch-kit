@@ -85,7 +85,7 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - orchestration and communication: `pi-subagents`, including its bundled Intercom runtime;
 - connected work: `pi-mcp-adapter`, `pi-agent-browser-native`;
 - repository work: native search plus `pi-apply-edits`;
-- task control: structured questions, persistent todos, session naming, and working-directory changes;
+- task control: clarification guidance, persistent todos, session naming, and working-directory changes;
 - deterministic support: calculator, `/ctx` context inspection, tool duration, verbosity, session editing, stash, and raw message copy;
 - kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, and `/side-question`, while `pi-subagents` owns its profile defaults.
 
@@ -138,7 +138,7 @@ The public skills are source-managed rather than copied through a home directory
 
 - [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries clarification, dogfooding, TDD, extension development, end-to-end shipping, UX review, completion verification, and strict review modes. Its [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) skill produces editable D2 plus SVG/PNG architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with generated review images.
 - `pi-subagents` ships both orchestration and Intercom usage skills; `pi-mcp-adapter` ships its scripting skill.
-- [`ponytail`](https://github.com/DietrichGebert/ponytail) supplies the minimalism mode and its audit/review helpers.
+- [`ponytail`](https://github.com/DietrichGebert/ponytail) supplies the active minimalism mode and focused review skill; my runtime filters its audit, debt, gain, and help variants.
 
 Pi loads a skill only when the task matches. This keeps the default prompt small while giving specialized work an explicit procedure. My runtime filters the packaged `handoff` skill because subagent artifacts and Intercom cover that path.
 
