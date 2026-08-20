@@ -1,10 +1,8 @@
 # pi-fitch-kit
 
-My real Pi harness, packaged as a versioned, inspectable setup.
+This repository packages the reusable parts of my Pi setup: public extensions, model-routed subagents, skills, connected MCP services, and local policy.
 
-This repository shows the composition layer I use every day: public extensions, model-routed subagents, reusable skills, authenticated MCP connections, and a small amount of local policy. It is also a working prototype for a model-agnostic organization harness built on top of [Pi](https://github.com/badlogic/pi-mono), without forking Pi core.
-
-Extension installs follow their package's default channel instead of freezing refs or versions. The current kit targets and pins Pi `0.84.2` on Node.js `>=24.0.0`; Agent Browser 0.33.2 sets the Node floor. The kit is patch-free: it modifies no Pi core files. One accepted gap from that stance: stock Pi 0.84.2 does not classify OpenAI's bare transient `Sorry, something went wrong` response as retryable, so those turns fail instead of recovering. No retry-classification setting exists, and the kit declines to carry an extension shim around message handling, so the fix belongs upstream in pi-ai's retry classification.
+It does not fork or patch Pi core. Credentials, private provider definitions, and user-local experiments stay user-managed.
 
 ## Start here
 
