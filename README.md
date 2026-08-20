@@ -1,10 +1,8 @@
 # pi-fitch-kit
 
-My real Pi harness, packaged as a versioned, inspectable setup.
+This repository documents how I combine public extensions, model-routed subagents, skills, connected MCP services, and local policy.
 
-This repository shows the composition layer I use every day: public extensions, model-routed subagents, reusable skills, authenticated MCP connections, and a small amount of local policy. It is also a working prototype for a model-agnostic organization harness built on top of [Pi](https://github.com/badlogic/pi-mono), without forking Pi core.
-
-Extension installs follow their package's default channel instead of freezing refs or versions. The current kit targets and pins Pi `0.84.2` on Node.js `>=24.0.0`; Agent Browser 0.33.2 sets the Node floor. The kit is patch-free: it modifies no Pi core files. One accepted gap from that stance: stock Pi 0.84.2 does not classify OpenAI's bare transient `Sorry, something went wrong` response as retryable, so those turns fail instead of recovering. No retry-classification setting exists, and the kit declines to carry an extension shim around message handling, so the fix belongs upstream in pi-ai's retry classification.
+The kit installs the public packages without forking or patching [Pi](https://github.com/badlogic/pi-mono). Credentials, private provider definitions, and user-local experiments stay user-managed.
 
 ## Start here
 
@@ -187,6 +185,8 @@ Pi core
 This is already the working composition layer for a broader organization harness. Productizing it would add centralized provisioning, policy distribution, scoped credential brokerage, audit and cost visibility, managed local/cloud execution, and multi-user controls. It would not require turning the extensions into a monolith or locking the harness to one model provider.
 
 ## Install the kit
+
+Requires Node.js 24 or newer.
 
 ```bash
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.2
