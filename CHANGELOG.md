@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.12 — 20 August 2026
+
+- Synced the public-safe settings snapshot to the active runtime: direct OpenAI GPT-5.6 Sol at max thinking, the current ten-route model cycle, five agent-level retries, and a two-minute provider timeout.
+- Replaced stale Luna/Terra model requirements with the current direct fallback baseline and optional gateway, Codex, xAI, Fireworks, and cf-google routes. The context-window merge now covers only routes the kit can safely reproduce; private custom model definitions remain user-managed.
+- Updated setup guidance and docs from fourteen stale Grok/Codex-heavy roles to the current sixteen-profile OpenAI, gateway Claude, and Kimi routing, including `watcher` and `reviewer-ponytail`.
+- Added `pi-ctx-info` to the core extension set, and retired the disabled `pi-ask-question` and `pi-fff` packages in favor of the clarification skill and native repository search.
+
 ## 0.9.11 — 18 August 2026
 
 - The fast-mode footer shows `fast` only while a toggle is on, instead of a permanent muted `fast:off` whenever an eligible model is selected. Off and ineligible models show nothing, identically across the Anthropic, OpenAI/Codex, and xAI toggles.

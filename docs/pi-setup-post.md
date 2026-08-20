@@ -1,6 +1,6 @@
 # My Pi harness, and why it is structured this way
 
-_Updated 14 August 2026 for Pi 0.84.2 on Node.js 24 or newer._
+_Updated 20 August 2026 for Pi 0.84.2 on Node.js 24 or newer._
 
 A few people have asked about my terminal agent setup. The public, installable version is [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit).
 
@@ -19,8 +19,8 @@ The normal path includes:
 
 - [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) for delegated work and session coordination;
 - [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter) and [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) for connected context and real browser work;
-- [`pi-fff`](https://github.com/dmtrKovalenko/fff/tree/main/packages/pi-fff) and [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) for repository search and reliable changes;
-- small public tools for structured questions, persistent todos, working-directory changes, deterministic math, timing, verbosity, stash, session editing, and raw message copy;
+- native repository search and [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) for discovery and reliable changes;
+- small public tools for persistent todos, working-directory changes, deterministic math, `/ctx` context inspection, timing, verbosity, stash, session editing, and raw message copy;
 - [`ponytail`](https://github.com/DietrichGebert/ponytail) to keep the code path boring and small.
 
 The kit itself bundles stable session naming, the Claude image boundary, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, and `/side-question`. The profiles ship directly with `pi-subagents`, so there is no second copy or sync layer.
@@ -31,17 +31,17 @@ I keep `images.autoResize` off so agents can inspect original image detail. Anth
 
 ## Subagents
 
-The fourteen `pi-subagents` specialist profiles cover scouting, context assembly, debugging, research, planning, bounded implementation, focused fixes, GPT review, Claude review, security review, UI review, oracle decisions, and writing. Its general-purpose `delegate` remains available beside them.
+The sixteen `pi-subagents` specialist profiles cover scouting, context assembly, debugging, research, planning, monitoring, bounded implementation, focused fixes, GPT review, Claude review, security review, over-engineering review, UI review, oracle decisions, and writing. Its general-purpose `delegate` remains available beside them.
 
-Grok 4.6 handles fast bounded work. GPT-5.6 Sol handles diagnosis, research, planning, and the GPT review path. Claude Fable 5 supplies an independent model family for writing, UI judgment, and cross-model review, with Opus 5 behind it.
+Gateway Opus handles the Claude-heavy analysis and review roles. Direct OpenAI Sol handles scouting, research, implementation, monitoring, and the GPT path. Kimi Fast handles security and over-engineering review, while Gateway Fable handles writing. Direct Anthropic and Codex routes remain fallbacks when the owner-specific gateway or router configuration is unavailable.
 
 Every profile is a leaf. Almost every child starts with fresh context. The parent inspects the actual files and evidence, makes the final decision, and stays accountable for the outcome.
 
 ## Skills
 
-[`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) packages the reusable operating procedures: clarification, dogfooding, handoffs, TDD, Pi extension development, end-to-end shipping, verification, and strict review. [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) adds editable D2 plus rendered SVG/PNG technical diagrams and review crops. Subagents, Intercom, the MCP adapter, and Ponytail ship their own companion skills.
+[`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) packages the reusable operating procedures: clarification, dogfooding, TDD, Pi extension development, end-to-end shipping, UX review, verification, and strict review. [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) adds editable D2 plus rendered SVG/PNG technical diagrams and review crops. Subagents, Intercom, the MCP adapter, and Ponytail ship their own companion skills.
 
-Skills load only when the task matches. They provide a procedure without bloating every prompt.
+Skills load only when the task matches. They provide a procedure without bloating every prompt. My runtime filters the packaged `handoff` skill because subagent artifacts and Intercom cover that path.
 
 ## Connected context
 
@@ -54,7 +54,7 @@ My personal runtime is fully approved. The working agreement and operator direct
 ## A typical larger change
 
 1. The parent retrieves the issue and relevant connected context.
-2. FFF and, when useful, a fresh scout map the real code path.
+2. Native repository search and, when useful, a fresh scout map the real code path.
 3. The parent makes the design decision and usually implements it.
 4. Agent Browser checks browser-visible behavior when tests cannot prove it.
 5. Deterministic repository checks establish current evidence.

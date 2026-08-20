@@ -34,8 +34,6 @@ These are the extensions loaded in my current setup. Every external extension li
 | Extension | What I use it for |
 |---|---|
 | [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) | Atomic exact edits, whole-file rewrites, and plan-first multi-file changes |
-| [`pi-fff`](https://github.com/dmtrKovalenko/fff/tree/main/packages/pi-fff) | Fast fuzzy path search and repository-aware content search |
-| [`pi-ask-question`](https://github.com/fitchmultz/pi-ask-question) | Structured user decisions when ambiguity changes scope or safety |
 | [`pi-todo-list`](https://github.com/fitchmultz/pi-todo-list) | Persistent nested task state that survives long sessions and compaction |
 | [`pi-change-working-dir`](https://github.com/fitchmultz/pi-change-working-dir) | Safe mid-session movement into worktrees and monorepo subprojects |
 | [`pi-calculator`](https://github.com/fitchmultz/pi-calculator) | Deterministic high-precision arithmetic instead of model estimation |
@@ -44,6 +42,7 @@ These are the extensions loaded in my current setup. Every external extension li
 
 | Extension | What I use it for |
 |---|---|
+| [`pi-ctx-info`](https://github.com/fitchmultz/pi-ctx-info) | `/ctx` breakdown of reported context usage, estimated composition, loaded resources, and the largest session entries |
 | [`pi-verbosity-control`](https://github.com/ferologics/pi-verbosity-control) | Low routine answer verbosity on OpenAI routes |
 | [`pi-tool-duration`](https://github.com/fitchmultz/pi-tool-duration) | Model-visible timing on slow tool calls |
 | [`pi-edit-session-in-place`](https://github.com/fitchmultz/pi-edit-session-in-place) | Re-edit or remove an earlier user turn in the current branch |
@@ -85,24 +84,28 @@ That exposed stricter Anthropic image limits. The bundled guard fixes the bounda
 
 ## Subagent bench
 
-[`pi-subagents`](https://github.com/fitchmultz/pi-subagents) now supplies both the orchestration runtime and the opinionated defaults: fourteen specialist profiles plus its general-purpose `delegate`. This kit uses that package instead of owning duplicate copies.
+[`pi-subagents`](https://github.com/fitchmultz/pi-subagents) supplies both the orchestration runtime and the opinionated defaults: sixteen specialist profiles plus its general-purpose `delegate`. This kit uses that package instead of owning duplicate copies.
 
 | Job | Profiles |
 |---|---|
 | Map and investigate | [`scout`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/scout.md), [`context-builder`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/context-builder.md), [`debugger`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/debugger.md), [`researcher`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/researcher.md) |
+| Monitor changing state | [`watcher`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/watcher.md) |
 | Decide and plan | [`planner`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/planner.md), [`oracle`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/oracle.md) |
 | Implement bounded work | [`worker`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/worker.md), [`fixer`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/fixer.md) |
-| Challenge the result | [`reviewer`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer.md), [`reviewer-gpt`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer-gpt.md), [`reviewer-claude`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer-claude.md), [`reviewer-security`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer-security.md), [`ui-designer`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/ui-designer.md) |
+| Challenge the result | [`reviewer`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer.md), [`reviewer-gpt`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer-gpt.md), [`reviewer-claude`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer-claude.md), [`reviewer-security`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer-security.md), [`reviewer-ponytail`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/reviewer-ponytail.md), [`ui-designer`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/ui-designer.md) |
 | Human-facing output | [`writer`](https://github.com/fitchmultz/pi-subagents/blob/main/agents/writer.md) |
 
 The parent session remains responsible for the task. Specialists return evidence; they do not become an autonomous hierarchy.
 
-The routing is intentional:
+The current routing is:
 
-- `xai/grok-4.6` handles speed-sensitive scouting, context assembly, bounded implementation, and confirmed fixes.
-- `openai-codex/gpt-5.6-sol` handles diagnosis, research, planning, GPT review, security review, and oracle decisions.
-- `anthropic/claude-fable-5` supplies an independent model family for writing, UI judgment, and cross-model review, with Opus 5 behind it.
-- `oracle` alone uses forked parent context. Every other role starts fresh, and every profile is a leaf agent.
+- `cloudflare-ai-gateway/claude-opus-5` handles context assembly, debugging, planning, fixes, general review, Claude review, and UI judgment.
+- `openai/gpt-5.6-sol` handles scouting, research, implementation, GPT review, monitoring, and oracle decisions.
+- `fireworks/accounts/fireworks/routers/kimi-k3-fast` handles security and over-engineering review.
+- `cloudflare-ai-gateway/claude-fable-5` handles writing.
+- `delegate` inherits the parent model.
+
+Direct Anthropic, OpenAI Codex, and alternate gateway routes provide ordered fallbacks. Gateway and Fireworks routes require the user's own provider configuration; the public direct routes keep the setup portable when those owner-specific routes are unavailable. `oracle` alone uses forked parent context. Every other specialist starts fresh, and every profile is a leaf agent.
 
 The exact primary, fallback, thinking, context, tool, and output policy lives in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/main/agents). See [the full setup guide](docs/pi-setup.md#model-routing) for the complete table.
 
@@ -117,11 +120,11 @@ Skills load task-specific operating instructions only when the work matches. [`p
 | [`deslop`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/deslop) | Remove AI-generated diff noise and ceremonial test tables without dropping real boundary coverage |
 | [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) | Create editable D2 architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with rendered SVG/PNG review artifacts |
 | [`dogfood`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/dogfood) | Exploratory QA through real browser and terminal/TUI flows |
-| [`handoff`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/handoff) | Produce paste-ready continuation and bounded delegation briefs |
 | [`pi-extension-development`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/pi-extension-development) | Build, debug, validate, package, and release Pi extensions against current runtime contracts |
 | [`propose-then-ship-pi`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/propose-then-ship-pi) | Rank one repository improvement, stop for direction, then implement, review, and ship it |
 | [`tdd`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/tdd) | Red-green-refactor when test-first behavior is explicitly required |
 | [`thermo-nuclear-code-quality-review`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/thermo-nuclear-code-quality-review) | Strict maintainability review for large or structurally risky diffs |
+| [`ux-review`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/ux-review) | Review user-visible workflows for completion, recovery, progress, and truthful outcomes |
 | [`verification-before-completion`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/verification-before-completion) | Require current evidence before completion, commit, PR, or passing-check claims |
 
 Companion skills ship beside their extensions:
@@ -132,7 +135,7 @@ Companion skills ship beside their extensions:
 | [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/main/skills/mcp-scripting) | `mcp-scripting` for discovering and composing MCP calls |
 | [`ponytail`](https://github.com/DietrichGebert/ponytail/tree/main/skills) | `ponytail`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help`, `ponytail-review` |
 
-`bro` is intentionally user-invoked only. The rest are selected by task fit rather than loaded into every prompt.
+`bro` is intentionally user-invoked only. My runtime filters the packaged `handoff` skill because subagent artifacts and Intercom cover that path; unfiltered `pi-agent-skills` installs still include it. The rest are selected by task fit rather than loaded into every prompt.
 
 ## Connected MCP services
 
@@ -160,7 +163,7 @@ The organization-specific endpoint and authentication configuration stay private
 A typical substantial change looks like this:
 
 1. The main session reads repository instructions and pulls the relevant issue or service context through MCP.
-2. FFF and, when useful, a fresh `scout` map the real code path before editing.
+2. Native repository search and, when useful, a fresh `scout` map the real code path before editing.
 3. The main session makes the design decision and usually implements it with `apply_edits`; independent `worker` tasks are the exception, not the default.
 4. Agent Browser verifies browser-visible behavior when tests cannot prove the user experience.
 5. Repository checks and deterministic tools establish current evidence.
@@ -192,7 +195,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 
 `/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every package install and file change, and asks which parts to apply. It never reads or copies credentials. Reruns normalize filtered, pinned, or duplicate kit entries to one canonical source. They also preview removal of retired standalone packages, the archived Intercom package, and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. A separate consent step merges the manifest's flat context-window overrides into `models.json` per route, keeping existing values unless explicitly overwritten. `/fitch-setup verify` reports all drift without changing anything.
 
-The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.2 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump.
+The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. It keeps the released `pi-agent-browser-native` wrapper paired with its tested Agent Browser 0.33.2 baseline instead of waiting on an unreleased wrapper update. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump. It mirrors the direct OpenAI Sol default and current ten-route model cycle; setup filters unavailable owner-specific routes when applying `enabledModels`.
 
 ## Prompts
 
@@ -234,7 +237,7 @@ npm run check
 npm run smoke
 ```
 
-- `npm run check` type-checks and syntax-checks the bundled extensions, exercises the image guard boundary, the fast toggles, session naming, `/draft`, and `/side-question`, then validates unpinned package sources, manifest resources, package metadata alignment, the absence of retired patch and duplicate surfaces, the settings example's compaction values, and that every manifest context-window override names a manifest-managed route with a sane value.
+- `npm run check` type-checks and syntax-checks the bundled extensions, exercises the image guard boundary, the fast toggles, session naming, `/draft`, and `/side-question`, then validates unpinned package sources, manifest resources, package metadata alignment, the absence of retired patch and duplicate surfaces, the settings example's model, retry, and compaction values, and that every enabled or context-window route is manifest-managed with a sane value.
 - `npm run regression:fast-mode` verifies the fast toggles at the wire through real pi-ai serialization: `speed` plus fetch-time beta append on direct and gateway Opus routes without dropping existing markers, beta deduplication, prebuilt-client bypass, full-stream option survival, OpenAI and xAI priority via the stock request hook, off-state passthrough, footer eligibility including proxy exclusion, and watcher cleanup.
 - `npm run regression:session-name` verifies naming, metadata injection, protected identities, and single ownership during standalone-package migration.
 - `npm run regression:write-prompt` verifies model-override parsing, accept/deny, boxed rewrite instructions, `/side-question` ask-again history, session-prefix rewriting, and that tweak rounds reuse the same writer history.
