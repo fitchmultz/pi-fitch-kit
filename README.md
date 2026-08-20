@@ -1,8 +1,8 @@
 # pi-fitch-kit
 
-This repository packages the reusable parts of my Pi setup: public extensions, model-routed subagents, skills, connected MCP services, and local policy.
+This repository documents how I combine public extensions, model-routed subagents, skills, connected MCP services, and local policy.
 
-It does not fork or patch Pi core. Credentials, private provider definitions, and user-local experiments stay user-managed.
+The kit installs the public packages without forking or patching [Pi](https://github.com/badlogic/pi-mono). Credentials, private provider definitions, and user-local experiments stay user-managed.
 
 ## Start here
 
@@ -185,6 +185,8 @@ Pi core
 This is already the working composition layer for a broader organization harness. Productizing it would add centralized provisioning, policy distribution, scoped credential brokerage, audit and cost visibility, managed local/cloud execution, and multi-user controls. It would not require turning the extensions into a monolith or locking the harness to one model provider.
 
 ## Install the kit
+
+Requires Node.js 24 or newer.
 
 ```bash
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.2
