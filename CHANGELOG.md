@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.13 — 22 August 2026
+
+- `/codex-fast` and `/xai-fast` now also cover Cloudflare AI Gateway routes: gateway models with ids starting `gpt-` join the OpenAI toggle and ids starting `grok-` join the xAI toggle, so `cloudflare-ai-gateway/grok-4.6` and gateway GPT routes honor priority instead of silently ignoring the toggle. Direct `openai`/`openai-codex`/`xai` behavior is unchanged, the toggles stay mutually exclusive per model, and the footer follows the same eligibility. Live-verified through the real gateway: fast legs echoed `service_tier: "priority"` on `gpt-5.6-sol` (median TTFT 1168ms to 877ms) and `grok-4.6` (TTFT unchanged while idle, which matches xAI's queue-priority semantics), and gateway Opus confirmed `usage.speed: "fast"`.
+
 ## 0.9.12 — 20 August 2026
 
 - Synced the public-safe settings snapshot to the active runtime: direct OpenAI GPT-5.6 Sol at max thinking, the current ten-route model cycle, five agent-level retries, and a two-minute provider timeout.
