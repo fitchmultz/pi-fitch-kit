@@ -199,6 +199,11 @@ for (const model of [MODELS.openai, MODELS.codex, MODELS.gatewayGpt]) {
 assert.equal(await requestPayload(MODELS.anthropicOpus), undefined, "codex toggle must not touch Anthropic requests");
 assert.equal(await requestPayload(MODELS.xai), undefined, "codex toggle must not touch xAI requests");
 assert.equal(await requestPayload(MODELS.gatewayGrok), undefined, "codex toggle must not touch gateway Grok");
+assert.equal(
+	await requestPayload({ provider: "cloudflare-ai-gateway", id: "workers-ai/@cf/openai/gpt-oss-120b", api: "openai-completions" }),
+	undefined,
+	"codex toggle must not touch namespaced workers-ai ids",
+);
 assert.equal(await requestPayload(MODELS.openai, "raw"), undefined, "non-object payloads pass through");
 await commands["codex-fast"].handler("off", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI fast mode OFF");
