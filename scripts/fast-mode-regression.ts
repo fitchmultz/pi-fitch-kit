@@ -181,6 +181,8 @@ const MODELS = {
 	openai: { provider: "openai", id: "gpt-5.6-sol", api: "openai-responses" },
 	codex: { provider: "openai-codex", id: "gpt-5.6-sol", api: "openai-codex-responses" },
 	xai: { provider: "xai", id: "grok-4.6", api: "openai-completions" },
+	gatewayGpt: { provider: "cloudflare-ai-gateway", id: "gpt-5.6-sol", api: "openai-responses" },
+	gatewayGrok: { provider: "cloudflare-ai-gateway", id: "grok-4.6", api: "openai-responses" },
 	anthropicOpus: { provider: "anthropic", id: "claude-opus-5", api: "anthropic-messages" },
 	copilotOpus: { provider: "github-copilot", id: "claude-opus-5", api: "anthropic-messages" },
 } as const;
@@ -189,13 +191,14 @@ for (const model of Object.values(MODELS)) {
 }
 await commands["codex-fast"].handler("on", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI fast mode ON");
-for (const model of [MODELS.openai, MODELS.codex]) {
+for (const model of [MODELS.openai, MODELS.codex, MODELS.gatewayGpt]) {
 	const fast = (await requestPayload(model)) as Record<string, unknown>;
-	assert.equal(fast.service_tier, "priority", `${model.provider} must request priority`);
+	assert.equal(fast.service_tier, "priority", `${model.provider}/${model.id} must request priority`);
 	assert.equal(fast.model, "m", "payload fields must survive");
 }
 assert.equal(await requestPayload(MODELS.anthropicOpus), undefined, "codex toggle must not touch Anthropic requests");
 assert.equal(await requestPayload(MODELS.xai), undefined, "codex toggle must not touch xAI requests");
+assert.equal(await requestPayload(MODELS.gatewayGrok), undefined, "codex toggle must not touch gateway Grok");
 assert.equal(await requestPayload(MODELS.openai, "raw"), undefined, "non-object payloads pass through");
 await commands["codex-fast"].handler("off", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI fast mode OFF");
@@ -205,7 +208,10 @@ assert.equal(notices.at(-1), "xAI fast mode ON");
 const xaiFast = (await requestPayload(MODELS.xai)) as Record<string, unknown>;
 assert.equal(xaiFast.service_tier, "priority", "xai must request priority");
 assert.equal(xaiFast.model, "m", "payload fields must survive");
+const gatewayGrokFast = (await requestPayload(MODELS.gatewayGrok)) as Record<string, unknown>;
+assert.equal(gatewayGrokFast.service_tier, "priority", "gateway grok must request priority");
 assert.equal(await requestPayload(MODELS.openai), undefined, "xai toggle must not touch OpenAI requests");
+assert.equal(await requestPayload(MODELS.gatewayGpt), undefined, "xai toggle must not touch gateway GPT");
 await commands["xai-fast"].handler("off", uiCtx(MODELS.xai));
 
 // Command verbs: toggle flips, status reports, invalid warns without a write.

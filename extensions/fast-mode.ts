@@ -91,7 +91,10 @@ const OPENAI_TOGGLE: Toggle = {
 	label: "OpenAI",
 	description: "Toggle OpenAI priority/fast mode",
 	statePath: join(getAgentDir(), "openai-codex-fast.json"),
-	eligible: (model) => model?.provider !== undefined && OPENAI_PROVIDERS.has(model.provider),
+	eligible: (model) =>
+		model?.provider !== undefined &&
+		(OPENAI_PROVIDERS.has(model.provider) ||
+			(model.provider === "cloudflare-ai-gateway" && model.id?.startsWith("gpt-") === true)),
 };
 
 const XAI_TOGGLE: Toggle = {
@@ -99,7 +102,9 @@ const XAI_TOGGLE: Toggle = {
 	label: "xAI",
 	description: "Toggle xAI priority/fast mode",
 	statePath: join(getAgentDir(), "xai-fast.json"),
-	eligible: (model) => model?.provider === "xai",
+	eligible: (model) =>
+		model?.provider === "xai" ||
+		(model?.provider === "cloudflare-ai-gateway" && model.id?.startsWith("grok-") === true),
 };
 
 const TOGGLES = [ANTHROPIC_TOGGLE, OPENAI_TOGGLE, XAI_TOGGLE];
