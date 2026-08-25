@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0 — 25 August 2026
+
+- Treat Pi `0.84.2` and Node.js `24` as minimum runtime floors instead of requiring one exact installed Pi version; keep the `0.84.2` development dependencies exact for reproducible checks.
+- Update the Agent Browser prerequisite to the live-verified `0.34.0` CLI baseline.
+- Retain `/fast` and `--fast` as aliases for the kit's shared OpenAI priority toggle, without restoring the unhelpful `x-codex-routing-hint` header.
+- Let `/fitch-setup` preview and retire only provenance-matching Fold footer and standalone fast-mode symlinks while preserving their source files; standalone session naming remains a retired package owned by the kit after reload.
+- Keep schema 7 model requirements unchanged pending a separate model-manifest review.
+
 ## 0.9.14 — 22 August 2026
 
 - Documented the live verification of `/codex-fast` on the `openai-codex` subscription route, which had never been measured. In one session on a single account, `gpt-5.6-sol` with output pinned at 603 tokens per sample ran 55.5 tok/s and 12502ms standard against 82.6 tok/s and 9074ms fast across three interleaved pairs, a 1.49x throughput and 1.38x completion speedup; time-to-first-token did not improve (1641ms standard against 1772ms fast). No code change: the stock `before_provider_request` payload field already carries it. Recorded two measurement traps: the Codex backend echoes `service_tier: "default"` while serving priority (openai/codex#14204), so the echoed tier proves nothing there, and the gain only appears as throughput on a fixed-length output. Adding the Codex CLI's `x-codex-routing-hint` header measured 84.1 tok/s against 82.6 without it, inside noise at that sample size, so the kit does not send it and keeps `before_provider_headers` unused.

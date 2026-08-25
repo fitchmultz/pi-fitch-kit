@@ -25,7 +25,11 @@ for (const [route, value] of Object.entries(manifest.modelContextWindows)) {
     `modelContextWindows value for ${route} must be a sane positive integer`,
   );
 }
-assert(manifest.runtime.pi === "0.84.2", "the kit must pin the validated Pi runtime");
+const piFloor = /^>=(\d+\.\d+\.\d+)$/.exec(manifest.runtime.pi)?.[1];
+assert(piFloor === "0.84.2", "the kit must accept Pi 0.84.2 or newer");
+assert(packageJson.engines.node === manifest.runtime.node, "package and manifest Node floors must match");
+assert(packageJson.version === "0.10.0", "package version must match the approved kit release");
+assert(packageLock.version === packageJson.version, "lockfile version must match package.json");
 const resolvedOrigins = Object.values(packageLock.packages)
   .map((entry) => entry.resolved)
   .filter(Boolean)
@@ -45,7 +49,7 @@ for (const dependency of [
   "@earendil-works/pi-coding-agent",
   "@earendil-works/pi-tui",
 ]) {
-  assert(packageJson.devDependencies[dependency] === manifest.runtime.pi, `${dependency} must pin the exact validated Pi version`);
+  assert(packageJson.devDependencies[dependency] === piFloor, `${dependency} must pin the exact validated Pi floor for reproducible checks`);
   assert(packageJson.peerDependencies[dependency] === "*", `${dependency} must remain an unversioned Pi peer`);
   assert(packageJson.peerDependenciesMeta[dependency]?.optional === true, `${dependency} must remain an optional Pi peer`);
 }
@@ -129,6 +133,19 @@ for (const source of [
     `upgrades must remove the retired standalone package: ${source}`,
   );
 }
+assert(
+  JSON.stringify(manifest.retiredExtensionLinks) === JSON.stringify([
+    {
+      path: "extensions/fold-responsive-footer.ts",
+      targetSuffix: "/fold-dev-environment/extensions/fold-responsive-footer.ts",
+    },
+    {
+      path: "extensions/openai-codex-fast-mode",
+      targetSuffix: "/fold-dev-environment/extensions/openai-codex-fast-mode",
+    },
+  ]),
+  "upgrades must retire the approved Fold footer and standalone fast-mode links",
+);
 assert(Array.isArray(manifest.consentBehaviors), "consentBehaviors must stay a declared list, even when empty");
 for (const behavior of manifest.consentBehaviors) {
   assert(behavior?.consent?.required === true, "consent behaviors must require explicit consent");
@@ -142,9 +159,9 @@ const editSession = manifest.corePackages.find(({ id }) => id === "edit-session"
 assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");
 
 const browser = manifest.corePackages.find(({ id }) => id === "agent-browser")?.externalPrerequisite;
-assert(browser?.version === "0.33.2", "Agent Browser prerequisite must match the wrapper's tested 0.33.2 baseline");
+assert(browser?.version === "0.34.0", "Agent Browser prerequisite must match the wrapper's tested 0.34.0 baseline");
 assert(
-  browser?.installCommand === "npm install --global agent-browser@0.33.2",
+  browser?.installCommand === "npm install --global agent-browser@0.34.0",
   "Agent Browser install must use the exact tested version",
 );
 
@@ -175,6 +192,8 @@ assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not ha
 assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
 assert(setupPrompt.includes("consentBehaviors"), "setup prompt must honor consent-gated behavior");
 assert(setupPrompt.includes("openai-codex-fast.json"), "setup prompt must preserve fast-mode state during legacy removals");
+assert(setupPrompt.includes("retiredExtensionLinks"), "setup prompt must migrate approved extension collisions");
+assert(setupPrompt.includes("targetSuffix"), "setup prompt must verify retired link provenance");
 assert(setupPrompt.includes("pi-codex-context.json"), "setup prompt must preserve legacy compaction consent files");
 assert(setupPrompt.includes("enable, disable, or keep"), "setup must offer explicit consent revocation");
 assert(setupPrompt.includes("filtered, pinned, or duplicate"), "setup must normalize stale kit package entries");

@@ -204,6 +204,12 @@ function updateFooterStatus(ctx: ExtensionContext): void {
 }
 
 export default function fastMode(pi: ExtensionAPI): void {
+	pi.registerFlag("fast", {
+		description: "Start with OpenAI priority/fast mode enabled",
+		type: "boolean",
+		default: false,
+	});
+
 	// Anthropic fast mode: the override receives auth-resolved options (credential
 	// headers, gateway env) and reproduces pi-ai's own dispatch for
 	// anthropic-messages models, including the gateway endpoint-placeholder
@@ -231,6 +237,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 	};
 	pi.on("session_start", (_event, ctx) => {
 		footerContext = ctx;
+		if (pi.getFlag("fast") === true) writeEnabled(OPENAI_TOGGLE.statePath, true);
 		updateFooterStatus(ctx);
 		for (const toggle of TOGGLES) {
 			// Unwatch first: a repeated session_start must not stack listeners, or a
@@ -245,13 +252,14 @@ export default function fastMode(pi: ExtensionAPI): void {
 	});
 	pi.on("model_select", (_event, ctx) => updateFooterStatus(ctx));
 
-	for (const toggle of TOGGLES) {
-		pi.registerCommand(toggle.name, {
-			description: toggle.description,
+	const registerToggleCommand = (name: string, toggle: Toggle, emptyMeansToggle = false): void => {
+		pi.registerCommand(name, {
+			description: name === toggle.name ? toggle.description : `Alias for /${toggle.name}`,
 			handler: async (args, ctx) => {
-				const command = args.trim().toLowerCase();
+				const input = args.trim().toLowerCase();
+				const command = emptyMeansToggle && input === "" ? "toggle" : input;
 				if (!["", "status", "on", "off", "toggle"].includes(command)) {
-					ctx.ui.notify(`Usage: /${toggle.name} [on|off|toggle|status]`, "warning");
+					ctx.ui.notify(`Usage: /${name} [on|off|toggle|status]`, "warning");
 					return;
 				}
 				if (command === "on" || command === "off" || command === "toggle") {
@@ -265,5 +273,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 				);
 			},
 		});
-	}
+	};
+	for (const toggle of TOGGLES) registerToggleCommand(toggle.name, toggle);
+	registerToggleCommand("fast", OPENAI_TOGGLE, true);
 }

@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Updated 20 August 2026 for Pi 0.84.2 on Node.js 24 or newer._
+_Updated 25 August 2026 for Pi 0.84.2 or newer on Node.js 24 or newer._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 
@@ -218,7 +218,7 @@ The contrast is the point: the main session usually implements, while specialist
 ## Install and verify
 
 ```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.84.2
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 pi
 # Complete provider login, then:
 pi install git:github.com/fitchmultz/pi-fitch-kit
@@ -226,7 +226,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only the selected unpinned sources. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. Agent Browser stays at 0.33.2 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys and the context-window overrides as separate consent steps, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources after reload.
+The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only the selected unpinned sources. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. Agent Browser stays at 0.34.0 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys and the context-window overrides as separate consent steps, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources after reload.
 
 `/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, model availability, consent-gated route state, and `models.json` context-window overrides.
 

@@ -18,6 +18,19 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const manifest = JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf8"));
+const minimumPi = manifest.runtime.pi.replace(/^>=/, "");
+const versionAtLeast = (actual, minimum) => {
+	const left = actual.split(".").map(Number);
+	const right = minimum.split(".").map(Number);
+	for (let index = 0; index < Math.max(left.length, right.length); index++) {
+		if ((left[index] ?? 0) !== (right[index] ?? 0)) return (left[index] ?? 0) > (right[index] ?? 0);
+	}
+	return true;
+};
+assert.equal(versionAtLeast("0.84.2", "0.84.2"), true);
+assert.equal(versionAtLeast("0.84.3", "0.84.2"), true);
+assert.equal(versionAtLeast("0.84.1", "0.84.2"), false);
 const temp = mkdtempSync(join(tmpdir(), "pi-fitch-kit-lifecycle-"));
 const agentDir = join(temp, "agent");
 const home = join(temp, "home");
@@ -42,7 +55,8 @@ const pi = (...args) =>
 	});
 
 try {
-	assert.equal(pi("--version").trim(), "0.84.2");
+	const piVersion = pi("--version").trim();
+	assert.ok(versionAtLeast(piVersion, minimumPi), `Pi ${piVersion} must satisfy ${manifest.runtime.pi}`);
 	pi("install", root);
 	assert.ok(
 		pi("list").includes(root),

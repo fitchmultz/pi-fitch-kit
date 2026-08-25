@@ -13,12 +13,19 @@ type Handler = (event: Record<string, unknown>, ctx: Record<string, unknown>) =>
 const handlers: Record<string, Handler[]> = {};
 const commands: Record<string, { handler: (args: string, ctx: unknown) => Promise<void> }> = {};
 const providers = new Map<string, { api: string; streamSimple: CallableFunction }>();
+const flags = new Map<string, boolean>();
 fastMode({
 	on(event: string, handler: Handler) {
 		(handlers[event] ??= []).push(handler);
 	},
 	registerCommand(name: string, config: (typeof commands)[string]) {
 		commands[name] = config;
+	},
+	registerFlag(name: string, config: { default: boolean }) {
+		flags.set(name, config.default);
+	},
+	getFlag(name: string) {
+		return flags.get(name);
 	},
 	registerProvider(name: string, config: { api: string; streamSimple: CallableFunction }) {
 		providers.set(name, config);
@@ -35,7 +42,8 @@ for (const provider of providers.values()) {
 	assert.equal(typeof provider.streamSimple, "function");
 }
 assert.equal(typeof handlers.before_provider_request?.[0], "function");
-assert.deepEqual(Object.keys(commands).sort(), ["anthropic-fast", "codex-fast", "xai-fast"]);
+assert.deepEqual(Object.keys(commands).sort(), ["anthropic-fast", "codex-fast", "fast", "xai-fast"]);
+assert.equal(flags.get("fast"), false, "--fast must default off");
 
 assert.deepEqual(
 	fastRates({ input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 }),
@@ -207,6 +215,10 @@ assert.equal(
 assert.equal(await requestPayload(MODELS.openai, "raw"), undefined, "non-object payloads pass through");
 await commands["codex-fast"].handler("off", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI fast mode OFF");
+await commands.fast.handler("", uiCtx(MODELS.openai));
+assert.equal(notices.at(-1), "OpenAI fast mode ON", "/fast with no verb must retain toggle behavior");
+await commands.fast.handler("off", uiCtx(MODELS.openai));
+assert.equal(notices.at(-1), "OpenAI fast mode OFF");
 
 await commands["xai-fast"].handler("on", uiCtx(MODELS.xai));
 assert.equal(notices.at(-1), "xAI fast mode ON");
@@ -240,7 +252,11 @@ const runHandlers = async (event: string, ...args: [Record<string, unknown>, unk
 	for (const handler of handlers[event] ?? []) await handler(...(args as [never, never]));
 };
 const gatewayOpus = { provider: "cloudflare-ai-gateway", id: "claude-opus-5", api: "anthropic-messages" };
+flags.set("fast", true);
 await runHandlers("session_start", {}, uiCtx(gatewayOpus));
+assert.equal(JSON.parse(readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8")).enabled, true, "--fast must enable shared OpenAI fast state");
+flags.set("fast", false);
+await commands["codex-fast"].handler("off", uiCtx(gatewayOpus));
 assert.equal(status.get("anthropic-fast"), undefined, "no footer while off");
 assert.equal(status.get("codex-fast"), undefined);
 await commands["anthropic-fast"].handler("on", uiCtx(gatewayOpus));
