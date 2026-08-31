@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.1 — 31 August 2026
+
+- Restore the latest prompt cache hit rate (`CH`) to the compact footer while keeping cumulative token, cache, and cost counters hidden.
+
 ## 0.10.0 — 25 August 2026
 
 - Treat Pi `0.84.2` and Node.js `24` as minimum runtime floors instead of requiring one exact installed Pi version; keep the `0.84.2` development dependencies exact for reproducible checks.
