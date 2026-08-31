@@ -130,6 +130,10 @@ try {
 		sessionManager: {
 			getCwd: () => join(process.env.HOME ?? temp, "Projects", "demo"),
 			getSessionName: () => "footer-smoke",
+			getEntries: () => [
+				{ type: "message", message: { role: "assistant", usage: { input: 20, cacheRead: 80, cacheWrite: 0 } } },
+				{ type: "message", message: { role: "assistant", usage: { input: 100, cacheRead: 0, cacheWrite: 0 } } },
+			],
 		},
 		getContextUsage: () => ({ percent: 74, contextWindow: 272_000 }),
 		model: {
@@ -166,13 +170,13 @@ try {
 	const narrowText = narrowFooter.join("\n");
 	const normalizedNarrowText = narrowText.replace(/\s+/g, " ");
 	if (narrowText.includes("...")) throw new Error(`Clean footer truncated content: ${narrowText}`);
-	for (const hidden of ["↑", "↓", "CH", "$"]) {
+	for (const hidden of ["↑", "↓", "$"]) {
 		if (narrowText.includes(hidden)) throw new Error(`Clean footer leaked cumulative counter ${hidden}`);
 	}
 	for (const expected of [
 		"footer-smoke",
 		"(openai-codex) gpt-5.6-sol • high • 🗣 medium",
-		"74.0%/272k",
+		"74.0%/272k • CH0.0%",
 		"MCP: 13 servers enabled (2 connected)",
 		"todo 0 active · 1 pending",
 	]) {

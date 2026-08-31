@@ -115,6 +115,16 @@ function installFooter(ctx: ExtensionContext, verbosity: VerbosityConfig): void 
 				const sessionName = ctx.sessionManager.getSessionName();
 				if (sessionName) location += theme.fg("dim", ` • ${sessionName}`);
 
+				let latestCacheHitRate: number | undefined;
+				let hasCacheActivity = false;
+				for (const entry of ctx.sessionManager.getEntries()) {
+					if (entry.type !== "message" || entry.message.role !== "assistant") continue;
+					const { input, cacheRead, cacheWrite } = entry.message.usage;
+					hasCacheActivity ||= cacheRead > 0 || cacheWrite > 0;
+					const promptTokens = input + cacheRead + cacheWrite;
+					latestCacheHitRate = promptTokens > 0 ? (cacheRead / promptTokens) * 100 : undefined;
+				}
+
 				const usage = ctx.getContextUsage();
 				const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
 				const percent = usage?.percent;
@@ -142,7 +152,9 @@ function installFooter(ctx: ExtensionContext, verbosity: VerbosityConfig): void 
 					.sort(([a], [b]) => a.localeCompare(b))
 					.map(([, text]) => sanitize(text));
 				const statusLines: string[] = [];
-				let current = context;
+				let current = hasCacheActivity && latestCacheHitRate !== undefined
+					? `${context} ${theme.fg("dim", `• CH${latestCacheHitRate.toFixed(1)}%`)}`
+					: context;
 				for (const [index, status] of statuses.entries()) {
 					const candidate = `${current}${index === 0 ? ` ${theme.fg("dim", "•")}` : ""} ${status}`;
 					if (visibleWidth(candidate) <= width) current = candidate;
