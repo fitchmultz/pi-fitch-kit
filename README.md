@@ -50,7 +50,7 @@ These are the extensions loaded in my current setup. Every external extension li
 
 ### Extensions bundled by this kit
 
-[`clean-footer`](extensions/clean-footer.ts) removes cumulative token, cache, cache-hit, and cost counters while retaining the working directory, session name, context usage, model, thinking level, and extension statuses. It uses two lines when everything fits and wraps whole status items onto additional lines instead of truncating them. `/clean-footer` toggles the compact and built-in footers for comparison.
+[`clean-footer`](extensions/clean-footer.ts) removes cumulative token, cache, and cost counters while retaining the latest prompt cache hit rate, working directory, session name, context usage, model, thinking level, and extension statuses. It uses two lines when everything fits and wraps whole status items onto additional lines instead of truncating them. `/clean-footer` toggles the compact and built-in footers for comparison.
 
 [`session-name`](extensions/session-name.ts) provides the `name_session` tool and inert session-name metadata that keep `/resume` searchable without renaming sessions for every subtask. It preserves coordinator and numbered subagent identities unless the user confirms their removal. During migration, it defers to an already loaded standalone `name_session` tool until `/fitch-setup` removes that package and Pi reloads.
 
