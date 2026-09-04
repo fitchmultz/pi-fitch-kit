@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.2 — 4 September 2026
+
+- Align the Agent Browser prerequisite with `pi-agent-browser-native` 0.6.3 by installing its tested 0.36.0 target instead of the now-unsupported 0.34.0 release.
+
 ## 0.10.1 — 31 August 2026
 
 - Restore the latest prompt cache hit rate (`CH`) to the compact footer while keeping cumulative token, cache, and cost counters hidden.

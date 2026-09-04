@@ -28,7 +28,7 @@ for (const [route, value] of Object.entries(manifest.modelContextWindows)) {
 const piFloor = /^>=(\d+\.\d+\.\d+)$/.exec(manifest.runtime.pi)?.[1];
 assert(piFloor === "0.84.2", "the kit must accept Pi 0.84.2 or newer");
 assert(packageJson.engines.node === manifest.runtime.node, "package and manifest Node floors must match");
-assert(packageJson.version === "0.10.1", "package version must match the approved kit release");
+assert(packageJson.version === "0.10.2", "package version must match the approved kit release");
 assert(packageLock.version === packageJson.version, "lockfile version must match package.json");
 const resolvedOrigins = Object.values(packageLock.packages)
   .map((entry) => entry.resolved)
@@ -159,9 +159,9 @@ const editSession = manifest.corePackages.find(({ id }) => id === "edit-session"
 assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");
 
 const browser = manifest.corePackages.find(({ id }) => id === "agent-browser")?.externalPrerequisite;
-assert(browser?.version === "0.34.0", "Agent Browser prerequisite must match the wrapper's tested 0.34.0 baseline");
+assert(browser?.version === "0.36.0", "Agent Browser prerequisite must match the wrapper's tested 0.36.0 baseline");
 assert(
-  browser?.installCommand === "npm install --global agent-browser@0.34.0",
+  browser?.installCommand === "npm install --global agent-browser@0.36.0",
   "Agent Browser install must use the exact tested version",
 );
 
