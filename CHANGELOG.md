@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.10.3 — 5 September 2026
 
 - `/codex-fast` and its footer now cover Cloudflare AI Gateway `o3` and `o4-mini`, including their `2025-04-16` snapshots, using OpenAI's documented Fast-mode support. Other gateway o-series models remain excluded; direct-provider, GPT, Grok, Workers AI, and toggle-state behavior is unchanged.
 - Validate the exact 320000 context-window policy and report missing compaction settings with useful errors. Qualify the v0.9.0 headroom explanation as Anthropic-only.
+- Resolve Pi's package root through its native API in the session-name regression so both regular and bundled CLI layouts run the same checks.
 
 ## 0.10.2 — 4 September 2026
 

@@ -1,14 +1,13 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const piExecutable = execFileSync("which", ["pi"], { encoding: "utf8" }).trim();
-const piPackageRoot = dirname(dirname(realpathSync(piExecutable)));
+import { getPackageDir } from "@earendil-works/pi-coding-agent";
+
 const { createExtensionRuntime, loadExtensions } = await import(
-	pathToFileURL(join(piPackageRoot, "dist/core/extensions/loader.js")).href
+	pathToFileURL(join(getPackageDir(), "dist/core/extensions/loader.js")).href
 );
 
 const bundlePath = join(process.cwd(), "extensions/session-name.ts");
