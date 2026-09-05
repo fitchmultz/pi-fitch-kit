@@ -24,6 +24,8 @@ const ANTHROPIC_FAST_MODEL_PREFIXES = ["claude-opus-5", "claude-opus-4-8"];
 // not overridden and stay stock.
 const ANTHROPIC_FAST_PROVIDERS = ["anthropic", "cloudflare-ai-gateway"];
 const OPENAI_PROVIDERS = new Set(["openai", "openai-codex"]);
+// OpenAI Fast pricing supports these o-series models, not the whole family.
+const OPENAI_PRIORITY_O_MODELS = new Set(["o3", "o3-2025-04-16", "o4-mini", "o4-mini-2025-04-16"]);
 
 // Anthropic-native options a simple caller cannot express. Pi's composer collapses
 // Provider.stream() and Provider.streamSimple() into one extension callback and drops the
@@ -94,7 +96,8 @@ const OPENAI_TOGGLE: Toggle = {
 	eligible: (model) =>
 		model?.provider !== undefined &&
 		(OPENAI_PROVIDERS.has(model.provider) ||
-			(model.provider === "cloudflare-ai-gateway" && model.id?.startsWith("gpt-") === true)),
+			(model.provider === "cloudflare-ai-gateway" &&
+				(model.id?.startsWith("gpt-") === true || OPENAI_PRIORITY_O_MODELS.has(model.id ?? "")))),
 };
 
 const XAI_TOGGLE: Toggle = {

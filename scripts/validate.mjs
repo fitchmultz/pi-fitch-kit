@@ -21,14 +21,14 @@ assert(
 for (const [route, value] of Object.entries(manifest.modelContextWindows)) {
   assert(manifestModelRoutes.has(route), `modelContextWindows route ${route} must be a manifest-managed model route`);
   assert(
-    Number.isInteger(value) && value > 0 && value <= 2_000_000,
-    `modelContextWindows value for ${route} must be a sane positive integer`,
+    value === 320000,
+    `modelContextWindows value for ${route} must be 320000`,
   );
 }
 const piFloor = /^>=(\d+\.\d+\.\d+)$/.exec(manifest.runtime.pi)?.[1];
 assert(piFloor === "0.84.2", "the kit must accept Pi 0.84.2 or newer");
 assert(packageJson.engines.node === manifest.runtime.node, "package and manifest Node floors must match");
-assert(packageJson.version === "0.10.2", "package version must match the approved kit release");
+assert(packageJson.version === "0.10.3", "package version must match the approved kit release");
 assert(packageLock.version === packageJson.version, "lockfile version must match package.json");
 const resolvedOrigins = Object.values(packageLock.packages)
   .map((entry) => entry.resolved)
@@ -186,8 +186,8 @@ for (const route of settingsExample.enabledModels) {
 }
 assert(settingsExample.retry?.maxRetries === 5, "settings example must carry the active retry budget");
 assert(settingsExample.retry?.provider?.timeoutMs === 120000, "settings example must carry the active provider timeout");
-assert(settingsExample.compaction.reserveTokens === 64000, "settings example must carry the 64k compaction reserve");
-assert(settingsExample.compaction.keepRecentTokens === 40000, "settings example must keep 40k recent tokens");
+assert(settingsExample.compaction?.reserveTokens === 64000, "settings example must carry the 64k compaction reserve");
+assert(settingsExample.compaction?.keepRecentTokens === 40000, "settings example must keep 40k recent tokens");
 assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");
 assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
 assert(setupPrompt.includes("consentBehaviors"), "setup prompt must honor consent-gated behavior");

@@ -2,35 +2,32 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-fast-mode-"));
 process.on("exit", () => rmSync(agentDir, { recursive: true, force: true }));
 process.env.PI_CODING_AGENT_DIR = agentDir;
 
-const { default: fastMode, fastRates } = await import("../extensions/fast-mode.ts");
+const { fastRates } = await import("../extensions/fast-mode.ts");
+const { discoverAndLoadExtensions } = await import("@earendil-works/pi-coding-agent");
+const loaded = await discoverAndLoadExtensions(
+	[fileURLToPath(new URL("../extensions/fast-mode.ts", import.meta.url))], agentDir, agentDir,
+);
+assert.deepEqual(loaded.errors, []);
+assert.equal(loaded.extensions.length, 1);
 
 type Handler = (event: Record<string, unknown>, ctx: Record<string, unknown>) => unknown;
-const handlers: Record<string, Handler[]> = {};
-const commands: Record<string, { handler: (args: string, ctx: unknown) => Promise<void> }> = {};
+const handlers = Object.fromEntries(loaded.extensions[0].handlers) as Record<string, Handler[]>;
+const commands = Object.fromEntries(loaded.extensions[0].commands) as Record<
+	string, { handler: (args: string, ctx: unknown) => Promise<void> }
+>;
 const providers = new Map<string, { api: string; streamSimple: CallableFunction }>();
-const flags = new Map<string, boolean>();
-fastMode({
-	on(event: string, handler: Handler) {
-		(handlers[event] ??= []).push(handler);
-	},
-	registerCommand(name: string, config: (typeof commands)[string]) {
-		commands[name] = config;
-	},
-	registerFlag(name: string, config: { default: boolean }) {
-		flags.set(name, config.default);
-	},
-	getFlag(name: string) {
-		return flags.get(name);
-	},
-	registerProvider(name: string, config: { api: string; streamSimple: CallableFunction }) {
-		providers.set(name, config);
-	},
-} as never);
+for (const { name, config } of loaded.runtime.pendingProviderRegistrations) {
+	assert.ok(config.api);
+	assert.ok(config.streamSimple);
+	providers.set(name, { api: config.api, streamSimple: config.streamSimple });
+}
+const flags = loaded.runtime.flagValues;
 
 // The mandatory beta header can only survive pi-ai's last-write-wins client
 // assembly via a fetch-time append, so Anthropic fast mode must be a scoped
@@ -181,6 +178,44 @@ await commands["anthropic-fast"].handler("off", anthropicOpusCtx);
 assert.equal(notices.at(-1), "Anthropic fast mode OFF");
 assert.equal((await fastRequest("anthropic", "claude-opus-5")).payload?.speed, undefined);
 
+const { cloudflareAIGatewayProvider } = await import("@earendil-works/pi-ai/providers/cloudflare-ai-gateway");
+const gatewayProvider = cloudflareAIGatewayProvider();
+const gatewayO3 = gatewayProvider.getModels().find(({ id }) => id === "o3");
+assert.ok(gatewayO3, "the native gateway catalog must include o3");
+const supportedGatewayIds = ["o3", "o3-2025-04-16", "o4-mini", "o4-mini-2025-04-16"];
+const unsupportedGatewayIds = [
+	"o1", "o1-pro", "o3-mini", "o3-pro", "o4-mini-deep-research",
+	"o3-2025-04-16-extra", "o4-mini-2026-01-01",
+	"workers-ai/@cf/openai/gpt-oss-120b", "workers-ai/@cf/openai/o3",
+];
+// Aliases use the native catalog. Snapshot/negative IDs exercise custom models,
+// not invented catalog entries. No request leaves the fake fetch boundary.
+const gatewayModel = (id: string) => gatewayProvider.getModels().find((model) => model.id === id) ?? { ...gatewayO3, id };
+async function gatewayPriorityRequest(id: string) {
+	const model = gatewayModel(id);
+	let payload: Record<string, unknown> | undefined;
+	let url = "";
+	const stream = gatewayProvider.streamSimple(
+		model,
+		{ messages: [{ role: "user", content: "test", timestamp: 0 }] },
+		{
+			apiKey: "test", maxRetries: 0, env: GATEWAY_ENV,
+			onPayload: (body) => requestPayload(model, body),
+			fetch: async (input, init) => {
+				url = String(input);
+				payload = JSON.parse(String(init?.body));
+				throw new Error("payload captured");
+			},
+		},
+	);
+	for await (const _event of stream) { /* Drain the capture abort. */ }
+	assert.ok(payload, `${id} must reach real provider serialization`);
+	const endpoint = model.api === "openai-completions" ? "compat/chat/completions" : "openai/responses";
+	assert.equal(url, `https://gateway.ai.cloudflare.com/v1/acct-123/gw-456/${endpoint}`);
+	assert.equal(payload.model, id);
+	return payload;
+}
+
 // OpenAI priority mode is provider-gated payload injection via the stock hook.
 const requestHook = handlers.before_provider_request[0];
 const requestPayload = async (model: unknown, payload: unknown = { model: "m" }) =>
@@ -212,7 +247,35 @@ assert.equal(
 	undefined,
 	"codex toggle must not touch namespaced workers-ai ids",
 );
-assert.equal(await requestPayload(MODELS.openai, "raw"), undefined, "non-object payloads pass through");
+// The loaded hook, real gateway/Responses serializer, and footer must agree.
+for (const enabled of [false, true]) {
+	await commands["codex-fast"].handler(enabled ? "on" : "off", uiCtx(MODELS.openai));
+	for (const id of [...supportedGatewayIds, ...unsupportedGatewayIds]) {
+		const priority = enabled && supportedGatewayIds.includes(id);
+		const payload = await gatewayPriorityRequest(id);
+		await handlers.model_select[0]({}, uiCtx(gatewayModel(id)));
+		assert.deepEqual(
+			{ tier: payload.service_tier, footer: status.get("codex-fast") },
+			{ tier: priority ? "priority" : undefined, footer: priority ? "accent:fast" : undefined },
+			`${id}, enabled=${enabled}`,
+		);
+		assert.equal(status.get("xai-fast"), undefined);
+		assert.equal(status.get("anthropic-fast"), undefined);
+	}
+}
+// Preserve the existing direct-provider gate, including models not enabled above.
+for (const provider of ["openai", "openai-codex"]) {
+	for (const id of ["o1", "o1-pro", "o3", "o3-mini", "o3-pro", "o4-mini"]) {
+		const model = { provider, id };
+		const payload = await requestPayload(model) as Record<string, unknown>;
+		assert.equal(payload.service_tier, "priority", `${provider}/${id} retains direct behavior`);
+		await handlers.model_select[0]({}, uiCtx(model));
+		assert.equal(status.get("codex-fast"), "accent:fast");
+	}
+}
+for (const payload of [null, [], "raw"]) {
+	assert.equal(await requestPayload(MODELS.openai, payload), undefined, "non-object payloads pass through");
+}
 await commands["codex-fast"].handler("off", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI fast mode OFF");
 await commands.fast.handler("", uiCtx(MODELS.openai));
@@ -229,6 +292,12 @@ const gatewayGrokFast = (await requestPayload(MODELS.gatewayGrok)) as Record<str
 assert.equal(gatewayGrokFast.service_tier, "priority", "gateway grok must request priority");
 assert.equal(await requestPayload(MODELS.openai), undefined, "xai toggle must not touch OpenAI requests");
 assert.equal(await requestPayload(MODELS.gatewayGpt), undefined, "xai toggle must not touch gateway GPT");
+for (const id of supportedGatewayIds) {
+	assert.equal((await gatewayPriorityRequest(id)).service_tier, undefined, "xai toggle must not touch gateway o-series");
+	await handlers.model_select[0]({}, uiCtx(gatewayModel(id)));
+	assert.equal(status.get("codex-fast"), undefined);
+	assert.equal(status.get("xai-fast"), undefined);
+}
 await commands["xai-fast"].handler("off", uiCtx(MODELS.xai));
 
 // Command verbs: toggle flips, status reports, invalid warns without a write.
@@ -282,7 +351,7 @@ console.log(
 		anthropicFast: "wire-verified on direct+gateway opus",
 		betaHeader: "fetch-time append preserves existing markers",
 		prebuiltClient: "stays standard speed",
-		openaiFast: "provider-gated priority",
+		openaiFast: "native registered hook + gateway Responses wire: supported o3/o4-mini aliases/snapshots only",
 		xaiFast: "provider-gated priority",
 		footer: "eligibility-scoped incl. proxy exclusion",
 		watchers: "released",
