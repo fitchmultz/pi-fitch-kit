@@ -21,8 +21,8 @@ assert(
 for (const [route, value] of Object.entries(manifest.modelContextWindows)) {
   assert(manifestModelRoutes.has(route), `modelContextWindows route ${route} must be a manifest-managed model route`);
   assert(
-    Number.isInteger(value) && value > 0 && value <= 2_000_000,
-    `modelContextWindows value for ${route} must be a sane positive integer`,
+    value === 320000,
+    `modelContextWindows value for ${route} must be 320000`,
   );
 }
 const piFloor = /^>=(\d+\.\d+\.\d+)$/.exec(manifest.runtime.pi)?.[1];
@@ -186,8 +186,8 @@ for (const route of settingsExample.enabledModels) {
 }
 assert(settingsExample.retry?.maxRetries === 5, "settings example must carry the active retry budget");
 assert(settingsExample.retry?.provider?.timeoutMs === 120000, "settings example must carry the active provider timeout");
-assert(settingsExample.compaction.reserveTokens === 64000, "settings example must carry the 64k compaction reserve");
-assert(settingsExample.compaction.keepRecentTokens === 40000, "settings example must keep 40k recent tokens");
+assert(settingsExample.compaction?.reserveTokens === 64000, "settings example must carry the 64k compaction reserve");
+assert(settingsExample.compaction?.keepRecentTokens === 40000, "settings example must keep 40k recent tokens");
 assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");
 assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
 assert(setupPrompt.includes("consentBehaviors"), "setup prompt must honor consent-gated behavior");
