@@ -12,6 +12,7 @@ import {
 	rawKeyHint,
 	type ExtensionAPI,
 	type ExtensionCommandContext,
+	type RegisteredCommand,
 } from "@earendil-works/pi-coding-agent";
 import { Container, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
 import { prepareClaudeImages } from "./anthropic-image-guard.ts";
@@ -55,6 +56,12 @@ export function configuredModelRef(raw: string): string | undefined {
 	} catch {
 		return undefined;
 	}
+}
+
+function writerActivity() {
+	const key = Symbol.for("fitch-kit.write-prompt.activity");
+	const store = globalThis as typeof globalThis & { [key]?: { active: number } };
+	return store[key] ??= { active: 0 };
 }
 
 function readConfiguredModel(): string | undefined {
@@ -170,7 +177,10 @@ async function runWriter(
 		return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
 			const view = new BorderedLoader(tui, theme, loader);
 			view.onAbort = () => done(undefined);
+			const activity = writerActivity();
+			activity.active++;
 			completeWriter(ctx, model, systemPrompt, messages, userText, sessionId, view.signal)
+				.finally(() => { activity.active--; })
 				.then(done)
 				.catch((error: unknown) => {
 					ctx.ui.notify(error instanceof Error ? error.message : failed, "error");
@@ -255,9 +265,21 @@ function prepare(ctx: ExtensionCommandContext) {
 }
 
 export default function writePrompt(pi: ExtensionAPI): void {
+	const activity = writerActivity();
+	pi.events.on("fitch:write-prompt:status", (request) => {
+		const reply = (request as { reply?: unknown } | null)?.reply;
+		if (typeof reply === "function") reply(activity.active);
+	});
+	function track(handler: RegisteredCommand["handler"]): RegisteredCommand["handler"] {
+		return async (args, ctx) => {
+			activity.active++;
+			try { await handler(args, ctx); }
+			finally { activity.active--; }
+		};
+	}
 	pi.registerCommand("draft", {
 		description: "Rewrite text into a better agent request, then accept, copy, tweak, or deny",
-		handler: async (args, ctx) => {
+		handler: track(async (args, ctx) => {
 			const source = args.trim();
 			if (!source) {
 				ctx.ui.notify("Usage: /draft <text>", "warning");
@@ -317,12 +339,12 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				if (!next) continue;
 				draft = next;
 			}
-		},
+		}),
 	});
 
 	pi.registerCommand("side-question", {
 		description: "Ask a question off-transcript using the current session, then copy, ask again, or dismiss",
-		handler: async (args, ctx) => {
+		handler: track(async (args, ctx) => {
 			const source = args.trim();
 			if (!source) {
 				ctx.ui.notify("Usage: /side-question <text>", "warning");
@@ -373,6 +395,6 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				if (!next) continue;
 				answer = next;
 			}
-		},
+		}),
 	});
 }

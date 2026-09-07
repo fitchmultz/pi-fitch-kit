@@ -2,7 +2,7 @@
 
 This repository documents how I combine public extensions, model-routed subagents, skills, connected MCP services, and local policy.
 
-The kit installs the public packages without forking or patching [Pi](https://github.com/earendil-works/pi). It works on official Pi; the optional compact-view preference below requires a supporting runtime such as [my fork](https://github.com/fitchmultz/pi). Credentials, private provider definitions, and user-local experiments stay user-managed.
+The kit installs public extension packages without patching [Pi](https://github.com/earendil-works/pi). Most work on stock Pi; `/restart` and the optional compact-view preference use public features in [my Pi fork](https://github.com/fitchmultz/pi). Credentials, private provider definitions, and user-local experiments stay user-managed.
 
 ## Start here
 
@@ -63,6 +63,12 @@ Accepted caveats of owning that callback: do not combine it with another Anthrop
 [`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other models while resizing only Claude-bound images to Anthropic's inline limits, on every route that speaks `anthropic-messages` (direct, Cloudflare AI Gateway, proxies such as GitHub Copilot). Non-Claude models sharing that wire API keep their source images.
 
 [`write-prompt`](extensions/write-prompt.ts) adds `/draft <text>` and `/side-question <text>`. Both use the current session system prompt and conversation off-transcript. `/draft` wraps the source and rewrites it into an agent request (it does not answer the text and does not receive tools), then Accept, Copy prompt, Tweak, or Deny. `/side-question` answers the question, then Copy answer, Ask again, or Dismiss; it never sends to the agent. Ask again goes back to the same writer. Copy does not touch the editor. Both use the active session model unless `~/.pi/agent/write-prompt.json` sets `{ "model": "provider/id" }`. That writer, including an override model, receives the current session context.
+
+**Restart requires native activity support.** Use the Pi fork with `ctx.isBashRunning()` and `ctx.getPendingNextTurnCount()`. They expose intercepted Bash work and queued context without relying on extension load order. Hosts without these APIs, including official Pi 0.84.2, report restart as unavailable and refuse both restart modes; they are never treated as idle.
+
+[`session-restart`](extensions/session-restart.ts) adds `/restart` for one or several helper-enabled Pi sessions, or `/restart all`. The native picker supports Space to mark several sessions and Enter to choose. Busy sessions are skipped by default; **Stop work and restart** is a separate, explicit choice that can discard drafts, queued input, and unfinished work, and stops reported owned subagents, including background runs. Each selected process resumes its exact saved session in the same terminal, preserving its current name/model/thinking, launch options, temporary environment, and native versus virtual working directories. The initiating session restarts last. A request is counted as successful only after the replacement process confirms the expected session.
+
+The helper runs only in a Unix Node Pi CLI with a real TTY, not SDK/RPC/print hosts, Bun, or native binaries. Unsaved and ephemeral sessions stay untouched. Native activity remains visible on first activation through `/reload`, including Bash started before the helper loaded. An unknown original `--api-key` provider still requires a fresh Pi start rather than guessing its binding. Ordinary reloads retain the process-image identity. Child activity is checked through loaded `pi-subagents`; a missing expected bridge blocks restart, while a genuinely absent integration is not applicable—not a claim that arbitrary external jobs were checked. Private sockets live under the system temp directory; `PI_FITCH_RESTART_DIR` can select a short, private shared directory. No daemon, terminal keystrokes, or argv/credential journal is involved. [Restart details and limits](docs/pi-setup.md#restarting-pi-sessions) explain the lifecycle and preservation boundaries.
 
 ### Optional compact view
 
@@ -194,7 +200,7 @@ This is already the working composition layer for a broader organization harness
 
 ## Install the kit
 
-Requires Node.js 24 or newer and Pi 0.84.2 or newer.
+Requires Node.js 24 or newer and Pi 0.84.2 or newer. `/restart` additionally requires the Pi fork's native activity APIs described above; installing the kit does not patch or replace Pi.
 
 ```bash
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
@@ -231,7 +237,7 @@ The older prompt files remain in `prompts/` as source material, but the package 
 ## Repository map
 
 ```text
-extensions/             compact footer, Anthropic image guard, fast-mode toggles, session naming, /draft, and /side-question
+extensions/             footer, image guard, fast modes, session naming, writer commands, and /restart
 examples/settings.json  safe, non-secret behavioral settings
 prompts/                setup, one active operational prompt, and retained source material
 themes/                 calm theme: event-horizon neutrals, single steel-blue accent family
@@ -249,11 +255,14 @@ npm run check
 npm run smoke
 ```
 
-- `npm run check` type-checks and syntax-checks the bundled extensions, exercises the image guard boundary, the fast toggles, session naming, `/draft`, and `/side-question`, then validates unpinned package sources, manifest resources, package metadata alignment, the absence of retired patch and duplicate surfaces, the settings example's model, retry, and compaction values, and that every enabled or context-window route is manifest-managed and every declared context window is exactly 320000. It also runs the validator against invalid manifest and compaction inputs.
+- `npm run check` type-checks and syntax-checks the bundled extensions, exercises the image guard boundary, the fast toggles, session naming, writer commands, and restart argument/activity/protocol boundaries, then validates unpinned package sources, manifest resources, package metadata alignment, the absence of retired patch and duplicate surfaces, the settings example's model, retry, and compaction values, and that every enabled or context-window route is manifest-managed and every declared context window is exactly 320000. It also runs the validator against invalid manifest and compaction inputs.
 - `npm run regression:fast-mode` verifies the fast toggles at the wire through real pi-ai serialization: `speed` plus fetch-time beta append on direct and gateway Opus routes without dropping existing markers, beta deduplication, prebuilt-client bypass, full-stream option survival, OpenAI and xAI priority via the native-loaded request hook, supported gateway o3/o4-mini aliases and snapshots through the real gateway serializer, unsupported-model and cross-toggle isolation, off-state passthrough, matching footer eligibility, and watcher cleanup.
 - `npm run regression:session-name` verifies naming, metadata injection, protected identities, and single ownership during standalone-package migration.
-- `npm run regression:write-prompt` verifies model-override parsing, accept/deny, boxed rewrite instructions, `/side-question` ask-again history, session-prefix rewriting, and that tweak rounds reuse the same writer history.
-- `npm run smoke` loads the checkout through Pi's real resource loader, renders the compact footer at wide and narrow widths, checks its toggle, and requires the seven bundled commands, `name_session`, one provider request hook, five extensions, and two prompts.
+- `npm run regression:write-prompt` verifies model-override parsing, accept/deny, boxed rewrite instructions, `/side-question` ask-again history, session-prefix rewriting, reusable tweak history, and activity throughout calls/dialogs and reload.
+- `npm run regression:session-restart` checks native argument round-trips, paged child status/stopping, socket identity, and native single/multiple/all selection. Set `PI_SUBAGENTS_SOURCE` to a local owning-package checkout to also exercise its actual bridge, executor, restored ownership, and foreground/background stop routes with synthetic child processes—not agents.
+- `npm run smoke` loads the checkout through Pi's real resource loader, renders the compact footer at wide and narrow widths, checks its toggle, and requires seven non-TTY commands, `name_session`, one provider request hook, six extensions, and two prompts. `/restart` remains inert in this SDK host and is exercised in the real TTY check.
 - `npm run smoke:lifecycle` uses an isolated Pi agent dir for real install, stale-filter and duplicate-identity normalization, and resource reload; it also checks that installation leaves compact view unset and reinstall preserves an explicit opt-out.
+
+`npm run smoke:restart -- --pi-root <built-fork-packages/coding-agent> --output <new-results-dir> --runtime-dir <new-short-private-dir>` runs real Pi PTY checks using Python 3, synthetic saved sessions, Pi's built-in faux provider, and owned processes only. It covers repeated restart, current state/key binding, tree/root preservation, busy skipping and stopping, intercepted Bash, queued nextTurn context, late activation, malformed requests, termination/exec failures, and actual single/multiple/all UI. The harness creates cleared child environments; no paid model calls are needed. Both output paths must be new, and the runtime socket path must fit the platform's Unix-socket limit. Run it from an isolated outer HOME/agent/XDG environment too. Add `--session-cwd --cases preserve,virtual,separator --virtual-source <pi-change-working-dir checkout>` to check distinct native cwd, separator behavior and the actual virtual-cwd extension. Against an older host, use `--cases unsupported` to verify truthful refusal, not compatibility.
 
 For the detailed workflow, model table, evidence, and security rationale, read [docs/pi-setup.md](docs/pi-setup.md). For the short version, read [docs/pi-setup-post.md](docs/pi-setup-post.md).

@@ -50,7 +50,7 @@ try {
 	const errors = prompts.diagnostics.filter(({ severity }) => severity === "error");
 	if (errors.length > 0) throw new Error(`Prompt load errors: ${JSON.stringify(errors)}`);
 	if (extensions.errors.length > 0) throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
-	if (extensions.extensions.length !== 5) throw new Error(`Expected 5 extensions, got ${extensions.extensions.length}`);
+	if (extensions.extensions.length !== 6) throw new Error(`Expected 6 extensions, got ${extensions.extensions.length}`);
 	const cleanFooter = extensions.extensions.find(({ path }) => path.endsWith("/extensions/clean-footer.ts"));
 	if (!cleanFooter) throw new Error("Clean-footer extension missing");
 	const fastMode = extensions.extensions.find(({ path }) => path.endsWith("/extensions/fast-mode.ts"));
@@ -59,6 +59,8 @@ try {
 	if (!sessionName) throw new Error("Session-name extension missing");
 	const writePrompt = extensions.extensions.find(({ path }) => path.endsWith("/extensions/write-prompt.ts"));
 	if (!writePrompt) throw new Error("Write-prompt extension missing");
+	const restart = extensions.extensions.find(({ path }) => path.endsWith("/extensions/session-restart.ts"));
+	if (!restart || restart.commands.size || restart.handlers.size) throw new Error("Restart helper must load inertly outside a real Node Pi TTY");
 	extensions.runtime.getCommands = () =>
 		extensions.extensions.flatMap(({ commands }) =>
 			[...commands.values()].map(({ name, description, sourceInfo }) => ({

@@ -85,8 +85,9 @@ assert(
       "extensions/fast-mode.ts",
       "extensions/session-name.ts",
       "extensions/write-prompt.ts",
+      "extensions/session-restart.ts",
     ]),
-  "the kit must bundle the image-guard, clean-footer, fast-mode, session-name, and write-prompt extensions",
+  "the kit must bundle the image-guard, clean-footer, fast-mode, session-name, write-prompt, and session-restart extensions",
 );
 
 for (const pkg of manifest.corePackages) {
