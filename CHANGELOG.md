@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.5 — 7 September 2026
+
+- Add `/restart` for selected or all helper-enabled Pi sessions, preserving the exact saved session, current state, launch options and working directories in the same terminal. Busy work is skipped by default; confirmed Stop work and restart also stops reported owned foreground/background children. Restart requires the Pi fork's native Bash, pending-input and nextTurn activity APIs; older hosts report it as unavailable rather than guessing idle.
+- Keep off-transcript writer calls and dialogs visible to restart activity checks, including cancelled dialogs whose API calls have not settled. Verify preservation, busy refusal and explicit stopping with real owned PTYs and disposable Ghostty panes.
+
 ## 0.10.4 — 7 September 2026
 
 - Offer the native `compactView` preference separately during setup on supporting Pi runtimes. The fork defaults to off; `/compact-view` toggles the current session and saves the preference for new sessions, while `/compact-view off` restores the normal view. Official Pi remains supported, unsupported runtimes skip the setting, and installing the kit does not enable it. No new extension or core patch is added.

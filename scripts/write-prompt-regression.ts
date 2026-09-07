@@ -64,9 +64,12 @@ assert.match(JSON.stringify(flat[0]), /called read/);
 assert.match(JSON.stringify(flat[0]), /a\.ts/);
 assert.match(JSON.stringify(flat[1]), /read result/);
 
+const { createEventBus } = await import("@earendil-works/pi-coding-agent");
+const events = createEventBus();
 const commands: Record<string, { handler: (args: string, ctx: never) => Promise<void> }> = {};
 let sent: string | undefined;
 writePrompt({
+	events,
 	registerCommand(name: string, config: { handler: (args: string, ctx: never) => Promise<void> }) {
 		commands[name] = config;
 	},
@@ -576,5 +579,78 @@ await commands["draft"].handler(
 );
 assert.equal(imageCapture.some((part) => part.type === "image"), false);
 assert.match(imageCapture.find((part) => part.type === "text")?.text ?? "", /does not support this image type/);
+
+// Activity spans the off-transcript call and its dialogs, including overlap and reload.
+const activity = (bus = events) => {
+	let count: number | undefined;
+	bus.emit("fitch:write-prompt:status", { reply: (value: number) => { count = value; } });
+	return count;
+};
+assert.equal(activity(), 0);
+let closeDraft!: (value: string) => void;
+let closeQuestion!: (value: string) => void;
+let dialogsReady!: () => void;
+let dialogs = 0;
+const readyDialogs = new Promise<void>((resolve) => { dialogsReady = resolve; });
+const waiting = (close: (value: (answer: string) => void) => void) => ctx({
+	ui: { ...baseUi, select: () => new Promise<string>((resolve) => {
+		close(resolve);
+		if (++dialogs === 2) dialogsReady();
+	}) },
+});
+const pendingDraft = commands.draft.handler("draft activity", waiting((close) => { closeDraft = close; }) as never);
+const pendingQuestion = commands["side-question"].handler("question activity", waiting((close) => { closeQuestion = close; }) as never);
+assert.equal(activity(), 2);
+await readyDialogs;
+assert.equal(activity(), 2, "finishing the model call does not finish the command's unsaved dialog");
+const reloadedEvents = createEventBus();
+writePrompt({ events: reloadedEvents, registerCommand() {} } as never);
+assert.equal(activity(reloadedEvents), 2, "reload must not hide commands still finishing in the old instance");
+closeDraft("Deny");
+await pendingDraft;
+assert.equal(activity(reloadedEvents), 1);
+closeQuestion("Dismiss");
+await pendingQuestion;
+assert.equal(activity(), 0);
+await assert.rejects(commands.draft.handler("dialog throws", ctx({ ui: { ...baseUi, select: async () => { throw new Error("dialog failure"); } } }) as never), /dialog failure/);
+assert.equal(activity(), 0, "finally releases activity even on a thrown dialog error");
+
+// Closing a cancelled TUI loader is not proof that its API promise has settled.
+const { initTheme } = await import("@earendil-works/pi-coding-agent");
+initTheme("dark");
+let releaseCompletion!: (value: unknown) => void;
+let markStarted!: () => void;
+let markSettled!: () => void;
+let view: { handleInput(data: string): void; dispose(): void };
+let apiSignal: AbortSignal | undefined;
+const started = new Promise<void>((resolve) => { markStarted = resolve; });
+const settled = new Promise<void>((resolve) => { markSettled = resolve; });
+let doneCount = 0;
+const cancelledWriter = commands.draft.handler("cancel pending API", ctx({
+	mode: "tui",
+	modelRegistry: {
+		find: () => undefined, hasConfiguredAuth: () => true,
+		complete: (_model: unknown, _context: unknown, options: { signal?: AbortSignal }) => {
+			apiSignal = options.signal;
+			markStarted();
+			return new Promise((resolve) => { releaseCompletion = resolve; });
+		},
+	},
+	ui: { ...baseUi, custom: (factory: Function) => new Promise((resolve) => {
+		view = factory({ requestRender() {} }, { fg: (_color: string, value: string) => value }, {}, (value: unknown) => {
+			view.dispose();
+			resolve(value);
+			if (++doneCount === 2) markSettled();
+		});
+	}) },
+}) as never);
+await started;
+view!.handleInput("\x1b");
+await cancelledWriter;
+assert.equal(apiSignal?.aborted, true);
+assert.ok(activity()! > 0, "an unsettled API call remains busy after its dialog closes");
+releaseCompletion({ role: "assistant", content: [], stopReason: "aborted" });
+await settled;
+assert.equal(activity(), 0);
 
 console.log("write-prompt regression ok");

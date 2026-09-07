@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Updated 25 August 2026 for Pi 0.84.2 or newer on Node.js 24 or newer._
+_Updated 7 September 2026 for Pi 0.84.2 or newer on Node.js 24 or newer._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 
@@ -18,7 +18,7 @@ Pi core
   └─ user-authenticated MCP services
 ```
 
-[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: five bundled extensions, a safe settings example, unpinned package sources, and a setup prompt. The sixteen specialist profiles now ship with [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) instead of being duplicated here. Most reusable extensions and all skill packages remain independent public repositories; the kit directly owns only its harness-coupled runtime.
+[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: six bundled extensions, a safe settings example, unpinned package sources, and a setup prompt. The sixteen specialist profiles now ship with [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) instead of being duplicated here. Most reusable extensions and all skill packages remain independent public repositories; the kit directly owns only its harness-coupled runtime.
 
 ## A representative task
 
@@ -87,12 +87,32 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - repository work: native search plus `pi-apply-edits`;
 - task control: clarification guidance, persistent todos, session naming, and working-directory changes;
 - deterministic support: calculator, `/ctx` context inspection, tool duration, verbosity, session editing, stash, and raw message copy;
-- kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, and `/side-question`, while `pi-subagents` owns its profile defaults;
+- kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, `/side-question`, and in-place `/restart`, while `pi-subagents` owns its profile defaults;
 - user-local only: a force-disabled `nested-agents.ts` file and the loaded 500k Sol Pro alias outside the enabled model cycle, both documented in the README but excluded from Complete core.
 
 Most reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
 
 [`macuse`](https://github.com/fitchmultz/macuse) is the selective exception to the default stack. It adds native macOS app inspection and control for tasks that cannot be handled through browser DOM or CLI tools. I enable it only when needed and treat it as experimental because Codex app updates can break the integration surface.
+
+## Restarting Pi sessions
+
+Restart requires [the Pi fork](https://github.com/fitchmultz/pi) with the public `ctx.isBashRunning()`, `ctx.getPendingInputCount()` and `ctx.getPendingNextTurnCount()` APIs. Hosts without these facts, including official Pi 0.84.2, report restart as unavailable and refuse both default and explicit-stop requests. Installing the kit does not patch Pi.
+
+`/restart` lists responding helper-enabled sessions. Choose one with Enter, mark several with Space, or choose All; `/restart all` skips the picker. The next choice defaults to restarting idle sessions and skipping busy ones. The initiating session goes last, and success requires a new process image confirming the exact saved file and session ID—not just an accepted request.
+
+Busy includes agent/retry work, shell commands, compaction/tree operations, editor drafts, submitted or queued input and nextTurn context, Kit writer calls/dialogs, and owned child work. Native `isIdle()` covers agent/compaction/tree work; `isBashRunning()` covers the full Bash dispatch, including asynchronous earlier interceptors and replacement results; `getPendingInputCount()` covers prompt preparation and terminal-held input, including queues retained after tree cancellation; `getPendingNextTurnCount()` exposes context not yet saved. The helper reads these facts without observing or replacing shell execution. It asks the existing `pi-subagents` management bridge for every needed page and uses its detailed control/child state before declaring terminal-looking results idle. Completed-unreviewed history is not itself busy.
+
+**Stop work and restart** requires confirmation. It interrupts reported owned foreground/background children through that same management bridge and waits for terminal ownership status. Native Pi's signal shutdown stops the parent's agent, shell, retry, and summary work before process replacement. Drafts, queued input/context, partial output, and unfinished writer dialogs may be discarded; this is not checkpoint-and-continue for in-flight work. A child whose stopping cannot be confirmed leaves its parent running. Unrelated parents' children are never targeted. A loaded/previously observed bridge or saved child ownership makes child status mandatory; absent `pi-subagents` is explicitly not applicable, not proof about external jobs managed elsewhere.
+
+The replacement reuses Node's executable, Node options, Pi's CLI entry, launch cwd, and current environment. Pi's actual public parser interprets startup flags; the serializer retains restart-safe options but drops initial messages/file inputs and stale session/name selectors. It resumes the current saved file and reads current model/thinking at restart. A one-run `--api-key` stays bound to its original provider even after model switches: the new process binds that provider first, then restores the current model through Pi's public API. No argv, environment, or credentials are written to control records or the session journal.
+
+Native session cwd and `pi-change-working-dir`'s branch-local virtual cwd remain separate. Native `--session-cwd` preserves the current native cwd independently of the saved header and launch directory. If `/tree` selected an earlier in-memory position, the helper appends one empty, inert native entry immediately before an approved actual restart to save that branch. Ordinary last-leaf restarts, listing, skips, and cancellations add no marker. Existing session and child history stays attached to the same parent ID.
+
+Ephemeral sessions and nominated files not yet written cannot be resumed and are left unchanged. First helper activation during `/reload` reads complete native activity, including Bash and input dispatch started before the helper loaded. Recoverable launch state does not require a manual restart, but an unknown original API-key provider does. Reload of an already active helper retains the process-image identity; it never counts as a full restart.
+
+Control uses one socket per process in a user-owned mode-0700 directory under the system temp directory, with mode-0600 sockets. `PI_FITCH_RESTART_DIR` overrides that directory for isolation or shorter socket paths. Requests can only inspect or restart the receiving process's captured session; they cannot supply executable paths, command arguments, environments, or child IDs. The helper does not scan operating-system processes or control Ghostty, and exposes no model-callable restart tool.
+
+The supported host is the ordinary Unix Node Pi CLI on a real TTY. SDK/RPC/print hosts, Bun, native binaries, and unrecognized launchers remain inert. Exit/execve follows Pi's awaited cleanup and terminal restoration. Separately delivered external TERM/HUP cancels an armed restart; Node does not expose signal sender identity or guarantee distinct delivery of coalesced signals. Executable/CLI/session preflight catches missing paths before stopping work, but a later native exec failure can still terminate the process. Such a restart remains unconfirmed; use the saved session file to resume manually rather than an automatic restart loop. Native interrupted Bash history can also lack a useful cancellation flag, so it is never reported as successful work merely because shutdown finished.
 
 ## Model routing
 
@@ -260,7 +280,7 @@ Consequential external writes, production actions, account changes, and merges s
 The current stack already proves the reusable substrate:
 
 - multiple model providers with per-role routing and fallback;
-- independent extension packages rather than a core fork;
+- independent extension packages, with narrow native APIs for runtime facts;
 - bounded multi-agent execution, worktrees, review loops, and local session coordination;
 - authenticated access to planning, conversation, support, knowledge, and observability systems;
 - Git-backed policy, skills, profiles, and updateable package sources;
