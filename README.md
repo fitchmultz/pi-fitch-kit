@@ -2,7 +2,7 @@
 
 This repository documents how I combine public extensions, model-routed subagents, skills, connected MCP services, and local policy.
 
-The kit installs the public packages without forking or patching [Pi](https://github.com/badlogic/pi-mono). Credentials, private provider definitions, and user-local experiments stay user-managed.
+The kit installs the public packages without forking or patching [Pi](https://github.com/earendil-works/pi). It works on official Pi; the optional compact-view preference below requires a supporting runtime such as [my fork](https://github.com/fitchmultz/pi). Credentials, private provider definitions, and user-local experiments stay user-managed.
 
 ## Start here
 
@@ -63,6 +63,12 @@ Accepted caveats of owning that callback: do not combine it with another Anthrop
 [`anthropic-image-guard`](extensions/anthropic-image-guard.ts) preserves full-resolution images for other models while resizing only Claude-bound images to Anthropic's inline limits, on every route that speaks `anthropic-messages` (direct, Cloudflare AI Gateway, proxies such as GitHub Copilot). Non-Claude models sharing that wire API keep their source images.
 
 [`write-prompt`](extensions/write-prompt.ts) adds `/draft <text>` and `/side-question <text>`. Both use the current session system prompt and conversation off-transcript. `/draft` wraps the source and rewrites it into an agent request (it does not answer the text and does not receive tools), then Accept, Copy prompt, Tweak, or Deny. `/side-question` answers the question, then Copy answer, Ask again, or Dismiss; it never sends to the agent. Ask again goes back to the same writer. Copy does not touch the editor. Both use the active session model unless `~/.pi/agent/write-prompt.json` sets `{ "model": "provider/id" }`. That writer, including an override model, receives the current session context.
+
+### Optional compact view
+
+On a supporting Pi runtime, `/compact-view` switches between compact tool cards and the normal view. `/compact-view on` and `/compact-view off` choose explicitly. The change applies immediately to the current session and is remembered for new sessions; other open sessions are unchanged. Individual tool cards remain expandable by click in fullscreen mode, and Ctrl+O still expands or collapses all tools.
+
+The fork defaults to off. [`examples/settings.json`](examples/settings.json) includes `"compactView": true` as my optional preference, which `/fitch-setup` offers separately only when the installed runtime supports it. Installing the kit never enables it. Official Pi without this feature remains supported and skips this setting. Core owns the view; `pi-subagents` follows it for routine coordination notices. The kit adds no rendering extension and changes no tool results or model context.
 
 ### Selective experimental extension
 
@@ -248,6 +254,6 @@ npm run smoke
 - `npm run regression:session-name` verifies naming, metadata injection, protected identities, and single ownership during standalone-package migration.
 - `npm run regression:write-prompt` verifies model-override parsing, accept/deny, boxed rewrite instructions, `/side-question` ask-again history, session-prefix rewriting, and that tweak rounds reuse the same writer history.
 - `npm run smoke` loads the checkout through Pi's real resource loader, renders the compact footer at wide and narrow widths, checks its toggle, and requires the seven bundled commands, `name_session`, one provider request hook, five extensions, and two prompts.
-- `npm run smoke:lifecycle` uses an isolated Pi agent dir for real install, stale-filter and duplicate-identity normalization, and resource reload.
+- `npm run smoke:lifecycle` uses an isolated Pi agent dir for real install, stale-filter and duplicate-identity normalization, and resource reload; it also checks that installation leaves compact view unset and reinstall preserves an explicit opt-out.
 
 For the detailed workflow, model table, evidence, and security rationale, read [docs/pi-setup.md](docs/pi-setup.md). For the short version, read [docs/pi-setup-post.md](docs/pi-setup-post.md).

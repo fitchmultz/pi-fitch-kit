@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.4 — 7 September 2026
+
+- Offer the native `compactView` preference separately during setup on supporting Pi runtimes. The fork defaults to off; `/compact-view` toggles the current session and saves the preference for new sessions, while `/compact-view off` restores the normal view. Official Pi remains supported, unsupported runtimes skip the setting, and installing the kit does not enable it. No new extension or core patch is added.
+- Verify through real package installation that compact view remains unset initially and an explicit opt-out survives reinstall and resource reload.
+
 ## 0.10.3 — 5 September 2026
 
 - `/codex-fast` and its footer now cover Cloudflare AI Gateway `o3` and `o4-mini`, including their `2025-04-16` snapshots, using OpenAI's documented Fast-mode support. Other gateway o-series models remain excluded; direct-provider, GPT, Grok, Workers AI, and toggle-state behavior is unchanged.

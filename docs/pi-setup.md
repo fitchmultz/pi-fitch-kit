@@ -163,6 +163,12 @@ Authentication remains user-scoped. The setup process may inspect non-secret con
 
 My personal runtime uses full approvals. MCP transports tool calls; it is not the authorization boundary. The working agreement tells the model when external writes need explicit user direction, but that is policy rather than a per-tool enforcement mechanism. A multi-user product needs its authorization controls in the surrounding identity and execution plane.
 
+## Compact transcript view
+
+Compact view is an optional native Pi feature, not a bundled extension. On [the supporting fork](https://github.com/fitchmultz/pi), `/compact-view` toggles the current session; `/compact-view off` returns to the normal view. The preference is saved for new sessions without changing other open sessions. Click individual tool cards in fullscreen mode or use Ctrl+O to expand details.
+
+The native default is off. The safe settings example includes `"compactView": true` as an optional preference, not a package-install default. `/fitch-setup` offers it separately only when the installed Pi documents the setting and command, preserves an existing value or absence unless a change is selected, and skips it on unsupported runtimes. Official Pi remains supported. Core renders the tool cards; `pi-subagents` owns compact routine coordination notices. Neither the kit nor the view changes model context or saved tool results.
+
 ## Compaction policy
 
 The settings example pins `compaction.reserveTokens: 64000` with `keepRecentTokens: 40000`, and the manifest's `modelContextWindows` merge flat 320k windows into `models.json` for the managed routes. Together they compact at a 256k threshold with roughly 60k of near-threshold generation runway. The override lowers the ~1M direct Anthropic routes, raises the 272k direct OpenAI and Codex routes, and pins the verified Claude gateway routes to the same policy. Any direct OpenAI request whose input crosses 272k bills at the long-context tier for the entire request. That is a deliberate quality-over-cost choice; decline the consent step to keep stock behavior. Gateway Grok, xAI Grok, Fireworks, and cf-google are full user-managed model definitions in my setup and already declare 320k; the public kit does not copy their private endpoints or pricing metadata.
