@@ -102,6 +102,8 @@ class OwnedPi:
         (root / 'launch/fixture.ts').symlink_to(FIXTURE)
         if root.name.startswith('interceptor') or root.name == 'late-interceptor':
             self.env['PI_RESTART_TEST_INTERCEPT'] = {'interceptor-async': 'async', 'interceptor-result': 'result'}.get(root.name, 'operations')
+        if root.name in ('input-dispatch', 'late-input-dispatch'):
+            self.env['PI_RESTART_TEST_INPUT'] = '1'
         args = ['--offline', '--no-approve', '--no-skills', '--no-prompt-templates', '--no-themes', '--no-context-files', '--no-tools',
                 '--extension', './fixture.ts', '--fixture-enabled', '--fixture-value=two words = retained', '--use-theme', 'light', '--thinking', 'low']
         if root.name in ('preserve', 'separator'):
@@ -229,7 +231,7 @@ def assert_preserved(before, after):
 
 def run_case(options, case, runtime):
     root = options.output / case
-    child = OwnedPi(options, root, runtime, late=case.startswith('late'), key=case not in ('late-no-key', 'late-interceptor'),
+    child = OwnedPi(options, root, runtime, late=case.startswith('late'), key=case not in ('late-no-key', 'late-interceptor', 'late-input-dispatch'),
                     empty=case == 'late-key', initial=case in ('preserve', 'late-key'), ephemeral=case == 'ephemeral', unsaved=case == 'unsaved',
                     copy_node=case in ('preflight-failure', 'exec-failure'))
     writer_pid = None
@@ -237,6 +239,9 @@ def run_case(options, case, runtime):
     try:
         child.event('resources')
         if case.startswith('late'):
+            if case == 'late-input-dispatch':
+                child.send('synthetic pending input handler')
+                child.event('input-dispatch-start')
             if case == 'late-interceptor':
                 child.send('!held work before helper activation')
                 child.event('intercepted-bash-start')
@@ -251,17 +256,112 @@ def run_case(options, case, runtime):
             child.event('start', reason='reload')
         old = child.wait(lambda: (value if value and value.get('unavailable') else None) if (value := child.status()) else None, 'unsupported host') if case == 'unsupported' else child.ready()
         if case == 'unsupported':
-            assert 'native Bash and nextTurn activity APIs' in old['unavailable'] and old['ready'] is False
+            assert 'native Bash, input and nextTurn activity APIs' in old['unavailable'] and old['ready'] is False
             before = child.file.read_bytes()
             for stop in (False, True):
                 _, reply = child.restart(stop, old)
-                assert 'native Bash and nextTurn activity APIs' in reply['error']
+                assert 'native Bash, input and nextTurn activity APIs' in reply['error']
                 assert child.status()['instance'] == old['instance']
             assert child.file.read_bytes() == before
         elif case in ('ephemeral', 'unsaved', 'late-key'):
             assert old.get('unavailable'), old
             _, reply = child.restart(True, old)
             assert 'error' in reply and child.status()['instance'] == old['instance']
+        elif case in ('input-dispatch', 'late-input-dispatch'):
+            marker = 'synthetic pending input handler'
+            if case == 'input-dispatch':
+                child.send(marker)
+            before = child.event('input-dispatch-start')
+            result['nativeWhileInputAwaits'] = {key: before[key] for key in ('idle', 'pending', 'pendingInput', 'editor')}
+            result['boundaryStatus'] = child.ready()
+            assert marker not in child.file.read_text()
+            _, reply = child.restart(False, old)
+            result['defaultReply'] = reply
+            if reply.get('accepted'):
+                child.ready(old)
+                result['defaultActuallyRestarted'] = True
+                result['inputLost'] = marker not in child.file.read_text()
+            assert 'error' in reply, 'Default restart must preserve submitted input awaiting native handlers'
+            assert 'Busy:' in reply['error'] and child.status()['instance'] == old['instance']
+            assert before['pendingInput'] == 1 and before['idle'] is True and before['pending'] is False and not before['editor']
+            (root / 'release-input').write_text('release')
+            assert child.event('fake-call')['pendingInputSeen'] is True
+            child.event('settled')
+            assert child.info('input-delivered')['pendingInput'] == 0
+            result['inputDelivered'] = True
+            (root / 'release-input').unlink()
+            forced_marker = 'synthetic pending input explicitly stopped'
+            child.send(forced_marker)
+            child.wait(lambda: sum(row['event'] == 'input-dispatch-start' for row in records(root)) == 2, 'second held input')
+            _, accepted = child.restart(True, old)
+            assert accepted == {'accepted': True}, accepted
+            child.ready(old)
+            after = child.info('after-input-stop')
+            assert_preserved(before, after)
+            assert after['pendingInput'] == 0 and forced_marker not in child.file.read_text()
+            result['explicitStopDiscardedPendingInput'] = True
+        elif case == 'tree-queue':
+            def queue_during_cancelled_summary(marker):
+                child.send('/fixture-mode summary')
+                child.wait(lambda: records(root)[-1]['event'] == 'mode-set', 'summary fixture mode')
+                calls = sum(row['event'] == 'fake-call' and row['mode'] == 'summary' for row in records(root))
+                start = len(child.output)
+                child.send('/tree')
+                child.screen('Session Tree', start)
+                child.input(b'\x1b[D\r')
+                child.screen('Summarize branch?', start)
+                child.input(b'\x1b[B\r')
+                child.wait(lambda: sum(row['event'] == 'fake-call' and row['mode'] == 'summary' for row in records(root)) > calls, 'branch summarizer started')
+                child.send(marker)
+                child.screen('Queued message for after compaction', start)
+                start = len(child.output)
+                child.input(b'\x1b')
+                child.screen('Branch summarization cancelled', start)
+                child.screen('Session Tree', start)
+                child.input(b'\x1b')
+                deadline = time.monotonic() + 0.5
+                while time.monotonic() < deadline:
+                    child.poll()
+            marker = 'synthetic pending input queued during tree summary'
+            queue_during_cancelled_summary(marker)
+            before = child.info('after-tree-cancel')
+            result['nativeAfterCancel'] = {key: before[key] for key in ('idle', 'pending', 'pendingInput', 'editor')}
+            result['boundaryStatus'] = child.ready()
+            assert marker not in child.file.read_text()
+            _, reply = child.restart(False, old)
+            result['defaultReply'] = reply
+            if reply.get('accepted'):
+                child.ready(old)
+                result['defaultActuallyRestarted'] = True
+                result['inputLost'] = marker not in child.file.read_text()
+            assert 'error' in reply, 'Default restart must preserve native input retained after tree cancellation'
+            assert 'Busy:' in reply['error'] and child.status()['instance'] == old['instance']
+            assert before['pendingInput'] == 1 and before['idle'] is True and before['pending'] is False and not before['editor']
+            child.send('/fixture-mode normal')
+            child.wait(lambda: records(root)[-1].get('mode') == 'normal', 'normal fixture mode')
+            start = len(child.output)
+            child.input(b'\x1b[1;3A')
+            child.screen('Restored 1 queued message to editor', start)
+            child.screen(marker, start)
+            assert 'Editor draft' in child.ready()['busy']
+            child.input(b'\r')
+            assert child.event('fake-call', mode='normal')['pendingInputSeen'] is True
+            child.event('settled')
+            assert child.info('tree-input-delivered')['pendingInput'] == 0
+            result['inputDequeuedAndDelivered'] = True
+            forced_marker = 'synthetic pending input tree explicitly stopped'
+            queue_during_cancelled_summary(forced_marker)
+            start = len(child.output)
+            child.send('/restart all')
+            child.screen('Restart selected sessions', start)
+            child.input(b'\x1b[B\r')
+            child.screen("Stop selected sessions' work?", start)
+            child.input(b'\r')
+            child.ready(old)
+            after = child.info('after-tree-input-stop')
+            assert_preserved(before, after)
+            assert after['pendingInput'] == 0 and forced_marker not in child.file.read_text()
+            result['confirmedStopDiscardedPendingInput'] = True
         elif case in ('interceptor', 'interceptor-async', 'interceptor-result', 'late-interceptor', 'nextturn'):
             if case.startswith('interceptor'):
                 child.send('!held synthetic intercepted Bash')
@@ -546,7 +646,7 @@ def main():
     parser.add_argument('--pi-root', type=Path, default=REPO / 'node_modules/@earendil-works/pi-coding-agent')
     parser.add_argument('--session-cwd', action='store_true')
     parser.add_argument('--virtual-source', type=Path)
-    parser.add_argument('--cases', default='preserve,reload,tree,root,late-no-key,late-key,ephemeral,unsaved,agent,retry,compact,summary,bash,draft,queue,writer-dialog,writer-active,identity,preflight-failure,external-term,external-hup,second-term,second-hup,unexpected-zero,unexpected-nonzero,exec-failure,protocol,fleet,interceptor,interceptor-async,interceptor-result,late-interceptor,nextturn')
+    parser.add_argument('--cases', default='preserve,reload,tree,root,late-no-key,late-key,ephemeral,unsaved,agent,retry,compact,summary,bash,draft,queue,writer-dialog,writer-active,identity,preflight-failure,external-term,external-hup,second-term,second-hup,unexpected-zero,unexpected-nonzero,exec-failure,protocol,fleet,interceptor,interceptor-async,interceptor-result,late-interceptor,nextturn,tree-queue,input-dispatch,late-input-dispatch')
     options = parser.parse_args()
     package = json.loads((options.pi_root / 'package.json').read_text())
     options.version = package['version']

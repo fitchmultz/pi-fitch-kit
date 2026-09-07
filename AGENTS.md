@@ -49,7 +49,7 @@
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
 - Keep `extensions/write-prompt.ts` off the main transcript: `modelRegistry.complete` without tools, flatten tool history to text, built-in dialogs, `copyToClipboard` for Copy, and `sendUserMessage` only on `/draft` Accept. `/side-question` never sends.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's tested compatibility baseline.
-- Keep restart on public Pi APIs and Node exit/execve, never a daemon or terminal keystroke bridge. Require the fork's native Bash/nextTurn activity facts; unsupported hosts must refuse, not guess idle. No argv/environment in socket replies or persisted state. See `docs/pi-setup.md`.
+- Keep restart on public Pi APIs and Node exit/execve, never a daemon or terminal keystroke bridge. Require the fork's native Bash/pending-input/nextTurn activity facts; unsupported hosts must refuse, not guess idle. No argv/environment in socket replies or persisted state. See `docs/pi-setup.md`.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.
 
 ## Validation

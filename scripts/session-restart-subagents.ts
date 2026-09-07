@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createEventBus } from "@earendil-works/pi-coding-agent";
-import { readChildren, stopChildren, subagentRequest } from "../extensions/session-restart.ts";
+import { readChildren, stopChildren } from "../extensions/session-restart.ts";
 
 // Pi's real loader supplies peer-package aliases to the external source checkout.
 export default async function (): Promise<void> {
@@ -82,8 +82,6 @@ try {
 	const failedButLive = await readChildren(pi, true);
 	const controlled = failedButLive.runs.find((item) => item.id === liveId);
 	assert.equal(controlled?.state, "failed");
-	const detail = await subagentRequest(pi, { action: "status", id: liveId });
-	console.log(JSON.stringify({ diagnostic: "real-owner-failed-control", listed: controlled, detail }));
 	assert.equal(controlled?.interruptible, true, "real owner failed-labeled active control must remain busy");
 	await stopChildren(pi, failedButLive);
 	await childClosed;

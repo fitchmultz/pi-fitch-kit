@@ -15,7 +15,7 @@ export default function fixture(pi: ExtensionAPI): void {
 	let hold = false;
 	let shutdownExit: number | undefined;
 	const response: FauxResponseFactory = async (_context, options) => {
-		record("fake-call", { mode, nextTurnSeen: JSON.stringify(_context.messages).includes("synthetic queued context marker") });
+		record("fake-call", { mode, nextTurnSeen: JSON.stringify(_context.messages).includes("synthetic queued context marker"), pendingInputSeen: JSON.stringify(_context.messages).includes("synthetic pending input") });
 		if (mode === "retry") return fauxAssistantMessage("", { stopReason: "error", errorMessage: "503 service unavailable" });
 		if (mode !== "normal") {
 			await new Promise<void>((resolve) => {
@@ -36,7 +36,7 @@ export default function fixture(pi: ExtensionAPI): void {
 	pi.registerFlag("fixture-value", { type: "string", default: "", description: "Synthetic preservation check" });
 	pi.registerFlag("fixture-enabled", { type: "boolean", default: false, description: "Synthetic preservation check" });
 
-	async function snapshot(ctx: ExtensionContext & { isBashRunning?: () => boolean; getPendingNextTurnCount?: () => number }) {
+	async function snapshot(ctx: ExtensionContext & { isBashRunning?: () => boolean; getPendingNextTurnCount?: () => number; getPendingInputCount?: () => number }) {
 		const file = ctx.sessionManager.getSessionFile();
 		const branch = ctx.sessionManager.getBranch();
 		const virtual = branch.filter((entry) => entry.type === "custom" && entry.customType === "fixture-virtual-cwd").at(-1);
@@ -49,22 +49,24 @@ export default function fixture(pi: ExtensionAPI): void {
 			name: pi.getSessionName(), model: ctx.model && `${ctx.model.provider}/${ctx.model.id}`, thinking: pi.getThinkingLevel(),
 			flags: { value: pi.getFlag("fixture-value"), enabled: pi.getFlag("fixture-enabled") },
 			configuredProviders: ["restart-a", "restart-b"].map((provider) => ({ provider, configured: ctx.modelRegistry.getProviderAuthStatus(provider).configured })),
-			idle: ctx.isIdle(), pending: ctx.hasPendingMessages(), bash: ctx.isBashRunning?.() ?? null, nextTurn: ctx.getPendingNextTurnCount?.() ?? null, trusted: ctx.isProjectTrusted(), nodeArgs: process.execArgv, tty: [0, 1, 2].map((fd) => fstatSync(fd).rdev), raw: process.stdin.isRaw,
+			idle: ctx.isIdle(), pending: ctx.hasPendingMessages(), bash: ctx.isBashRunning?.() ?? null, nextTurn: ctx.getPendingNextTurnCount?.() ?? null, pendingInput: ctx.getPendingInputCount?.() ?? null, editor: ctx.ui.getEditorText(), trusted: ctx.isProjectTrusted(), nodeArgs: process.execArgv, tty: [0, 1, 2].map((fd) => fstatSync(fd).rdev), raw: process.stdin.isRaw,
 			envHash: createHash("sha256").update(process.env.PI_RESTART_TEST_MARKER ?? "").digest("hex"),
 			aHasLaunchKey: (await ctx.modelRegistry.getApiKeyForProvider("restart-a")) === process.env.PI_RESTART_TEST_KEY,
 			bHasLaunchKey: (await ctx.modelRegistry.getApiKeyForProvider("restart-b")) === process.env.PI_RESTART_TEST_KEY,
 		};
 	}
 	pi.on("session_start", async (event, ctx) => {
-		if (process.env.PI_RESTART_TEST_PRECHANGE === "1" && event.reason === "startup" && !process.env.PI_FITCH_RESTART_HANDOFF) {
-			const model = ctx.modelRegistry.find("restart-b", "two");
-			if (model) await pi.setModel(model);
-		}
 		record("start", { reason: event.reason, ...await snapshot(ctx) });
 	});
 	pi.on("resources_discover", (_event, ctx) => { record("resources", { file: ctx.sessionManager.getSessionFile(), model: ctx.model && `${ctx.model.provider}/${ctx.model.id}` }); });
 	pi.on("model_select", (event) => record("model-select", { source: event.source, model: `${event.model.provider}/${event.model.id}` }));
 	pi.on("agent_settled", () => { record("settled"); });
+	if (process.env.PI_RESTART_TEST_INPUT === "1") pi.on("input", async (event, ctx) => {
+		if (!event.text.startsWith("synthetic pending input")) return;
+		record("input-dispatch-start", await snapshot(ctx));
+		while (!existsSync(join(root, "release-input"))) await delay(10);
+		return { action: "continue" };
+	});
 	const interception = process.env.PI_RESTART_TEST_INTERCEPT;
 	if (interception) pi.on("user_bash", async () => {
 		if (interception !== "operations") {
@@ -125,6 +127,5 @@ export default function fixture(pi: ExtensionAPI): void {
 	pi.registerCommand("fixture-mode", { handler: async (args) => { mode = args; record("mode-set", { mode }); } });
 	pi.registerCommand("fixture-queue", { handler: async () => { pi.sendUserMessage("Synthetic queued input", { deliverAs: "followUp" }); record("queue-set"); } });
 	pi.registerCommand("fixture-nextturn", { handler: async () => { pi.sendMessage({ customType: "restart-nextturn-fixture", content: "synthetic queued context marker", display: false }, { deliverAs: "nextTurn" }); record("nextturn-set"); } });
-	pi.registerCommand("fixture-fatal", { handler: async () => { process.exit(23); } });
 	pi.registerCommand("fixture-switch", { handler: async (_args, ctx) => { await ctx.switchSession(join(root, "other.jsonl")); } });
 }

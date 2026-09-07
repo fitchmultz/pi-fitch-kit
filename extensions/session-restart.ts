@@ -20,7 +20,7 @@ type ModelRef = { provider: string; id: string };
 type Thinking = ReturnType<ExtensionAPI["getThinkingLevel"]>;
 type NativeArgs = Args & { sessionCwd?: string };
 // Older hosts may load the kit, but cannot safely restart without these public facts.
-type RestartContext = ExtensionContext & { isBashRunning?: () => boolean; getPendingNextTurnCount?: () => number };
+type RestartContext = ExtensionContext & { isBashRunning?: () => boolean; getPendingNextTurnCount?: () => number; getPendingInputCount?: () => number };
 
 export function restartArgs(args: NativeArgs, file: string, model: ModelRef, thinking: Thinking, nativeCwd: string): string[] {
 	const result = ["--session", file, "--provider", model.provider, "--model", model.id, "--thinking", thinking];
@@ -410,6 +410,7 @@ export default function sessionRestart(pi: ExtensionAPI): void {
 			...(!current.isIdle() ? ["Agent, retry, compaction, or tree work is running"] : []),
 			...(current.isBashRunning?.() ? ["Shell work is running"] : []),
 			...(current.getPendingNextTurnCount?.() ? ["Queued nextTurn context"] : []),
+			...(current.getPendingInputCount?.() ? ["Submitted input is pending"] : []),
 			...(current.hasPendingMessages() ? ["Queued input"] : []),
 			...(current.ui.getEditorText().length ? ["Editor draft"] : []),
 			...(writer ? ["Draft/side-question command or dialog is active"] : writerExpected && writer === undefined ? ["Draft/side-question activity is unknown"] : []),
@@ -512,8 +513,8 @@ export default function sessionRestart(pi: ExtensionAPI): void {
 		if (["new", "resume", "fork"].includes(event.reason)) { state.handoff = undefined; state.error = undefined; }
 		restoring = Boolean(state.handoff && event.reason === "startup");
 		if (state.sessionId !== current.sessionManager.getSessionId()) state.bridgeSeen = false;
-		if (typeof ctx.isBashRunning !== "function" || typeof ctx.getPendingNextTurnCount !== "function") {
-			state.error = "Restart requires the Pi fork's native Bash and nextTurn activity APIs; update Pi and start it fresh";
+		if (typeof ctx.isBashRunning !== "function" || typeof ctx.getPendingNextTurnCount !== "function" || typeof ctx.getPendingInputCount !== "function") {
+			state.error = "Restart requires the Pi fork's native Bash, input and nextTurn activity APIs; update Pi and start it fresh";
 		}
 		if (state.launch.args.apiKey && !state.keyModel) {
 			state.keyModel = event.reason === "startup" && current.model
