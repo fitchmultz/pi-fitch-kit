@@ -64,6 +64,8 @@ try {
 	);
 
 	const filtered = JSON.parse(readFileSync(settingsPath, "utf8"));
+	assert.equal(filtered.compactView, undefined, "installing the kit must not enable compact view");
+	filtered.compactView = false;
 	filtered.packages = [{ source: root, prompts: [] }];
 	writeFileSync(settingsPath, `${JSON.stringify(filtered, null, 2)}\n`);
 
@@ -97,6 +99,7 @@ try {
 	await loader.reload();
 
 	const normalized = JSON.parse(readFileSync(settingsPath, "utf8"));
+	assert.equal(normalized.compactView, false, "kit reinstall and reload must preserve an explicit compact-view opt-out");
 	assert.equal(normalized.packages.length, 1);
 	assert.equal(typeof normalized.packages[0], "string", "reinstall must remove stale package filters");
 	assert.equal(resolve(dirname(settingsPath), normalized.packages[0]), root);

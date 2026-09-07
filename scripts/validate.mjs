@@ -28,7 +28,7 @@ for (const [route, value] of Object.entries(manifest.modelContextWindows)) {
 const piFloor = /^>=(\d+\.\d+\.\d+)$/.exec(manifest.runtime.pi)?.[1];
 assert(piFloor === "0.84.2", "the kit must accept Pi 0.84.2 or newer");
 assert(packageJson.engines.node === manifest.runtime.node, "package and manifest Node floors must match");
-assert(packageJson.version === "0.10.3", "package version must match the approved kit release");
+assert(packageJson.version === "0.10.4", "package version must match the approved kit release");
 assert(packageLock.version === packageJson.version, "lockfile version must match package.json");
 const resolvedOrigins = Object.values(packageLock.packages)
   .map((entry) => entry.resolved)
@@ -180,6 +180,8 @@ const settingsExample = JSON.parse(readFileSync(join(root, "examples", "settings
 assert(settingsExample.defaultProvider === "openai", "settings example must default to direct OpenAI");
 assert(settingsExample.defaultModel === "gpt-5.6-sol", "settings example must default to GPT-5.6 Sol");
 assert(settingsExample.defaultThinkingLevel === "max", "settings example must default to max thinking");
+assert(settingsExample.compactView === true, "settings example must carry the optional compact-view preference");
+assert(setupPrompt.includes("/compact-view off"), "setup must explain how to restore the normal view");
 assert(new Set(settingsExample.enabledModels).size === settingsExample.enabledModels.length, "settings enabledModels must be unique");
 for (const route of settingsExample.enabledModels) {
   assert(manifestModelRoutes.has(route), `settings enabled model ${route} must be a manifest-managed route`);

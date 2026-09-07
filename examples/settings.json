@@ -2,6 +2,7 @@
   "defaultProvider": "openai",
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "max",
+  "compactView": true,
   "enabledModels": [
     "cloudflare-ai-gateway/claude-fable-5",
     "cloudflare-ai-gateway/claude-opus-5",
