@@ -7,7 +7,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { fauxAssistantMessage } from "@earendil-works/pi-ai";
+import { DefaultResourceLoader, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const temp = mkdtempSync(join(tmpdir(), "pi-fitch-kit-package-"));
@@ -115,6 +116,12 @@ try {
 	let footerNotice;
 	let footerInstallCount = 0;
 	let resolveFooterRefresh;
+	const footerSession = SessionManager.inMemory(join(home, "Projects", "demo"));
+	footerSession.appendSessionInfo("footer-smoke");
+	for (const usage of [{ input: 20, cacheRead: 80 }, { input: 100, cacheRead: 0 }]) {
+		const message = fauxAssistantMessage("footer smoke");
+		footerSession.appendMessage({ ...message, usage: { ...message.usage, ...usage, totalTokens: 100 } });
+	}
 	const footerContext = {
 		mode: "tui",
 		hasUI: true,
@@ -129,14 +136,7 @@ try {
 				footerNotice = message;
 			},
 		},
-		sessionManager: {
-			getCwd: () => join(process.env.HOME ?? temp, "Projects", "demo"),
-			getSessionName: () => "footer-smoke",
-			getEntries: () => [
-				{ type: "message", message: { role: "assistant", usage: { input: 20, cacheRead: 80, cacheWrite: 0 } } },
-				{ type: "message", message: { role: "assistant", usage: { input: 100, cacheRead: 0, cacheWrite: 0 } } },
-			],
-		},
+		sessionManager: footerSession,
 		getContextUsage: () => ({ percent: 74, contextWindow: 272_000 }),
 		model: {
 			id: "gpt-5.6-sol",

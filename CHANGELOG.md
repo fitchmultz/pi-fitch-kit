@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Cache the clean footer's file-wide name and cache-hit data by Pi's native entry revision. Current context usage, model details, theme and wrapping remain live; Pi 0.84.2 retains a single uncached entry pass.
+
 ## 0.10.5 — 7 September 2026
 
 - Add `/restart` for selected or all helper-enabled Pi sessions, preserving the exact saved session, current state, launch options and working directories in the same terminal. Busy work is skipped by default; confirmed Stop work and restart also stops reported owned foreground/background children. Restart requires the Pi fork's native Bash, pending-input and nextTurn activity APIs; older hosts report it as unavailable rather than guessing idle.

@@ -96,6 +96,12 @@ function installFooter(ctx: ExtensionContext, verbosity: VerbosityConfig): void 
 	ctx.ui.setFooter((tui, theme, footerData) => {
 		const unsubscribe = footerData.onBranchChange(() => tui.requestRender());
 		let repoCache: { cwd: string; name?: { text: string; key: string } } | undefined;
+		let sessionStats: {
+			revision: number | undefined;
+			sessionName: string | undefined;
+			hasCacheActivity: boolean;
+			latestCacheHitRate: number | undefined;
+		} | undefined;
 
 		return {
 			dispose: unsubscribe,
@@ -112,18 +118,29 @@ function installFooter(ctx: ExtensionContext, verbosity: VerbosityConfig): void 
 				// getGitBranch crawls into the home dotfiles repo; only show a branch for a real project repo.
 				const branch = footerData.getGitBranch();
 				if (branch && repoCache.name) location += theme.fg("dim", ` (${branch})`);
-				const sessionName = ctx.sessionManager.getSessionName();
-				if (sessionName) location += theme.fg("dim", ` • ${sessionName}`);
-
-				let latestCacheHitRate: number | undefined;
-				let hasCacheActivity = false;
-				for (const entry of ctx.sessionManager.getEntries()) {
-					if (entry.type !== "message" || entry.message.role !== "assistant") continue;
-					const { input, cacheRead, cacheWrite } = entry.message.usage;
-					hasCacheActivity ||= cacheRead > 0 || cacheWrite > 0;
-					const promptTokens = input + cacheRead + cacheWrite;
-					latestCacheHitRate = promptTokens > 0 ? (cacheRead / promptTokens) * 100 : undefined;
+				const manager = ctx.sessionManager;
+				// Pi 0.84.2 has no revision getter; keep that host correct with an uncached pass.
+				const entryRevision: unknown = "getEntriesRevision" in manager && typeof manager.getEntriesRevision === "function"
+					? manager.getEntriesRevision()
+					: undefined;
+				const revision = typeof entryRevision === "number" ? entryRevision : undefined;
+				if (revision === undefined || sessionStats?.revision !== revision) {
+					// These values cover the whole file, including abandoned branches.
+					let sessionName: string | undefined;
+					let latestCacheHitRate: number | undefined;
+					let hasCacheActivity = false;
+					for (const entry of manager.getEntries()) {
+						if (entry.type === "session_info") sessionName = entry.name?.trim() || undefined;
+						if (entry.type !== "message" || entry.message.role !== "assistant") continue;
+						const { input, cacheRead, cacheWrite } = entry.message.usage;
+						hasCacheActivity ||= cacheRead > 0 || cacheWrite > 0;
+						const promptTokens = input + cacheRead + cacheWrite;
+						latestCacheHitRate = promptTokens > 0 ? (cacheRead / promptTokens) * 100 : undefined;
+					}
+					sessionStats = { revision, sessionName, hasCacheActivity, latestCacheHitRate };
 				}
+				const { sessionName, hasCacheActivity, latestCacheHitRate } = sessionStats;
+				if (sessionName) location += theme.fg("dim", ` • ${sessionName}`);
 
 				const usage = ctx.getContextUsage();
 				const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
