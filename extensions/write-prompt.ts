@@ -98,6 +98,10 @@ function sessionPrefix(ctx: ExtensionCommandContext): Message[] {
 export function flattenToolHistory(messages: Message[]): Message[] {
 	const out: Message[] = [];
 	for (const message of messages) {
+		// Current instructions come from getSystemPrompt(), once. Transcript hosts
+		// also retain historical system messages with tool declarations; those are
+		// not conversation and must not enable tools in this off-transcript writer.
+		if (message.role !== "user" && message.role !== "assistant" && message.role !== "toolResult") continue;
 		if (message.role === "toolResult") {
 			const label = message.isError ? `${message.toolName} error` : `${message.toolName} result`;
 			out.push({
