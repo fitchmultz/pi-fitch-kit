@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.10.6 — 16 September 2026
 
+- Keep `/draft` and `/side-question` completions tool-free on transcript-based Pi hosts: send current instructions once, omit historical system/tool declarations, and retain flattened conversational tool history. Preserve stock Pi behavior without fork-only APIs. Exercise both commands, follow-ups, file-backed resume, fresh sessions, and supported new-context rollover through native completion and HTTP serialization offline.
 - Cache the clean footer's file-wide name and cache-hit data by Pi's native entry revision. Current context usage, model details, theme and wrapping remain live; Pi 0.84.2 retains a single uncached entry pass.
 
 ## 0.10.5 — 7 September 2026

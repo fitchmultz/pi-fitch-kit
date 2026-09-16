@@ -1,6 +1,6 @@
 {
   "name": "@fitch/pi-kit",
-  "version": "0.10.5",
+  "version": "0.10.6",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -15,7 +15,7 @@
     "regression:clean-footer": "node scripts/clean-footer-regression.mjs",
     "regression:fast-mode": "node --experimental-strip-types scripts/fast-mode-regression.ts",
     "regression:session-name": "node --experimental-strip-types scripts/session-name-regression.ts",
-    "regression:write-prompt": "node --experimental-strip-types scripts/write-prompt-regression.ts",
+    "regression:write-prompt": "node --experimental-strip-types scripts/write-prompt-regression.ts && node scripts/write-prompt-boundary.mjs",
     "regression:session-restart": "node --experimental-strip-types scripts/session-restart-regression.ts",
     "smoke:restart": "python3 scripts/session-restart-pty.py",
     "smoke": "node scripts/package-smoke.mjs",
