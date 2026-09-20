@@ -144,6 +144,17 @@ try {
 	manager.newSession();
 	assert.doesNotMatch(render(), /Reloaded|Original|CH/);
 
+	// The checkpoint hook persists only the instance toggle, not derived footer data.
+	await session.prompt("/clean-footer");
+	assert.equal(footer, undefined);
+	const barrier = loader.getExtensions().extensions[0].handlers.get("session_checkpoint");
+	assert.equal(barrier?.length, 1);
+	const event = { type: "session_checkpoint", boundary: "settled", signal: new AbortController().signal, invalidate() {} };
+	assert.deepEqual(await barrier[0](event, session.extensionRunner.createContext()), { sleepReady: true });
+	assert.deepEqual(manager.getEntries().at(-1).data, { sessionId: manager.getSessionId(), enabled: false });
+	await session.reload();
+	assert.ok(footer, "Warm reload retains the existing reset-to-enabled behavior");
+
 	assert.equal(faux.state.callCount, 0, "No provider calls");
 	assert.equal(initialScans, 1, "Name and cache data use one entry pass");
 	assert.equal(redrawScans, hasRevision ? 0 : 3, "Unchanged entries are cached only when the host supplies a revision");

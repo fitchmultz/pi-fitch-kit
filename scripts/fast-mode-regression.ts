@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -311,6 +311,20 @@ const codexState = readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8"
 await commands["codex-fast"].handler("bogus", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "Usage: /codex-fast [on|off|toggle|status]");
 assert.equal(readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8"), codexState);
+
+// A failed real file write is not an adopted memory-only toggle. The provider and
+// status continue to read the file (including the existing off fallback on errors).
+const statePath = join(agentDir, "openai-codex-fast.json");
+renameSync(statePath, `${statePath}.saved`);
+mkdirSync(statePath);
+try {
+	await assert.rejects(commands["codex-fast"].handler("on", uiCtx(MODELS.openai)), /EISDIR/);
+	assert.equal(await requestPayload(MODELS.openai), undefined);
+	assert.deepEqual(await handlers.session_checkpoint[0]({}, {}), { sleepReady: true });
+} finally {
+	rmSync(statePath, { recursive: true });
+	renameSync(`${statePath}.saved`, statePath);
+}
 
 // Footer: `fast` only while enabled on an eligible model family, cleared while
 // off and on models fast mode ignores, including non-overridden Opus proxies.
