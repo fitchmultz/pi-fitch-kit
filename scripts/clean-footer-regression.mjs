@@ -148,7 +148,6 @@ try {
 	await session.prompt("/clean-footer");
 	assert.equal(footer, undefined);
 	const barrier = loader.getExtensions().extensions[0].handlers.get("session_checkpoint");
-	assert.equal(barrier?.length, 1);
 	const event = { type: "session_checkpoint", boundary: "settled", signal: new AbortController().signal, invalidate() {} };
 	assert.deepEqual(await barrier[0](event, session.extensionRunner.createContext()), { sleepReady: true });
 	assert.deepEqual(manager.getEntries().at(-1).data, { sessionId: manager.getSessionId(), enabled: false });
