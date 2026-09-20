@@ -255,6 +255,17 @@ export default function fastMode(pi: ExtensionAPI): void {
 	});
 	pi.on("model_select", (_event, ctx) => updateFooterStatus(ctx));
 
+	// Additive fork event; older hosts keep their normal lifecycle and stock API types.
+	(pi.on as unknown as (event: "session_checkpoint", handler: () => {
+		sleepReady: boolean;
+	}) => void)("session_checkpoint", () => {
+		// There is no adopted in-memory toggle: every request/status reads the same files,
+		// including enabled()'s existing off fallback on read errors. Native dispatch joins
+		// synchronous command/startup writes and provider work. Watchers only read/redraw;
+		// they neither accept work nor change settings. Files belong in the host archive.
+		return { sleepReady: true };
+	});
+
 	const registerToggleCommand = (name: string, toggle: Toggle, emptyMeansToggle = false): void => {
 		pi.registerCommand(name, {
 			description: name === toggle.name ? toggle.description : `Alias for /${toggle.name}`,

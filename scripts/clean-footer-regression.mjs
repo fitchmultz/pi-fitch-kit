@@ -50,11 +50,12 @@ try {
 	manager.appendSessionInfo("Original");
 	const leaf = manager.appendMessage(assistant(20, 80));
 	const settingsManager = SettingsManager.inMemory({ compaction: { enabled: false } });
-	const loader = new DefaultResourceLoader({
+	const resourceOptions = {
 		cwd, agentDir, settingsManager,
 		additionalExtensionPaths: [join(root, "extensions/clean-footer.ts")],
 		noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
-	});
+	};
+	const loader = new DefaultResourceLoader(resourceOptions);
 	await loader.reload();
 	assert.deepEqual(loader.getExtensions().errors, []);
 	const modelRuntime = await ModelRuntime.create({ credentials: new InMemoryCredentialStore(), modelsPath: null, refreshOnCreate: false });
@@ -143,6 +144,47 @@ try {
 	assert.match(render(), /CH75\.0%/);
 	manager.newSession();
 	assert.doesNotMatch(render(), /Reloaded|Original|CH/);
+
+	// Fresh SDK startup reads a saved journal, not the previous extension's live toggle.
+	for (const matchingId of [true, false]) {
+		const saved = SessionManager.inMemory(cwd);
+		saved.appendCustomEntry("clean-footer-checkpoint", {
+			sessionId: matchingId ? saved.getSessionId() : "copied-parent-session",
+			enabled: false,
+		});
+		const savedPath = join(temp, `cold-${matchingId}.jsonl`);
+		writeFileSync(savedPath, `${[saved.getHeader(), ...saved.getEntries()].map((entry) => JSON.stringify(entry)).join("\n")}\n`);
+		const coldLoader = new DefaultResourceLoader(resourceOptions);
+		await coldLoader.reload();
+		assert.deepEqual(coldLoader.getExtensions().errors, []);
+		const { session: coldSession } = await createAgentSession({
+			cwd, agentDir, model, modelRuntime, settingsManager,
+			sessionManager: SessionManager.open(savedPath), resourceLoader: coldLoader, tools: [],
+		});
+		let coldFooter;
+		try {
+			await coldSession.bindExtensions({
+				mode: "tui",
+				uiContext: { ...coldSession.extensionRunner.createContext().ui, setFooter(factory) { coldFooter = factory; } },
+				onError(error) { throw new Error(error.error); },
+			});
+			if (matchingId) assert.equal(coldFooter, undefined, "Cold startup restores the matching session's disabled footer");
+			else assert.equal(typeof coldFooter, "function", "Cold startup ignores a copied checkpoint from another session");
+		} finally {
+			await coldSession.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
+			coldSession.dispose();
+		}
+	}
+
+	// The checkpoint hook persists only the instance toggle, not derived footer data.
+	await session.prompt("/clean-footer");
+	assert.equal(footer, undefined);
+	const barrier = loader.getExtensions().extensions[0].handlers.get("session_checkpoint");
+	const event = { type: "session_checkpoint", boundary: "settled", signal: new AbortController().signal, invalidate() {} };
+	assert.deepEqual(await barrier[0](event, session.extensionRunner.createContext()), { sleepReady: true });
+	assert.deepEqual(manager.getEntries().at(-1).data, { sessionId: manager.getSessionId(), enabled: false });
+	await session.reload();
+	assert.ok(footer, "Warm reload retains the existing reset-to-enabled behavior");
 
 	assert.equal(faux.state.callCount, 0, "No provider calls");
 	assert.equal(initialScans, 1, "Name and cache data use one entry pass");

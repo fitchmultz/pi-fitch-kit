@@ -8,6 +8,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
+const CHECKPOINT_ENTRY = "clean-footer-checkpoint";
 const VERBOSITY_PATH = join(getAgentDir(), "verbosity.json");
 const VERBOSITY_APIS = new Set(["openai-responses", "openai-codex-responses", "azure-openai-responses"]);
 type Verbosity = "low" | "medium" | "high";
@@ -196,7 +197,16 @@ export default function (pi: ExtensionAPI) {
 		if (enabled && footerContext?.mode === "tui") installFooter(footerContext, verbosity);
 	};
 
-	pi.on("session_start", async (_event, ctx) => {
+	pi.on("session_start", async (event, ctx) => {
+		// This is an instance toggle, not a global or branch preference. Warm reload/new/
+		// resume/fork still start enabled; tree navigation leaves the live choice alone.
+		// Only cold startup restores the file-wide choice saved by a checkpoint, and
+		// copied entries in a fork must not carry the parent instance's choice with them.
+		if (event.reason === "startup") {
+			const entry = ctx.sessionManager.getEntries().findLast((entry) => entry.type === "custom" && entry.customType === CHECKPOINT_ENTRY);
+			const saved = entry?.type === "custom" ? entry.data as { sessionId?: unknown; enabled?: unknown } | null : undefined;
+			if (saved?.sessionId === ctx.sessionManager.getSessionId() && typeof saved.enabled === "boolean") enabled = saved.enabled;
+		}
 		footerContext = ctx;
 		verbosity = await loadVerbosity();
 		if (enabled && ctx.mode === "tui") installFooter(ctx, verbosity);
@@ -206,6 +216,16 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_shutdown", () => {
 		unwatchFile(VERBOSITY_PATH, refreshVerbosity);
 		footerContext = undefined;
+	});
+
+	// Additive fork event; no dependency on fork-only exported types or a second state store.
+	(pi.on as unknown as (event: "session_checkpoint", handler: (
+		event: unknown, ctx: ExtensionContext,
+	) => { sleepReady: boolean }) => void)("session_checkpoint", (_event, ctx) => {
+		pi.appendEntry(CHECKPOINT_ENTRY, { sessionId: ctx.sessionManager.getSessionId(), enabled });
+		// Native command ownership settles the toggle. The verbosity watcher only reads
+		// and redraws reconstructible presentation; no footer/cache serialization is needed.
+		return { sleepReady: true };
 	});
 
 	pi.registerCommand("clean-footer", {
