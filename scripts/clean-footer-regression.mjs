@@ -1,20 +1,26 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { findPackageJSON } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mock } from "node:test";
-import { fileURLToPath } from "node:url";
-import { fauxAssistantMessage, fauxProvider, InMemoryCredentialStore } from "@earendil-works/pi-ai";
-import {
-	createAgentSession,
-	DefaultResourceLoader,
-	initTheme,
-	ModelRuntime,
-	SessionManager,
-	SettingsManager,
-} from "@earendil-works/pi-coding-agent";
-import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+// As with write-prompt-boundary, an optional package root supports a focused
+// read-only host probe. Normal checks consume the selected node_modules graph.
+const sdkPath = process.argv[2] ? pathToFileURL(join(process.argv[2], "dist/index.js")).href : import.meta.resolve("@earendil-works/pi-coding-agent");
+const hostRoot = fileURLToPath(new URL("..", sdkPath));
+if (process.env.PI_COMPAT_EXPECTED_PACKAGE_DIR) assert.equal(realpathSync(hostRoot), realpathSync(process.env.PI_COMPAT_EXPECTED_PACKAGE_DIR));
+if (process.env.PI_HOST_INDEX) assert.equal(realpathSync(fileURLToPath(sdkPath)), realpathSync(process.env.PI_HOST_INDEX));
+const hostVersion = JSON.parse(readFileSync(join(hostRoot, "package.json"), "utf8")).version;
+if (process.env.PI_COMPAT_EXPECTED_VERSION) assert.equal(hostVersion, process.env.PI_COMPAT_EXPECTED_VERSION);
+const { createAgentSession, DefaultResourceLoader, initTheme, ModelRuntime, SessionManager, SettingsManager } = await import(sdkPath);
+const aiManifest = pathToFileURL(findPackageJSON("@earendil-works/pi-ai", sdkPath));
+const tuiManifest = pathToFileURL(findPackageJSON("@earendil-works/pi-tui", sdkPath));
+const { fauxAssistantMessage, fauxProvider, InMemoryCredentialStore } = await import(new URL(JSON.parse(readFileSync(aiManifest, "utf8")).exports["."].import, aiManifest).href);
+const { stripTerminalSequences, visibleWidth } = await import(new URL(JSON.parse(readFileSync(tuiManifest, "utf8")).main, tuiManifest).href);
+console.log(JSON.stringify({ host: process.env.PI_COMPAT_HOST ?? "local", version: hostVersion, sdkPath }));
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const temp = mkdtempSync(join(tmpdir(), "pi-clean-footer-"));
@@ -179,9 +185,27 @@ try {
 	// The checkpoint hook persists only the instance toggle, not derived footer data.
 	await session.prompt("/clean-footer");
 	assert.equal(footer, undefined);
-	const barrier = loader.getExtensions().extensions[0].handlers.get("session_checkpoint");
-	const event = { type: "session_checkpoint", boundary: "settled", signal: new AbortController().signal, invalidate() {} };
-	assert.deepEqual(await barrier[0](event, session.extensionRunner.createContext()), { sleepReady: true });
+	const context = session.extensionRunner.createContext();
+	if (process.env.PI_COMPAT_HOST === "fork") {
+		assert.equal(typeof session.acquireCheckpoint, "function", "Fork qualification requires native checkpoints");
+		for (const method of ["isBashRunning", "getPendingNextTurnCount", "getPendingInputCount"]) {
+			assert.equal(typeof context[method], "function", `Fork restart requires native ${method}`);
+		}
+	}
+	if (typeof session.acquireCheckpoint === "function") {
+		const hold = await session.acquireCheckpoint({ boundary: "settled", quiesce: () => () => {}, signal: AbortSignal.timeout(5000) });
+		try {
+			assert.equal(hold.sleepReady, true, JSON.stringify(hold.sleepBlockers));
+			assert.deepEqual(hold.checkpoint.entries.at(-1).data, { sessionId: manager.getSessionId(), enabled: false });
+		} finally {
+			hold.release();
+		}
+	} else {
+		// Official has no native checkpoint dispatch; retain the persistence unit contract.
+		const barrier = loader.getExtensions().extensions[0].handlers.get("session_checkpoint");
+		const event = { type: "session_checkpoint", boundary: "settled", signal: new AbortController().signal, invalidate() {} };
+		assert.deepEqual(await barrier[0](event, context), { sleepReady: true });
+	}
 	assert.deepEqual(manager.getEntries().at(-1).data, { sessionId: manager.getSessionId(), enabled: false });
 	await session.reload();
 	assert.ok(footer, "Warm reload retains the existing reset-to-enabled behavior");

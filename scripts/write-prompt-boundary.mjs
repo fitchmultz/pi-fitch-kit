@@ -12,6 +12,9 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const host = process.argv[2] ? resolve(process.argv[2]) : dirname(dirname(fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))));
 const hostRequire = createRequire(join(host, "package.json"));
 const sdkPath = join(host, "dist/index.js");
+if (process.env.PI_COMPAT_EXPECTED_PACKAGE_DIR) assert.equal(realpathSync(host), realpathSync(process.env.PI_COMPAT_EXPECTED_PACKAGE_DIR));
+if (process.env.PI_HOST_INDEX) assert.equal(realpathSync(sdkPath), realpathSync(process.env.PI_HOST_INDEX));
+if (process.env.PI_COMPAT_EXPECTED_VERSION) assert.equal(JSON.parse(readFileSync(join(host, "package.json"), "utf8")).version, process.env.PI_COMPAT_EXPECTED_VERSION);
 const aiRoot = hostRequire.resolve.paths("@earendil-works/pi-ai").map((base) => join(base, "@earendil-works/pi-ai")).find((base) => existsSync(join(base, "package.json")));
 const aiPath = realpathSync(join(aiRoot, "dist/index.js"));
 const temp = mkdtempSync(join(tmpdir(), "pi-writer-boundary-"));
@@ -135,6 +138,7 @@ try {
 	writeFileSync(join(agentDir, "write-prompt.json"), JSON.stringify({ model: "writer-boundary/override" }));
 	await exercise(resumed, "file-backed resume + override");
 	assert.equal(requests.at(-1).model, "override");
+	if (process.env.PI_COMPAT_HOST === "fork") assert.equal(typeof session.newContext, "function", "Fork qualification requires native new-context rollover");
 	if (typeof session.newContext === "function") {
 		session.newContext({ handoff: "HANDOFF_SENTINEL" });
 		await exercise(resumed, "native new context", false);

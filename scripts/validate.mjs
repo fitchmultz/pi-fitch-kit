@@ -49,7 +49,8 @@ for (const dependency of [
   "@earendil-works/pi-coding-agent",
   "@earendil-works/pi-tui",
 ]) {
-  assert(packageJson.devDependencies[dependency] === piFloor, `${dependency} must pin the exact validated Pi floor for reproducible checks`);
+  assert(/^\d+\.\d+\.\d+$/.test(packageJson.devDependencies[dependency]), `${dependency} must pin an exact Pi development baseline`);
+  assert(packageJson.devDependencies[dependency] === packageJson.devDependencies["@earendil-works/pi-coding-agent"], `${dependency} must use the coherent Pi development cohort`);
   assert(packageJson.peerDependencies[dependency] === "*", `${dependency} must remain an unversioned Pi peer`);
   assert(packageJson.peerDependenciesMeta[dependency]?.optional === true, `${dependency} must remain an optional Pi peer`);
 }
