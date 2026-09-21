@@ -229,6 +229,32 @@ def assert_preserved(before, after):
     assert after['bHasLaunchKey'] is False
 
 
+def run_managed(options, runtime):
+    """Current fork launcher owns restart; the kit must not replace it with execve."""
+    root = options.output / 'managed'
+    child = OwnedPi(options, root, runtime, initial=True)
+    try:
+        child.event('settled')
+        before = child.info('before-managed')
+        assert before['pid'] != child.pid, 'managed lane requires the actual launcher/worker boundary'
+        assert not list(runtime.glob('*.sock')), 'legacy kit helper must remain inert in a managed worker'
+        calls = sum(row['event'] == 'fake-call' for row in records(root))
+        child.send('/restart')
+        child.wait(lambda: any(row['event'] == 'start' and row['pid'] != before['pid'] for row in records(root)), 'replacement worker')
+        after = child.info('after-managed')
+        assert after['pid'] != before['pid'] and after['image'] != before['image'] and after['raw'] is True
+        for key in ('id', 'file', 'cwd', 'nativeCwd', 'name', 'model', 'thinking', 'flags', 'tty', 'envHash', 'aHasLaunchKey', 'bHasLaunchKey'):
+            assert before[key] == after[key], f'{key} changed across native managed restart'
+        assert sum(row['event'] == 'fake-call' for row in records(root)) == calls, 'restart must not replay startup prompts'
+        child.send('/quit')
+        child.wait(lambda: child.code == 0, 'launcher clean exit')
+        result = {'case': 'managed', 'passed': True, 'launcherPid': child.pid, 'workerPids': [before['pid'], after['pid']], 'sameSession': True, 'startupNotReplayed': True}
+        print(json.dumps(result), flush=True)
+        return result
+    finally:
+        child.close()
+
+
 def run_case(options, case, runtime):
     root = options.output / case
     child = OwnedPi(options, root, runtime, late=case.startswith('late'), key=case not in ('late-no-key', 'late-interceptor', 'late-input-dispatch'),
@@ -643,7 +669,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--runtime-dir', type=Path, required=True)
     parser.add_argument('--node', default=shutil.which('node'))
-    parser.add_argument('--pi-root', type=Path, default=REPO / 'node_modules/@earendil-works/pi-coding-agent')
+    parser.add_argument('--pi-root', type=Path, default=Path(os.environ.get('PI_COMPAT_EXPECTED_PACKAGE_DIR', REPO / 'node_modules/@earendil-works/pi-coding-agent')))
     parser.add_argument('--session-cwd', action='store_true')
     parser.add_argument('--virtual-source', type=Path)
     parser.add_argument('--cases', default='preserve,reload,tree,root,late-no-key,late-key,ephemeral,unsaved,agent,retry,compact,summary,bash,draft,queue,writer-dialog,writer-active,identity,preflight-failure,external-term,external-hup,second-term,second-hup,unexpected-zero,unexpected-nonzero,exec-failure,protocol,fleet,interceptor,interceptor-async,interceptor-result,late-interceptor,nextturn,tree-queue,input-dispatch,late-input-dispatch')
@@ -651,9 +677,15 @@ def main():
     package = json.loads((options.pi_root / 'package.json').read_text())
     options.version = package['version']
     options.cli = str(options.pi_root / package['bin']['pi'])
+    if os.environ.get('PI_HOST_CLI'):
+        assert Path(options.cli).resolve() == Path(os.environ['PI_HOST_CLI']).resolve(), 'restart CLI must be the selected bundled host'
+    if os.environ.get('PI_COMPAT_EXPECTED_VERSION'):
+        assert options.version == os.environ['PI_COMPAT_EXPECTED_VERSION']
+    if os.environ.get('PI_COMPAT_HOST') == 'fork':
+        assert 'unsupported' not in options.cases.split(','), 'fork lane must exercise native restart, not refusal'
     options.output.mkdir(parents=True)
     options.runtime_dir.mkdir(mode=0o700)
-    results = [run_fleet(options, options.runtime_dir) if case == 'fleet' else run_case(options, case, options.runtime_dir) for case in options.cases.split(',')]
+    results = [run_managed(options, options.runtime_dir) if case == 'managed' else run_fleet(options, options.runtime_dir) if case == 'fleet' else run_case(options, case, options.runtime_dir) for case in options.cases.split(',')]
     (options.output / 'results.json').write_text(json.dumps(results, indent=2) + '\n')
     print(f'PASS: {len(results)} real Pi {options.version} PTY cases; all owned Pi processes reaped')
 

@@ -5,6 +5,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -46,8 +47,17 @@ const env = {
 	PI_CODING_AGENT_DIR: agentDir,
 	PI_OFFLINE: "1",
 };
+const packageDir = fileURLToPath(new URL("..", import.meta.resolve("@earendil-works/pi-coding-agent")));
+const hostPackage = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
+const installedCli = resolve(packageDir, hostPackage.bin.pi);
+const cli = process.env.PI_HOST_CLI ?? installedCli;
+assert.equal(realpathSync(cli), realpathSync(installedCli), "Child CLI must match the installed SDK/types graph");
+if (process.env.PI_COMPAT_EXPECTED_PACKAGE_DIR) assert.equal(realpathSync(packageDir), realpathSync(process.env.PI_COMPAT_EXPECTED_PACKAGE_DIR));
+if (process.env.PI_HOST_INDEX) assert.equal(realpathSync(process.env.PI_HOST_INDEX), realpathSync(join(packageDir, "dist/index.js")));
+if (process.env.PI_COMPAT_EXPECTED_VERSION) assert.equal(hostPackage.version, process.env.PI_COMPAT_EXPECTED_VERSION);
+console.log(JSON.stringify({ host: process.env.PI_COMPAT_HOST ?? "local", version: hostPackage.version, packageDir, cli }));
 const pi = (...args) =>
-	execFileSync("pi", [...args, "--no-approve"], {
+	execFileSync(process.execPath, [cli, ...args, "--no-approve"], {
 		cwd,
 		encoding: "utf8",
 		env,
