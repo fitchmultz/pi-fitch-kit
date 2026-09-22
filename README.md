@@ -198,7 +198,7 @@ This is already the working composition layer for a broader organization harness
 
 ## Install the kit
 
-Requires Node.js 24 or newer and Pi 0.84.2 or newer. `/restart` additionally requires the Pi fork's native activity APIs described above; installing the kit does not patch or replace Pi.
+The kit requires Node.js 24 or newer and Pi 0.84.2 or newer. Selected external packages can require newer Pi versions: `pi-apply-edits` 1.0 requires Pi 0.87.0 or newer. Setup checks each selected package's documented requirements before installing. `/restart` additionally requires the Pi fork's native activity APIs described above; installing the kit does not patch or replace Pi.
 
 ```bash
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
