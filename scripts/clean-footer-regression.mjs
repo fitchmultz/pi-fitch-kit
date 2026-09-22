@@ -88,6 +88,9 @@ try {
 	assert.ok(footer, "Native session_start installs the footer");
 	const render = (width = 120) => footer.render(width).map(stripTerminalSequences).join("\n");
 	const entries = mock.method(manager, "getEntries");
+	session.getContextUsage();
+	const usageScans = entries.mock.callCount();
+	entries.mock.resetCalls();
 	const initial = render();
 	assert.match(initial, /Original/);
 	assert.match(initial, /CH80\.0%/);
@@ -100,9 +103,9 @@ try {
 	const redrawScans = entries.mock.callCount();
 	const hasRevision = typeof manager.getEntriesRevision === "function";
 
-	// Live context can grow before another journal entry is persisted.
+	// Non-triggering messages update both session history and live context.
 	const beforeUsage = session.getContextUsage();
-	session.agent.state.messages = [...session.agent.state.messages, { role: "user", content: "x".repeat(40_000), timestamp: 1 }];
+	await session.sendCustomMessage({ customType: "footer-test", content: "x".repeat(40_000), display: false }, { triggerTurn: false });
 	const afterUsage = session.getContextUsage();
 	assert.ok(afterUsage.percent > beforeUsage.percent);
 	assert.ok(render().includes(`${afterUsage.percent.toFixed(1)}%/200k`));
@@ -211,9 +214,9 @@ try {
 	assert.ok(footer, "Warm reload retains the existing reset-to-enabled behavior");
 
 	assert.equal(faux.state.callCount, 0, "No provider calls");
-	assert.equal(initialScans, 1, "Name and cache data use one entry pass");
-	assert.equal(redrawScans, hasRevision ? 0 : 3, "Unchanged entries are cached only when the host supplies a revision");
-	console.log(JSON.stringify({ ok: true, hasRevision, initialScans, redrawScans, providerCalls: faux.state.callCount }));
+	assert.equal(initialScans - usageScans, 1, "Name and cache data use one entry pass beyond native context usage");
+	assert.equal(redrawScans - 3 * usageScans, hasRevision ? 0 : 3, "Unchanged footer data is cached only when the host supplies a revision");
+	console.log(JSON.stringify({ ok: true, hasRevision, usageScans, initialScans, redrawScans, providerCalls: faux.state.callCount }));
 } finally {
 	await session?.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
 	footer?.dispose?.();
