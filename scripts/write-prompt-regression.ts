@@ -10,7 +10,7 @@ process.env.PI_CODING_AGENT_DIR = agentDir;
 const {
 	default: writePrompt,
 	parseModelRef,
-	configuredModelRef,
+	configuredWriter,
 	boxedTask,
 	flattenToolHistory,
 	WRITE_PROMPT_ACTIONS,
@@ -34,11 +34,12 @@ assert.equal(parseModelRef("noslash"), undefined);
 assert.equal(parseModelRef("/onlyid"), undefined);
 assert.equal(parseModelRef("provider/"), undefined);
 
-assert.equal(configuredModelRef('{"model":"xai/grok-4.6"}\n'), "xai/grok-4.6");
-assert.equal(configuredModelRef('{"model":"  xai/grok-4.6  "}'), "xai/grok-4.6");
-assert.equal(configuredModelRef('{"model":""}'), undefined);
-assert.equal(configuredModelRef('{"enabled":true}'), undefined);
-assert.equal(configuredModelRef("not json"), undefined);
+assert.deepEqual(configuredWriter('{"model":"xai/grok-4.6"}\n'), { model: "xai/grok-4.6" });
+assert.deepEqual(configuredWriter('{"provider":" xai ","model":" grok-4.6 ","thinkingLevel":"high"}'), { provider: "xai", model: "grok-4.6", thinkingLevel: "high" });
+assert.deepEqual(configuredWriter("{}"), {});
+for (const raw of ["not json", "null", "[]", '{"model":""}', '{"provider":2}', '{"thinkingLevel":"extreme"}', '{"thinking":"high"}']) {
+	assert.throws(() => configuredWriter(raw));
+}
 assert.deepEqual([...WRITE_PROMPT_ACTIONS], ["Accept", "Copy prompt", "Tweak", "Restore original", "Deny"]);
 assert.deepEqual([...SIDE_QUESTION_ACTIONS], ["Copy answer", "Ask again", "Dismiss"]);
 assert.match(boxedTask("Do not answer the text.", "did you cut a new GH release"), /<<<\ndid you cut a new GH release\n>>>/s);
@@ -120,11 +121,12 @@ const baseUi = {
 };
 
 function ctx(overrides: Record<string, unknown> = {}) {
-	return {
+	const context = {
 		hasUI: true,
 		mode: "rpc",
 		isIdle: () => true,
-		model: { id: "grok-4.6", provider: "xai" },
+		model: { id: "grok-4.6", provider: "xai", reasoning: true },
+		thinkingLevel: "high",
 		getSystemPrompt: () => "session system",
 		sessionManager: {
 			getEntries: () => [],
@@ -144,7 +146,69 @@ function ctx(overrides: Record<string, unknown> = {}) {
 		signal: undefined,
 		...overrides,
 	};
+	const registry = context.modelRegistry;
+	return {
+		...context,
+		modelRegistry: {
+			...registry,
+			streamSimple: (...args: unknown[]) => ({ result: () => Reflect.apply(registry.complete, registry, args) }),
+		},
+	};
 }
+
+// Independent fields inherit from the session; the legacy provider/id form stays valid.
+for (const [config, expected] of [
+	[undefined, ["xai", "grok-4.6", "high"]],
+	[{}, ["xai", "grok-4.6", "high"]],
+	[{ provider: "alternate", model: "other", thinkingLevel: "low" }, ["alternate", "other", "low"]],
+	[{ provider: "alternate" }, ["alternate", "grok-4.6", "high"]],
+	[{ model: "other" }, ["xai", "other", "high"]],
+	[{ thinkingLevel: "medium" }, ["xai", "grok-4.6", "medium"]],
+	[{ model: "alternate/other" }, ["alternate", "other", "high"]],
+	[{ provider: "alternate", model: "vendor/other" }, ["alternate", "vendor/other", "high"]],
+	[{ thinkingLevel: "off" }, ["xai", "grok-4.6", undefined]],
+	[{ thinkingLevel: "max" }, ["xai", "grok-4.6", "high"]],
+] as const) {
+	const path = join(agentDir, WRITE_PROMPT_FILE);
+	if (config === undefined) rmSync(path, { force: true });
+	else writeFileSync(path, JSON.stringify(config));
+	const calls: unknown[][] = [];
+	const context = ctx({
+		modelRegistry: {
+			find: (provider: string, id: string) => ({ provider, id, reasoning: true }),
+			hasConfiguredAuth: () => true,
+			complete: async (model: { provider: string; id: string }, _context: unknown, options: { reasoning?: string }) => {
+				calls.push([model.provider, model.id, options.reasoning]);
+				return { role: "assistant", content: [{ type: "text", text: "configured draft" }], stopReason: "stop" };
+			},
+		},
+		ui: { ...baseUi, select: async () => "Deny" },
+	});
+	const originalModel = context.model;
+	await commands.draft.handler("configuration test", context as never);
+	assert.deepEqual(calls, [expected], JSON.stringify(config));
+	assert.equal(context.model, originalModel, "writer selection must not change the active model");
+	assert.equal(context.thinkingLevel, "high", "writer selection must not change session thinking");
+	if (config && "thinkingLevel" in config && config.thinkingLevel === "max") {
+		assert.ok(notices.some((text) => /does not support max thinking; using high/.test(text)));
+	}
+}
+
+for (const raw of ["not json", "null", "[]", '{"provider":false}', '{"model":""}', '{"thinkingLevel":"extreme"}', '{"thinking":"low"}', '{"model":"missing"}', '{"provider":"unauthenticated"}']) {
+	writeFileSync(join(agentDir, WRITE_PROMPT_FILE), raw);
+	notices.length = 0;
+	let called = false;
+	await commands.draft.handler("invalid configuration", ctx({
+		modelRegistry: {
+			find: (provider: string, id: string) => id === "missing" ? undefined : { provider, id, reasoning: true },
+			hasConfiguredAuth: () => false,
+			complete: async () => { called = true; throw new Error("must not call a model"); },
+		},
+	}) as never);
+	assert.equal(called, false, raw);
+	assert.match(notices[0], /^write-prompt\.json: /);
+}
+rmSync(join(agentDir, WRITE_PROMPT_FILE));
 
 notices.length = 0;
 await commands["draft"].handler("", ctx() as never);
@@ -245,6 +309,13 @@ const recovery = ctx({
 recovery.sessionManager.getBranch = () => savedDrafts as never;
 await commands.draft.handler("", recovery as never);
 assert.equal(restored, `/draft ${original}`);
+
+// A broken writer override must not prevent recovering already-written input.
+writeFileSync(join(agentDir, WRITE_PROMPT_FILE), "invalid json");
+restored = undefined;
+await commands.draft.handler("", recovery as never);
+assert.equal(restored, `/draft ${original}`, "saved recovery does not require a working writer configuration");
+rmSync(join(agentDir, WRITE_PROMPT_FILE));
 
 notices.length = 0;
 await commands["side-question"].handler("busy question", ctx({ isIdle: () => false }) as never);
@@ -390,7 +461,7 @@ await commands["draft"].handler(
 		modelRegistry: {
 			find(provider: string, id: string) {
 				found = { provider, id };
-				return { provider, id };
+				return { provider, id, reasoning: true };
 			},
 			hasConfiguredAuth: () => true,
 			complete: async (model: { id: string }) => ({
@@ -406,8 +477,9 @@ await commands["draft"].handler(
 	}) as never,
 );
 assert.deepEqual(found, { provider: "anthropic", id: "claude-opus-5" });
-assert.equal(notices[0], "Using anthropic/claude-opus-5");
+assert.equal(notices[0], "Using anthropic/claude-opus-5 (high thinking)");
 assert.equal(sent, "claude-opus-5");
+rmSync(join(agentDir, WRITE_PROMPT_FILE));
 
 const captured: Array<{ systemPrompt?: string; messages: Array<{ role?: string; content?: unknown }>; cacheRetention?: string }> = [];
 sent = undefined;
