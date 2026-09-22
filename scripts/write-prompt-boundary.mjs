@@ -38,6 +38,7 @@ process.env.PI_OFFLINE = "1";
 const sdk = await import(pathToFileURL(sdkPath).href);
 const ai = await import(pathToFileURL(aiPath).href);
 const requests = [];
+const requestOrigins = [];
 let holdNextRequest;
 const originalFetch = globalThis.fetch;
 const originalWebSocket = globalThis.WebSocket;
@@ -49,7 +50,8 @@ const encrypted = { type: "reasoning", id: "rs_history", summary: [], encrypted_
 // No request can leave the process. Only the fake endpoint is accepted.
 globalThis.fetch = async (url, init) => {
 	const path = api === "openai-codex-responses" ? "codex/responses" : responses ? "responses" : "chat/completions";
-	assert.equal(String(url), `https://writer.invalid/v1/${path}`);
+	assert.ok(["writer.invalid", "alternate-writer.invalid"].some((host) => String(url) === `https://${host}/v1/${path}`));
+	requestOrigins.push(new URL(url).hostname);
 	const body = new Headers(init.headers).get("content-encoding") === "zstd" ? zstdDecompressSync(init.body).toString() : init.body;
 	requests.push(JSON.parse(body));
 	if (holdNextRequest) {
@@ -84,11 +86,13 @@ let toolExecutions = 0;
 try {
 	const runtime = await sdk.ModelRuntime.create({ credentials: new ai.InMemoryCredentialStore(), modelsPath: null, allowModelNetwork: false, refreshOnCreate: false });
 	const registry = new sdk.ModelRegistry(runtime);
-	registry.registerProvider("writer-boundary", {
+	const providerConfig = {
 		api, baseUrl: "https://writer.invalid/v1",
 		apiKey: `synthetic.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "offline" } })).toString("base64")}.synthetic`,
-		models: ["writer", "override"].map((id) => ({ id, name: id, reasoning: responses, thinkingLevelMap: { off: null }, input: ["text", "image"], contextWindow: 100000, maxTokens: 1000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } })),
-	});
+		models: ["writer", "override"].map((id) => ({ id, name: id, reasoning: true, thinkingLevelMap: { off: "none", high: "high" }, input: ["text", "image"], contextWindow: 100000, maxTokens: 1000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } })),
+	};
+	registry.registerProvider("writer-boundary", providerConfig);
+	registry.registerProvider("alternate-writer", { ...providerConfig, baseUrl: "https://alternate-writer.invalid/v1" });
 	const model = registry.find("writer-boundary", "writer");
 	assert.ok(model);
 	// Positive control: this native serializer really exposes supplied schemas.
@@ -129,6 +133,7 @@ try {
 		await loader.reload();
 		assert.deepEqual(loader.getExtensions().errors, []);
 		({ session } = await sdk.createAgentSession({ cwd, agentDir, model, modelRuntime: runtime, resourceLoader: loader, settingsManager, sessionManager: sm, tools: [] }));
+		session.setThinkingLevel("high");
 		const ui = session.extensionRunner.createContext().ui;
 		await session.bindExtensions({ mode: "rpc", uiContext: {
 			...ui,
@@ -160,13 +165,13 @@ try {
 		assert.doesNotMatch(JSON.stringify(messages), /tool_calls|tool_call_id|function_call|additional_tools/);
 		assert.ok(messages.every((m) => ["system", "developer", "user", "assistant"].includes(m.role) || m.type === "reasoning"));
 		if (responses) {
-			assert.equal(body.max_output_tokens, undefined, "raw writer does not set an output cap");
-			assert.equal(body.reasoning?.effort, undefined, "raw writer does not inherit main-agent effort");
+			assert.equal(body.max_output_tokens, api === "openai-codex-responses" ? undefined : 1000, "native simple streaming owns the output limit");
+			assert.equal(body.reasoning?.effort, "high", "writer inherits the session thinking level");
 			assert.equal(body.temperature, undefined);
 			const reasoning = body.input.filter((item) => item.type === "reasoning");
 			assert.deepEqual(reasoning, history && body.model === "writer" ? [encrypted] : [], "encrypted reasoning replays only for the same model");
 			if (api === "openai-codex-responses") assert.equal(body.prompt_cache_options, undefined);
-		}
+		} else assert.equal(body.reasoning_effort, "high", "Completions also inherits session thinking");
 		if (history) {
 			for (const text of ["CONVERSATION_SENTINEL", "HISTORY_REPLY", "called historical_tool", "ARG_SENTINEL", "historical_tool error", "RESULT_SENTINEL"]) assert.ok(serialized.includes(text), text);
 			assert.ok(serialized.includes(`data:image/png;base64,${png}`), "tool-result image must reach the native HTTP serializer");
@@ -229,6 +234,28 @@ try {
 	await open(fresh);
 	await exercise(fresh, "fresh session", false);
 	assert.doesNotMatch(JSON.stringify(requests.at(-1)), /CONVERSATION_SENTINEL/);
+	for (const [config, origin, id, effort] of [
+		[undefined, "writer.invalid", "writer", "high"],
+		[{ provider: "alternate-writer", model: "override", thinkingLevel: "low" }, "alternate-writer.invalid", "override", "low"],
+		[{ provider: "alternate-writer" }, "alternate-writer.invalid", "writer", "high"],
+		[{ model: "override" }, "writer.invalid", "override", "high"],
+		[{ thinkingLevel: "medium" }, "writer.invalid", "writer", "medium"],
+		[{ thinkingLevel: "off" }, "writer.invalid", "writer", "none"],
+	]) {
+		const configPath = join(agentDir, "write-prompt.json");
+		if (config === undefined) rmSync(configPath, { force: true });
+		else writeFileSync(configPath, JSON.stringify(config));
+		actions.push("Deny");
+		await session.prompt("/draft CONFIGURATION_SENTINEL");
+		assert.equal(requestOrigins.at(-1), origin);
+		assert.equal(requests.at(-1).model, id);
+		assert.equal(responses ? requests.at(-1).reasoning?.effort : requests.at(-1).reasoning_effort, effort);
+		assert.equal(session.model.provider, "writer-boundary");
+		assert.equal(session.model.id, "writer");
+		assert.equal(session.thinkingLevel, "high");
+	}
+	rmSync(join(agentDir, "write-prompt.json"));
+	console.log(`PASS ${api}: native thinking inheritance, full and partial overrides, off, unchanged session`);
 	// Real extension dispatch, native steering queues and async error handling.
 	async function until(predicate) {
 		const deadline = Date.now() + 5000;
