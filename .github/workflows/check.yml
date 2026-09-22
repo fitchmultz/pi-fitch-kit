@@ -15,8 +15,6 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-cache-mode: ${{ github.event_name == 'pull_request' && 'read' || 'write' }}
-
 env:
   FORK_REF: afed789dded723566b6ecb1c77a06e8561504f7a
 
