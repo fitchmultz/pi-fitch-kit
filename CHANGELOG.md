@@ -2,7 +2,7 @@
 
 ## 0.11.1 — 22 September 2026
 
-- Align setup verification and workflow guidance with the editor package's `apply_patch`, `replace_text`, `write_files`, and `preview_patch` tools. Respect explicit tool scopes, keep-builtins choices, custom writers, and preview-only selection. Check the editor's Pi 0.87 minimum separately from the kit's Pi 0.84.2 floor. Package source and extension entry remain unchanged.
+- Align setup verification and workflow guidance with the editor package's `apply_patch`, `replace_text`, `write_files`, and `preview_patch` tools. Respect explicit tool scopes, keep-builtins choices, custom writers, and preview-only selection. Check the editor's Pi 0.87 minimum separately from the kit's Pi 0.84.2 floor, and require pi-subagents 0.39.1 or newer when paired with the new editor. Package source and extension entry remain unchanged.
 
 ## 0.11.0 — 22 September 2026
 
