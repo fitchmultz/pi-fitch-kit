@@ -32,20 +32,19 @@ function rejects(change, message) {
   assert.ok(!result.stderr.includes("TypeError"), result.stderr);
 }
 
-test("current policy passes, including both managed Claude gateway windows", () => {
-  const result = validate();
+test("current policy passes and the manifest can select another context budget", () => {
+  assert.equal(validate().status, 0);
+  const result = validate(({ manifest }) => {
+    manifest.modelContextWindows[`${settings.defaultProvider}/${settings.defaultModel}`] = 600000;
+  });
   assert.equal(result.status, 0, result.stderr);
-  for (const route of ["cloudflare-ai-gateway/claude-fable-5", "cloudflare-ai-gateway/claude-opus-5"]) {
-    assert.ok(manifest.optionalModels.includes(route));
-    assert.equal(manifest.modelContextWindows[route], 320000);
-  }
 });
 
 for (const route of Object.keys(manifest.modelContextWindows)) {
-  test(`${route} rejects context-window drift`, () => {
-    for (const value of [321000, 319999, "320000", null]) {
+  test(`${route} rejects invalid or undersized context windows`, () => {
+    for (const value of [0, -1, 320000.5, Number.MAX_SAFE_INTEGER + 1, "320000", null, settings.compaction.reserveTokens + settings.compaction.keepRecentTokens]) {
       rejects(({ manifest }) => { manifest.modelContextWindows[route] = value; },
-        `modelContextWindows value for ${route} must be 320000`);
+        `modelContextWindows value for ${route} must be a safe integer exceeding the compaction reserve plus recent tokens`);
     }
   });
 }
@@ -58,11 +57,16 @@ test("unmanaged routes remain invalid even at the correct window", () => {
 for (const compaction of [undefined, null, {}, { keepRecentTokens: 40000 }]) {
   test(`missing reserve (${JSON.stringify(compaction)}) has a useful diagnostic`, () => {
     rejects(({ settings }) => { settings.compaction = compaction; },
-      "settings example must carry the 64k compaction reserve");
+      "compaction.reserveTokens must be a positive safe integer");
   });
 }
 
+test("default model must remain required and enabled", () => {
+  rejects(({ settings }) => { settings.defaultModel = "unmanaged"; }, "settings default model must be a required route");
+  rejects(({ settings }) => { settings.enabledModels = []; }, "settings default model must be enabled");
+});
+
 test("missing recent-token setting has its own diagnostic", () => {
   rejects(({ settings }) => { delete settings.compaction.keepRecentTokens; },
-    "settings example must keep 40k recent tokens");
+    "compaction.keepRecentTokens must be a positive safe integer");
 });

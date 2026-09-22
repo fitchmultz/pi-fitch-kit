@@ -24,7 +24,7 @@
 - Validate repo: `npm run check`
 - Package load smoke: `npm run smoke`
 - Install/update package in Pi from this checkout: `pi install "$PWD"`
-- After changing package resources in a running Pi session, use `/reload` or start a fresh session before runtime verification.
+- After changing extension code or dependencies, start a fresh Pi process before runtime verification. `/reload` refreshes settings and non-code resources; a new conversation in the old process is insufficient.
 
 ## Editing rules
 
@@ -44,10 +44,10 @@
 
 - Before changing Pi runtime/package behavior, read the installed Pi docs/types for the touched surface, especially `docs/packages.md`, `docs/prompt-templates.md`, and `docs/extensions.md` under the installed Pi root.
 - Keep `extensions/anthropic-image-guard.ts` scoped to Claude models on the `anthropic-messages` wire API (the API alone is shared by non-Claude vendors) and based on Pi's native `resizeImage`; preserve its pre-decode source limits and do not reintroduce global resizing logic.
-- Keep `extensions/clean-footer.ts` free of cumulative token, cache, and cost counters; preserve context usage, model details, extension statuses, and wrapping without truncation.
+- Keep `extensions/clean-footer.ts` free of cumulative token, cache, and cost counters; preserve context usage, model details, extension statuses, and wrapping without truncation. Verbosity comes from the controller's native `verbosity` status, never another config reader.
 - Keep `extensions/fast-mode.ts` scoped and preserve `/fast` plus `--fast` as aliases for the shared OpenAI toggle: OpenAI and xAI priority ride `before_provider_request` for `openai`/`openai-codex`/`xai` plus `cloudflare-ai-gateway` models whose id starts with `gpt-` or is `o3`/`o4-mini` (including their exact `2025-04-16` snapshots) for the OpenAI toggle, or starts with `grok-` for the xAI toggle; other gateway o-series and namespaced Workers AI models stay excluded; Anthropic fast mode owns the `anthropic-messages` override for only the `anthropic` and `cloudflare-ai-gateway` providers, appends the beta at fetch time, and never sends `speed` when the header cannot be attached. Keep the gateway endpoint-placeholder resolution in `fastStream`, the existing state filenames, and the doubled Anthropic fast cost rates.
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
-- Keep `extensions/write-prompt.ts` off the main transcript: `modelRegistry.complete` without tools, flatten tool history to text, built-in dialogs, `copyToClipboard` for Copy, and `sendUserMessage` only on `/draft` Accept. `/side-question` never sends.
+- Keep `extensions/write-prompt.ts` off the main transcript: `modelRegistry.complete` without tools, flatten tool-call semantics while retaining result images, built-in dialogs, `copyToClipboard` for Copy, and `sendUserMessage` only on `/draft` Accept. `/side-question` never sends.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's tested compatibility baseline.
 - Keep restart on public Pi APIs and Node exit/execve, never a daemon or terminal keystroke bridge. Require the fork's native Bash/pending-input/nextTurn activity facts; unsupported hosts must refuse, not guess idle. No argv/environment in socket replies or persisted state. See `docs/pi-setup.md`.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.
@@ -60,5 +60,5 @@
 - Run `npm run regression:session-name` after changing naming guidance, metadata injection, protected identities, or its migration gate.
 - Run `npm run regression:write-prompt` after changing `/draft` config parsing, writer history, activity reporting, or accept/copy/tweak/deny behavior.
 - Run `npm run regression:session-restart` and the disposable `npm run smoke:restart` recipe in `README.md` after restart changes; include the real optional-integration fixtures when touching child status or virtual cwd.
-- For runtime-facing changes, also verify Pi loads the package through `pi install ...` plus `/reload` or a fresh Pi session when practical.
+- For runtime-facing changes, also verify Pi loads the package through `pi install ...` and a fresh Pi process when practical.
 - Keep this file short and project-specific; point to `README.md` or Pi docs instead of copying generic coding rules.
