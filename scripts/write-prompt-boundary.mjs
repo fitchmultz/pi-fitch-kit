@@ -100,6 +100,11 @@ try {
 	assert.equal(control.stopReason, "stop");
 	assert.equal(responses ? requests.at(-1).tools[0].name : requests.at(-1).tools[0].function.name, "historical_tool");
 	assert.match(JSON.stringify(requests.at(-1)), /CURRENT_WRITER_INSTRUCTIONS/);
+	// Pi 0.84.2 Codex omits off on the wire; newer Pi emits "none".
+	// Compare the writer to the native simple API, independently of its config.
+	const offControl = await runtime.completeSimple(model, { messages: [{ role: "user", content: "off control", timestamp: 0 }] });
+	assert.equal(offControl.stopReason, "stop");
+	const nativeOffEffort = responses ? requests.at(-1).reasoning?.effort : requests.at(-1).reasoning_effort;
 	const manager = sdk.SessionManager.inMemory(cwd);
 	// System entries are supported only by transcript-capable hosts. Legacy hosts
 	// exercise the same conversational history without unsupported journal inputs.
@@ -240,7 +245,7 @@ try {
 		[{ provider: "alternate-writer" }, "alternate-writer.invalid", "writer", "high"],
 		[{ model: "override" }, "writer.invalid", "override", "high"],
 		[{ thinkingLevel: "medium" }, "writer.invalid", "writer", "medium"],
-		[{ thinkingLevel: "off" }, "writer.invalid", "writer", "none"],
+		[{ thinkingLevel: "off" }, "writer.invalid", "writer", nativeOffEffort],
 	]) {
 		const configPath = join(agentDir, "write-prompt.json");
 		if (config === undefined) rmSync(configPath, { force: true });
