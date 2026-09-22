@@ -1,5 +1,5 @@
 import { Type } from "@earendil-works/pi-ai";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { VERSION, type ContextEvent, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const TOOL_NAME = "name_session";
 
@@ -97,12 +97,23 @@ export default function sessionName(pi: ExtensionAPI): void {
 		registerTool();
 	});
 
-	pi.on("context", (event) => {
+	// context_with_system arrived in official/fork 0.87; transcript helpers already
+	// existed in 0.86. Use the public host version, keeping the 0.84.2 fallback.
+	const [major, minor] = VERSION.split(".").map(Number);
+	const withSystem = major > 0 || minor >= 87;
+	// Static bridge for the older host's on() overloads and message-role union.
+	const onContext = pi.on as (
+		event: "context" | "context_with_system",
+		handler: (event: Pick<ContextEvent, "messages">) => Pick<ContextEvent, "messages"> | void,
+	) => void;
+	onContext(withSystem ? "context_with_system" : "context", (event) => {
 		if (!active || !pi.getActiveTools().includes(TOOL_NAME)) return;
 
 		const metadata = JSON.stringify({ currentName: pi.getSessionName() ?? null });
+		const offset = withSystem && (event.messages[0]?.role as string | undefined) === "system" ? 1 : 0;
 		return {
 			messages: [
+				...event.messages.slice(0, offset),
 				{
 					role: "custom",
 					customType: "pi-session-name",
@@ -110,7 +121,7 @@ export default function sessionName(pi: ExtensionAPI): void {
 					display: false,
 					timestamp: 0,
 				},
-				...event.messages,
+				...event.messages.slice(offset),
 			],
 		};
 	});

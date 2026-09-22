@@ -2,14 +2,24 @@
 // Optional argument: another installed/built pi-coding-agent package root.
 // Use the host's native extension loader and completion/HTTP serializer, not a mocked complete().
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { zstdDecompressSync } from "node:zlib";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const host = process.argv[2] ? resolve(process.argv[2]) : dirname(dirname(fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))));
+const apis = ["openai-completions", "openai-responses", "openai-codex-responses"];
+const api = process.argv[3];
+if (!api) {
+	for (const route of apis) execFileSync(process.execPath, [fileURLToPath(import.meta.url), host, route], { stdio: "inherit" });
+	process.exit(0);
+}
+assert.ok(apis.includes(api));
+const responses = api !== "openai-completions";
 const hostRequire = createRequire(join(host, "package.json"));
 const sdkPath = join(host, "dist/index.js");
 if (process.env.PI_COMPAT_EXPECTED_PACKAGE_DIR) assert.equal(realpathSync(host), realpathSync(process.env.PI_COMPAT_EXPECTED_PACKAGE_DIR));
@@ -29,10 +39,27 @@ const sdk = await import(pathToFileURL(sdkPath).href);
 const ai = await import(pathToFileURL(aiPath).href);
 const requests = [];
 const originalFetch = globalThis.fetch;
+const originalWebSocket = globalThis.WebSocket;
+// Keep the writer's raw request options unchanged. Native auto transport falls
+// back to our fake HTTP endpoint when WebSockets are unavailable.
+globalThis.WebSocket = undefined;
+const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1kAAAAASUVORK5CYII=";
+const encrypted = { type: "reasoning", id: "rs_history", summary: [], encrypted_content: "SYNTHETIC_ENCRYPTED_REASONING" };
 // No request can leave the process. Only the fake endpoint is accepted.
 globalThis.fetch = async (url, init) => {
-	assert.equal(String(url), "https://writer.invalid/v1/chat/completions");
-	requests.push(JSON.parse(init.body));
+	const path = api === "openai-codex-responses" ? "codex/responses" : responses ? "responses" : "chat/completions";
+	assert.equal(String(url), `https://writer.invalid/v1/${path}`);
+	const body = new Headers(init.headers).get("content-encoding") === "zstd" ? zstdDecompressSync(init.body).toString() : init.body;
+	requests.push(JSON.parse(body));
+	if (responses) {
+		const item = { id: "msg_writer", type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: "WRITER_REPLY", annotations: [] }] };
+		const events = [
+			{ type: "response.output_item.added", output_index: 0, item: { ...item, content: [] } },
+			{ type: "response.output_item.done", output_index: 0, item },
+			{ type: "response.completed", response: { id: "resp_writer", status: "completed", output: [item], usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } } },
+		];
+		return new Response(events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
+	}
 	const chunk = { id: "writer-response", object: "chat.completion.chunk", created: 1, model: "writer", choices: [{ index: 0, delta: { role: "assistant", content: "WRITER_REPLY" }, finish_reason: "stop" }] };
 	return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, { headers: { "content-type": "text/event-stream" } });
 };
@@ -43,19 +70,21 @@ const actions = [];
 const lifecycle = [];
 const sentinel = "CURRENT_WRITER_INSTRUCTIONS";
 const historicalTool = { name: "historical_tool", description: "OLD_SCHEMA_SENTINEL", parameters: { type: "object", properties: {} } };
+let toolExecutions = 0;
 try {
 	const runtime = await sdk.ModelRuntime.create({ credentials: new ai.InMemoryCredentialStore(), modelsPath: null, allowModelNetwork: false, refreshOnCreate: false });
 	const registry = new sdk.ModelRegistry(runtime);
 	registry.registerProvider("writer-boundary", {
-		api: "openai-completions", baseUrl: "https://writer.invalid/v1", apiKey: "synthetic",
-		models: ["writer", "override"].map((id) => ({ id, name: id, reasoning: false, input: ["text"], contextWindow: 100000, maxTokens: 1000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } })),
+		api, baseUrl: "https://writer.invalid/v1",
+		apiKey: `synthetic.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "offline" } })).toString("base64")}.synthetic`,
+		models: ["writer", "override"].map((id) => ({ id, name: id, reasoning: responses, thinkingLevelMap: { off: null }, input: ["text", "image"], contextWindow: 100000, maxTokens: 1000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } })),
 	});
 	const model = registry.find("writer-boundary", "writer");
 	assert.ok(model);
 	// Positive control: this native serializer really exposes supplied schemas.
 	const control = await registry.complete(model, { systemPrompt: sentinel, tools: [historicalTool], messages: [{ role: "user", content: "control", timestamp: 0 }] });
 	assert.equal(control.stopReason, "stop");
-	assert.equal(requests.at(-1).tools[0].function.name, "historical_tool");
+	assert.equal(responses ? requests.at(-1).tools[0].name : requests.at(-1).tools[0].function.name, "historical_tool");
 	assert.match(JSON.stringify(requests.at(-1)), /CURRENT_WRITER_INSTRUCTIONS/);
 	const manager = sdk.SessionManager.inMemory(cwd);
 	// System entries are supported only by transcript-capable hosts. Legacy hosts
@@ -67,8 +96,8 @@ try {
 	}
 	manager.appendMessage({ role: "user", content: "CONVERSATION_SENTINEL", timestamp: 3 });
 	const assistant = { ...ai.fauxAssistantMessage("HISTORY_REPLY"), api: model.api, provider: model.provider, model: model.id };
-	manager.appendMessage({ ...assistant, content: [{ type: "text", text: "HISTORY_REPLY" }, { type: "toolCall", id: "call-1", name: "historical_tool", arguments: { query: "ARG_SENTINEL" } }], stopReason: "toolUse" });
-	manager.appendMessage({ role: "toolResult", toolName: "historical_tool", toolCallId: "call-1", content: [{ type: "text", text: "RESULT_SENTINEL" }], isError: true, timestamp: 4 });
+	manager.appendMessage({ ...assistant, content: [...(responses ? [{ type: "thinking", thinking: "", thinkingSignature: JSON.stringify(encrypted) }] : []), { type: "text", text: "HISTORY_REPLY" }, { type: "toolCall", id: "call-1", name: "historical_tool", arguments: { query: "ARG_SENTINEL" } }], stopReason: "toolUse" });
+	manager.appendMessage({ role: "toolResult", toolName: "historical_tool", toolCallId: "call-1", content: [{ type: "text", text: "RESULT_SENTINEL" }, { type: "image", data: png, mimeType: "image/png" }, { type: "text", text: "AFTER_IMAGE" }], isError: true, timestamp: 4 });
 	if (supportsSystemMessages) manager.appendMessage({ role: "system", content: "", toolsAdded: [historicalTool], timestamp: 5 });
 	const branchLeaf = manager.getLeafId();
 	manager.appendMessage({ role: "user", content: "OFF_BRANCH_SENTINEL", timestamp: 6 });
@@ -80,6 +109,7 @@ try {
 		noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
 		systemPromptOverride: () => sentinel,
 		extensionFactories: [(pi) => {
+			pi.registerTool({ ...historicalTool, label: "Historical tool", execute: async () => { toolExecutions++; throw new Error("Writer must not execute tools"); } });
 			pi.on("session_start", (event) => { lifecycle.push(event.reason); });
 			pi.on("session_shutdown", (event) => { lifecycle.push(`shutdown:${event.reason}`); });
 		}],
@@ -105,15 +135,42 @@ try {
 		const serialized = JSON.stringify(body);
 		assert.equal(serialized.split(sentinel).length - 1, 1, "current instructions must occur exactly once at the HTTP boundary");
 		assert.equal(body.tools?.length ?? 0, 0, "writer must not advertise historical tools");
-		assert.doesNotMatch(serialized, /OLD_INSTRUCTIONS|OLD_SCHEMA_SENTINEL|OFF_BRANCH_SENTINEL|tool_calls|tool_call_id/);
-		assert.ok(body.messages.every((m) => ["system", "user", "assistant"].includes(m.role)));
+		assert.doesNotMatch(serialized, /OLD_INSTRUCTIONS|OLD_SCHEMA_SENTINEL|OFF_BRANCH_SENTINEL/);
+		const messages = responses ? body.input : body.messages;
+		assert.doesNotMatch(JSON.stringify(messages), /tool_calls|tool_call_id|function_call|additional_tools/);
+		assert.ok(messages.every((m) => ["system", "developer", "user", "assistant"].includes(m.role) || m.type === "reasoning"));
+		if (responses) {
+			assert.equal(body.max_output_tokens, undefined, "raw writer does not set an output cap");
+			assert.equal(body.reasoning?.effort, undefined, "raw writer does not inherit main-agent effort");
+			assert.equal(body.temperature, undefined);
+			const reasoning = body.input.filter((item) => item.type === "reasoning");
+			assert.deepEqual(reasoning, history && body.model === "writer" ? [encrypted] : [], "encrypted reasoning replays only for the same model");
+			if (api === "openai-codex-responses") assert.equal(body.prompt_cache_options, undefined);
+		}
 		if (history) {
 			for (const text of ["CONVERSATION_SENTINEL", "HISTORY_REPLY", "called historical_tool", "ARG_SENTINEL", "historical_tool error", "RESULT_SENTINEL"]) assert.ok(serialized.includes(text), text);
+			assert.ok(serialized.includes(`data:image/png;base64,${png}`), "tool-result image must reach the native HTTP serializer");
+			const result = messages.find((m) => Array.isArray(m.content) && m.content.some((part) => part.text === "RESULT_SENTINEL"));
+			assert.ok(result, "flattened tool result remains a user message");
+			assert.equal(result.role, "user");
+			assert.deepEqual(result.content, responses ? [
+				{ type: "input_text", text: "[historical_tool error]" },
+				{ type: "input_text", text: "RESULT_SENTINEL" },
+				{ type: "input_image", detail: "auto", image_url: `data:image/png;base64,${png}` },
+				{ type: "input_text", text: "AFTER_IMAGE" },
+			] : [
+				{ type: "text", text: "[historical_tool error]" },
+				{ type: "text", text: "RESULT_SENTINEL" },
+				{ type: "image_url", image_url: { url: `data:image/png;base64,${png}` } },
+				{ type: "text", text: "AFTER_IMAGE" },
+			], "tool-result image bytes and text order survive native HTTP serialization");
 		}
 	}
 	async function exercise(sm, label, history = true) {
 		const before = structuredClone(sm.getEntries());
 		const leaf = sm.getLeafId();
+		const file = sm.getSessionFile();
+		const journal = file && existsSync(file) ? readFileSync(file) : undefined;
 		for (const [command, followup, dismiss] of [["draft", "Tweak", "Deny"], ["side-question", "Ask again", "Dismiss"]]) {
 			const start = requests.length;
 			actions.push(followup, dismiss);
@@ -124,8 +181,10 @@ try {
 			assert.equal(actions.length, 0);
 			assert.deepEqual(sm.getEntries(), before, "off-transcript commands must not alter the journal");
 			assert.equal(sm.getLeafId(), leaf);
+			if (journal) assert.deepEqual(readFileSync(file), journal, "off-transcript commands must not write to the main journal");
+			assert.equal(toolExecutions, 0);
 		}
-		console.log(`PASS ${label}: draft/tweak/deny and side-question/ask-again/dismiss`);
+		console.log(`PASS ${api} ${label}: draft/tweak/deny and side-question/ask-again/dismiss`);
 	}
 	await open(manager);
 	await exercise(manager, "active branch");
@@ -152,9 +211,10 @@ try {
 	assert.doesNotMatch(JSON.stringify(requests.at(-1)), /CONVERSATION_SENTINEL/);
 	assert.equal(notices.some((notice) => notice.level === "error"), false, JSON.stringify(notices));
 	assert.ok(lifecycle.includes("startup"));
-	console.log(JSON.stringify({ host, version: JSON.parse(readFileSync(join(host, "package.json"))).version, aiVersion: JSON.parse(readFileSync(join(aiRoot, "package.json"))).version, sdkPath, aiPath, extension: loader.getExtensions().extensions[0].path, requests: requests.length, lifecycle }));
+	console.log(JSON.stringify({ host, api, version: JSON.parse(readFileSync(join(host, "package.json"))).version, aiVersion: JSON.parse(readFileSync(join(aiRoot, "package.json"))).version, sdkPath, aiPath, extension: loader.getExtensions().extensions[0].path, requests: requests.length, lifecycle }));
 } finally {
 	if (session) { await session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" }); session.dispose(); }
 	globalThis.fetch = originalFetch;
+	globalThis.WebSocket = originalWebSocket;
 	rmSync(temp, { recursive: true, force: true });
 }
