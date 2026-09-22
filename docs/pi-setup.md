@@ -53,7 +53,7 @@ Fresh context is deliberate. Each child receives a bounded brief rather than inh
 
 ### 4. The parent decides and usually implements
 
-Most changes stay in the main session, which keeps design, implementation, and validation in one accountable place. `apply_edits` is the normal mutation surface.
+Most changes stay in the main session, which keeps design, implementation, and validation in one accountable place. The [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) package provides `apply_patch`, `replace_text`, and `write_files` for mutations, with `preview_patch` for read-only inspection. Its own documentation defines the tool arguments and filesystem guarantees.
 
 A `worker` is useful when an implementation item is independent enough for an isolated worktree or true parallelism. A `fixer` receives a confirmed finding list and changes only those items. The parent then inspects the real files and diff; a child success report is evidence, not proof.
 

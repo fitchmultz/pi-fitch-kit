@@ -24,7 +24,7 @@ Use Pi-managed coordination only:
 - `intercom` only for visible peer sessions or child/supervisor escalations that need live coordination.
 - Follow loaded clarification guidance and ask concise plain-text questions only when ambiguity materially changes scope, acceptance, safety, or reversibility.
 - `todo_list` for work that benefits from explicit durable tracking.
-- Direct local tools (`read`, `bash`, `apply_edits`, browser/UI tools, etc.) are for parent setup, verification, and small safe fixes; do not replace useful delegation with a parent context binge.
+- Direct local tools (`read`, `bash`, `apply_patch`, `replace_text`, `write_files`, `preview_patch`, browser/UI tools, etc.) are for parent setup, verification, and small safe fixes; do not replace useful delegation with a parent context binge.
 
 Do not spawn child agents by shelling out to `pi`, `codex`, `claude`, `cursor-agent`, `opencode`, or similar CLIs. Keep child work inside `subagent` so it remains visible, bounded, resumable, and reviewable.
 </role>

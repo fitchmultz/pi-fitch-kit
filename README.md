@@ -31,7 +31,7 @@ These are the extensions loaded in my current setup. Every external extension li
 
 | Extension | What I use it for |
 |---|---|
-| [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) | Atomic exact edits, whole-file rewrites, and plan-first multi-file changes |
+| [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) | `apply_patch`, `replace_text`, `write_files`, and read-only `preview_patch`; contracts live in the owning package |
 | [`pi-todo-list`](https://github.com/fitchmultz/pi-todo-list) | Persistent nested task state that survives long sessions and compaction |
 | [`pi-change-working-dir`](https://github.com/fitchmultz/pi-change-working-dir) | Safe mid-session movement into worktrees and monorepo subprojects |
 | [`pi-calculator`](https://github.com/fitchmultz/pi-calculator) | Deterministic high-precision arithmetic instead of model estimation |
@@ -178,7 +178,7 @@ A typical substantial change looks like this:
 
 1. The main session reads repository instructions and pulls the relevant issue or service context through MCP.
 2. Native repository search and, when useful, a fresh `scout` map the real code path before editing.
-3. The main session makes the design decision and usually implements it with `apply_edits`; independent `worker` tasks are the exception, not the default.
+3. The main session makes the design decision and usually implements it with the editor package's mutation tools; independent `worker` tasks are the exception, not the default.
 4. Agent Browser verifies browser-visible behavior when tests cannot prove the user experience.
 5. Repository checks and deterministic tools establish current evidence.
 6. A fresh reviewer reconstructs the claim from the diff and evidence. Any changed diff gets a new reviewer pass; old reviewer judgment is never cached as sign-off.

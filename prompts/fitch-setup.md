@@ -72,6 +72,10 @@ If mode is `verify`, make no changes, installs, downloads, logins, or repairs. A
 
 Report compact-view support and the selected preference separately: an absent `compactView` or explicit `false` is disabled, not drift to repair. An unsupported runtime is unavailable, not a failed kit installation. Verify that installing or restarting the kit does not enable the view without the user's setting choice.
 
-In either mode, verification is read-only after the required process restart or non-code reload. Use only harmless documented smokes: version and resource-list checks, local repository search, read-only subagent and intercom checks, a todo-list read, a non-authenticated browser page only if its runtime was approved, deterministic calculator input, and tool or schema discovery for integrations. Confirm `apply_edits` is active and the built-in `edit` and `write` tools are hidden. If a capability has no harmless smoke, report it as manual verification instead of inventing one.
+In either mode, verification is read-only after the required process restart or non-code reload. Use only harmless documented smokes: version and resource-list checks, local repository search, read-only subagent and intercom checks, a todo-list read, a non-authenticated browser page only if its runtime was approved, deterministic calculator input, and tool or schema discovery for integrations.
+
+For the selected `pi-apply-edits` component, confirm `apply_patch`, `replace_text`, `write_files`, and `preview_patch` are registered, then check their active selection and built-in `edit`/`write` visibility against the installed package's defaults, platform support, and explicit tool-scope or keep-builtins choices. Do not reactivate excluded tools or hide custom/remote writers. Preview-only selection must leave writers available and must not run publication probes. An installation exposing only the retired `apply_edits` surface is an editor-version mismatch to report, never a reason to mutate files during verification.
+
+If a capability has no harmless smoke, report it as manual verification instead of inventing one.
 
 Finish with selected components, installed sources, changed and skipped paths, model results, smoke results, process-restart or non-code reload status, and remaining manual authentication or setup. Do not claim success for a skipped or unverified capability.
