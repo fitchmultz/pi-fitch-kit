@@ -62,7 +62,7 @@ for (const paths of [
 	assert.ok(start);
 	await start({}, {});
 	assert.deepEqual(
-		transition.extensions.flatMap(({ tools }) => [...tools.keys()]),
+		transition.extensions.flatMap(({ tools }) => [...tools.values()].map(({ definition }) => definition.name)),
 		["name_session"],
 		"the effective standalone tool must remain the sole owner",
 	);
@@ -89,11 +89,11 @@ assert.equal(loaded.extensions.length, 1);
 bindTools(runtime, loaded);
 
 const extension = loaded.extensions[0];
-assert.equal(extension.tools.has("name_session"), false);
+assert.equal(extension.tools.size, 0);
 const start = extension.handlers.get("session_start")?.[0];
 assert.ok(start);
 await start({}, {});
-const tool = extension.tools.get("name_session")?.definition;
+const tool = [...extension.tools.values()].find(({ definition }) => definition.name === "name_session")?.definition;
 assert.ok(tool);
 assert.equal(tool.executionMode, "sequential");
 type ContextResult = {

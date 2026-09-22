@@ -99,7 +99,7 @@ try {
 	if (!sessionNameStart) throw new Error("Session-name session_start handler missing");
 	await sessionNameStart({}, {});
 	const toolNames = extensions.extensions
-		.flatMap(({ tools }) => [...tools.keys()])
+		.flatMap(({ tools }) => [...tools.values()].map(({ definition }) => definition.name))
 		.sort();
 	if (JSON.stringify(toolNames) !== JSON.stringify(["name_session"])) {
 		throw new Error(`Expected [\"name_session\"], got ${JSON.stringify(toolNames)}`);
