@@ -2,7 +2,8 @@
 
 ## 0.11.2 — 22 September 2026
 
-- Inherit the selected session model and thinking level for `/draft`, including off-transcript writing, without changing `/side-question` or saved conversation history.
+- Inherit the selected session provider, model, and thinking level for `/draft` and `/side-question` off-transcript calls. Optional writer configuration can override each; saved conversation history and session model selection remain unchanged.
+- Steer accepted drafts when the agent is busy instead of dropping them. Restore original text to the editor, or reopen the last accepted draft with `/draft` and no text.
 - Qualify registered tool identity against Pi's public tool definitions so compatibility checks do not depend on private registry keys.
 
 ## 0.11.1 — 22 September 2026
