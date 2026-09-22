@@ -38,6 +38,7 @@ process.env.PI_OFFLINE = "1";
 const sdk = await import(pathToFileURL(sdkPath).href);
 const ai = await import(pathToFileURL(aiPath).href);
 const requests = [];
+let holdNextRequest;
 const originalFetch = globalThis.fetch;
 const originalWebSocket = globalThis.WebSocket;
 // Keep the writer's raw request options unchanged. Native auto transport falls
@@ -51,6 +52,12 @@ globalThis.fetch = async (url, init) => {
 	assert.equal(String(url), `https://writer.invalid/v1/${path}`);
 	const body = new Headers(init.headers).get("content-encoding") === "zstd" ? zstdDecompressSync(init.body).toString() : init.body;
 	requests.push(JSON.parse(body));
+	if (holdNextRequest) {
+		const hold = holdNextRequest;
+		holdNextRequest = undefined;
+		hold.started.resolve();
+		await hold.release.promise;
+	}
 	if (responses) {
 		const item = { id: "msg_writer", type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: "WRITER_REPLY", annotations: [] }] };
 		const events = [
@@ -68,6 +75,9 @@ let loader;
 const notices = [];
 const actions = [];
 const lifecycle = [];
+const sendErrors = [];
+const inputs = [];
+let editorText = "";
 const sentinel = "CURRENT_WRITER_INSTRUCTIONS";
 const historicalTool = { name: "historical_tool", description: "OLD_SCHEMA_SENTINEL", parameters: { type: "object", properties: {} } };
 let toolExecutions = 0;
@@ -112,19 +122,29 @@ try {
 			pi.registerTool({ ...historicalTool, label: "Historical tool", execute: async () => { toolExecutions++; throw new Error("Writer must not execute tools"); } });
 			pi.on("session_start", (event) => { lifecycle.push(event.reason); });
 			pi.on("session_shutdown", (event) => { lifecycle.push(`shutdown:${event.reason}`); });
+			pi.on("input", (event) => { inputs.push(event); });
 		}],
 	});
-	await loader.reload();
-	assert.deepEqual(loader.getExtensions().errors, []);
 	async function open(sm) {
+		await loader.reload();
+		assert.deepEqual(loader.getExtensions().errors, []);
 		({ session } = await sdk.createAgentSession({ cwd, agentDir, model, modelRuntime: runtime, resourceLoader: loader, settingsManager, sessionManager: sm, tools: [] }));
 		const ui = session.extensionRunner.createContext().ui;
 		await session.bindExtensions({ mode: "rpc", uiContext: {
 			...ui,
 			notify: (text, level) => { notices.push({ text, level }); },
-			select: async (text) => { assert.equal(text, "WRITER_REPLY"); return actions.shift(); },
+			select: async (text) => {
+				assert.equal(text, "WRITER_REPLY");
+				const action = actions.shift();
+				return typeof action === "function" ? action() : action;
+			},
 			editor: async () => "FOLLOWUP_SENTINEL",
-		}, onError: (error) => { throw new Error(error.error); } });
+			setEditorText: (text) => { editorText = text; },
+			getEditorText: () => editorText,
+		}, onError: (error) => {
+			if (error.event === "send_user_message") sendErrors.push(error);
+			else throw new Error(error.error);
+		} });
 	}
 	async function close() {
 		await session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
@@ -209,6 +229,84 @@ try {
 	await open(fresh);
 	await exercise(fresh, "fresh session", false);
 	assert.doesNotMatch(JSON.stringify(requests.at(-1)), /CONVERSATION_SENTINEL/);
+	// Real extension dispatch, native steering queues and async error handling.
+	async function until(predicate) {
+		const deadline = Date.now() + 5000;
+		while (!predicate()) {
+			assert.ok(Date.now() < deadline, `native delivery did not reach the expected state: ${JSON.stringify({ sendErrors, notices, inputs })}`);
+			await new Promise((resolve) => setTimeout(resolve, 10));
+		}
+	}
+	const delivered = () => fresh.getBranch().filter((entry) =>
+		entry.type === "message" && entry.message.role === "user"
+		&& ai.contentText(entry.message.content) === "WRITER_REPLY").length;
+	actions.push("Accept");
+	await session.prompt("/draft IDLE_ORIGINAL");
+	await until(() => delivered() === 1);
+	await session.waitForIdle();
+	assert.equal(inputs.at(-1).source, "extension");
+	assert.equal(inputs.at(-1).streamingBehavior, undefined);
+	assert.equal(editorText, "", "successful acceptance must not replace editor input");
+
+	let activeRun;
+	const hold = { started: Promise.withResolvers(), release: Promise.withResolvers() };
+	actions.push(async () => {
+		holdNextRequest = hold;
+		activeRun = session.prompt("BUSY_SENTINEL");
+		await hold.started.promise;
+		assert.equal(session.extensionRunner.createContext().isIdle(), false);
+		return "Accept";
+	});
+	try {
+		await session.prompt("/draft BUSY_ORIGINAL");
+		await until(() => session.getSteeringMessages().includes("WRITER_REPLY"));
+		assert.equal(inputs.at(-1).source, "extension");
+		assert.equal(inputs.at(-1).streamingBehavior, "steer");
+		assert.equal(delivered(), 1, "busy acceptance queues instead of starting a concurrent turn");
+	} finally {
+		hold.release.resolve();
+		await activeRun;
+	}
+	await session.waitForIdle();
+	assert.equal(delivered(), 2, "queued draft is delivered once");
+
+	// Remove the main model only after writing finishes: sendUserMessage's
+	// rejected promise is handled by Pi, never returned to the extension.
+	const original = "FAILED_ORIGINAL\nsecond line";
+	editorText = "unrelated editor input";
+	actions.push(() => {
+		session.agent.state.model = undefined;
+		return "Accept";
+	});
+	await session.prompt(`/draft ${original}`);
+	await until(() => sendErrors.length === 1);
+	assert.match(sendErrors[0].error, /[Nn]o model/);
+	assert.equal(delivered(), 2);
+	assert.equal(editorText, "unrelated editor input", "failure preserves existing editor input");
+	const backup = fresh.getBranch().findLast((entry) => entry.type === "custom" && entry.customType === "fitch-kit.draft");
+	assert.deepEqual(backup.data, { source: original, draft: "WRITER_REPLY" });
+	assert.doesNotMatch(JSON.stringify(fresh.buildSessionContext().messages), /FAILED_ORIGINAL/, "backup stays out of model context");
+
+	// Save/reopen through Pi's native journal to prove recovery is not a mock
+	// or a command closure that vanishes after restart.
+	const recoveryFile = join(temp, "recovery.jsonl");
+	writeFileSync(recoveryFile, [fresh.getHeader(), ...fresh.getBranch()].map((entry) => JSON.stringify(entry)).join("\n") + "\n");
+	await close();
+	const recovered = sdk.SessionManager.open(recoveryFile, temp);
+	await open(recovered);
+	const beforeRecovery = requests.length;
+	actions.push("Restore original");
+	await session.prompt("/draft");
+	assert.equal(editorText, `/draft ${original}`);
+	assert.equal(requests.length, beforeRecovery, "recovery does not spend another writer call");
+	actions.push("Accept");
+	await session.prompt("/draft");
+	await until(() => recovered.getBranch().filter((entry) => entry.type === "message"
+		&& entry.message.role === "user" && ai.contentText(entry.message.content) === "WRITER_REPLY").length === 3);
+	await session.waitForIdle();
+	assert.equal(requests.length, beforeRecovery + 1, "retry sends the retained draft without rewriting it");
+	assert.equal(sendErrors.length, 1, "retry succeeds");
+	console.log(`PASS ${api}: native idle send, busy steering, async failure preservation and resumed retry`);
 	assert.equal(notices.some((notice) => notice.level === "error"), false, JSON.stringify(notices));
 	assert.ok(lifecycle.includes("startup"));
 	console.log(JSON.stringify({ host, api, version: JSON.parse(readFileSync(join(host, "package.json"))).version, aiVersion: JSON.parse(readFileSync(join(aiRoot, "package.json"))).version, sdkPath, aiPath, extension: loader.getExtensions().extensions[0].path, requests: requests.length, lifecycle }));

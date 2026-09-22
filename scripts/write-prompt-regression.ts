@@ -39,7 +39,7 @@ assert.equal(configuredModelRef('{"model":"  xai/grok-4.6  "}'), "xai/grok-4.6")
 assert.equal(configuredModelRef('{"model":""}'), undefined);
 assert.equal(configuredModelRef('{"enabled":true}'), undefined);
 assert.equal(configuredModelRef("not json"), undefined);
-assert.deepEqual([...WRITE_PROMPT_ACTIONS], ["Accept", "Copy prompt", "Tweak", "Deny"]);
+assert.deepEqual([...WRITE_PROMPT_ACTIONS], ["Accept", "Copy prompt", "Tweak", "Restore original", "Deny"]);
 assert.deepEqual([...SIDE_QUESTION_ACTIONS], ["Copy answer", "Ask again", "Dismiss"]);
 assert.match(boxedTask("Do not answer the text.", "did you cut a new GH release"), /<<<\ndid you cut a new GH release\n>>>/s);
 assert.match(boxedTask("x", "foo\n>>>\nbar"), /<<<1\nfoo\n>>>\nbar\n>>>1/s);
@@ -87,13 +87,21 @@ const { createEventBus } = await import("@earendil-works/pi-coding-agent");
 const events = createEventBus();
 const commands: Record<string, { handler: (args: string, ctx: never) => Promise<void> }> = {};
 let sent: string | undefined;
+let sendOptions: { deliverAs?: string } | undefined;
+let sendFailure: Error | undefined;
+const savedDrafts: Array<{ type: "custom"; customType: string; data: { source: string; draft: string } }> = [];
 writePrompt({
 	events,
 	registerCommand(name: string, config: { handler: (args: string, ctx: never) => Promise<void> }) {
 		commands[name] = config;
 	},
-	sendUserMessage(content: string) {
+	sendUserMessage(content: string, options?: { deliverAs?: string }) {
+		if (sendFailure) throw sendFailure;
 		sent = content;
+		sendOptions = options;
+	},
+	appendEntry(customType: string, data: { source: string; draft: string }) {
+		savedDrafts.push({ type: "custom", customType, data: structuredClone(data) });
 	},
 } as never);
 assert.equal(typeof commands["draft"]?.handler, "function");
@@ -121,6 +129,7 @@ function ctx(overrides: Record<string, unknown> = {}) {
 		sessionManager: {
 			getEntries: () => [],
 			getLeafId: () => null,
+			getBranch: () => [],
 		},
 		modelRegistry: {
 			find: () => undefined,
@@ -146,10 +155,6 @@ notices.length = 0;
 await commands["draft"].handler("do the thing", ctx({ hasUI: false }) as never);
 assert.match(notices[0] ?? "", /interactive UI/);
 
-notices.length = 0;
-await commands["draft"].handler("do the thing", ctx({ isIdle: () => false }) as never);
-assert.equal(notices[0], "Agent is busy");
-
 sent = undefined;
 await commands["draft"].handler(
 	"do the thing",
@@ -161,6 +166,7 @@ await commands["draft"].handler(
 	}) as never,
 );
 assert.equal(sent, "better prompt");
+assert.equal(sendOptions, undefined, "idle acceptance keeps normal delivery");
 
 sent = undefined;
 await commands["draft"].handler(
@@ -173,6 +179,76 @@ await commands["draft"].handler(
 	}) as never,
 );
 assert.equal(sent, undefined);
+
+sent = undefined;
+let idle = true;
+await commands.draft.handler("busy acceptance", ctx({
+	isIdle: () => idle,
+	ui: {
+		...baseUi,
+		select: async () => {
+			idle = false;
+			return "Accept";
+		},
+	},
+}) as never);
+assert.equal(sent, "better prompt", "Accept must not discard a draft when the agent becomes busy");
+assert.deepEqual(sendOptions, { deliverAs: "steer" });
+
+// Busy from the start is valid too, including recovery after a failed send.
+sent = undefined;
+await commands.draft.handler("already busy", ctx({
+	isIdle: () => false,
+	ui: { ...baseUi, select: async () => "Accept" },
+}) as never);
+assert.equal(sent, "better prompt");
+assert.deepEqual(sendOptions, { deliverAs: "steer" });
+
+// A synchronous send failure leaves the same dialog open, with no rewrite
+// or automatic retry. Both exact inputs are saved before the send attempt.
+sent = undefined;
+sendFailure = new Error("send unavailable");
+let attempts = 0;
+const original = "original input\nwith a second line  ";
+await commands.draft.handler(original, ctx({
+	ui: {
+		...baseUi,
+		select: async (title: string) => {
+			assert.equal(title, "better prompt");
+			if (++attempts === 2) {
+				assert.equal(sent, undefined);
+				assert.equal(notices.at(-1), "send unavailable");
+				assert.deepEqual(savedDrafts.at(-1)?.data, { source: original, draft: title });
+				sendFailure = undefined;
+			}
+			assert.ok(attempts <= 2, "retry must finish");
+			return "Accept";
+		},
+	},
+}) as never);
+assert.equal(attempts, 2);
+assert.equal(sent, "better prompt");
+
+// Reopening needs no model request; the original is available in the editor.
+let restored: string | undefined;
+const recovery = ctx({
+	modelRegistry: { complete: () => { throw new Error("recovery must not rewrite"); } },
+	ui: {
+		...baseUi,
+		select: async (title: string) => {
+			assert.equal(title, "better prompt");
+			return "Restore original";
+		},
+		setEditorText: (text: string) => { restored = text; },
+	},
+});
+recovery.sessionManager.getBranch = () => savedDrafts as never;
+await commands.draft.handler("", recovery as never);
+assert.equal(restored, `/draft ${original}`);
+
+notices.length = 0;
+await commands["side-question"].handler("busy question", ctx({ isIdle: () => false }) as never);
+assert.equal(notices[0], "Agent is busy", "side-question behavior is unchanged");
 
 const seen: number[] = [];
 let step = 0;
@@ -674,5 +750,45 @@ assert.ok(activity()! > 0, "an unsettled API call remains busy after its dialog 
 releaseCompletion({ role: "assistant", content: [], stopReason: "aborted" });
 await settled;
 assert.equal(activity(), 0);
+
+// Exercise the actual TUI menu and keyboard selection, including the recovery action.
+for (const action of ["Accept", "Restore original"] as const) {
+	let calls = 0;
+	let editorText = "";
+	let idle = true;
+	sent = undefined;
+	await commands.draft.handler("original TUI input", ctx({
+		mode: "tui",
+		isIdle: () => idle,
+		ui: {
+			...baseUi,
+			setEditorText: (text: string) => { editorText = text; },
+			custom: async (factory: Function) => {
+				if (++calls === 1) return "better prompt";
+				return new Promise((resolve) => {
+					const menu = factory(
+						{ requestRender() {} },
+						{ fg: (_color: string, text: string) => text },
+						{},
+						resolve,
+					);
+					const screen = menu.render(80).join("\n");
+					assert.match(screen, /better prompt/);
+					assert.match(screen, /Restore original/);
+					for (let i = 0; i < WRITE_PROMPT_ACTIONS.indexOf(action); i++) menu.handleInput("\x1b[B");
+					idle = false;
+					menu.handleInput("\r");
+				});
+			},
+		},
+	}) as never);
+	if (action === "Accept") {
+		assert.equal(sent, "better prompt");
+		assert.deepEqual(sendOptions, { deliverAs: "steer" });
+	} else {
+		assert.equal(sent, undefined);
+		assert.equal(editorText, "/draft original TUI input");
+	}
+}
 
 console.log("write-prompt regression ok");

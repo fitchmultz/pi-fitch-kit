@@ -18,8 +18,20 @@ import { Container, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
 import { prepareClaudeImages } from "./anthropic-image-guard.ts";
 
 export const WRITE_PROMPT_FILE = "write-prompt.json";
-export const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Deny"] as const;
+export const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Restore original", "Deny"] as const;
 export const SIDE_QUESTION_ACTIONS = ["Copy answer", "Ask again", "Dismiss"] as const;
+const SAVED_DRAFT = "fitch-kit.draft";
+
+function savedDraft(ctx: ExtensionCommandContext): { source: string; draft: string } | undefined {
+	for (const entry of ctx.sessionManager.getBranch().toReversed()) {
+		if (entry.type !== "custom" || entry.customType !== SAVED_DRAFT) continue;
+		const data = entry.data;
+		if (data && typeof data === "object" && "source" in data && "draft" in data
+			&& typeof data.source === "string" && typeof data.draft === "string") {
+			return { source: data.source, draft: data.draft };
+		}
+	}
+}
 
 const OUTPUT_RULES = `You are not the session agent. Output only the rewritten prompt. No preamble, quotes, or explanation.
 Preserve intent. Make the request specific, complete, and actionable.
@@ -246,12 +258,12 @@ function pickAction(ctx: ExtensionCommandContext, draft: string, actions: readon
 	});
 }
 
-function prepare(ctx: ExtensionCommandContext) {
+function prepare(ctx: ExtensionCommandContext, allowBusy = false) {
 	if (!ctx.hasUI) {
 		ctx.ui.notify("Needs an interactive UI", "error");
 		return;
 	}
-	if (!ctx.isIdle()) {
+	if (!allowBusy && !ctx.isIdle()) {
 		ctx.ui.notify("Agent is busy", "warning");
 		return;
 	}
@@ -282,17 +294,18 @@ export default function writePrompt(pi: ExtensionAPI): void {
 		};
 	}
 	pi.registerCommand("draft", {
-		description: "Rewrite text into a better agent request, then accept, copy, tweak, or deny",
+		description: "Rewrite text into a better agent request; omit text to reopen the last accepted draft",
 		handler: track(async (args, ctx) => {
-			const source = args.trim();
-			if (!source) {
+			const saved = args.trim() ? undefined : savedDraft(ctx);
+			const source = saved?.source ?? args;
+			if (!source.trim()) {
 				ctx.ui.notify("Usage: /draft <text>", "warning");
 				return;
 			}
-			const ready = prepare(ctx);
+			const ready = prepare(ctx, true);
 			if (!ready) return;
 			const { model, messages, systemPrompt, sessionId } = ready;
-			let draft = await runWriter(
+			let draft = saved?.draft ?? await runWriter(
 				ctx,
 				model,
 				systemPrompt,
@@ -311,11 +324,20 @@ export default function writePrompt(pi: ExtensionAPI): void {
 					return;
 				}
 				if (action === "Accept") {
-					if (!ctx.isIdle()) {
-						ctx.ui.notify("Agent is busy; prompt not sent", "warning");
-						return;
+					try {
+						// sendUserMessage is fire-and-forget: native async failures cannot
+						// be caught here. Keep both inputs off-model for /draft recovery.
+						pi.appendEntry(SAVED_DRAFT, { source, draft });
+						if (ctx.isIdle()) pi.sendUserMessage(draft);
+						else pi.sendUserMessage(draft, { deliverAs: "steer" });
+					} catch (error) {
+						ctx.ui.notify(error instanceof Error ? error.message : "Send failed", "error");
+						continue;
 					}
-					pi.sendUserMessage(draft);
+					return;
+				}
+				if (action === "Restore original") {
+					ctx.ui.setEditorText(`/draft ${source}`);
 					return;
 				}
 				if (action === "Copy prompt") {
@@ -335,7 +357,7 @@ export default function writePrompt(pi: ExtensionAPI): void {
 					model,
 					systemPrompt,
 					messages,
-					boxedTask(TWEAK_INSTRUCTION, notes.trim()),
+					boxedTask(TWEAK_INSTRUCTION, `Original request:\n${source}\n\nCurrent draft:\n${draft}\n\nRevision notes:\n${notes.trim()}`),
 					sessionId,
 					"Drafting...",
 					"Draft failed",
