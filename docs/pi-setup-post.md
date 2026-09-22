@@ -1,10 +1,10 @@
 # My Pi harness, and why it is structured this way
 
-_Updated 25 August 2026 for Pi 0.84.2 or newer on Node.js 24 or newer._
+_Updated 22 September 2026 for Pi 0.84.2 or newer on Node.js 24 or newer._
 
 A few people have asked about my terminal agent setup. The public, installable version is [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit).
 
-I use [Pi](https://github.com/badlogic/pi-mono), a small terminal coding agent, as the runtime. The useful part is the composition around it:
+I use [Pi](https://github.com/earendil-works/pi), a small terminal coding agent, as the runtime. The useful part is the composition around it:
 
 1. public extensions for reliable tools;
 2. fresh, bounded subagents with model routing;
@@ -33,7 +33,7 @@ I keep `images.autoResize` off so agents can inspect original image detail. Anth
 
 The sixteen `pi-subagents` specialist profiles cover scouting, context assembly, debugging, research, planning, monitoring, bounded implementation, focused fixes, general review, GPT review, Claude review, security review, over-engineering review, UI review, oracle decisions, and writing. Its general-purpose `delegate` remains available beside them.
 
-Gateway Opus handles the Claude-heavy analysis and review roles. Direct OpenAI Sol handles scouting, research, implementation, monitoring, and the GPT path. Kimi Fast handles security and over-engineering review, while Gateway Fable handles writing. Direct Anthropic and Codex routes remain fallbacks when the owner-specific gateway or router configuration is unavailable.
+The owning [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/main/agents) files define each role's models and ordered fallbacks. The kit preserves user and project overrides, including cross-family reviewers. The public settings example selects direct OpenAI Astra at max reasoning; my personal main session uses Codex Astra at max with a 600k context budget.
 
 Every profile is a leaf. Almost every child starts with fresh context. The parent inspects the actual files and evidence, makes the final decision, and stays accountable for the outcome.
 
@@ -84,10 +84,10 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 pi
 # Complete provider login, then:
 pi install git:github.com/fitchmultz/pi-fitch-kit
-# /reload, then:
+# Start a fresh Pi process, then:
 /fitch-setup
 ```
 
 `/fitch-setup` reads unpinned package sources from [`setup-manifest.json`](../setup-manifest.json), normalizes duplicate or filtered kit entries, previews every selected change, and stops for each user's own authentication. `/fitch-setup verify` reports drift without changing anything.
 
-The [README](../README.md) is the navigation hub. The [full guide](./pi-setup.md) explains the model table, launch policy, evidence rules, usage sample, and security boundaries.
+The [README](../README.md) is the navigation hub. The [full guide](./pi-setup.md) explains model ownership, launch policy, evidence rules, usage sample, and security boundaries.

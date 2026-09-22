@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.0 — 22 September 2026
+
+- Select Astra for the public OpenAI default while preserving max reasoning, the optional public context budgets, and existing user settings. Setup can preview full-model-to-override migrations without freezing native capabilities or replacing personal profiles.
+- Keep naming metadata after Pi's leading system message on 0.87 and newer, preserving incremental prompt and tool updates. Retain the legacy hook on older supported hosts.
+- Preserve screenshots in off-transcript writer context, with native Responses and Codex boundary coverage and unchanged writer request policy.
+- Read verbosity from the owning controller's native status instead of a second configuration parser and watcher. Setup selects the maintained controller fork and preserves existing verbosity settings during migration.
+- Derive validation from the manifest and settings, point to the owning subagent profiles, and require a fresh process after extension-code updates. Retain the Pi 0.84.2 floor and current official/fork qualification.
+
 ## 0.10.6 — 16 September 2026
 
 - Keep `/draft` and `/side-question` completions tool-free on transcript-based Pi hosts: send current instructions once, omit historical system/tool declarations, and retain flattened conversational tool history. Preserve stock Pi behavior without fork-only APIs. Exercise both commands, follow-ups, file-backed resume, fresh sessions, and supported new-context rollover through native completion and HTTP serialization offline.

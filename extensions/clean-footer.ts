@@ -1,50 +1,10 @@
-import { existsSync, readFile, unwatchFile, watchFile } from "node:fs";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
-import {
-	getAgentDir,
-	type ExtensionAPI,
-	type ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
 const CHECKPOINT_ENTRY = "clean-footer-checkpoint";
-const VERBOSITY_PATH = join(getAgentDir(), "verbosity.json");
-const VERBOSITY_APIS = new Set(["openai-responses", "openai-codex-responses", "azure-openai-responses"]);
-type Verbosity = "low" | "medium" | "high";
-type VerbosityConfig = { showIndicator: boolean; models: Record<string, Verbosity> };
-const NO_VERBOSITY: VerbosityConfig = { showIndicator: false, models: {} };
-
-async function loadVerbosity(): Promise<VerbosityConfig> {
-	return new Promise((resolve) => {
-		readFile(VERBOSITY_PATH, "utf8", (error, data) => {
-			if (error) return resolve(NO_VERBOSITY);
-			try {
-				const value = JSON.parse(data) as { showIndicator?: unknown; models?: unknown };
-				const models: Record<string, Verbosity> = {};
-				if (value.models && typeof value.models === "object" && !Array.isArray(value.models)) {
-					for (const [rawKey, rawValue] of Object.entries(value.models)) {
-						const key = rawKey.trim();
-						const normalized = typeof rawValue === "string" ? rawValue.trim().toLowerCase() : "";
-						if (key && (normalized === "low" || normalized === "medium" || normalized === "high")) {
-							models[key] = normalized;
-						}
-					}
-				}
-				resolve({ showIndicator: value.showIndicator === true, models });
-			} catch {
-				resolve(NO_VERBOSITY);
-			}
-		});
-	});
-}
-
-function verbosityText(ctx: ExtensionContext, config: VerbosityConfig): string {
-	const model = ctx.model;
-	if (!config.showIndicator || !model || !VERBOSITY_APIS.has(model.api)) return "";
-	const verbosity = config.models[`${model.provider}/${model.id}`] ?? config.models[model.id];
-	return verbosity ? ` • 🗣  ${verbosity}` : "";
-}
 
 function formatCount(count: number): string {
 	if (count < 1_000) return String(count);
@@ -93,7 +53,7 @@ function sanitize(text: string): string {
 	return text.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
 }
 
-function installFooter(ctx: ExtensionContext, verbosity: VerbosityConfig): void {
+function installFooter(ctx: ExtensionContext): void {
 	ctx.ui.setFooter((tui, theme, footerData) => {
 		const unsubscribe = footerData.onBranchChange(() => tui.requestRender());
 		let repoCache: { cwd: string; name?: { text: string; key: string } } | undefined;
@@ -156,7 +116,9 @@ function installFooter(ctx: ExtensionContext, verbosity: VerbosityConfig): void 
 				const model = ctx.model?.id.split("/").pop() ?? "no-model";
 				const thinking = ctx.model?.reasoning ? ` • ${ctx.thinkingLevel ?? "off"}` : "";
 				const provider = footerData.getAvailableProviderCount() > 1 && ctx.model ? `(${ctx.model.provider}) ` : "";
-				const rightText = `${provider}${model}${thinking}${verbosityText(ctx, verbosity)}`;
+				const extensionStatuses = footerData.getExtensionStatuses();
+				const verbosity = extensionStatuses.get("verbosity");
+				const rightText = `${provider}${model}${thinking}${verbosity ? ` • ${sanitize(verbosity)}` : ""}`;
 				const topLines = visibleWidth(location) + visibleWidth(rightText) + 2 <= width
 					? [location + " ".repeat(width - visibleWidth(location) - visibleWidth(rightText)) + theme.fg("dim", rightText)]
 					: [
@@ -166,7 +128,8 @@ function installFooter(ctx: ExtensionContext, verbosity: VerbosityConfig): void 
 							),
 						];
 
-				const statuses = [...footerData.getExtensionStatuses().entries()]
+				const statuses = [...extensionStatuses.entries()]
+					.filter(([key]) => key !== "verbosity")
 					.sort(([a], [b]) => a.localeCompare(b))
 					.map(([, text]) => sanitize(text));
 				const statusLines: string[] = [];
@@ -190,14 +153,8 @@ function installFooter(ctx: ExtensionContext, verbosity: VerbosityConfig): void 
 
 export default function (pi: ExtensionAPI) {
 	let enabled = true;
-	let verbosity = NO_VERBOSITY;
-	let footerContext: ExtensionContext | undefined;
-	const refreshVerbosity = async () => {
-		verbosity = await loadVerbosity();
-		if (enabled && footerContext?.mode === "tui") installFooter(footerContext, verbosity);
-	};
 
-	pi.on("session_start", async (event, ctx) => {
+	pi.on("session_start", (event, ctx) => {
 		// This is an instance toggle, not a global or branch preference. Warm reload/new/
 		// resume/fork still start enabled; tree navigation leaves the live choice alone.
 		// Only cold startup restores the file-wide choice saved by a checkpoint, and
@@ -207,15 +164,7 @@ export default function (pi: ExtensionAPI) {
 			const saved = entry?.type === "custom" ? entry.data as { sessionId?: unknown; enabled?: unknown } | null : undefined;
 			if (saved?.sessionId === ctx.sessionManager.getSessionId() && typeof saved.enabled === "boolean") enabled = saved.enabled;
 		}
-		footerContext = ctx;
-		verbosity = await loadVerbosity();
-		if (enabled && ctx.mode === "tui") installFooter(ctx, verbosity);
-		unwatchFile(VERBOSITY_PATH, refreshVerbosity);
-		if (ctx.hasUI) watchFile(VERBOSITY_PATH, { interval: 500 }, refreshVerbosity);
-	});
-	pi.on("session_shutdown", () => {
-		unwatchFile(VERBOSITY_PATH, refreshVerbosity);
-		footerContext = undefined;
+		if (enabled && ctx.mode === "tui") installFooter(ctx);
 	});
 
 	// Additive fork event; no dependency on fork-only exported types or a second state store.
@@ -223,8 +172,7 @@ export default function (pi: ExtensionAPI) {
 		event: unknown, ctx: ExtensionContext,
 	) => { sleepReady: boolean }) => void)("session_checkpoint", (_event, ctx) => {
 		pi.appendEntry(CHECKPOINT_ENTRY, { sessionId: ctx.sessionManager.getSessionId(), enabled });
-		// Native command ownership settles the toggle. The verbosity watcher only reads
-		// and redraws reconstructible presentation; no footer/cache serialization is needed.
+		// Native command ownership settles the toggle; presentation is reconstructed.
 		return { sleepReady: true };
 	});
 
@@ -233,7 +181,7 @@ export default function (pi: ExtensionAPI) {
 		handler: async (_args, ctx) => {
 			if (ctx.mode !== "tui") return;
 			enabled = !enabled;
-			if (enabled) installFooter(ctx, verbosity);
+			if (enabled) installFooter(ctx);
 			else ctx.ui.setFooter(undefined);
 			ctx.ui.notify(`Clean footer ${enabled ? "enabled" : "disabled"}`, "info");
 		},

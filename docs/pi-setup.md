@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Updated 7 September 2026 for Pi 0.84.2 or newer on Node.js 24 or newer._
+_Updated 22 September 2026. Supports Pi 0.84.2 or newer on Node.js 24 or newer; qualified against official Pi and the maintained 0.87.0 fork._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 
@@ -88,7 +88,7 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 - task control: clarification guidance, persistent todos, session naming, and working-directory changes;
 - deterministic support: calculator, `/ctx` context inspection, tool duration, verbosity, session editing, stash, and raw message copy;
 - kit boundary: a compact non-truncating footer, stable session naming, Anthropic-only image resizing, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, `/side-question`, and in-place `/restart`, while `pi-subagents` owns its profile defaults;
-- user-local only: a force-disabled `nested-agents.ts` file and the loaded 500k Sol Pro alias outside the enabled model cycle, both documented in the README but excluded from Complete core.
+- user-local only: provider definitions, agent-profile overrides, and Posthorse fresh-context windows on the supporting fork; none are copied into Complete core.
 
 Most reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
 
@@ -118,42 +118,17 @@ The supported host is the ordinary Unix Node Pi CLI on a real TTY. SDK/RPC/print
 
 ## Model routing
 
-The agent files are the runtime source of truth. Models, fallbacks, effort, and context policy live in frontmatter; role bodies contain only the job, evidence standard, boundaries, and output contract.
+[`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/main/agents) owns the specialist defaults. Primary models, ordered fallbacks, thinking levels, and context policy live in those files. The generic delegate inherits the parent model. User and project profiles take precedence and are preserved during kit setup; the setup preview shows the installed mapping rather than a copied table.
 
-| Agent | Primary | Fallbacks | Thinking | Context |
-|---|---|---|---|---|
-| `scout` | OpenAI Sol | Codex Sol | high | fresh |
-| `context-builder` | Gateway Opus | Direct Opus, Gateway Fable, OpenAI Sol | xhigh | fresh |
-| `debugger` | Gateway Opus | Direct Opus, OpenAI Sol, Codex Sol | max | fresh |
-| `researcher` | OpenAI Sol | Codex Sol | xhigh | fresh |
-| `planner` | Gateway Opus | Direct Opus, Gateway Fable, OpenAI Sol | xhigh | fresh |
-| `worker` | OpenAI Sol | Gateway Opus, Codex Sol | xhigh | fresh |
-| `fixer` | Gateway Opus | Direct Opus, OpenAI Sol, Codex Sol | max | fresh |
-| `reviewer` | Gateway Opus | Direct Opus, OpenAI Sol, Gateway Fable | max | fresh |
-| `reviewer-gpt` | OpenAI Sol | Codex Sol | xhigh | fresh |
-| `reviewer-claude` | Gateway Opus | Direct Opus, Gateway Fable | max | fresh |
-| `reviewer-security` | Kimi Fast | OpenAI Sol, Codex Sol | max | fresh |
-| `reviewer-ponytail` | Kimi Fast | Direct Fable | max | fresh |
-| `oracle` | OpenAI Sol | Codex Sol | xhigh | fork |
-| `ui-designer` | Gateway Opus | Direct Opus, Gateway Fable, Codex Sol | xhigh | fresh |
-| `writer` | Gateway Fable | Direct Fable, Gateway Opus | high | fresh |
-| `watcher` | OpenAI Sol | Kimi Fast | high | fresh |
+The public settings example selects `openai/gpt-6-astra` at max reasoning. My personal main session instead uses `openai-codex/gpt-6-astra` at max, with a 600k context budget. Updating the kit does not change that choice or replace explicit cross-family reviewer routes.
 
-`delegate` inherits the parent model. Full model identifiers are in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/main/agents):
+Use `modelOverrides` for intentional changes to native models. A full matching `models[]` definition replaces the native model and can hide new capabilities such as incremental system messages. Setup can preview a narrow migration while preserving deliberate context/output limits, reasoning maps, pricing, and all unrelated configuration. It never invents provider authentication or copies private endpoints.
 
-- Gateway Opus: `cloudflare-ai-gateway/claude-opus-5`
-- Gateway Fable: `cloudflare-ai-gateway/claude-fable-5`
-- Direct Opus: `anthropic/claude-opus-5`
-- Direct Fable: `anthropic/claude-fable-5`
-- OpenAI Sol: `openai/gpt-5.6-sol`
-- Codex Sol: `openai-codex/gpt-5.6-sol`
-- Kimi Fast: `fireworks/accounts/fireworks/routers/kimi-k3-fast`
+On Pi 0.87, session naming uses the full-transcript context hook and keeps Pi's leading system message and later tool/prompt updates intact. Earlier supported hosts use the legacy path. Cache-friendly composition also requires native model capabilities and cooperating prompt extensions: a full-prompt override elsewhere can still rebuild the leading prompt.
 
-Gateway Opus handles the Claude-heavy analysis and review roles. OpenAI Sol handles fast reconnaissance, implementation, monitoring, and the GPT path. Kimi supplies focused security and deletion-oriented review. Gateway Fable handles writing. Direct Anthropic and Codex routes preserve portable fallbacks when the owner-specific gateway and router configuration is unavailable. Grok, GLM, and Gemini remain available in the main session's model cycle but are not current subagent primaries.
+The off-transcript `/draft` and `/side-question` writer retains tool-result screenshots while removing executable tool semantics. Its raw completion call does not inherit the main agent's reasoning or verbosity hooks. Astra was verified with medium reasoning by default, medium verbosity on direct OpenAI, and low verbosity on Codex. No output cap or unsupported Codex parameter is added by the kit.
 
-Every specialist is a leaf. `oracle` is the only fork-context role because its job is to compare a direction against the parent conversation; other roles receive fresh briefs and inspect current evidence.
-
-Benchmark rationale and the 26 July 2026 Artificial Analysis plus CursorBench snapshot are available as [PDF](./Model_Reference_Sheet_Artificial_Analysis_2026-07-26.pdf) and [DOCX](./Model_Reference_Sheet_Artificial_Analysis_2026-07-26.docx).
+Native protocol async tools, live WebSocket steering, and positional reasoning updates belong to Pi's provider, agent, and session layers. They are not supplied by installing this kit. Existing background subagents continue to use their durable launch handles and completion notifications. Availability of newer native features must be checked against the selected Pi release and route.
 
 ## Active skills
 
@@ -193,7 +168,9 @@ The native default is off. The safe settings example includes `"compactView": tr
 
 ## Compaction policy
 
-The settings example pins `compaction.reserveTokens: 64000` with `keepRecentTokens: 40000`, and the manifest's `modelContextWindows` merge flat 320k windows into `models.json` for the managed routes. Together they compact at a 256k threshold with roughly 60k of near-threshold generation runway. The override lowers the ~1M direct Anthropic routes, raises the 272k direct OpenAI and Codex routes, and pins the verified Claude gateway routes to the same policy. Any direct OpenAI request whose input crosses 272k bills at the long-context tier for the entire request. That is a deliberate quality-over-cost choice; decline the consent step to keep stock behavior. Gateway Grok, xAI Grok, Fireworks, and cf-google are full user-managed model definitions in my setup and already declare 320k; the public kit does not copy their private endpoints or pricing metadata.
+The settings example uses `compaction.reserveTokens: 64000` and `keepRecentTokens: 40000`. The manifest offers 320k public context budgets, giving a 256k compaction threshold. My existing 600k Astra choice instead gives a 536k threshold with the same reserve. These are selected budgets, not claims that one size or effort level is universally optimal.
+
+Setup derives each threshold from the selected window and effective reserve, previews changes, and preserves existing values unless an overwrite is approved. `modelOverrides` inherits native capability and pricing metadata. Raising a window may cross that route's long-context pricing tier; inspect the effective model rather than assuming direct OpenAI, Codex, and gateway routes share limits or billing. Custom provider definitions remain user-managed.
 
 ## Image quality boundary
 
@@ -250,11 +227,11 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 pi
 # Complete provider login, then:
 pi install git:github.com/fitchmultz/pi-fitch-kit
-# /reload, then:
+# Start a fresh Pi process, then:
 /fitch-setup
 ```
 
-The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only the selected unpinned sources. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. Agent Browser stays at 0.36.0 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys and the context-window overrides as separate consent steps, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources after reload.
+The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), shows one preview, and installs only the selected unpinned sources. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. Agent Browser stays at 0.36.0 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys and the context-window overrides as separate consent steps, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources in a fresh Pi process after extension-code or dependency changes. `/reload` refreshes settings and non-code resources; it does not activate new extension code on Pi 0.87. A new conversation in the same process is insufficient. Use native `/restart` on a supporting fork, or quit and relaunch the saved session.
 
 `/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, model availability, consent-gated route state, and `models.json` context-window overrides.
 

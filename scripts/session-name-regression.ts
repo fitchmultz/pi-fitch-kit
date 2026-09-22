@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { getPackageDir } from "@earendil-works/pi-coding-agent";
+import { getPackageDir, VERSION } from "@earendil-works/pi-coding-agent";
+
+const [major, minor] = VERSION.split(".").map(Number);
+const contextHook = major > 0 || minor >= 87 ? "context_with_system" : "context";
 
 const { createExtensionRuntime, loadExtensions } = await import(
 	pathToFileURL(join(getPackageDir(), "dist/core/extensions/loader.js")).href
@@ -62,7 +66,7 @@ for (const paths of [
 		["name_session"],
 		"the effective standalone tool must remain the sole owner",
 	);
-	const bundledContext = bundled.handlers.get("context")?.[0];
+	const bundledContext = bundled.handlers.get(contextHook)?.[0];
 	assert.ok(bundledContext);
 	assert.equal(await bundledContext({ messages: [] }, {}), undefined);
 }
@@ -95,7 +99,8 @@ assert.equal(tool.executionMode, "sequential");
 type ContextResult = {
 	messages: Array<{ role?: string; content?: unknown }>;
 };
-const context = extension.handlers.get("context")?.[0] as
+assert.equal(extension.handlers.has(contextHook === "context" ? "context_with_system" : "context"), false);
+const context = extension.handlers.get(contextHook)?.[0] as
 	| ((event: { messages: unknown[] }) => ContextResult | undefined)
 	| undefined;
 assert.ok(context);
@@ -312,4 +317,5 @@ await assert.rejects(
 active = false;
 assert.equal(await context({ messages: [userMessage] }), undefined);
 
-console.log("kit session-name checks passed");
+console.log(`kit session-name checks passed (${VERSION}, ${contextHook})`);
+execFileSync(process.execPath, [join(process.cwd(), "scripts/session-name-boundary.mjs"), getPackageDir()], { stdio: "inherit" });

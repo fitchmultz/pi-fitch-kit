@@ -7,6 +7,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifest = JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf-8"));
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
 const packageLock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf-8"));
+const settingsExample = JSON.parse(readFileSync(join(root, "examples", "settings.json"), "utf-8"));
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -14,6 +15,10 @@ const assert = (condition, message) => {
 
 assert(manifest.schemaVersion === 7, "setup manifest schema must match the patch-free context-window shape");
 const manifestModelRoutes = new Set([...manifest.requiredModels, ...manifest.optionalModels]);
+const compaction = settingsExample.compaction;
+for (const key of ["reserveTokens", "keepRecentTokens"]) {
+  assert(Number.isSafeInteger(compaction?.[key]) && compaction[key] > 0, `compaction.${key} must be a positive safe integer`);
+}
 assert(
   manifest.modelContextWindows && Object.keys(manifest.modelContextWindows).length > 0,
   "manifest must carry modelContextWindows",
@@ -21,15 +26,15 @@ assert(
 for (const [route, value] of Object.entries(manifest.modelContextWindows)) {
   assert(manifestModelRoutes.has(route), `modelContextWindows route ${route} must be a manifest-managed model route`);
   assert(
-    value === 320000,
-    `modelContextWindows value for ${route} must be 320000`,
+    Number.isSafeInteger(value) && value > compaction.reserveTokens + compaction.keepRecentTokens,
+    `modelContextWindows value for ${route} must be a safe integer exceeding the compaction reserve plus recent tokens`,
   );
 }
 const piFloor = /^>=(\d+\.\d+\.\d+)$/.exec(manifest.runtime.pi)?.[1];
 assert(piFloor === "0.84.2", "the kit must accept Pi 0.84.2 or newer");
 assert(packageJson.engines.node === manifest.runtime.node, "package and manifest Node floors must match");
-assert(packageJson.version === "0.10.6", "package version must match the approved kit release");
-assert(packageLock.version === packageJson.version, "lockfile version must match package.json");
+assert(/^\d+\.\d+\.\d+$/.test(packageJson.version), "package version must be a release version");
+assert(packageLock.version === packageJson.version && packageLock.packages[""].version === packageJson.version, "lockfile version must match package.json");
 const resolvedOrigins = Object.values(packageLock.packages)
   .map((entry) => entry.resolved)
   .filter(Boolean)
@@ -129,6 +134,7 @@ for (const source of [
   "git:github.com/fitchmultz/pi-session-name",
   "git:github.com/fitchmultz/pi-ask-question",
   "npm:@ff-labs/pi-fff",
+  "npm:pi-verbosity-control",
 ]) {
   assert(
     manifest.retiredPackageSources.includes(source),
@@ -157,6 +163,9 @@ assert(manifest.piCorePatch === undefined, "the retired Pi core patch must not r
 
 assert(manifest.kit.packageName === "@fitch/pi-kit", "setup must identify duplicate kit package entries");
 
+const verbosity = manifest.corePackages.find(({ id }) => id === "verbosity");
+assert(verbosity?.source === "git:github.com/fitchmultz/pi-verbosity-control", "verbosity must use the native-status owner");
+
 const editSession = manifest.corePackages.find(({ id }) => id === "edit-session");
 assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");
 
@@ -178,10 +187,10 @@ assert(setupPrompt.includes("${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"), "setup p
 assert(setupPrompt.includes("modelContextWindows"), "setup prompt must offer the context-window override step");
 assert(setupPrompt.includes("keep-or-overwrite"), "setup prompt must define rerun semantics for existing overrides");
 assert(setupPrompt.includes("long-context tier"), "setup prompt must disclose the OpenAI pricing consequence");
-const settingsExample = JSON.parse(readFileSync(join(root, "examples", "settings.json"), "utf-8"));
-assert(settingsExample.defaultProvider === "openai", "settings example must default to direct OpenAI");
-assert(settingsExample.defaultModel === "gpt-5.6-sol", "settings example must default to GPT-5.6 Sol");
-assert(settingsExample.defaultThinkingLevel === "max", "settings example must default to max thinking");
+const defaultRoute = `${settingsExample.defaultProvider}/${settingsExample.defaultModel}`;
+assert(manifest.requiredModels.includes(defaultRoute), "settings default model must be a required route");
+assert(settingsExample.enabledModels.includes(defaultRoute), "settings default model must be enabled");
+assert(["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(settingsExample.defaultThinkingLevel), "settings thinking level must be valid");
 assert(settingsExample.compactView === true, "settings example must carry the optional compact-view preference");
 assert(setupPrompt.includes("/compact-view off"), "setup must explain how to restore the normal view");
 assert(new Set(settingsExample.enabledModels).size === settingsExample.enabledModels.length, "settings enabledModels must be unique");
@@ -190,8 +199,7 @@ for (const route of settingsExample.enabledModels) {
 }
 assert(settingsExample.retry?.maxRetries === 5, "settings example must carry the active retry budget");
 assert(settingsExample.retry?.provider?.timeoutMs === 120000, "settings example must carry the active provider timeout");
-assert(settingsExample.compaction?.reserveTokens === 64000, "settings example must carry the 64k compaction reserve");
-assert(settingsExample.compaction?.keepRecentTokens === 40000, "settings example must keep 40k recent tokens");
+
 assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");
 assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
 assert(setupPrompt.includes("consentBehaviors"), "setup prompt must honor consent-gated behavior");

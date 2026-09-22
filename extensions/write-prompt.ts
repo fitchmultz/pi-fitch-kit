@@ -106,7 +106,7 @@ export function flattenToolHistory(messages: Message[]): Message[] {
 			const label = message.isError ? `${message.toolName} error` : `${message.toolName} result`;
 			out.push({
 				role: "user",
-				content: [{ type: "text", text: `[${label}]\n${contentText(message.content)}` }],
+				content: [{ type: "text", text: `[${label}]` }, ...message.content],
 				timestamp: message.timestamp,
 			});
 			continue;

@@ -64,6 +64,25 @@ assert.match(JSON.stringify(flat[0]), /called read/);
 assert.match(JSON.stringify(flat[0]), /a\.ts/);
 assert.match(JSON.stringify(flat[1]), /read result/);
 
+// Text and screenshots from browser/MCP results retain their original order.
+const resultContent = [
+	{ type: "text" as const, text: "before" },
+	{ type: "image" as const, data: "first-image", mimeType: "image/png" },
+	{ type: "text" as const, text: "between" },
+	{ type: "image" as const, data: "second-image", mimeType: "image/jpeg" },
+	{ type: "text" as const, text: "after" },
+];
+for (const isError of [false, true]) {
+	const imageResult = { role: "toolResult" as const, toolCallId: "images", toolName: "browser", content: resultContent, isError, timestamp: 7 };
+	const before = structuredClone(imageResult);
+	assert.deepEqual(flattenToolHistory([imageResult]), [{
+		role: "user",
+		content: [{ type: "text", text: `[browser ${isError ? "error" : "result"}]` }, ...resultContent],
+		timestamp: 7,
+	}]);
+	assert.deepEqual(imageResult, before, "flattening must not mutate source history");
+}
+
 const { createEventBus } = await import("@earendil-works/pi-coding-agent");
 const events = createEventBus();
 const commands: Record<string, { handler: (args: string, ctx: never) => Promise<void> }> = {};
@@ -531,54 +550,57 @@ assert.match(toolCapture.blob ?? "", /called read/);
 assert.match(toolCapture.blob ?? "", /a\.ts/);
 assert.match(toolCapture.blob ?? "", /read result/);
 
-const imageCapture: Array<{ type?: string; mimeType?: string; text?: string }> = [];
-sent = undefined;
-await commands["draft"].handler(
-	"after image",
-	ctx({
-		model: { id: "claude-opus-5", provider: "anthropic", api: "anthropic-messages" },
-		sessionManager: {
-			getEntries: () => [
-				{
-					type: "message",
-					id: "u1",
-					parentId: null,
-					timestamp: "2026-01-01T00:00:00.000Z",
-					message: {
-						role: "user",
-						content: [
-							{
-								type: "image",
-								data: "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAATCwAAEwsAAAAAAAAAAAAAAAD/AA==",
-								mimeType: "image/bmp",
-							},
-						],
-						timestamp: 1,
+for (const role of ["user", "toolResult"]) {
+	const imageCapture: Array<{ type?: string; mimeType?: string; text?: string }> = [];
+	sent = undefined;
+	await commands["draft"].handler(
+		"after image",
+		ctx({
+			model: { id: "claude-opus-5", provider: "anthropic", api: "anthropic-messages" },
+			sessionManager: {
+				getEntries: () => [
+					{
+						type: "message",
+						id: "u1",
+						parentId: null,
+						timestamp: "2026-01-01T00:00:00.000Z",
+						message: {
+							role,
+							...(role === "toolResult" ? { toolCallId: "image", toolName: "browser", isError: false } : {}),
+							content: [
+								{
+									type: "image",
+									data: "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAATCwAAEwsAAAAAAAAAAAAAAAD/AA==",
+									mimeType: "image/bmp",
+								},
+							],
+							timestamp: 1,
+						},
 					},
-				},
-			],
-			getLeafId: () => "u1",
-		},
-		modelRegistry: {
-			find: () => undefined,
-			hasConfiguredAuth: () => true,
-			complete: async (_model: unknown, context: { messages: Array<{ content?: Array<{ type?: string; mimeType?: string; text?: string }> }> }) => {
-				imageCapture.push(...(context.messages[0]?.content ?? []));
-				return {
-					role: "assistant",
-					content: [{ type: "text", text: "better prompt" }],
-					stopReason: "stop",
-				};
+				],
+				getLeafId: () => "u1",
 			},
-		},
-		ui: {
-			...baseUi,
-			select: async () => "Accept",
-		},
-	}) as never,
-);
-assert.equal(imageCapture.some((part) => part.type === "image"), false);
-assert.match(imageCapture.find((part) => part.type === "text")?.text ?? "", /does not support this image type/);
+			modelRegistry: {
+				find: () => undefined,
+				hasConfiguredAuth: () => true,
+				complete: async (_model: unknown, context: { messages: Array<{ content?: Array<{ type?: string; mimeType?: string; text?: string }> }> }) => {
+					imageCapture.push(...(context.messages[0]?.content ?? []));
+					return {
+						role: "assistant",
+						content: [{ type: "text", text: "better prompt" }],
+						stopReason: "stop",
+					};
+				},
+			},
+			ui: {
+				...baseUi,
+				select: async () => "Accept",
+			},
+		}) as never,
+	);
+	assert.equal(imageCapture.some((part) => part.type === "image"), false);
+	assert.match(imageCapture.map((part) => part.text ?? "").join("\n"), /does not support this image type/);
+}
 
 // Activity spans the off-transcript call and its dialogs, including overlap and reload.
 const activity = (bus = events) => {

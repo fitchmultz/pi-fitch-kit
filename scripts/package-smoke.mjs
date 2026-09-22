@@ -25,7 +25,7 @@ try {
 	writeFileSync(join(agentDir, "settings.json"), `${JSON.stringify({ packages: [root] }, null, 2)}\n`);
 	writeFileSync(
 		join(agentDir, "verbosity.json"),
-		`${JSON.stringify({ showIndicator: true, models: { " openai-codex/gpt-5.6-sol ": " MEDIUM " } }, null, 2)}\n`,
+		`${JSON.stringify({ showIndicator: true, models: { "openai-codex/gpt-6-astra": "low" } }, null, 2)}\n`,
 	);
 	process.env.HOME = home;
 	process.env.PI_CODING_AGENT_DIR = "~/agent";
@@ -84,7 +84,7 @@ try {
 	if (!fastModeStart) throw new Error("Fast-mode session_start handler missing");
 	const fastStatuses = new Map();
 	await fastModeStart({}, {
-		model: { provider: "openai-codex", id: "gpt-5.6-sol", api: "openai-codex-responses" },
+		model: { provider: "openai-codex", id: "gpt-6-astra", api: "openai-codex-responses" },
 		hasUI: false,
 		ui: {
 			setStatus: (key, value) => fastStatuses.set(key, value),
@@ -104,18 +104,16 @@ try {
 	if (JSON.stringify(toolNames) !== JSON.stringify(["name_session"])) {
 		throw new Error(`Expected [\"name_session\"], got ${JSON.stringify(toolNames)}`);
 	}
-	const sessionContext = sessionName.handlers.get("context")?.[0];
+	const sessionContext = sessionName.handlers.get("context_with_system")?.[0] ?? sessionName.handlers.get("context")?.[0];
 	if (!sessionContext) throw new Error("Session-name context handler missing");
-	const contextResult = await sessionContext({ messages: [] }, {});
-	if (!String(contextResult?.messages?.[0]?.content).includes('"currentName":null')) {
+	const contextResult = await sessionContext({ messages: [{ role: "system", content: "Smoke instructions", timestamp: 0 }] }, {});
+	if (!contextResult?.messages?.some((message) => String(message.content).includes('"currentName":null'))) {
 		throw new Error("Session-name context metadata missing");
 	}
 	const cleanFooterStart = cleanFooter.handlers.get("session_start")?.[0];
 	if (!cleanFooterStart) throw new Error("Clean-footer session_start handler missing");
 	let footerFactory;
 	let footerNotice;
-	let footerInstallCount = 0;
-	let resolveFooterRefresh;
 	const footerSession = SessionManager.inMemory(join(home, "Projects", "demo"));
 	footerSession.appendSessionInfo("footer-smoke");
 	for (const usage of [{ input: 20, cacheRead: 80 }, { input: 100, cacheRead: 0 }]) {
@@ -128,9 +126,6 @@ try {
 		ui: {
 			setFooter: (factory) => {
 				footerFactory = factory;
-				footerInstallCount++;
-				resolveFooterRefresh?.();
-				resolveFooterRefresh = undefined;
 			},
 			notify: (message) => {
 				footerNotice = message;
@@ -139,7 +134,7 @@ try {
 		sessionManager: footerSession,
 		getContextUsage: () => ({ percent: 74, contextWindow: 272_000 }),
 		model: {
-			id: "gpt-5.6-sol",
+			id: "gpt-6-astra",
 			provider: "openai-codex",
 			api: "openai-codex-responses",
 			contextWindow: 272_000,
@@ -149,24 +144,26 @@ try {
 	};
 	await cleanFooterStart({}, footerContext);
 	if (typeof footerFactory !== "function") throw new Error("Clean footer was not installed in TUI mode");
+	const statuses = new Map([
+		["mcp", "MCP: 13 servers enabled (2 connected)"],
+		["todo", "todo 0 active · 1 pending"],
+		["verbosity", "🗣  medium"],
+	]);
 	const createFooter = () => footerFactory(
 		{ requestRender: () => {} },
 		{ fg: (_color, text) => text },
 		{
 			getGitBranch: () => "main",
 			getAvailableProviderCount: () => 2,
-			getExtensionStatuses: () => new Map([
-				["mcp", "MCP: 13 servers enabled (2 connected)"],
-				["todo", "todo 0 active · 1 pending"],
-			]),
+			getExtensionStatuses: () => statuses,
 			onBranchChange: () => () => {},
 		},
 	);
 	const footer = createFooter();
 	const wideFooter = footer.render(170);
 	if (wideFooter.length !== 2) throw new Error(`Expected two wide footer lines, got ${JSON.stringify(wideFooter)}`);
-	if (!wideFooter.join("\n").includes("🗣  medium")) {
-		throw new Error(`Clean footer lost the configured verbosity indicator: ${wideFooter.join("\n")}`);
+	if (!wideFooter.join("\n").includes("🗣 medium")) {
+		throw new Error(`Clean footer lost the controller's native verbosity status: ${wideFooter.join("\n")}`);
 	}
 	const narrowFooter = footer.render(45);
 	const narrowText = narrowFooter.join("\n");
@@ -177,31 +174,19 @@ try {
 	}
 	for (const expected of [
 		"footer-smoke",
-		"(openai-codex) gpt-5.6-sol • high • 🗣 medium",
+		"(openai-codex) gpt-6-astra • high • 🗣 medium",
 		"74.0%/272k • CH0.0%",
 		"MCP: 13 servers enabled (2 connected)",
 		"todo 0 active · 1 pending",
 	]) {
 		if (!normalizedNarrowText.includes(expected)) throw new Error(`Clean footer lost ${expected}: ${narrowText}`);
 	}
+	if (wideFooter.join("\n").split("🗣").length !== 2) throw new Error("Verbosity status was rendered twice");
+	statuses.set("verbosity", "🗣  high");
+	if (!footer.render(170).join("\n").includes("🗣 high")) throw new Error("Footer did not follow updated native status");
+	statuses.delete("verbosity");
+	if (footer.render(170).join("\n").includes("🗣")) throw new Error("Footer read verbosity from stale config without the controller");
 	footer.dispose?.();
-
-	await new Promise((resolve, reject) => {
-		const timeout = setTimeout(() => reject(new Error("Clean footer did not refresh after verbosity config changed")), 3_000);
-		resolveFooterRefresh = () => {
-			clearTimeout(timeout);
-			resolve();
-		};
-		writeFileSync(
-			join(agentDir, "verbosity.json"),
-			`${JSON.stringify({ showIndicator: true, models: { "openai-codex/gpt-5.6-sol": "high" } }, null, 2)}\n`,
-		);
-	});
-	const refreshedFooter = createFooter();
-	if (!refreshedFooter.render(170).join("\n").includes("🗣  high")) {
-		throw new Error("Clean footer did not render the refreshed verbosity indicator");
-	}
-	refreshedFooter.dispose?.();
 
 	const cleanFooterCommand = cleanFooter.commands.get("clean-footer");
 	if (!cleanFooterCommand) throw new Error("Clean-footer command missing");
@@ -213,16 +198,6 @@ try {
 	if (typeof footerFactory !== "function" || footerNotice !== "Clean footer enabled") {
 		throw new Error("Clean-footer command did not restore the compact footer");
 	}
-	const cleanFooterShutdown = cleanFooter.handlers.get("session_shutdown")?.[0];
-	if (!cleanFooterShutdown) throw new Error("Clean-footer session_shutdown handler missing");
-	await cleanFooterShutdown({}, footerContext);
-	const installsAtShutdown = footerInstallCount;
-	writeFileSync(
-		join(agentDir, "verbosity.json"),
-		`${JSON.stringify({ showIndicator: true, models: { "openai-codex/gpt-5.6-sol": "low" } }, null, 2)}\n`,
-	);
-	await new Promise((resolve) => setTimeout(resolve, 650));
-	if (footerInstallCount !== installsAtShutdown) throw new Error("Clean-footer verbosity watcher survived shutdown");
 
 	const commandNames = extensions.extensions
 		.flatMap(({ commands }) => [...commands.keys()])
