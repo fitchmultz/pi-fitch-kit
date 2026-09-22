@@ -1,19 +1,30 @@
-name: Historical Pi support floor
+name: CI
 
 on:
   push:
     branches: [main]
+    paths-ignore: [README.md, CHANGELOG.md, AGENTS.md, LICENSE, 'docs/**']
   pull_request:
+    paths-ignore: [README.md, CHANGELOG.md, AGENTS.md, LICENSE, 'docs/**']
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# Shared compatibility owns current official/fork Pi on Node 24 and 26.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+cache-mode: ${{ github.event_name == 'pull_request' && 'read' || 'write' }}
+
+env:
+  FORK_REF: afed789dded723566b6ecb1c77a06e8561504f7a
+
 jobs:
   historical-pi-floor:
-    name: Advertised Pi 0.84.2 floor / Node 24
+    name: Official Pi 0.84.2 / Ubuntu / Node 24
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 6
     env:
       PI_OFFLINE: '1'
       PI_TELEMETRY: '0'
@@ -53,3 +64,122 @@ jobs:
           env -i PATH="$PATH" HOME="$fixture/home" TMPDIR="$fixture/tmp" \
             PI_CODING_AGENT_DIR="$fixture/agent" PI_OFFLINE=1 PI_TELEMETRY=0 \
             PI_COMPAT_HOST=official PI_COMPAT_EXPECTED_VERSION=0.84.2 npm run check:compat
+
+  official:
+    name: Current official Pi / Ubuntu / Node 24
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      npm_config_cache: ${{ github.workspace }}/.npm-cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: extension
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: fitchmultz/.github
+          ref: 117b227140265329055bcda5927ac170c6301d75 # v1.0.0
+          path: automation
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - name: Check against the declared official Pi version and a clean Git consumer
+        run: |
+          npm install --global "$(node -p 'require("./automation/package.json").packageManager')"
+          official="$(node -p 'require("./extension/package.json").devDependencies["@earendil-works/pi-coding-agent"]')"
+          node automation/scripts/qualify.mjs --repo pi-fitch-kit --source "$GITHUB_WORKSPACE/extension" \
+            --host official --target "$official" --output "$GITHUB_WORKSPACE/evidence"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: official-failure
+          path: evidence
+          if-no-files-found: warn
+          retention-days: 3
+
+  fork-package:
+    name: Build pinned fork / Ubuntu / Node 24
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: fitchmultz/.github
+          ref: 117b227140265329055bcda5927ac170c6301d75 # v1.0.0
+          path: automation
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: fitchmultz/pi
+          ref: ${{ env.FORK_REF }}
+          path: fork
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: fork/package-lock.json
+      - name: Build the selected fork once
+        working-directory: fork
+        env:
+          PI_OFFLINE: '1'
+          PI_TELEMETRY: '0'
+        run: |
+          npm install --global "$(node -p 'require("../automation/package.json").packageManager')"
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run hydrate:model-data
+          npm run build:offline
+          node ../automation/scripts/pack-fork.mjs . "$RUNNER_TEMP/fork-package" "$FORK_REF"
+          git diff --exit-code
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fork-host
+          path: ${{ runner.temp }}/fork-package
+          if-no-files-found: error
+          retention-days: 1
+
+  fork:
+    name: Pinned fork / macOS / Node 24
+    needs: fork-package
+    runs-on: macos-latest
+    timeout-minutes: 6
+    env:
+      npm_config_cache: ${{ github.workspace }}/.npm-cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: extension
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: fitchmultz/.github
+          ref: 117b227140265329055bcda5927ac170c6301d75 # v1.0.0
+          path: automation
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: fork-host
+          path: ${{ runner.temp }}/fork-package
+      - name: Check against the fork and a clean Git consumer
+        env:
+          PI_COMPAT_FORK_REF: ${{ env.FORK_REF }}
+        run: |
+          npm install --global "$(node -p 'require("./automation/package.json").packageManager')"
+          node automation/scripts/qualify.mjs --repo pi-fitch-kit --source "$GITHUB_WORKSPACE/extension" \
+            --host fork --target "$RUNNER_TEMP/fork-package" --output "$GITHUB_WORKSPACE/evidence"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: fork-failure
+          path: evidence
+          if-no-files-found: warn
+          retention-days: 3
