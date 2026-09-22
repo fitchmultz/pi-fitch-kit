@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.2 — 22 September 2026
+
+- Inherit the selected session provider, model, and thinking level for `/draft` and `/side-question` off-transcript calls. Optional writer configuration can override each; saved conversation history and session model selection remain unchanged.
+- Steer accepted drafts when the agent is busy instead of dropping them. Restore original text to the editor, or reopen the last accepted draft with `/draft` and no text.
+- Qualify registered tool identity against Pi's public tool definitions so compatibility checks do not depend on private registry keys.
+
 ## 0.11.1 — 22 September 2026
 
 - Align setup verification and workflow guidance with the editor package's `apply_patch`, `replace_text`, `write_files`, and `preview_patch` tools. Respect explicit tool scopes, keep-builtins choices, custom writers, and preview-only selection. Check the editor's Pi 0.87 minimum separately from the kit's Pi 0.84.2 floor, and require pi-subagents 0.39.1 or newer when paired with the new editor. Package source and extension entry remain unchanged.
