@@ -103,10 +103,9 @@ try {
 	const redrawScans = entries.mock.callCount();
 	const hasRevision = typeof manager.getEntriesRevision === "function";
 
-	// Pi 0.87 derives context usage from the canonical session journal.
+	// Non-triggering messages update both session history and live context.
 	const beforeUsage = session.getContextUsage();
-	manager.appendMessage({ role: "user", content: "x".repeat(40_000), timestamp: 1 });
-	session.refreshContext();
+	await session.sendCustomMessage({ customType: "footer-test", content: "x".repeat(40_000), display: false }, { triggerTurn: false });
 	const afterUsage = session.getContextUsage();
 	assert.ok(afterUsage.percent > beforeUsage.percent);
 	assert.ok(render().includes(`${afterUsage.percent.toFixed(1)}%/200k`));
