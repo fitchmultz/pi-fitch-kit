@@ -31,7 +31,7 @@ These are the extensions loaded in my current setup. Every external extension li
 
 | Extension | What I use it for |
 |---|---|
-| [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) | Atomic exact edits, whole-file rewrites, and plan-first multi-file changes |
+| [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) | `apply_patch`, `replace_text`, `write_files`, and read-only `preview_patch`; contracts live in the owning package |
 | [`pi-todo-list`](https://github.com/fitchmultz/pi-todo-list) | Persistent nested task state that survives long sessions and compaction |
 | [`pi-change-working-dir`](https://github.com/fitchmultz/pi-change-working-dir) | Safe mid-session movement into worktrees and monorepo subprojects |
 | [`pi-calculator`](https://github.com/fitchmultz/pi-calculator) | Deterministic high-precision arithmetic instead of model estimation |
@@ -178,7 +178,7 @@ A typical substantial change looks like this:
 
 1. The main session reads repository instructions and pulls the relevant issue or service context through MCP.
 2. Native repository search and, when useful, a fresh `scout` map the real code path before editing.
-3. The main session makes the design decision and usually implements it with `apply_edits`; independent `worker` tasks are the exception, not the default.
+3. The main session makes the design decision and usually implements it with the editor package's mutation tools; independent `worker` tasks are the exception, not the default.
 4. Agent Browser verifies browser-visible behavior when tests cannot prove the user experience.
 5. Repository checks and deterministic tools establish current evidence.
 6. A fresh reviewer reconstructs the claim from the diff and evidence. Any changed diff gets a new reviewer pass; old reviewer judgment is never cached as sign-off.
@@ -198,7 +198,7 @@ This is already the working composition layer for a broader organization harness
 
 ## Install the kit
 
-Requires Node.js 24 or newer and Pi 0.84.2 or newer. `/restart` additionally requires the Pi fork's native activity APIs described above; installing the kit does not patch or replace Pi.
+The kit requires Node.js 24 or newer and Pi 0.84.2 or newer. Selected external packages can require newer Pi versions: `pi-apply-edits` 1.0 requires Pi 0.87.0 or newer. When using that editor with `pi-subagents`, use subagents 0.39.1 or newer so completion tracking recognizes the new editing tools and partial-error receipts. Setup checks each selected package's documented requirements before installing. `/restart` additionally requires the Pi fork's native activity APIs described above; installing the kit does not patch or replace Pi.
 
 ```bash
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent

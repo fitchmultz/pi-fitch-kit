@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Updated 22 September 2026. Supports Pi 0.84.2 or newer on Node.js 24 or newer; qualified against official Pi and the maintained 0.87.0 fork._
+_Updated 22 September 2026. The kit supports Pi 0.84.2 or newer on Node.js 24 or newer; qualified against official Pi and the maintained 0.87.0 fork. Selected external packages have their own requirements; `pi-apply-edits` 1.0 requires Pi 0.87.0 or newer._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 
@@ -53,7 +53,7 @@ Fresh context is deliberate. Each child receives a bounded brief rather than inh
 
 ### 4. The parent decides and usually implements
 
-Most changes stay in the main session, which keeps design, implementation, and validation in one accountable place. `apply_edits` is the normal mutation surface.
+Most changes stay in the main session, which keeps design, implementation, and validation in one accountable place. The [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) package provides `apply_patch`, `replace_text`, and `write_files` for mutations, with `preview_patch` for read-only inspection. Its own documentation defines the tool arguments and filesystem guarantees. Pair editor 1.0 with `pi-subagents` 0.39.1 or newer so completion tracking recognizes the new tools and committed paths from partial errors.
 
 A `worker` is useful when an implementation item is independent enough for an isolated worktree or true parallelism. A `fixer` receives a confirmed finding list and changes only those items. The parent then inspects the real files and diff; a child success report is evidence, not proof.
 
