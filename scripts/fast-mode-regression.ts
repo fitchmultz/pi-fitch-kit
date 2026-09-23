@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Api, Model } from "@earendil-works/pi-ai";
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-fast-mode-"));
 process.on("exit", () => rmSync(agentDir, { recursive: true, force: true }));
@@ -72,13 +73,14 @@ async function fastRequest(
 	id: string,
 	beta = "pi-existing-beta",
 	extraOptions: Record<string, unknown> = {},
+	modelOverride?: Model<Api>,
 ) {
 	let payload: Record<string, unknown> | undefined;
 	let headers = new Headers();
 	let url: string | undefined;
 	const gateway = provider === "cloudflare-ai-gateway";
 	const stream = providers.get(provider)?.streamSimple(
-		{
+		modelOverride ?? {
 			id,
 			api: "anthropic-messages",
 			provider,
@@ -125,9 +127,27 @@ const offOpus = await fastRequest("anthropic", "claude-opus-5");
 assert.equal(offOpus.payload?.speed, undefined);
 assert.deepEqual(offOpus.beta, ["pi-existing-beta"], "no fast beta while disabled");
 
+const { anthropicProvider } = await import("@earendil-works/pi-ai/providers/anthropic");
+const nativeOpus = anthropicProvider().getModels().find((model) => model.id === "claude-opus-4-8");
+assert.ok(nativeOpus);
+const reasonedNoTools = await fastRequest(
+	"anthropic", nativeOpus.id, "pi-existing-beta",
+	{ reasoning: "high", toolChoice: "none" }, nativeOpus,
+);
+assert.deepEqual(reasonedNoTools.payload?.thinking, { type: "adaptive", display: "summarized" }, "toolChoice must not suppress reasoning");
+assert.equal((reasonedNoTools.payload?.output_config as { effort?: string } | undefined)?.effort, "high");
+assert.deepEqual(reasonedNoTools.payload?.tool_choice, { type: "none" });
+
 await commands["anthropic-fast"].handler("on", anthropicOpusCtx);
 assert.equal(JSON.parse(readFileSync(join(agentDir, "anthropic-fast.json"), "utf8")).enabled, true);
 assert.equal(notices.at(-1), "Anthropic fast mode ON");
+const fastReasoned = await fastRequest(
+	"anthropic", nativeOpus.id, "pi-existing-beta",
+	{ reasoning: "high", toolChoice: "none" }, nativeOpus,
+);
+assert.equal(fastReasoned.payload?.speed, "fast");
+assert.equal((fastReasoned.payload?.output_config as { effort?: string } | undefined)?.effort, "high");
+assert.deepEqual(fastReasoned.payload?.tool_choice, { type: "none" });
 // Direct route and gateway route get identical fast treatment.
 for (const provider of ["anthropic", "cloudflare-ai-gateway"]) {
 	for (const id of ["claude-opus-5", "claude-opus-4-8"]) {
