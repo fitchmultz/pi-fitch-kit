@@ -238,9 +238,9 @@ export default function fastMode(pi: ExtensionAPI): void {
 	const refreshFooter = () => {
 		if (footerContext) updateFooterStatus(footerContext);
 	};
-	pi.on("session_start", (_event, ctx) => {
+	pi.on("session_start", (event, ctx) => {
 		footerContext = ctx;
-		if (pi.getFlag("fast") === true) writeEnabled(OPENAI_TOGGLE.statePath, true);
+		if (event.reason === "startup" && pi.getFlag("fast") === true) writeEnabled(OPENAI_TOGGLE.statePath, true);
 		updateFooterStatus(ctx);
 		for (const toggle of TOGGLES) {
 			// Unwatch first: a repeated session_start must not stack listeners, or a
