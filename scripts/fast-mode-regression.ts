@@ -336,10 +336,16 @@ const runHandlers = async (event: string, ...args: [Record<string, unknown>, unk
 };
 const gatewayOpus = { provider: "cloudflare-ai-gateway", id: "claude-opus-5", api: "anthropic-messages" };
 flags.set("fast", true);
-await runHandlers("session_start", {}, uiCtx(gatewayOpus));
+await runHandlers("session_start", { reason: "startup" }, uiCtx(gatewayOpus));
 assert.equal(JSON.parse(readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8")).enabled, true, "--fast must enable shared OpenAI fast state");
-flags.set("fast", false);
 await commands["codex-fast"].handler("off", uiCtx(gatewayOpus));
+for (const reason of ["reload", "new", "resume", "fork"]) {
+	await runHandlers("session_start", { reason }, uiCtx(MODELS.openai));
+	assert.equal(JSON.parse(readFileSync(statePath, "utf8")).enabled, false, `${reason} must preserve explicit fast off despite --fast`);
+	assert.equal(await requestPayload(MODELS.openai), undefined, `${reason} must not restore priority requests`);
+	assert.equal(status.get("codex-fast"), undefined, `${reason} must leave the fast footer off`);
+}
+flags.set("fast", false);
 assert.equal(status.get("anthropic-fast"), undefined, "no footer while off");
 assert.equal(status.get("codex-fast"), undefined);
 await commands["anthropic-fast"].handler("on", uiCtx(gatewayOpus));
