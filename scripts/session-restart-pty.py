@@ -289,7 +289,7 @@ def run_case(options, case, runtime):
                 assert 'native Bash, input and nextTurn activity APIs' in reply['error']
                 assert child.status()['instance'] == old['instance']
             assert child.file.read_bytes() == before
-        elif case in ('ephemeral', 'unsaved', 'late-key'):
+        elif case in ('ephemeral', 'unsaved'):
             assert old.get('unavailable'), old
             _, reply = child.restart(True, old)
             assert 'error' in reply and child.status()['instance'] == old['instance']
@@ -464,7 +464,7 @@ def run_case(options, case, runtime):
             assert accepted == {'accepted': True}, accepted
             child.ready(old)
             assert len([row for row in records(root) if row['event'] == 'fake-call']) == 3
-        elif case in ('preserve', 'reload', 'tree', 'root', 'late-no-key'):
+        elif case in ('preserve', 'reload', 'tree', 'root', 'late-no-key', 'late-key'):
             if case == 'preserve':
                 child.event('settled')
                 assert child.info('launch-key')['aHasLaunchKey'] is True, 'the fixture must actually resolve the one-run key, not compare two false values'
@@ -489,7 +489,7 @@ def run_case(options, case, runtime):
                 after = child.info('after-' + str(index))
                 assert_preserved(before, after)
                 before = after
-            if case == 'preserve':
+            if case in ('preserve', 'late-key'):
                 assert len([row for row in records(root) if row['event'] == 'fake-call']) == 1, 'initial input was replayed'
                 assert before['aHasLaunchKey'] is True and before['bHasLaunchKey'] is False
                 assert child.key not in child.file.read_text() and child.key not in json.dumps(new), 'one-run key leaked into saved/control state'
