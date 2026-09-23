@@ -40,6 +40,7 @@
       "extensions/clean-footer.ts",
       "extensions/fast-mode.ts",
       "extensions/session-name.ts",
+      "extensions/setup-models.ts",
       "extensions/write-prompt.ts",
       "extensions/session-restart.ts"
     ],

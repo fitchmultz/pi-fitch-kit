@@ -9,6 +9,7 @@
   - `extensions/clean-footer.ts` for a compact footer without cumulative token, cache, or cost counters.
   - `extensions/fast-mode.ts` for the shared `/anthropic-fast`, `/codex-fast`, and `/xai-fast` toggles.
   - `extensions/session-name.ts` for stable, searchable session naming and protected role identifiers.
+  - `extensions/setup-models.ts` for read-only model availability in the running Pi session during setup.
   - `extensions/write-prompt.ts` for `/draft` rewrite, `/side-question` off-transcript answers, accept/copy/tweak/deny, and `write-prompt.json` model override.
   - `extensions/session-restart.ts` for `/restart`, private process-local control sockets, exact saved-session preservation, and default busy skipping.
   - `examples/settings.json` for the safe, non-secret behavioral settings subset.

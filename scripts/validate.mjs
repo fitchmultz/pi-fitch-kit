@@ -90,6 +90,7 @@ assert(
       "extensions/clean-footer.ts",
       "extensions/fast-mode.ts",
       "extensions/session-name.ts",
+      "extensions/setup-models.ts",
       "extensions/write-prompt.ts",
       "extensions/session-restart.ts",
     ]),
@@ -185,6 +186,8 @@ assert(setupPrompt.includes("sixteen specialist"), "setup prompt must describe t
 assert(!setupPrompt.includes("fourteen specialist"), "setup prompt must not keep the retired specialist count");
 assert(setupPrompt.includes("${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"), "setup prompt must honor the active Pi agent directory");
 assert(setupPrompt.includes("modelContextWindows"), "setup prompt must offer the context-window override step");
+assert(!setupPrompt.includes("pi --list-models"), "setup verification must not launch Pi's migration-capable model listing");
+assert(setupPrompt.includes("fitch_setup_models"), "setup must inspect models through the running session");
 assert(setupPrompt.includes("keep-or-overwrite"), "setup prompt must define rerun semantics for existing overrides");
 assert(setupPrompt.includes("long-context tier"), "setup prompt must disclose the OpenAI pricing consequence");
 const defaultRoute = `${settingsExample.defaultProvider}/${settingsExample.defaultModel}`;
