@@ -632,7 +632,7 @@ class ReaderOverlay implements Component, Focusable {
 			? [all[cursorRow] ?? all[1] ?? all[0], ...(rows === 2 ? [all.at(-1)!] : [])]
 			: [
 				all[0],
-				...all.slice(1 + start, 1 + start + capacity),
+				...all.slice(1 + start, Math.min(all.length - 1, 1 + start + capacity)),
 				all.at(-1)!,
 			];
 		const body = {
@@ -669,15 +669,17 @@ class ReaderOverlay implements Component, Focusable {
 		const doc = this.currentDoc();
 		const current = this.mode === "list" ? undefined : this.currentPage(contentWidth, bodyRows);
 		const section = current && doc ? doc.sections[current.sectionIndex] : undefined;
-		const title = this.mode === "list" ? "Reader library" : `${doc?.replyToFeedbackId ? "Reply · " : "Reader · "}${displayLabel(doc?.title ?? "")}`;
-		const progress = current ? `${current.sectionIndex + 1}/${doc?.sections.length} · ${current.sectionPage}/${current.sectionPages}` : "";
+		const title = this.mode === "list" ? "Reader library"
+			: `${this.mode === "note" ? "Note" : doc?.replyToFeedbackId ? "Reply" : "Reader"} · ${displayLabel(doc?.title ?? "")}`;
 		const status = this.mode === "note" ? this.status : this.readingStatus();
 		const subtitle = this.mode === "list" ? `${state.order.length} saved documents · latest at bottom`
-			: [status, progress, displayLabel(section?.heading ?? "")].filter(Boolean).join(" · ");
+			: current ? `Section ${current.sectionIndex + 1}/${doc?.sections.length} · ${displayLabel(section?.heading ?? "")}` : "";
+		const detail = this.mode === "list" ? "─".repeat(contentWidth)
+			: [current ? `Page ${current.sectionPage}/${current.sectionPages}` : "", status].filter(Boolean).join(" · ");
 		const panel = new Box(1, 1, (text) => this.theme.bg("customMessageBg", text));
 		panel.addChild(new Text(this.theme.fg("accent", this.theme.bold(truncateToWidth(title, contentWidth))), 0, 0));
-		panel.addChild(new Text(this.theme.fg("muted", truncateToWidth(subtitle, contentWidth)), 0, 0));
-		panel.addChild(new Text(this.theme.fg("border", "─".repeat(contentWidth)), 0, 0));
+		panel.addChild(new Text(truncateToWidth(subtitle, contentWidth), 0, 0));
+		panel.addChild(new Text(this.theme.fg("muted", truncateToWidth(detail, contentWidth)), 0, 0));
 		const body: Component = this.mode === "list" ? this.listBody(contentWidth, bodyRows)
 			: this.mode === "note" ? this.noteBody(contentWidth, bodyRows)
 			: { render: (w) => Array.from({ length: bodyRows }, (_, i) => {

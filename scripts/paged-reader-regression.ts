@@ -189,7 +189,18 @@ try {
 	tui.renderNow();
 	assert.deepEqual(lastCursor(), anchorBeforeResize);
 
+	const sectionHeaderRow = lines().findIndex((line) => line.includes("Original section"));
+	const sectionHeader = lines()[sectionHeaderRow];
 	clickText("N Note");
+	assert.equal(lines()[sectionHeaderRow], sectionHeader, "opening a note must not shift the section heading behind status text");
+	assert.ok(lines().some((line) => line.includes("Note · Immutable explanation")), "note mode is named explicitly");
+	assert.equal(lines().filter((line) => /^─+$/.test(line.trim())).length, 2, "the native note editor has one top and one bottom border");
+	terminal.columns = 44;
+	tui.renderNow();
+	assert.ok(lines().some((line) => line.includes("Original section")), "a narrow note keeps the section name visible");
+	assert.ok(lines().some((line) => /Page \d+\/\d+/.test(line)), "page progress is labeled separately from the section");
+	terminal.columns = 100;
+	tui.renderNow();
 	assert.ok(lines().join("\n").includes("Original section"), "note editor keeps section header");
 	assert.ok(overlay.render(terminal.columns).some((line) => line.includes(CURSOR_MARKER)), "native Editor cursor marker reaches the focused overlay for IME");
 	for (const letter of "Please clarify the implication.") press(letter);
@@ -204,6 +215,7 @@ try {
 	tui.renderNow();
 	press("\x13"); // Ctrl+S: local-only save.
 	assert.equal(sent.length, 0);
+	assert.equal(lines()[sectionHeaderRow], sectionHeader, "saving a note keeps the section heading fixed");
 	press("\x1b");
 	clickText("N Note");
 	assert.ok(lines().join("\n").includes("Please clarify the implication."));
@@ -217,6 +229,7 @@ try {
 	assert.ok(request.message.content.includes("Section ID: scope · heading: Original section"));
 	assert.ok(request.message.content.includes(JSON.stringify({ originalSectionText: body, note: "Please clarify the implication." })));
 	assert.deepEqual(lastCursor(), anchorBeforeResize, "sending cannot move original reading position");
+	assert.equal(lines()[sectionHeaderRow], sectionHeader, "sending feedback keeps the section heading fixed");
 	assert.ok(lines().join("\n").includes("Queued for agent"), "click alone does not claim agent delivery");
 	clickText("N Note");
 	press("\x1b[13;5u");
@@ -231,6 +244,7 @@ try {
 	assert.equal(docs()[1].replyToFeedbackId, feedbackId);
 	assert.deepEqual(lastCursor(), anchorBeforeResize, "incoming reply cannot replace current page");
 	assert.ok(lines().join("\n").includes("Reply ready"));
+	assert.equal(lines()[sectionHeaderRow], sectionHeader, "a ready reply cannot displace the section heading");
 	clickText("R Reply");
 	assert.ok(lines().join("\n").includes("The implication is narrower"));
 	press("b");
