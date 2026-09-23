@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — 23 September 2026
+
+- Add a bounded native reader for long, sectioned explanations. `/reader` resumes the saved page, `/reader list` browses prior documents, and `/reader demo` works without a model. Local section drafts enter model context only on explicit send; busy feedback waits for successful agent settlement and cannot leak after cancellation. Linked replies wait behind the current page until opened, while incomplete or ambiguous responses remain readable in the library.
+
 ## 0.11.2 — 22 September 2026
 
 - Inherit the selected session provider, model, and thinking level for `/draft` and `/side-question` off-transcript calls. Optional writer configuration can override each; saved conversation history and session model selection remain unchanged.

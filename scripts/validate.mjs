@@ -93,8 +93,9 @@ assert(
       "extensions/setup-models.ts",
       "extensions/write-prompt.ts",
       "extensions/session-restart.ts",
+      "extensions/paged-reader.ts",
     ]),
-  "the kit must bundle the image-guard, clean-footer, fast-mode, session-name, write-prompt, and session-restart extensions",
+  "the kit must bundle its active extensions including the paged reader",
 );
 
 for (const pkg of manifest.corePackages) {

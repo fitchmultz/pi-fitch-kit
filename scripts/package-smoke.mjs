@@ -51,7 +51,7 @@ try {
 	const errors = prompts.diagnostics.filter(({ severity }) => severity === "error");
 	if (errors.length > 0) throw new Error(`Prompt load errors: ${JSON.stringify(errors)}`);
 	if (extensions.errors.length > 0) throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
-	if (extensions.extensions.length !== 7) throw new Error(`Expected 7 extensions, got ${extensions.extensions.length}`);
+	if (extensions.extensions.length !== 8) throw new Error(`Expected 8 extensions, got ${extensions.extensions.length}`);
 	const cleanFooter = extensions.extensions.find(({ path }) => path.endsWith("/extensions/clean-footer.ts"));
 	if (!cleanFooter) throw new Error("Clean-footer extension missing");
 	const fastMode = extensions.extensions.find(({ path }) => path.endsWith("/extensions/fast-mode.ts"));
@@ -139,7 +139,7 @@ try {
 	const toolNames = extensions.extensions
 		.flatMap(({ tools }) => [...tools.values()].map(({ definition }) => definition.name))
 		.sort();
-	if (JSON.stringify(toolNames) !== JSON.stringify(["fitch_setup_models", "name_session"])) {
+	if (JSON.stringify(toolNames) !== JSON.stringify(["fitch_setup_models", "name_session", "reader_present"])) {
 		throw new Error(`Unexpected kit tools: ${JSON.stringify(toolNames)}`);
 	}
 	const sessionContext = sessionName.handlers.get("context_with_system")?.[0] ?? sessionName.handlers.get("context")?.[0];
@@ -240,7 +240,7 @@ try {
 	const commandNames = extensions.extensions
 		.flatMap(({ commands }) => [...commands.keys()])
 		.sort();
-	const expectedCommands = ["anthropic-fast", "clean-footer", "codex-fast", "draft", "fast", "side-question", "xai-fast"];
+	const expectedCommands = ["anthropic-fast", "clean-footer", "codex-fast", "draft", "fast", "reader", "side-question", "xai-fast"];
 	if (JSON.stringify(commandNames) !== JSON.stringify(expectedCommands)) {
 		throw new Error(`Expected ${JSON.stringify(expectedCommands)}, got ${JSON.stringify(commandNames)}`);
 	}

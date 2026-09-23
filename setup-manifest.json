@@ -42,7 +42,8 @@
       "extensions/session-name.ts",
       "extensions/setup-models.ts",
       "extensions/write-prompt.ts",
-      "extensions/session-restart.ts"
+      "extensions/session-restart.ts",
+      "extensions/paged-reader.ts"
     ],
     "prompts": [
       "prompts/fitch-setup.md",
