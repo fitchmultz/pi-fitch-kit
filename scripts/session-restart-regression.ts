@@ -4,10 +4,11 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createEventBus, initTheme, parseArgs } from "@earendil-works/pi-coding-agent";
+import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
+import { createEventBus, initTheme, ModelRegistry, ModelRuntime, parseArgs } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import {
-	privateRuntimeDir, readChildren, restartArgs, selectSessions,
+	initialKeyModel, privateRuntimeDir, readChildren, restartArgs, selectSessions,
 	socketRequest, stopChildren, validRequest, validStatus, waitForRestart,
 	type RestartStatus,
 } from "../extensions/session-restart.ts";
@@ -45,6 +46,23 @@ for (const trust of [undefined, true, false]) {
 	const roundtrip = parseArgs(restartArgs({ ...args, projectTrustOverride: trust }, "/saved", { provider: "p", id: "m" }, "off", "/native"));
 	assert.equal(roundtrip.projectTrustOverride, trust);
 }
+
+const keyRuntime = await ModelRuntime.create({
+	credentials: new InMemoryCredentialStore(), modelsPath: null, allowModelNetwork: false, refreshOnCreate: false,
+});
+const keyContext = { modelRegistry: new ModelRegistry(keyRuntime) } as never;
+const overlappingModel = parseArgs(["--model", "mistral/codestral", "--api-key", "synthetic-mistral-key"]);
+await keyRuntime.setRuntimeApiKey("mistral", overlappingModel.apiKey!);
+const keyModel = initialKeyModel(overlappingModel, keyContext);
+assert.ok(keyModel);
+assert.equal(keyModel.provider, "mistral", "late loading must preserve Pi's key owner despite an exact gateway model ID");
+const keyRestart = parseArgs(restartArgs(overlappingModel, "/saved", keyModel, "off", "/native"));
+assert.equal(keyRestart.provider, "mistral");
+assert.equal(keyRestart.apiKey, overlappingModel.apiKey);
+assert.equal(initialKeyModel(parseArgs(["--models", "*", "--api-key", "synthetic-mistral-key"]), keyContext)?.provider, "mistral");
+await keyRuntime.removeRuntimeApiKey("mistral");
+await keyRuntime.setRuntimeApiKey("vercel-ai-gateway", "synthetic-gateway-key");
+assert.equal(initialKeyModel({ ...overlappingModel, apiKey: "synthetic-gateway-key" }, keyContext)?.provider, "vercel-ai-gateway", "Pi's recorded owner also wins over a provider-looking model prefix");
 
 const previous: RestartStatus = {
 	version: 1, instance: "old-image", pid: 123, file: "/saved", id: "saved-id", name: "fixture", cwd: "/native",

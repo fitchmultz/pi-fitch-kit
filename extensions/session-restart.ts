@@ -301,15 +301,11 @@ function savedFile(ctx: ExtensionContext): string {
 	return file;
 }
 
-function initialKeyModel(args: Args, ctx: ExtensionContext): ModelRef | undefined {
-	if (!args.apiKey || !args.model) return;
-	const models = ctx.modelRegistry.getAll();
-	const exact = models.filter((model) => (!args.provider || args.provider === model.provider)
-		&& [model.id, `${model.provider}/${model.id}`].some((ref) => args.model === ref || args.model?.startsWith(`${ref}:`) && parseArgs(["--thinking", args.model.slice(ref.length + 1)]).thinking !== undefined));
-	if (exact.length === 1) return { provider: exact[0].provider, id: exact[0].id };
-	// An explicit provider still fixes key ownership even if the old model pattern was fuzzy.
-	const sameProvider = args.provider && models.find((model) => model.provider === args.provider);
-	return sameProvider ? { provider: sameProvider.provider, id: sameProvider.id } : undefined;
+export function initialKeyModel(args: Args, ctx: ExtensionContext): ModelRef | undefined {
+	if (!args.apiKey) return;
+	// Pi retains the CLI key's provider even when the helper first loads through /reload.
+	const model = ctx.modelRegistry.getAll().find((model) => ctx.modelRegistry.getProviderAuthStatus(model.provider).source === "runtime");
+	return model ? { provider: model.provider, id: model.id } : undefined;
 }
 
 export function selectSessions(ctx: ExtensionCommandContext, peers: RestartStatus[]): Promise<RestartStatus[] | undefined> {
