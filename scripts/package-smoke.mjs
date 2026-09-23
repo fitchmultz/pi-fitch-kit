@@ -2,9 +2,9 @@
 // Loads this repo as a real Pi package in a throwaway agent dir and asserts
 // its active prompts and bundled extensions load cleanly. Catches resource
 // breakage that static validation cannot see. Requires `npm install` first.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { fauxAssistantMessage } from "@earendil-works/pi-ai";
@@ -51,13 +51,51 @@ try {
 	const errors = prompts.diagnostics.filter(({ severity }) => severity === "error");
 	if (errors.length > 0) throw new Error(`Prompt load errors: ${JSON.stringify(errors)}`);
 	if (extensions.errors.length > 0) throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
-	if (extensions.extensions.length !== 6) throw new Error(`Expected 6 extensions, got ${extensions.extensions.length}`);
+	if (extensions.extensions.length !== 7) throw new Error(`Expected 7 extensions, got ${extensions.extensions.length}`);
 	const cleanFooter = extensions.extensions.find(({ path }) => path.endsWith("/extensions/clean-footer.ts"));
 	if (!cleanFooter) throw new Error("Clean-footer extension missing");
 	const fastMode = extensions.extensions.find(({ path }) => path.endsWith("/extensions/fast-mode.ts"));
 	if (!fastMode) throw new Error("Fast-mode extension missing");
 	const sessionName = extensions.extensions.find(({ path }) => path.endsWith("/extensions/session-name.ts"));
 	if (!sessionName) throw new Error("Session-name extension missing");
+	const setupModels = extensions.extensions.find(({ path }) => path.endsWith("/extensions/setup-models.ts"));
+	const setupModelsTool = [...(setupModels?.tools.values() ?? [])].find(({ definition }) => definition.name === "fitch_setup_models")?.definition;
+	if (!setupModelsTool) throw new Error("Read-only setup model tool missing");
+	const legacyFiles = [
+		[join(cwd, ".pi", "commands", "legacy.md"), "project command"],
+		[join(agentDir, "tools", "rg"), "older distinct binary"],
+		[join(agentDir, "bin", "rg"), "current distinct binary"],
+	];
+	for (const [path, content] of legacyFiles) {
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, content);
+	}
+	const models = [
+		{ provider: "openai", id: "gpt-6-astra" },
+		{ provider: "fireworks", id: "accounts/fireworks/routers/kimi-k3-fast" },
+	];
+	const modelStatus = await setupModelsTool.execute("models", {
+		routes: ["openai/gpt-6-astra", "fireworks/accounts/fireworks/routers/kimi-k3-fast", "anthropic/missing"],
+	}, undefined, () => {}, {
+		modelRegistry: { getAll: () => models, getAvailable: () => [models[0]] },
+		isProjectTrusted: () => true,
+	});
+	const expectedStatus = {
+		projectTrusted: true,
+		routes: [
+			{ route: "openai/gpt-6-astra", known: true, available: true },
+			{ route: "fireworks/accounts/fireworks/routers/kimi-k3-fast", known: true, available: false },
+			{ route: "anthropic/missing", known: false, available: false },
+		],
+	};
+	if (JSON.stringify(modelStatus.details) !== JSON.stringify(expectedStatus)
+		|| JSON.stringify(JSON.parse(modelStatus.content[0].text)) !== JSON.stringify(expectedStatus)) {
+		throw new Error(`Unexpected in-session model status: ${JSON.stringify(modelStatus)}`);
+	}
+	for (const [path, content] of legacyFiles) {
+		if (readFileSync(path, "utf8") !== content) throw new Error(`Model inspection changed ${path}`);
+	}
+	if (existsSync(join(cwd, ".pi", "prompts"))) throw new Error("Model inspection migrated project commands");
 	const writePrompt = extensions.extensions.find(({ path }) => path.endsWith("/extensions/write-prompt.ts"));
 	if (!writePrompt) throw new Error("Write-prompt extension missing");
 	const restart = extensions.extensions.find(({ path }) => path.endsWith("/extensions/session-restart.ts"));
@@ -101,8 +139,8 @@ try {
 	const toolNames = extensions.extensions
 		.flatMap(({ tools }) => [...tools.values()].map(({ definition }) => definition.name))
 		.sort();
-	if (JSON.stringify(toolNames) !== JSON.stringify(["name_session"])) {
-		throw new Error(`Expected [\"name_session\"], got ${JSON.stringify(toolNames)}`);
+	if (JSON.stringify(toolNames) !== JSON.stringify(["fitch_setup_models", "name_session"])) {
+		throw new Error(`Unexpected kit tools: ${JSON.stringify(toolNames)}`);
 	}
 	const sessionContext = sessionName.handlers.get("context_with_system")?.[0] ?? sessionName.handlers.get("context")?.[0];
 	if (!sessionContext) throw new Error("Session-name context handler missing");
