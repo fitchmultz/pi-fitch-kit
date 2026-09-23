@@ -253,7 +253,7 @@ for (const model of Object.values(MODELS)) {
 	assert.equal(await requestPayload(model), undefined, "all payloads pass through while off");
 }
 await commands["codex-fast"].handler("on", uiCtx(MODELS.openai));
-assert.equal(notices.at(-1), "OpenAI fast mode ON");
+assert.equal(notices.at(-1), "OpenAI priority requests ON");
 for (const model of [MODELS.openai, MODELS.codex, MODELS.gatewayGpt]) {
 	const fast = (await requestPayload(model)) as Record<string, unknown>;
 	assert.equal(fast.service_tier, "priority", `${model.provider}/${model.id} must request priority`);
@@ -276,7 +276,7 @@ for (const enabled of [false, true]) {
 		await handlers.model_select[0]({}, uiCtx(gatewayModel(id)));
 		assert.deepEqual(
 			{ tier: payload.service_tier, footer: status.get("codex-fast") },
-			{ tier: priority ? "priority" : undefined, footer: priority ? "accent:fast" : undefined },
+			{ tier: priority ? "priority" : undefined, footer: priority ? "accent:priority enabled" : undefined },
 			`${id}, enabled=${enabled}`,
 		);
 		assert.equal(status.get("xai-fast"), undefined);
@@ -290,18 +290,18 @@ for (const provider of ["openai", "openai-codex"]) {
 		const payload = await requestPayload(model) as Record<string, unknown>;
 		assert.equal(payload.service_tier, "priority", `${provider}/${id} retains direct behavior`);
 		await handlers.model_select[0]({}, uiCtx(model));
-		assert.equal(status.get("codex-fast"), "accent:fast");
+		assert.equal(status.get("codex-fast"), "accent:priority enabled");
 	}
 }
 for (const payload of [null, [], "raw"]) {
 	assert.equal(await requestPayload(MODELS.openai, payload), undefined, "non-object payloads pass through");
 }
 await commands["codex-fast"].handler("off", uiCtx(MODELS.openai));
-assert.equal(notices.at(-1), "OpenAI fast mode OFF");
+assert.equal(notices.at(-1), "OpenAI priority requests OFF");
 await commands.fast.handler("", uiCtx(MODELS.openai));
-assert.equal(notices.at(-1), "OpenAI fast mode ON", "/fast with no verb must retain toggle behavior");
+assert.equal(notices.at(-1), "OpenAI priority requests ON", "/fast with no verb must retain toggle behavior");
 await commands.fast.handler("off", uiCtx(MODELS.openai));
-assert.equal(notices.at(-1), "OpenAI fast mode OFF");
+assert.equal(notices.at(-1), "OpenAI priority requests OFF");
 
 await commands["xai-fast"].handler("on", uiCtx(MODELS.xai));
 assert.equal(notices.at(-1), "xAI fast mode ON");
@@ -322,11 +322,11 @@ await commands["xai-fast"].handler("off", uiCtx(MODELS.xai));
 
 // Command verbs: toggle flips, status reports, invalid warns without a write.
 await commands["codex-fast"].handler("toggle", uiCtx(MODELS.openai));
-assert.equal(notices.at(-1), "OpenAI fast mode ON");
+assert.equal(notices.at(-1), "OpenAI priority requests ON");
 await commands["codex-fast"].handler("toggle", uiCtx(MODELS.openai));
-assert.equal(notices.at(-1), "OpenAI fast mode OFF");
+assert.equal(notices.at(-1), "OpenAI priority requests OFF");
 await commands["codex-fast"].handler("status", uiCtx(MODELS.openai));
-assert.equal(notices.at(-1), "OpenAI fast mode OFF");
+assert.equal(notices.at(-1), "OpenAI priority requests OFF");
 const codexState = readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8");
 await commands["codex-fast"].handler("bogus", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "Usage: /codex-fast [on|off|toggle|status]");
@@ -346,7 +346,7 @@ try {
 	renameSync(`${statePath}.saved`, statePath);
 }
 
-// Footer: `fast` only while enabled on an eligible model family, cleared while
+// Footer: request policy only while enabled on an eligible model family, cleared while
 // off and on models fast mode ignores, including non-overridden Opus proxies.
 const statWatchers = () =>
 	process.getActiveResourcesInfo().filter((resource) => resource === "StatWatcher").length;

@@ -217,7 +217,8 @@ function updateFooterStatus(ctx: ExtensionContext): void {
 				ctx.ui.setStatus(toggle.name, undefined);
 				continue;
 			}
-			ctx.ui.setStatus(toggle.name, ctx.hasUI ? ctx.ui.theme.fg("accent", "fast") : "fast");
+			const label = toggle === OPENAI_TOGGLE ? "priority enabled" : "fast";
+			ctx.ui.setStatus(toggle.name, ctx.hasUI ? ctx.ui.theme.fg("accent", label) : label);
 		} catch {
 			// Headless hosts do not expose a footer.
 		}
@@ -300,7 +301,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 				}
 				updateFooterStatus(ctx);
 				ctx.ui.notify(
-					`${toggle.label} fast mode ${enabled(toggle.statePath) ? "ON" : "OFF"}`,
+					`${toggle.label} ${toggle === OPENAI_TOGGLE ? "priority requests" : "fast mode"} ${enabled(toggle.statePath) ? "ON" : "OFF"}`,
 					"info",
 				);
 			},
