@@ -39,7 +39,6 @@ const FULL_STREAM_KEYS = [
 	"effort",
 	"thinkingDisplay",
 	"interleavedThinking",
-	"toolChoice",
 	"client",
 ];
 
@@ -170,6 +169,22 @@ function fastOptions(options: SimpleStreamOptions | undefined): SimpleStreamOpti
 	};
 }
 
+function preserveToolChoice(options: SimpleStreamOptions | undefined): SimpleStreamOptions | undefined {
+	if (!options || !("toolChoice" in options) || options.toolChoice === undefined) return options;
+	const choice = options.toolChoice;
+	return {
+		...options,
+		onPayload: async (payload, model) => {
+			// Pi 0.84.2's simple Anthropic serializer does not forward toolChoice.
+			const body = typeof payload === "object" && payload !== null && "tool_choice" in payload
+				? payload
+				: { ...(payload as Record<string, unknown>), tool_choice: typeof choice === "string" ? { type: choice } : choice };
+			const replaced = await options.onPayload?.(body, model);
+			return replaced === undefined ? body : replaced;
+		},
+	};
+}
+
 function fastStream(
 	model: Model<Api>,
 	context: Parameters<typeof messagesApi.streamSimple>[1],
@@ -185,9 +200,12 @@ function fastStream(
 		anthropicEligible(resolved);
 	const target = fast ? fastModel(resolved) : resolved;
 	const streamOptions = fast ? fastOptions(options) : options;
-	return FULL_STREAM_KEYS.some((key) => options !== undefined && key in options)
+	// toolChoice is shared by both APIs; explicit reasoning identifies a simple call.
+	const fullStream = FULL_STREAM_KEYS.some((key) => options !== undefined && key in options) ||
+		(options !== undefined && "toolChoice" in options && options.reasoning === undefined);
+	return fullStream
 		? messagesApi.stream(target, context, streamOptions)
-		: messagesApi.streamSimple(target, context, streamOptions);
+		: messagesApi.streamSimple(target, context, preserveToolChoice(streamOptions));
 }
 
 // Mirrors the per-request gates, so the footer never claims fast mode on a
