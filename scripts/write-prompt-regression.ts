@@ -731,8 +731,11 @@ for (const role of ["user", "toolResult"]) {
 			modelRegistry: {
 				find: () => undefined,
 				hasConfiguredAuth: () => true,
-				complete: async (_model: unknown, context: { messages: Array<{ content?: Array<{ type?: string; mimeType?: string; text?: string }> }> }) => {
+				complete: async (_model: unknown, context: { messages: Array<{ content?: Array<{ type?: string; mimeType?: string; text?: string }> }> }, options: { onPayload?: (payload: unknown) => Promise<unknown> }) => {
 					imageCapture.push(...(context.messages[0]?.content ?? []));
+					assert.equal(typeof options.onPayload, "function", "nested writer calls must guard the serialized payload");
+					const payload = { messages: [{ role: "user", content: [{ type: "text", text: "unchanged" }] }] };
+					assert.equal(await options.onPayload!(payload), payload);
 					return {
 						role: "assistant",
 						content: [{ type: "text", text: "better prompt" }],

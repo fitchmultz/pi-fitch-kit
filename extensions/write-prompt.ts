@@ -15,7 +15,7 @@ import {
 	type RegisteredCommand,
 } from "@earendil-works/pi-coding-agent";
 import { Container, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
-import { prepareClaudeImages } from "./anthropic-image-guard.ts";
+import { fitClaudeRequest, prepareClaudeImages } from "./anthropic-image-guard.ts";
 
 export const WRITE_PROMPT_FILE = "write-prompt.json";
 export const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Restore original", "Deny"] as const;
@@ -193,7 +193,11 @@ async function completeWriter(
 	const outgoing = flattenToolHistory(structuredClone([...messages, pending]));
 	await prepareClaudeImages(model, outgoing);
 	const context = { systemPrompt, messages: outgoing };
-	const options = { signal, cacheRetention: "short" as const, sessionId, reasoning: thinkingLevel === "off" ? undefined : thinkingLevel };
+	const options = {
+		signal, cacheRetention: "short" as const, sessionId,
+		reasoning: thinkingLevel === "off" ? undefined : thinkingLevel,
+		onPayload: (payload: unknown) => fitClaudeRequest(model, payload),
+	};
 	const registry: typeof ctx.modelRegistry & { streamSimple?: Models["streamSimple"] } = ctx.modelRegistry;
 	let response;
 	if (typeof registry.streamSimple === "function") {
