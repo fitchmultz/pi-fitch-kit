@@ -128,7 +128,7 @@ Pi defaults `images.autoResize` to `true`, which protects provider limits by shr
 }
 ```
 
-That exposed stricter Anthropic image limits. The bundled guard fixes the boundary instead of giving up source quality everywhere: it runs only on Claude models over the `anthropic-messages` API regardless of which provider routes them, reuses Pi's native image resizer, keeps eight recent successful transformations, clears that cache on compaction, and retries later after resize failures. It omits sources above 32 MiB of base64 or contexts above 64 MiB before native decoding. The complete safe settings subset is in [`examples/settings.json`](examples/settings.json).
+That exposed stricter Anthropic image limits. The bundled guard fixes the boundary instead of giving up source quality everywhere: it runs only on Claude models over the `anthropic-messages` API regardless of which provider routes them, reuses Pi's native image resizer, keeps eight recent successful transformations, clears that cache on compaction, and retries later after resize failures. Before native decoding, it omits sources above 32 MiB of base64 and admits the newest images within a 64 MiB source budget, preserving conversation order and saved originals. On the bundled direct Anthropic and Cloudflare routes, and in writer calls, it also budgets the complete serialized request against Anthropic's 32 MB limit, including text and tool definitions. It resizes images further when needed, omitting oldest images first only when resizing cannot fit them; text/tool-only overflow retains native handling. The complete safe settings subset is in [`examples/settings.json`](examples/settings.json).
 
 ## Subagent bench
 
