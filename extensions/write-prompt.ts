@@ -192,6 +192,7 @@ async function completeWriter(
 	};
 	const outgoing = flattenToolHistory(structuredClone([...messages, pending]));
 	await prepareClaudeImages(model, outgoing);
+	if (signal?.aborted) return undefined;
 	const context = { systemPrompt, messages: outgoing };
 	const options = {
 		signal, cacheRetention: "short" as const, sessionId,
@@ -250,6 +251,7 @@ async function runWriter(
 				.finally(() => { activity.active--; })
 				.then(done)
 				.catch((error: unknown) => {
+					if (view.signal.aborted) return;
 					ctx.ui.notify(error instanceof Error ? error.message : failed, "error");
 					done(undefined);
 				});
