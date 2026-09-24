@@ -826,6 +826,74 @@ releaseCompletion({ role: "assistant", content: [], stopReason: "aborted" });
 await settled;
 assert.equal(activity(), 0);
 
+// Cancelled work must not touch a context retired by /reload or /new.
+for (const command of ["draft", "side-question"]) {
+	for (const phase of ["image preparation", "provider rejection"]) {
+		let retired = false;
+		let staleReads = 0;
+		let calls = 0;
+		let rejectCompletion!: (error: Error) => void;
+		const started = Promise.withResolvers<void>();
+		const context = ctx({
+			mode: "tui",
+			model: { id: "claude-test", provider: "anthropic", api: "anthropic-messages" },
+			thinkingLevel: "off",
+			sessionManager: {
+				getEntries: () => [{
+					type: "message", id: "image", parentId: null, timestamp: "2026-01-01T00:00:00.000Z",
+					message: {
+						role: "user", timestamp: 1,
+						content: [{
+							type: "image", mimeType: "image/png",
+							data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+						}],
+					},
+				}],
+				getLeafId: () => "image",
+			},
+			modelRegistry: {
+				complete: () => {
+					calls++;
+					started.resolve();
+					return new Promise((_resolve, reject) => { rejectCompletion = reject; });
+				},
+			},
+			ui: { ...baseUi, custom: (factory: Function) => new Promise((resolve) => {
+				view = factory({ requestRender() {} }, { fg: (_color: string, value: string) => value }, {}, (value: unknown) => {
+					view.dispose();
+					resolve(value);
+				});
+			}) },
+		});
+		for (const key of ["ui", "modelRegistry"] as const) {
+			const value = context[key];
+			Object.defineProperty(context, key, { get() {
+				if (retired) {
+					staleReads++;
+					throw new Error(`stale ${key}`);
+				}
+				return value;
+			} });
+		}
+		notices.length = 0;
+		const pending = commands[command].handler("cancel before replacement", context as never);
+		if (phase === "provider rejection") await started.promise;
+		view!.handleInput("\x1b");
+		await pending;
+		retired = true;
+		if (phase === "provider rejection") rejectCompletion(new Error("late provider failure"));
+		const deadline = Date.now() + 5000;
+		while (activity() !== 0 && Date.now() < deadline) {
+			await new Promise((resolve) => setTimeout(resolve, 10));
+		}
+		await new Promise((resolve) => setImmediate(resolve));
+		assert.equal(activity(), 0, `${command}: cancelled ${phase} must settle`);
+		assert.equal(staleReads, 0, `${command}: cancelled ${phase} must not read retired context`);
+		assert.equal(calls, phase === "provider rejection" ? 1 : 0);
+		assert.deepEqual(notices, [], "cancelled work must not report late errors");
+	}
+}
+
 // Exercise the actual TUI menu and keyboard selection, including the recovery action.
 for (const action of ["Accept", "Restore original"] as const) {
 	let calls = 0;
