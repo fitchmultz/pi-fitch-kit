@@ -46,7 +46,7 @@
   "engines": {
     "node": ">=24.0.0"
   },
-  "packageManager": "npm@11.16.0",
+  "packageManager": "npm@11.20.0",
   "devDependencies": {
     "@earendil-works/pi-ai": "0.87.0",
     "@earendil-works/pi-coding-agent": "0.87.0",
