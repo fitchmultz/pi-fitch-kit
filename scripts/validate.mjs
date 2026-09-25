@@ -128,14 +128,24 @@ assert(ctxInfo?.source === "git:github.com/fitchmultz/pi-ctx-info", "ctx-info mu
 
 assert(!manifest.corePackages.some(({ id }) => id === "codex-context"), "codex-context is retired, not a core package");
 assert(!manifest.corePackages.some(({ id }) => id === "session-name"), "session-name now belongs to the kit");
-assert(!manifest.corePackages.some(({ id }) => id === "ask-question"), "ask-question is retired in favor of the clarification skill");
+const askQuestion = manifest.corePackages.find(({ id }) => id === "ask-question");
+assert(
+  askQuestion?.source === "git:github.com/fitchmultz/pi-ask-question",
+  "ask-question supplies the structured question tool the clarification skill prefers",
+);
+assert(
+  !manifest.retiredPackageSources.includes("git:github.com/fitchmultz/pi-ask-question"),
+  "an active core package cannot also be a retired source",
+);
+const ponytail = manifest.corePackages.find(({ id }) => id === "ponytail");
+assert(ponytail?.source === "git:github.com/fitchmultz/ponytail", "ponytail must use the maintained fork");
 assert(!manifest.corePackages.some(({ id }) => id === "fff"), "fff is retired in favor of native repository search");
 for (const source of [
   "git:github.com/fitchmultz/pi-codex-context",
   "git:github.com/fitchmultz/pi-session-name",
-  "git:github.com/fitchmultz/pi-ask-question",
   "npm:@ff-labs/pi-fff",
   "npm:pi-verbosity-control",
+  "git:github.com/DietrichGebert/ponytail",
 ]) {
   assert(
     manifest.retiredPackageSources.includes(source),
