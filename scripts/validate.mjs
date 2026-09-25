@@ -217,6 +217,7 @@ assert(setupPrompt.includes("openai-codex-fast.json"), "setup prompt must preser
 assert(setupPrompt.includes("retiredExtensionLinks"), "setup prompt must migrate approved extension collisions");
 assert(setupPrompt.includes("targetSuffix"), "setup prompt must verify retired link provenance");
 assert(setupPrompt.includes("pi-codex-context.json"), "setup prompt must preserve legacy compaction consent files");
+assert(setupPrompt.includes("apply the same filters to the fork"), "setup prompt must keep upstream Ponytail filters on the fork");
 assert(setupPrompt.includes("enable, disable, or keep"), "setup must offer explicit consent revocation");
 assert(setupPrompt.includes("filtered, pinned, or duplicate"), "setup must normalize stale kit package entries");
 assert(
