@@ -102,6 +102,7 @@ for (const pkg of manifest.corePackages) {
     /^npm:(?:@[\w.-]+\/)?[\w.-]+$/.test(pkg.source) || /^git:github\.com\/[\w-]+\/[\w-]+$/.test(pkg.source),
     `corePackages ${pkg.id} must use an unpinned npm or Git source: ${pkg.source}`,
   );
+  assert(!manifest.retiredPackageSources.includes(pkg.source), `corePackages ${pkg.id} cannot also be retired`);
 }
 const subagents = manifest.corePackages.find(({ id }) => id === "subagents");
 assert(
@@ -132,10 +133,6 @@ const askQuestion = manifest.corePackages.find(({ id }) => id === "ask-question"
 assert(
   askQuestion?.source === "git:github.com/fitchmultz/pi-ask-question",
   "ask-question supplies the structured question tool the clarification skill prefers",
-);
-assert(
-  !manifest.retiredPackageSources.includes("git:github.com/fitchmultz/pi-ask-question"),
-  "an active core package cannot also be a retired source",
 );
 const ponytail = manifest.corePackages.find(({ id }) => id === "ponytail");
 assert(ponytail?.source === "git:github.com/fitchmultz/ponytail", "ponytail must use the maintained fork");
