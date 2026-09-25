@@ -20,8 +20,8 @@ The normal path includes:
 - [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) for delegated work and session coordination;
 - [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter) and [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) for connected context and real browser work;
 - native repository search and [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) for discovery and reliable changes;
-- small public tools for persistent todos, working-directory changes, deterministic math, `/ctx` context inspection, timing, verbosity, stash, session editing, and raw message copy;
-- [`ponytail`](https://github.com/DietrichGebert/ponytail) to keep the code path boring and small.
+- small public tools for structured questions, persistent todos, working-directory changes, deterministic math, `/ctx` context inspection, timing, verbosity, stash, session editing, and raw message copy;
+- [`ponytail`](https://github.com/fitchmultz/ponytail) to keep the code path boring and small.
 
 The kit itself bundles stable session naming, read-only model status for setup, the Claude image boundary, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, and `/side-question`. The profiles ship directly with `pi-subagents`, so there is no second copy or sync layer.
 

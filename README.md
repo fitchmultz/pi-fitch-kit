@@ -32,6 +32,7 @@ These are the extensions loaded in my current setup. Every external extension li
 | Extension | What I use it for |
 |---|---|
 | [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) | `apply_patch`, `replace_text`, `write_files`, and read-only `preview_patch`; contracts live in the owning package |
+| [`pi-ask-question`](https://github.com/fitchmultz/pi-ask-question) | Structured user decisions when ambiguity changes scope or safety |
 | [`pi-todo-list`](https://github.com/fitchmultz/pi-todo-list) | Persistent nested task state that survives long sessions and compaction |
 | [`pi-change-working-dir`](https://github.com/fitchmultz/pi-change-working-dir) | Safe mid-session movement into worktrees and monorepo subprojects |
 | [`pi-calculator`](https://github.com/fitchmultz/pi-calculator) | Deterministic high-precision arithmetic instead of model estimation |
@@ -46,7 +47,7 @@ These are the extensions loaded in my current setup. Every external extension li
 | [`pi-edit-session-in-place`](https://github.com/fitchmultz/pi-edit-session-in-place) | Re-edit or remove an earlier user turn in the current branch |
 | [`pi-stash`](https://github.com/fitchmultz/pi-stash) | Park and restore a draft message while handling another thought |
 | [`pi-copy-message`](https://github.com/fitchmultz/pi-copy-message) | Copy raw session messages without terminal formatting |
-| [`ponytail`](https://github.com/DietrichGebert/ponytail) | Persistent pressure toward reuse, deletion, native features, and the smallest root-cause fix |
+| [`ponytail`](https://github.com/fitchmultz/ponytail) | Persistent pressure toward reuse, deletion, native features, and the smallest root-cause fix |
 
 ### Extensions bundled by this kit
 
@@ -171,7 +172,7 @@ Companion skills ship beside their extensions:
 |---|---|
 | [`pi-subagents`](https://github.com/fitchmultz/pi-subagents/tree/main/skills) | `pi-subagents` orchestration and `pi-intercom` coordination guidance |
 | [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter/tree/main/skills/mcp-scripting) | `mcp-scripting` for discovering and composing MCP calls |
-| [`ponytail`](https://github.com/DietrichGebert/ponytail/tree/main/skills) | `ponytail`, `ponytail-review` (my runtime filters the audit, debt, gain, and help variants) |
+| [`ponytail`](https://github.com/fitchmultz/ponytail/tree/main/skills) | `ponytail`, `ponytail-review` (my runtime filters the audit, debt, gain, and help variants) |
 
 `bro` is intentionally user-invoked only. My runtime filters the packaged `handoff` skill because subagent artifacts and Intercom cover that path; unfiltered `pi-agent-skills` installs still include it. The rest are selected by task fit rather than loaded into every prompt.
 

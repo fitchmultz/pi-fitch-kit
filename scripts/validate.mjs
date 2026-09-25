@@ -102,6 +102,7 @@ for (const pkg of manifest.corePackages) {
     /^npm:(?:@[\w.-]+\/)?[\w.-]+$/.test(pkg.source) || /^git:github\.com\/[\w-]+\/[\w-]+$/.test(pkg.source),
     `corePackages ${pkg.id} must use an unpinned npm or Git source: ${pkg.source}`,
   );
+  assert(!manifest.retiredPackageSources.includes(pkg.source), `corePackages ${pkg.id} cannot also be retired`);
 }
 const subagents = manifest.corePackages.find(({ id }) => id === "subagents");
 assert(
@@ -128,14 +129,20 @@ assert(ctxInfo?.source === "git:github.com/fitchmultz/pi-ctx-info", "ctx-info mu
 
 assert(!manifest.corePackages.some(({ id }) => id === "codex-context"), "codex-context is retired, not a core package");
 assert(!manifest.corePackages.some(({ id }) => id === "session-name"), "session-name now belongs to the kit");
-assert(!manifest.corePackages.some(({ id }) => id === "ask-question"), "ask-question is retired in favor of the clarification skill");
+const askQuestion = manifest.corePackages.find(({ id }) => id === "ask-question");
+assert(
+  askQuestion?.source === "git:github.com/fitchmultz/pi-ask-question",
+  "ask-question supplies the structured question tool the clarification skill prefers",
+);
+const ponytail = manifest.corePackages.find(({ id }) => id === "ponytail");
+assert(ponytail?.source === "git:github.com/fitchmultz/ponytail", "ponytail must use the maintained fork");
 assert(!manifest.corePackages.some(({ id }) => id === "fff"), "fff is retired in favor of native repository search");
 for (const source of [
   "git:github.com/fitchmultz/pi-codex-context",
   "git:github.com/fitchmultz/pi-session-name",
-  "git:github.com/fitchmultz/pi-ask-question",
   "npm:@ff-labs/pi-fff",
   "npm:pi-verbosity-control",
+  "git:github.com/DietrichGebert/ponytail",
 ]) {
   assert(
     manifest.retiredPackageSources.includes(source),
@@ -210,6 +217,7 @@ assert(setupPrompt.includes("openai-codex-fast.json"), "setup prompt must preser
 assert(setupPrompt.includes("retiredExtensionLinks"), "setup prompt must migrate approved extension collisions");
 assert(setupPrompt.includes("targetSuffix"), "setup prompt must verify retired link provenance");
 assert(setupPrompt.includes("pi-codex-context.json"), "setup prompt must preserve legacy compaction consent files");
+assert(setupPrompt.includes("apply the same filters to the fork"), "setup prompt must keep upstream Ponytail filters on the fork");
 assert(setupPrompt.includes("enable, disable, or keep"), "setup must offer explicit consent revocation");
 assert(setupPrompt.includes("filtered, pinned, or duplicate"), "setup must normalize stale kit package entries");
 assert(
