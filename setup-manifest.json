@@ -35,7 +35,7 @@
     "openai-codex/gpt-6-astra": 300000,
     "xai/grok-4.7": 300000
   },
-  "modelContextWindowsNote": "Optional public 300000-token budgets, merged per route as modelOverrides { contextWindow } to inherit native model capabilities. With the example's 64000 reserve, compaction begins at 236000. Existing choices remain unchanged unless explicitly overwritten. Inspect the effective model's pricing tiers before raising its window; the kit does not copy private provider definitions or pricing.",
+  "modelContextWindowsNote": "Optional budgets, merged per route as modelOverrides { contextWindow } to inherit native model capabilities. Existing choices remain unchanged unless explicitly overwritten. Inspect the effective model's pricing tiers before raising its window; the kit does not copy private provider definitions or pricing.",
   "kitResources": {
     "extensions": [
       "extensions/anthropic-image-guard.ts",
