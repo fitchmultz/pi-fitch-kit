@@ -1,6 +1,6 @@
 # My Pi harness, and why it is structured this way
 
-_Updated 22 September 2026 for Pi 0.84.2 or newer on Node.js 24 or newer._
+_Updated 25 September 2026 for Pi 0.84.2 or newer on Node.js 24 or newer; the full core install needs Pi 0.87.0 or newer._
 
 A few people have asked about my terminal agent setup. The public, installable version is [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit).
 
@@ -25,7 +25,7 @@ The normal path includes:
 
 The kit itself bundles stable session naming, read-only model status for setup, the Claude image boundary, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, and `/side-question`. The profiles ship directly with `pi-subagents`, so there is no second copy or sync layer.
 
-For native macOS automation, [`macuse`](https://github.com/fitchmultz/macuse) is a selective experimental add-on. I enable it only when browser DOM and CLI tools are insufficient; Codex app updates can break its integration surface.
+For native macOS automation, [`macuse`](https://github.com/fitchmultz/macuse) is an experimental add-on for work browser DOM and CLI tools cannot reach. It runs on the Computer Use runtime installed with ChatGPT, whose private interfaces OpenAI can change without notice.
 
 I keep `images.autoResize` off so agents can inspect original image detail. Anthropic has stricter inline limits, so the guard resizes only Claude-bound images, on any provider route that speaks the Anthropic Messages API, instead of shrinking every image for every model. The exact non-secret settings subset is checked in at [`examples/settings.json`](../examples/settings.json).
 
@@ -33,15 +33,15 @@ I keep `images.autoResize` off so agents can inspect original image detail. Anth
 
 The sixteen `pi-subagents` specialist profiles cover scouting, context assembly, debugging, research, planning, monitoring, bounded implementation, focused fixes, general review, GPT review, Claude review, security review, over-engineering review, UI review, oracle decisions, and writing. Its general-purpose `delegate` remains available beside them.
 
-The owning [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/main/agents) files define each role's models and ordered fallbacks. The kit preserves user and project overrides, including cross-family reviewers. The public settings example selects direct OpenAI Astra at max reasoning; my personal main session uses Codex Astra at max with a 600k context budget.
+The owning [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/main/agents) files define each role's models and ordered fallbacks. The kit preserves user and project overrides, including cross-family reviewers. The public settings example selects direct OpenAI Astra at medium reasoning; my personal main session uses Codex Astra at medium with a 300k context budget.
 
 Every profile is a leaf. Almost every child starts with fresh context. The parent inspects the actual files and evidence, makes the final decision, and stays accountable for the outcome.
 
 ## Skills
 
-[`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) packages the reusable operating procedures: clarification, dogfooding, TDD, Pi extension development, end-to-end shipping, UX review, verification, and strict review. [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) adds editable D2 plus rendered SVG/PNG technical diagrams and review crops. Subagents, Intercom, the MCP adapter, and Ponytail ship their own companion skills.
+[`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) packages the reusable operating procedures: clarification, dogfooding, handoff prompts, TDD, test auditing, Pi extension development, end-to-end shipping, UX review, verification, and strict review. [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) adds editable D2 plus rendered SVG/PNG technical diagrams and review crops. Subagents, Intercom, the MCP adapter, and Ponytail ship their own companion skills.
 
-Skills load only when the task matches. They provide a procedure without bloating every prompt. My runtime filters the packaged `handoff` skill because subagent artifacts and Intercom cover that path.
+Skills load only when the task matches. They provide a procedure without bloating every prompt.
 
 ## Connected context
 

@@ -150,7 +150,7 @@ assert.equal((fastReasoned.payload?.output_config as { effort?: string } | undef
 assert.deepEqual(fastReasoned.payload?.tool_choice, { type: "none" });
 // Direct route and gateway route get identical fast treatment.
 for (const provider of ["anthropic", "cloudflare-ai-gateway"]) {
-	for (const id of ["claude-opus-5", "claude-opus-4-8"]) {
+	for (const id of ["claude-opus-5-5", "claude-opus-5", "claude-opus-4-8"]) {
 		const fast = await fastRequest(provider, id);
 		assert.equal(fast.payload?.speed, "fast", `${provider}/${id} must request fast mode`);
 		assert.deepEqual(
