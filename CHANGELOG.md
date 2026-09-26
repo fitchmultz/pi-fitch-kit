@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** require Pi 0.87.1 or newer (official or the fork) and Node.js 24.15 or newer. The Pi 0.84.2 shims are gone: `/draft` and `/side-question` always use the registry's native simple streaming, fast mode relies on Pi's own tool-choice serialization, and session naming always uses the system-aware context hook. Fork-only checkpoints and entry revisions stay behind feature checks, so official Pi is unaffected.
+- CI qualifies official Pi 0.87.1 and fork `b1b4ac34` on Node 24 with the tagged `fitchmultz/.github` v1.0.0 automation; the historical 0.84.2 job is removed.
+- Pin all development tooling exactly and regenerate the lockfile from scratch against the public npm registry.
+
 ## 0.13.0 — 25 September 2026
 
 - Remove the kit's `/restart` helper. On official Pi it could only refuse, and on the maintained fork Pi's native launcher already owns `/restart`; official Pi users quit and relaunch after extension updates. The writer activity counter, which only answered that helper, is removed too.

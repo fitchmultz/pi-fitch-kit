@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { clampThinkingLevel, contentText, uuidv7, type Message, type Models, type UserMessage } from "@earendil-works/pi-ai";
+import { clampThinkingLevel, contentText, uuidv7, type Message, type UserMessage } from "@earendil-works/pi-ai";
 import {
 	BorderedLoader,
 	buildSessionContext,
@@ -192,23 +192,7 @@ async function completeWriter(
 		reasoning: thinkingLevel === "off" ? undefined : thinkingLevel,
 		onPayload: (payload: unknown) => fitClaudeRequest(model, payload),
 	};
-	const registry: typeof ctx.modelRegistry & { streamSimple?: Models["streamSimple"] } = ctx.modelRegistry;
-	let response;
-	if (typeof registry.streamSimple === "function") {
-		response = await registry.streamSimple(model, context, options).result();
-	} else {
-		// Pi 0.84.2 exposes native simple streaming on the configured provider,
-		// before it was added to the extension's model-registry facade.
-		const provider = registry.getProvider(model.provider);
-		if (!provider) throw new Error(`Unknown provider: ${model.provider}`);
-		const auth = await registry.getApiKeyAndHeaders(model);
-		if (!auth.ok) throw new Error(auth.error);
-		signal?.throwIfAborted();
-		const legacyContext = context as unknown as Parameters<typeof provider.streamSimple>[1];
-		response = await provider.streamSimple(auth.baseUrl ? { ...model, baseUrl: auth.baseUrl } : model, legacyContext, {
-			...options, apiKey: auth.apiKey, headers: auth.headers, env: auth.env,
-		}).result();
-	}
+	const response = await ctx.modelRegistry.streamSimple(model, context, options).result();
 	if (response.stopReason === "aborted") return undefined;
 	if (response.stopReason !== "stop") {
 		ctx.ui.notify(response.errorMessage ?? `Writer stopped (${response.stopReason})`, "error");

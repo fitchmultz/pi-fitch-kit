@@ -66,13 +66,11 @@ if (!selected || selected === "wire") {
 	const originals = messages(data, 9);
 	const outgoing = structuredClone(originals);
 	await prepareClaudeImages(model, outgoing);
-	const legacyContext = {
+	const context = ai.normalizeContext({
 		messages: outgoing,
 		systemPrompt: "Unicode overhead: 🐎 漢字 ".repeat(15000),
 		tools: [{ name: "inspect", description: "tool schema overhead ".repeat(10000), parameters: { type: "object", properties: {} } }],
-	};
-	// Current native APIs use transcript system messages; Pi 0.84.2 accepts Context.
-	const context = ai.normalizeContext ? ai.normalizeContext(legacyContext) : legacyContext;
+	});
 	async function capture(stream, options = {}) {
 		let body;
 		const response = await stream(model, structuredClone(context), {

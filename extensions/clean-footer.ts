@@ -80,7 +80,7 @@ function installFooter(ctx: ExtensionContext): void {
 				const branch = footerData.getGitBranch();
 				if (branch && repoCache.name) location += theme.fg("dim", ` (${branch})`);
 				const manager = ctx.sessionManager;
-				// Pi 0.84.2 has no revision getter; keep that host correct with an uncached pass.
+				// The revision getter is fork-only; official Pi takes an uncached pass.
 				const entryRevision: unknown = "getEntriesRevision" in manager && typeof manager.getEntriesRevision === "function"
 					? manager.getEntriesRevision()
 					: undefined;

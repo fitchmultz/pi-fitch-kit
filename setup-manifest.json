@@ -1,8 +1,8 @@
 {
   "schemaVersion": 8,
   "runtime": {
-    "pi": ">=0.84.2",
-    "node": ">=24.0.0"
+    "pi": ">=0.87.1",
+    "node": ">=24.15.0"
   },
   "kit": {
     "packageName": "@fitch/pi-kit",

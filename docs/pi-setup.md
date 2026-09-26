@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Updated 25 September 2026. The kit supports Pi 0.84.2 or newer on Node.js 24 or newer; qualified against official Pi and the maintained 0.87.1 fork. Complete core needs Pi 0.87.0 or newer because several of its packages, including `pi-apply-edits` 1.0, require it._
+_Updated 26 September 2026. The kit supports Pi 0.87.1 or newer on Node.js 24.15 or newer; qualified against official Pi 0.87.1 and the maintained 0.87.1 fork._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 
