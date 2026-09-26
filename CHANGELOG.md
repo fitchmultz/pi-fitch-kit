@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.15.0 — 26 September 2026
 
-- Add a bounded native reader for long, sectioned explanations. `/reader` resumes the saved page, `/reader list` browses prior documents, and `/reader demo` works without a model. Local section drafts enter model context only on explicit send; busy feedback waits for successful agent settlement and cannot leak after cancellation. Linked replies wait behind the current page until opened, while incomplete or ambiguous responses remain readable in the library.
+- Add a bounded native reader for long, sectioned explanations. `/reader` resumes the saved page, `/reader list` browses prior documents, and `/reader demo` works without a model. Local section drafts enter model context only on explicit send; busy feedback waits for successful agent settlement and cannot leak after cancellation. Linked replies wait behind the current page until opened, while incomplete or ambiguous responses remain readable in the library. Pointer controls use the fork's native mouse regions; official Pi uses the same keyboard controls.
+- CI qualifies fork `3d29fc65`.
 
 ## 0.14.0 — 26 September 2026
 
