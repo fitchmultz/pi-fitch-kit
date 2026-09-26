@@ -37,10 +37,11 @@ try {
 	await runner.emit({ type: "session_start", reason: "startup" });
 	const user = (content) => ({ role: "user", content, timestamp: 1 });
 	const plain = [user("first")];
+	manager.appendMessage(plain[0]);
 	assert.equal(sdk.VERSION, JSON.parse(readFileSync(join(host, "package.json"))).version);
 	assert.ok(loaded.extensions[0].handlers.has("context_with_system"));
 	const unnamed = await runner.emitContext(plain);
-	assert.match(unnamed[0].content, /"currentName":null/);
+	assert.match(unnamed[0].content, /"nameAtContextStart":null/);
 	assert.deepEqual(unnamed.slice(1), plain);
 
 	const tool = (name) => ({ name, description: name, parameters: { type: "object", properties: {} } });
@@ -81,16 +82,20 @@ try {
 		assert.equal(next.instructions, first.instructions);
 		assert.match(JSON.stringify(next), /INITIAL_INSTRUCTIONS/);
 		assert.match(JSON.stringify(next), /ADDED_INSTRUCTIONS/);
+		// Pi records a rename as a session_info entry after the conversation has started.
 		name = "renamed-session";
-		const renamed = await capture(await runner.emitContext(updated));
-		assert.notDeepEqual(renamed.input, next.input, "an actual rename changes the early metadata once");
-		assert.deepEqual(await capture(await runner.emitContext(updated)), renamed, "subsequent requests with that name are stable");
+		manager.appendSessionInfo(name);
+		assert.deepEqual(await capture(await runner.emitContext(updated)), next, "a rename leaves the request byte-identical");
 		name = undefined;
-		console.log(`PASS ${route}: stable head, additional_tools B, additive system patch, same-name prefix and one rename reset`);
+		console.log(`PASS ${route}: stable head, additional_tools B, additive system patch, same-name prefix and rename-stable prefix`);
 	}
 	active = false;
 	assert.deepEqual(await runner.emitContext(plain), plain, "inactive naming does not add context");
-	assert.deepEqual(manager.getEntries(), [], "request metadata is not persisted in the main journal");
+	assert.deepEqual(
+		manager.getEntries().map((entry) => entry.type),
+		["message", "session_info", "session_info"],
+		"request metadata is not persisted in the main journal",
+	);
 	assert.deepEqual(errors, []);
 	console.log(JSON.stringify({ host, version: sdk.VERSION, aiRoot }));
 } finally {

@@ -1,7 +1,25 @@
 import { Type } from "@earendil-works/pi-ai";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const TOOL_NAME = "name_session";
+
+type BranchEntry = ReturnType<ExtensionContext["sessionManager"]["getBranch"]>[number];
+
+// The metadata leads every request, so it must stay byte-stable for the whole context:
+// a change re-sends every later message as uncached input and breaks incremental
+// requests. Report the name as of the context's start (first message, latest compaction,
+// or native context window); name_session results report renames made after that.
+function nameAtContextStart(branch: BranchEntry[]): string | null {
+	let boundary = branch.findLastIndex(
+		(entry) => entry.type === "compaction" || (entry as { type: string }).type === "context_window",
+	);
+	if (boundary < 0) boundary = branch.findIndex((entry) => entry.type === "message");
+	let name: string | null = null;
+	for (const entry of boundary < 0 ? branch : branch.slice(0, boundary)) {
+		if (entry.type === "session_info") name = entry.name || null;
+	}
+	return name;
+}
 
 export default function sessionName(pi: ExtensionAPI): void {
 	let active = false;
@@ -14,7 +32,7 @@ export default function sessionName(pi: ExtensionAPI): void {
 			promptSnippet: "Set or update the current Pi session's searchable display name",
 			executionMode: "sequential",
 			promptGuidelines: [
-				"Before your first final response in an unnamed session, you must call name_session once after the overall purpose is clear; session display-name metadata reports currentName as null when unnamed. Do not skip naming just because no other tools are needed.",
+				"In an unnamed session you must call name_session once before your first final response: as soon as the overall purpose is clear, send it in the same tool batch as your next other tool call. Do not skip naming just because no other tools are needed. Session display-name metadata gives the name when this context began (null if unnamed); name_session results in this context supersede it.",
 				"Choose a broad, durable name for the session's overall purpose, usually 2-4 short terms. Do not name the current subtask, implementation detail, file, issue, phase, or temporary activity.",
 				"Treat an existing session name as stable. Rename only when the overall purpose has clearly and permanently changed and the old name would be misleading. Do not rename for ordinary follow-ups, subtasks, phases, or temporary detours. When unsure, keep the current name.",
 				"If this session or agent is designated as a coordinator, ensure its name contains coordinator. Preserve coordinator and any exact numbered subagent identifier, such as subagent-1, in every later name_session name. Never attempt to remove a protected role or identifier unless the user explicitly says it no longer applies; Pi will require the user to confirm the removal.",
@@ -97,10 +115,10 @@ export default function sessionName(pi: ExtensionAPI): void {
 		registerTool();
 	});
 
-	pi.on("context_with_system", (event) => {
+	pi.on("context_with_system", (event, ctx) => {
 		if (!active || !pi.getActiveTools().includes(TOOL_NAME)) return;
 
-		const metadata = JSON.stringify({ currentName: pi.getSessionName() ?? null });
+		const metadata = JSON.stringify({ nameAtContextStart: nameAtContextStart(ctx.sessionManager.getBranch()) });
 		const offset = event.messages[0]?.role === "system" ? 1 : 0;
 		return {
 			messages: [

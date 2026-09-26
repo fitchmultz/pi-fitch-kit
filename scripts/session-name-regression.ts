@@ -96,12 +96,15 @@ assert.equal(tool.executionMode, "sequential");
 type ContextResult = {
 	messages: Array<{ role?: string; content?: unknown }>;
 };
+type Branch = Array<{ type: string; name?: string }>;
 assert.equal(extension.handlers.has("context"), false);
 const context = extension.handlers.get("context_with_system")?.[0] as
-	| ((event: { messages: unknown[] }) => ContextResult | undefined)
+	| ((event: { messages: unknown[] }, ctx: { sessionManager: { getBranch: () => Branch } }) => ContextResult | undefined)
 	| undefined;
 assert.ok(context);
+const onBranch = (...branch: Branch) => ({ sessionManager: { getBranch: () => branch } });
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /must call name_session/);
+assert.match(tool.promptGuidelines?.join("\n") ?? "", /same tool batch as your next other tool call/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /overall purpose/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /When unsure, keep the current name/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /exact numbered subagent identifier/);
@@ -109,9 +112,11 @@ assert.match(tool.promptGuidelines?.join("\n") ?? "", /require the user to confi
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /avoid spaces/);
 
 const userMessage = { role: "user", content: "task", timestamp: 1 };
-const unnamedContext = await context({ messages: [userMessage] });
+const message = { type: "message" };
+const unnamedContext = await context({ messages: [userMessage] }, onBranch(message));
 assert.equal(unnamedContext?.messages[0]?.role, "custom");
-assert.match(String(unnamedContext?.messages[0]?.content), /"currentName":null/);
+const unnamedHead = String(unnamedContext?.messages[0]?.content);
+assert.match(unnamedHead, /"nameAtContextStart":null/);
 assert.deepEqual(unnamedContext?.messages.slice(1), [userMessage]);
 
 const first = await tool.execute(
@@ -160,8 +165,10 @@ const followUpMessages = [
 	{ role: "assistant", content: [{ type: "toolCall", name: "name_session" }] },
 	{ role: "toolResult", toolName: "name_session" },
 ];
-const namedContext = await context({ messages: followUpMessages });
-assert.match(String(namedContext?.messages[0]?.content), /"currentName":"Fix auth refresh"/);
+const renamed = { type: "session_info", name: "Fix auth refresh" };
+const namedContext = await context({ messages: followUpMessages }, onBranch(message, message, renamed, message));
+// A rename inside the context must leave the cached head byte-identical.
+assert.equal(String(namedContext?.messages[0]?.content), unnamedHead);
 assert.deepEqual(namedContext?.messages.slice(1), followUpMessages);
 
 await tool.execute(
@@ -172,9 +179,17 @@ await tool.execute(
 	{} as never,
 );
 assert.deepEqual(names, ["Fix auth refresh", "Ship auth migration"]);
+const shipped = { type: "session_info", name: "Ship auth migration" };
+const headOn = async (...branch: Branch) =>
+	String((await context({ messages: followUpMessages }, onBranch(...branch)))?.messages[0]?.content);
+assert.match(await headOn(shipped, message, message), /"nameAtContextStart":"Ship auth migration"/);
 assert.match(
-	String((await context({ messages: followUpMessages }))?.messages[0]?.content),
-	/"currentName":"Ship auth migration"/,
+	await headOn(message, renamed, message, { type: "compaction" }, message, shipped),
+	/"nameAtContextStart":"Fix auth refresh"/,
+);
+assert.match(
+	await headOn(message, renamed, { type: "context_window" }, message, shipped),
+	/"nameAtContextStart":"Fix auth refresh"/,
 );
 
 await tool.execute(
@@ -312,7 +327,7 @@ await assert.rejects(
 );
 
 active = false;
-assert.equal(await context({ messages: [userMessage] }), undefined);
+assert.equal(await context({ messages: [userMessage] }, onBranch(message)), undefined);
 
 console.log(`kit session-name checks passed (${VERSION})`);
 execFileSync(process.execPath, [join(process.cwd(), "scripts/session-name-boundary.mjs"), getPackageDir()], { stdio: "inherit" });
