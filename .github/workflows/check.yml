@@ -17,7 +17,7 @@ concurrency:
 
 env:
   PI_AUTOMATION_REF: fe049ea97a8c91d1a4c3a0958a85b37c7759dcc6 # v1.0.0
-  FORK_REF: b1b4ac34d807b577d66f5879119a9ed4833c8ed7
+  FORK_REF: 06a195979349ae6da54752b562b5c8b4cfc32f35
 
 jobs:
   official:
