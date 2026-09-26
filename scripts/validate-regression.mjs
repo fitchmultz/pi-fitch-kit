@@ -61,9 +61,15 @@ for (const compaction of [undefined, null, {}, { keepRecentTokens: 40000 }]) {
   });
 }
 
-test("default model must remain required and enabled", () => {
-  rejects(({ settings }) => { settings.defaultModel = "unmanaged"; }, "settings default model must be a required route");
+test("default model must remain the preferred required route and enabled", () => {
+  rejects(({ settings }) => { settings.defaultModel = "unmanaged"; }, "settings default model must be the preferred route of a required entry");
+  rejects(({ settings }) => { settings.defaultProvider = "openai"; }, "settings default model must be the preferred route of a required entry");
   rejects(({ settings }) => { settings.enabledModels = []; }, "settings default model must be enabled");
+});
+
+test("required models are ordered alternative lists", () => {
+  rejects(({ manifest }) => { manifest.requiredModels.push("openai/gpt-6-astra"); }, "each requiredModels entry must be a non-empty ordered list of provider/model routes");
+  rejects(({ manifest }) => { manifest.requiredModels.push([]); }, "each requiredModels entry must be a non-empty ordered list of provider/model routes");
 });
 
 test("missing recent-token setting has its own diagnostic", () => {

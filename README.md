@@ -107,7 +107,7 @@ The fork defaults to off. [`examples/settings.json`](examples/settings.json) inc
 
 ### User-local extensions
 
-Personal provider definitions, agent-profile overrides, and experimental extensions remain outside Complete core. My main session uses `openai-codex/gpt-6-astra` instead of the public direct-OpenAI example below. Personal Posthorse provides fresh context windows through fork APIs and is not an official-Pi fallback or a kit dependency. Setup preserves these choices and never copies private configuration into the public package.
+Personal provider definitions, agent-profile overrides, and experimental extensions remain outside Complete core. Personal Posthorse provides fresh context windows through fork APIs and is not an official-Pi fallback or a kit dependency. Setup preserves these choices and never copies private configuration into the public package.
 
 ### Why the image guard exists
 
@@ -230,7 +230,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 
 `/fitch-setup` reads [`setup-manifest.json`](setup-manifest.json), previews every package install and file change, and asks which parts to apply. It checks models through the running session's read-only `fitch_setup_models` tool, rather than starting a Pi CLI whose migrations can change files. It never reads or copies credentials. Reruns normalize filtered, pinned, or duplicate kit entries to one canonical source. They also preview removal of retired standalone packages, the archived Intercom package, approved Fold footer and fast-mode loader symlinks, and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. A separate consent step merges the manifest's flat context-window overrides into `models.json` per route, keeping existing values unless explicitly overwritten. `/fitch-setup verify` reports all drift without changing anything.
 
-The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump. It selects direct OpenAI Astra at medium reasoning for the public setup; optional routes are filtered by availability. The manifest offers 300k context budgets.
+The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump. It selects Astra through a ChatGPT/Codex subscription at medium reasoning; setup falls back to an OpenAI API key when there is no subscription and filters optional routes by availability. The manifest offers 300k context budgets.
 
 ## Prompts
 
