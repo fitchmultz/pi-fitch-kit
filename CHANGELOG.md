@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0 — 25 September 2026
+
+- Remove the kit's `/restart` helper. On official Pi it could only refuse, and on the maintained fork Pi's native launcher already owns `/restart`; official Pi users quit and relaunch after extension updates. The writer activity counter, which only answered that helper, is removed too.
+- Prefer a ChatGPT/Codex subscription for GPT-6 Astra and fall back to an OpenAI API key. Required models are ordered alternative lists: Astra via `openai-codex` then `openai`, and Claude via reviewer-claude's chain of Opus 5.5, Fable 5.1, and Cloudflare AI Gateway Opus 5. The settings example defaults to the subscription route, and setup offers the first available alternative. Matches pi-subagents 0.41.0 role routing.
+- Update development tooling to TypeScript 7, npm 12, and `@types/node` 24.19.0.
+
 ## 0.12.0 — 25 September 2026
 
 - Sync setup with the current harness. Require Claude Fable 5.1 alongside Opus 5 and GPT-6 Astra, and offer Opus 5.5, GPT-6 Sol, and Grok 4.7. The settings example now defaults to medium thinking with a 150-second provider timeout, and setup offers flat 300k context budgets. Retired private routes (cf-google Gemini, gateway Grok 4.6, Fireworks GLM/Kimi) are no longer proposed. Existing user settings and budgets are preserved.
