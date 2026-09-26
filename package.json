@@ -46,11 +46,11 @@
   "engines": {
     "node": ">=24.0.0"
   },
-  "packageManager": "npm@11.16.0",
+  "packageManager": "npm@11.20.0",
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.87.0",
-    "@earendil-works/pi-coding-agent": "0.87.0",
-    "@earendil-works/pi-tui": "0.87.0",
+    "@earendil-works/pi-ai": "0.87.1",
+    "@earendil-works/pi-coding-agent": "0.87.1",
+    "@earendil-works/pi-tui": "0.87.1",
     "@types/node": "^24.13.3",
     "typescript": "^6.0.3"
   },

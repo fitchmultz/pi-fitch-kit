@@ -10,30 +10,32 @@
     "installSource": "git:github.com/fitchmultz/pi-fitch-kit"
   },
   "requiredModels": [
-    "anthropic/claude-fable-5",
+    "anthropic/claude-fable-5-1",
     "anthropic/claude-opus-5",
     "openai/gpt-6-astra"
   ],
   "optionalModels": [
-    "cloudflare-ai-gateway/claude-fable-5",
+    "anthropic/claude-opus-5-5",
+    "cloudflare-ai-gateway/claude-opus-5-5",
+    "cloudflare-ai-gateway/claude-fable-5-1",
     "cloudflare-ai-gateway/claude-opus-5",
-    "cloudflare-ai-gateway/grok-4.6",
     "openai-codex/gpt-6-astra",
-    "xai/grok-4.6",
-    "fireworks/accounts/fireworks/routers/kimi-k3-fast",
-    "fireworks/accounts/fireworks/routers/glm-5p2-fast",
-    "cf-google/gemini-3.7-flash"
+    "openai/gpt-6-sol",
+    "xai/grok-4.7"
   ],
   "optionalModelsNote": "Optional routes require the user's own authentication and, where needed, provider configuration. Missing routes are reported and omitted from the selected setup; existing user profiles and fallbacks are preserved.",
   "modelContextWindows": {
-    "cloudflare-ai-gateway/claude-fable-5": 320000,
-    "cloudflare-ai-gateway/claude-opus-5": 320000,
-    "anthropic/claude-fable-5": 320000,
-    "anthropic/claude-opus-5": 320000,
-    "openai/gpt-6-astra": 320000,
-    "openai-codex/gpt-6-astra": 320000
+    "anthropic/claude-fable-5-1": 300000,
+    "anthropic/claude-opus-5": 300000,
+    "anthropic/claude-opus-5-5": 300000,
+    "cloudflare-ai-gateway/claude-fable-5-1": 300000,
+    "cloudflare-ai-gateway/claude-opus-5": 300000,
+    "cloudflare-ai-gateway/claude-opus-5-5": 300000,
+    "openai/gpt-6-astra": 300000,
+    "openai-codex/gpt-6-astra": 300000,
+    "xai/grok-4.7": 300000
   },
-  "modelContextWindowsNote": "Optional public 320000-token budgets, merged per route as modelOverrides { contextWindow } to inherit native model capabilities. With the example's 64000 reserve, compaction begins at 256000. Existing choices, including personal Astra 600000-token budgets, remain unchanged unless explicitly overwritten. Inspect the effective model's pricing tiers before raising its window; the kit does not copy private provider definitions or pricing.",
+  "modelContextWindowsNote": "Optional budgets, merged per route as modelOverrides { contextWindow } to inherit native model capabilities. Existing choices remain unchanged unless explicitly overwritten. Inspect the effective model's pricing tiers before raising its window; the kit does not copy private provider definitions or pricing.",
   "kitResources": {
     "extensions": [
       "extensions/anthropic-image-guard.ts",
@@ -102,8 +104,8 @@
       "source": "git:github.com/fitchmultz/pi-agent-browser-native",
       "externalPrerequisite": {
         "package": "agent-browser",
-        "version": "0.36.0",
-        "installCommand": "npm install --global agent-browser@0.36.0",
+        "version": "0.38.1",
+        "installCommand": "npm install --global agent-browser@0.38.1",
         "runtimeDownloadCommand": "agent-browser install"
       }
     },

@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Updated 22 September 2026. The kit supports Pi 0.84.2 or newer on Node.js 24 or newer; qualified against official Pi and the maintained 0.87.0 fork. Selected external packages have their own requirements; `pi-apply-edits` 1.0 requires Pi 0.87.0 or newer._
+_Updated 25 September 2026. The kit supports Pi 0.84.2 or newer on Node.js 24 or newer; qualified against official Pi and the maintained 0.87.1 fork. Complete core needs Pi 0.87.0 or newer because several of its packages, including `pi-apply-edits` 1.0, require it._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 
@@ -92,13 +92,13 @@ The [README extension index](../README.md#enabled-extensions) links every loaded
 
 Most reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
 
-[`macuse`](https://github.com/fitchmultz/macuse) is the selective exception to the default stack. It adds native macOS app inspection and control for tasks that cannot be handled through browser DOM or CLI tools. I enable it only when needed and treat it as experimental because Codex app updates can break the integration surface.
+[`macuse`](https://github.com/fitchmultz/macuse) is the experimental exception to the default stack. It adds native macOS Computer Use for tasks that cannot be handled through browser DOM or CLI tools. It runs on the Computer Use runtime installed with ChatGPT, and OpenAI can change that runtime's private interfaces without notice.
 
 ## Restarting Pi sessions
 
-**Current managed fork (0.87.0, `afed789dded723566b6ecb1c77a06e8561504f7a`):** the bundled CLI launches a worker and owns native `/restart` itself. The kit's execve helper remains inert in that worker; no helper socket, multi-session picker, or `/restart all` is provided there. Use the host's native `/restart` or shell-tool `pi restart`; see its `docs/restart.md` for continuation, queueing, readiness and recovery. Keep that native launcher path intact rather than bypassing it to enable the old helper. The kit's `smoke:restart -- --cases managed` checks actual same-session worker replacement without startup replay; `--cases unsupported` checks official refusal.
+**Current managed fork (0.87.1):** the bundled CLI launches a worker and owns native `/restart` itself. The kit's execve helper remains inert in that worker; no helper socket, multi-session picker, or `/restart all` is provided there. Use the host's native `/restart` or shell-tool `pi restart`; see its `docs/restart.md` for continuation, queueing, readiness and recovery. Keep that native launcher path intact rather than bypassing it to enable the old helper. The kit's `smoke:restart -- --cases managed` checks actual same-session worker replacement without startup replay; `--cases unsupported` checks official refusal.
 
-The remainder of this section describes the **legacy unsupervised helper**, not the current managed path. Restart requires [the Pi fork](https://github.com/fitchmultz/pi) with the public `ctx.isBashRunning()`, `ctx.getPendingInputCount()` and `ctx.getPendingNextTurnCount()` APIs. Hosts without these facts, including official Pi 0.87.0, report restart as unavailable and refuse both default and explicit-stop requests. Installing the kit does not patch Pi.
+The remainder of this section describes the **legacy unsupervised helper**, not the current managed path. Restart requires [the Pi fork](https://github.com/fitchmultz/pi/blob/main/FORK.md) with the public `ctx.isBashRunning()`, `ctx.getPendingInputCount()` and `ctx.getPendingNextTurnCount()` APIs. Hosts without these facts, including official Pi, report restart as unavailable and refuse both default and explicit-stop requests. Installing the kit does not patch Pi.
 
 `/restart` lists responding helper-enabled sessions. Choose one with Enter, mark several with Space, or choose All; `/restart all` skips the picker. The next choice defaults to restarting idle sessions and skipping busy ones. The initiating session goes last, and success requires a new process image confirming the exact saved file and session ID—not just an accepted request.
 
@@ -120,7 +120,7 @@ The supported host is the ordinary Unix Node Pi CLI on a real TTY. SDK/RPC/print
 
 [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/main/agents) owns the specialist defaults. Primary models, ordered fallbacks, thinking levels, and context policy live in those files. The generic delegate inherits the parent model. User and project profiles take precedence and are preserved during kit setup; the setup preview shows the installed mapping rather than a copied table.
 
-The public settings example selects `openai/gpt-6-astra` at max reasoning. My personal main session instead uses `openai-codex/gpt-6-astra` at max, with a 600k context budget. Updating the kit does not change that choice or replace explicit cross-family reviewer routes.
+The public settings example selects `openai/gpt-6-astra` at medium reasoning; my personal main session uses `openai-codex/gpt-6-astra` instead. Updating the kit does not change that choice or replace explicit cross-family reviewer routes.
 
 Use `modelOverrides` for intentional changes to native models. A full matching `models[]` definition replaces the native model and can hide new capabilities such as incremental system messages. Setup can preview a narrow migration while preserving deliberate context/output limits, reasoning maps, pricing, and all unrelated configuration. It never invents provider authentication or copies private endpoints.
 
@@ -134,11 +134,11 @@ Native protocol async tools, live WebSocket steering, and positional reasoning u
 
 The public skills are source-managed rather than copied through a home directory:
 
-- [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries clarification, dogfooding, TDD, extension development, end-to-end shipping, UX review, completion verification, and strict review modes. Its [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) skill produces editable D2 plus SVG/PNG architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with generated review images.
+- [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries clarification, dogfooding, handoff prompts, TDD, test auditing, extension development, end-to-end shipping, UX review, completion verification, and strict review modes. Its [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills/tree/main/skills/diagram-creation) skill produces editable D2 plus SVG/PNG architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with generated review images.
 - `pi-subagents` ships both orchestration and Intercom usage skills; `pi-mcp-adapter` ships its scripting skill.
-- [`ponytail`](https://github.com/fitchmultz/ponytail) supplies the active minimalism mode and focused review skill; my runtime filters its audit, debt, gain, and help variants.
+- [`ponytail`](https://github.com/fitchmultz/ponytail) supplies the active minimalism mode plus its focused review and whole-repo audit skills; my runtime filters its debt, gain, and help variants.
 
-Pi loads a skill only when the task matches. This keeps the default prompt small while giving specialized work an explicit procedure. My runtime filters the packaged `handoff` skill because subagent artifacts and Intercom cover that path.
+Pi loads a skill only when the task matches. This keeps the default prompt small while giving specialized work an explicit procedure.
 
 ## MCP and authenticated context
 
@@ -162,13 +162,13 @@ My personal runtime uses full approvals. MCP transports tool calls; it is not th
 
 ## Compact transcript view
 
-Compact view is an optional native Pi feature, not a bundled extension. On [the supporting fork](https://github.com/fitchmultz/pi), `/compact-view` toggles the current session; `/compact-view off` returns to the normal view. The preference is saved for new sessions without changing other open sessions. Click individual tool cards in fullscreen mode or use Ctrl+O to expand details.
+Compact view is an optional native Pi feature, not a bundled extension. On [the supporting fork](https://github.com/fitchmultz/pi/blob/main/FORK.md), `/compact-view` toggles the current session; `/compact-view off` returns to the normal view. The preference is saved for new sessions without changing other open sessions. Click individual tool cards in fullscreen mode or use Ctrl+O to expand details.
 
 The native default is off. The safe settings example includes `"compactView": true` as an optional preference, not a package-install default. `/fitch-setup` offers it separately only when the installed Pi documents the setting and command, preserves an existing value or absence unless a change is selected, and skips it on unsupported runtimes. Official Pi remains supported. Core renders the tool cards; `pi-subagents` owns compact routine coordination notices. Neither the kit nor the view changes model context or saved tool results.
 
 ## Compaction policy
 
-The settings example uses `compaction.reserveTokens: 64000` and `keepRecentTokens: 40000`. The manifest offers 320k public context budgets, giving a 256k compaction threshold. My existing 600k Astra choice instead gives a 536k threshold with the same reserve. These are selected budgets, not claims that one size or effort level is universally optimal.
+The settings example uses `compaction.reserveTokens: 64000` and `keepRecentTokens: 40000`. The manifest offers 300k context budgets, giving a 236k compaction threshold. These are selected budgets, not claims that one size or effort level is universally optimal.
 
 Setup derives each threshold from the selected window and effective reserve, previews changes, and preserves existing values unless an overwrite is approved. `modelOverrides` inherits native capability and pricing metadata. Raising a window may cross that route's long-context pricing tier; inspect the effective model rather than assuming direct OpenAI, Codex, and gateway routes share limits or billing. Custom provider definitions remain user-managed.
 
@@ -231,7 +231,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), checks model routes through the running session's `fitch_setup_models` tool, shows one preview, and installs only the selected unpinned sources. A new Pi CLI invocation for model listing would run startup migrations before printing results, so verification does not use one. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. Agent Browser stays at 0.36.0 because that is the released wrapper's tested baseline; the wrapper documents that compatibility baseline. The prompt offers the safe settings keys and the context-window overrides as separate consent steps, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources in a fresh Pi process after extension-code or dependency changes. `/reload` refreshes settings and non-code resources; it does not activate new extension code on Pi 0.87. A new conversation in the same process is insufficient. Use native `/restart` on a supporting fork, or quit and relaunch the saved session.
+The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), checks model routes through the running session's `fitch_setup_models` tool, shows one preview, and installs only the selected unpinned sources. A new Pi CLI invocation for model listing would run startup migrations before printing results, so verification does not use one. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. The prompt offers the safe settings keys and the context-window overrides as separate consent steps, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources in a fresh Pi process after extension-code or dependency changes. `/reload` refreshes settings and non-code resources; it does not activate new extension code on Pi 0.87. A new conversation in the same process is insufficient. Use native `/restart` on a supporting fork, or quit and relaunch the saved session.
 
 `/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, current-session model availability (including whether project resources are trusted), consent-gated route state, and `models.json` context-window overrides.
 
@@ -250,7 +250,7 @@ A shared setup must not distribute:
 
 The settings example omits trust policy intentionally. Choose `defaultProjectTrust` and subagent child trust for the environment rather than copying mine. Untrusted repositories should use `no-approve`.
 
-Extension packages use bare Git or npm sources. The separate Agent Browser CLI version matches the wrapper's tested compatibility baseline.
+Extension packages use bare Git or npm sources. The separate Agent Browser CLI version matches the wrapper's recommended baseline.
 
 Consequential external writes, production actions, account changes, and merges still require explicit authorization.
 

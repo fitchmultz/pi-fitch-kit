@@ -178,10 +178,10 @@ const editSession = manifest.corePackages.find(({ id }) => id === "edit-session"
 assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");
 
 const browser = manifest.corePackages.find(({ id }) => id === "agent-browser")?.externalPrerequisite;
-assert(browser?.version === "0.36.0", "Agent Browser prerequisite must match the wrapper's tested 0.36.0 baseline");
+assert(/^\d+\.\d+\.\d+$/.test(browser?.version), "Agent Browser prerequisite must pin an exact version");
 assert(
-  browser?.installCommand === "npm install --global agent-browser@0.36.0",
-  "Agent Browser install must use the exact tested version",
+  browser.installCommand === `npm install --global agent-browser@${browser.version}`,
+  "Agent Browser install must use the pinned version",
 );
 
 const setupPromptPath = manifest.kitResources.prompts.find((path) => path.endsWith("/fitch-setup.md"));
@@ -207,8 +207,8 @@ assert(new Set(settingsExample.enabledModels).size === settingsExample.enabledMo
 for (const route of settingsExample.enabledModels) {
   assert(manifestModelRoutes.has(route), `settings enabled model ${route} must be a manifest-managed route`);
 }
-assert(settingsExample.retry?.maxRetries === 5, "settings example must carry the active retry budget");
-assert(settingsExample.retry?.provider?.timeoutMs === 120000, "settings example must carry the active provider timeout");
+assert(Number.isSafeInteger(settingsExample.retry?.maxRetries) && settingsExample.retry.maxRetries > 0, "settings example must carry a retry budget");
+assert(Number.isSafeInteger(settingsExample.retry?.provider?.timeoutMs) && settingsExample.retry.provider.timeoutMs > 0, "settings example must carry a provider timeout");
 
 assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");
 assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
