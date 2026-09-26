@@ -1,6 +1,6 @@
 {
   "name": "@fitch/pi-kit",
-  "version": "0.11.2",
+  "version": "0.14.0",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -10,16 +10,14 @@
   "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "npm run typecheck && node --check extensions/anthropic-image-guard.ts && node --check extensions/clean-footer.ts && node --check extensions/fast-mode.ts && node --check extensions/session-name.ts && node --check extensions/setup-models.ts && node --check extensions/write-prompt.ts && node --check extensions/session-restart.ts && node --check extensions/paged-reader.ts && node --check scripts/fast-mode-regression.ts && node --check scripts/session-name-regression.ts && node --check scripts/write-prompt-regression.ts && node --check scripts/paged-reader-regression.ts && node --check scripts/setup-lifecycle-smoke.mjs && node scripts/image-guard-smoke.mjs && npm run regression:clean-footer && npm run regression:fast-mode && npm run regression:session-name && npm run regression:write-prompt && npm run regression:session-restart && npm run regression:paged-reader && npm run smoke:lifecycle && node scripts/validate.mjs && node --test scripts/validate-regression.mjs",
-    "check:compat": "npm run check && npm run smoke && node scripts/restart-compat.mjs",
+    "check": "npm run typecheck && node scripts/image-guard-smoke.mjs && node scripts/image-budget-regression.mjs && npm run regression:clean-footer && npm run regression:fast-mode && npm run regression:session-name && npm run regression:write-prompt && npm run regression:paged-reader && npm run smoke:lifecycle && node scripts/validate.mjs && node --test scripts/validate-regression.mjs",
+    "check:compat": "npm run check && npm run smoke",
     "typecheck": "tsc --noEmit",
     "regression:clean-footer": "node scripts/clean-footer-regression.mjs",
     "regression:fast-mode": "node --experimental-strip-types scripts/fast-mode-regression.ts",
     "regression:session-name": "node --experimental-strip-types scripts/session-name-regression.ts",
     "regression:paged-reader": "node --experimental-strip-types scripts/paged-reader-regression.ts",
     "regression:write-prompt": "node --experimental-strip-types scripts/write-prompt-regression.ts && node scripts/write-prompt-boundary.mjs",
-    "regression:session-restart": "node --experimental-strip-types scripts/session-restart-regression.ts",
-    "smoke:restart": "python3 scripts/session-restart-pty.py",
     "smoke": "node scripts/package-smoke.mjs",
     "smoke:lifecycle": "node scripts/setup-lifecycle-smoke.mjs"
   },
@@ -34,7 +32,6 @@
       "./extensions/session-name.ts",
       "./extensions/setup-models.ts",
       "./extensions/write-prompt.ts",
-      "./extensions/session-restart.ts",
       "./extensions/paged-reader.ts"
     ],
     "prompts": [
@@ -46,15 +43,15 @@
     ]
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=24.15.0"
   },
-  "packageManager": "npm@11.16.0",
+  "packageManager": "npm@12.1.0",
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.87.0",
-    "@earendil-works/pi-coding-agent": "0.87.0",
-    "@earendil-works/pi-tui": "0.87.0",
-    "@types/node": "^24.13.3",
-    "typescript": "^6.0.3"
+    "@earendil-works/pi-ai": "0.87.1",
+    "@earendil-works/pi-coding-agent": "0.87.1",
+    "@earendil-works/pi-tui": "0.87.1",
+    "@types/node": "24.19.0",
+    "typescript": "7.0.2"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

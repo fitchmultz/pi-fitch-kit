@@ -84,15 +84,12 @@ for (const isError of [false, true]) {
 	assert.deepEqual(imageResult, before, "flattening must not mutate source history");
 }
 
-const { createEventBus } = await import("@earendil-works/pi-coding-agent");
-const events = createEventBus();
 const commands: Record<string, { handler: (args: string, ctx: never) => Promise<void> }> = {};
 let sent: string | undefined;
 let sendOptions: { deliverAs?: string } | undefined;
 let sendFailure: Error | undefined;
 const savedDrafts: Array<{ type: "custom"; customType: string; data: { source: string; draft: string } }> = [];
 writePrompt({
-	events,
 	registerCommand(name: string, config: { handler: (args: string, ctx: never) => Promise<void> }) {
 		commands[name] = config;
 	},
@@ -731,8 +728,11 @@ for (const role of ["user", "toolResult"]) {
 			modelRegistry: {
 				find: () => undefined,
 				hasConfiguredAuth: () => true,
-				complete: async (_model: unknown, context: { messages: Array<{ content?: Array<{ type?: string; mimeType?: string; text?: string }> }> }) => {
+				complete: async (_model: unknown, context: { messages: Array<{ content?: Array<{ type?: string; mimeType?: string; text?: string }> }> }, options: { onPayload?: (payload: unknown) => Promise<unknown> }) => {
 					imageCapture.push(...(context.messages[0]?.content ?? []));
+					assert.equal(typeof options.onPayload, "function", "nested writer calls must guard the serialized payload");
+					const payload = { messages: [{ role: "user", content: [{ type: "text", text: "unchanged" }] }] };
+					assert.equal(await options.onPayload!(payload), payload);
 					return {
 						role: "assistant",
 						content: [{ type: "text", text: "better prompt" }],
@@ -750,42 +750,7 @@ for (const role of ["user", "toolResult"]) {
 	assert.match(imageCapture.map((part) => part.text ?? "").join("\n"), /does not support this image type/);
 }
 
-// Activity spans the off-transcript call and its dialogs, including overlap and reload.
-const activity = (bus = events) => {
-	let count: number | undefined;
-	bus.emit("fitch:write-prompt:status", { reply: (value: number) => { count = value; } });
-	return count;
-};
-assert.equal(activity(), 0);
-let closeDraft!: (value: string) => void;
-let closeQuestion!: (value: string) => void;
-let dialogsReady!: () => void;
-let dialogs = 0;
-const readyDialogs = new Promise<void>((resolve) => { dialogsReady = resolve; });
-const waiting = (close: (value: (answer: string) => void) => void) => ctx({
-	ui: { ...baseUi, select: () => new Promise<string>((resolve) => {
-		close(resolve);
-		if (++dialogs === 2) dialogsReady();
-	}) },
-});
-const pendingDraft = commands.draft.handler("draft activity", waiting((close) => { closeDraft = close; }) as never);
-const pendingQuestion = commands["side-question"].handler("question activity", waiting((close) => { closeQuestion = close; }) as never);
-assert.equal(activity(), 2);
-await readyDialogs;
-assert.equal(activity(), 2, "finishing the model call does not finish the command's unsaved dialog");
-const reloadedEvents = createEventBus();
-writePrompt({ events: reloadedEvents, registerCommand() {} } as never);
-assert.equal(activity(reloadedEvents), 2, "reload must not hide commands still finishing in the old instance");
-closeDraft("Deny");
-await pendingDraft;
-assert.equal(activity(reloadedEvents), 1);
-closeQuestion("Dismiss");
-await pendingQuestion;
-assert.equal(activity(), 0);
-await assert.rejects(commands.draft.handler("dialog throws", ctx({ ui: { ...baseUi, select: async () => { throw new Error("dialog failure"); } } }) as never), /dialog failure/);
-assert.equal(activity(), 0, "finally releases activity even on a thrown dialog error");
-
-// Closing a cancelled TUI loader is not proof that its API promise has settled.
+// Cancelling a TUI loader aborts its pending API call, and the late result is harmless.
 const { initTheme } = await import("@earendil-works/pi-coding-agent");
 initTheme("dark");
 let releaseCompletion!: (value: unknown) => void;
@@ -818,10 +783,76 @@ await started;
 view!.handleInput("\x1b");
 await cancelledWriter;
 assert.equal(apiSignal?.aborted, true);
-assert.ok(activity()! > 0, "an unsettled API call remains busy after its dialog closes");
 releaseCompletion({ role: "assistant", content: [], stopReason: "aborted" });
 await settled;
-assert.equal(activity(), 0);
+
+// Cancelled work must not touch a context retired by /reload or /new.
+for (const command of ["draft", "side-question"]) {
+	for (const phase of ["image preparation", "provider rejection"]) {
+		let retired = false;
+		let staleReads = 0;
+		let calls = 0;
+		let rejectCompletion!: (error: Error) => void;
+		const started = Promise.withResolvers<void>();
+		const finished = Promise.withResolvers<void>();
+		let doneCalls = 0;
+		const context = ctx({
+			mode: "tui",
+			model: { id: "claude-test", provider: "anthropic", api: "anthropic-messages" },
+			thinkingLevel: "off",
+			sessionManager: {
+				getEntries: () => [{
+					type: "message", id: "image", parentId: null, timestamp: "2026-01-01T00:00:00.000Z",
+					message: {
+						role: "user", timestamp: 1,
+						content: [{
+							type: "image", mimeType: "image/png",
+							data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+						}],
+					},
+				}],
+				getLeafId: () => "image",
+			},
+			modelRegistry: {
+				complete: () => {
+					calls++;
+					started.resolve();
+					return new Promise((_resolve, reject) => { rejectCompletion = reject; });
+				},
+			},
+			ui: { ...baseUi, custom: (factory: Function) => new Promise((resolve) => {
+				view = factory({ requestRender() {} }, { fg: (_color: string, value: string) => value }, {}, (value: unknown) => {
+					view.dispose();
+					resolve(value);
+					// The abort closes the loader first; the completion's own return is the second call.
+					if (++doneCalls === 2) finished.resolve();
+				});
+			}) },
+		});
+		for (const key of ["ui", "modelRegistry"] as const) {
+			const value = context[key];
+			Object.defineProperty(context, key, { get() {
+				if (retired) {
+					staleReads++;
+					throw new Error(`stale ${key}`);
+				}
+				return value;
+			} });
+		}
+		notices.length = 0;
+		const pending = commands[command].handler("cancel before replacement", context as never);
+		if (phase === "provider rejection") await started.promise;
+		view!.handleInput("\x1b");
+		await pending;
+		retired = true;
+		if (phase === "provider rejection") rejectCompletion(new Error("late provider failure"));
+		else await finished.promise;
+		await new Promise((resolve) => setImmediate(resolve));
+		assert.equal(staleReads, 0, `${command}: cancelled ${phase} must not read retired context`);
+		assert.equal(calls, phase === "provider rejection" ? 1 : 0);
+		assert.deepEqual(notices, [], "cancelled work must not report late errors");
+	}
+}
 
 // Exercise the actual TUI menu and keyboard selection, including the recovery action.
 for (const action of ["Accept", "Restore original"] as const) {

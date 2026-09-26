@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { clampThinkingLevel, contentText, uuidv7, type Message, type Models, type UserMessage } from "@earendil-works/pi-ai";
+import { clampThinkingLevel, contentText, uuidv7, type Message, type UserMessage } from "@earendil-works/pi-ai";
 import {
 	BorderedLoader,
 	buildSessionContext,
@@ -12,10 +12,9 @@ import {
 	rawKeyHint,
 	type ExtensionAPI,
 	type ExtensionCommandContext,
-	type RegisteredCommand,
 } from "@earendil-works/pi-coding-agent";
 import { Container, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
-import { prepareClaudeImages } from "./anthropic-image-guard.ts";
+import { fitClaudeRequest, prepareClaudeImages } from "./anthropic-image-guard.ts";
 
 export const WRITE_PROMPT_FILE = "write-prompt.json";
 export const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Restore original", "Deny"] as const;
@@ -87,12 +86,6 @@ export function configuredWriter(raw: string): WriterConfig {
 		config.thinkingLevel = level;
 	}
 	return config;
-}
-
-function writerActivity() {
-	const key = Symbol.for("fitch-kit.write-prompt.activity");
-	const store = globalThis as typeof globalThis & { [key]?: { active: number } };
-	return store[key] ??= { active: 0 };
 }
 
 function readWriterConfig(): WriterConfig {
@@ -192,25 +185,14 @@ async function completeWriter(
 	};
 	const outgoing = flattenToolHistory(structuredClone([...messages, pending]));
 	await prepareClaudeImages(model, outgoing);
+	if (signal?.aborted) return undefined;
 	const context = { systemPrompt, messages: outgoing };
-	const options = { signal, cacheRetention: "short" as const, sessionId, reasoning: thinkingLevel === "off" ? undefined : thinkingLevel };
-	const registry: typeof ctx.modelRegistry & { streamSimple?: Models["streamSimple"] } = ctx.modelRegistry;
-	let response;
-	if (typeof registry.streamSimple === "function") {
-		response = await registry.streamSimple(model, context, options).result();
-	} else {
-		// Pi 0.84.2 exposes native simple streaming on the configured provider,
-		// before it was added to the extension's model-registry facade.
-		const provider = registry.getProvider(model.provider);
-		if (!provider) throw new Error(`Unknown provider: ${model.provider}`);
-		const auth = await registry.getApiKeyAndHeaders(model);
-		if (!auth.ok) throw new Error(auth.error);
-		signal?.throwIfAborted();
-		const legacyContext = context as unknown as Parameters<typeof provider.streamSimple>[1];
-		response = await provider.streamSimple(auth.baseUrl ? { ...model, baseUrl: auth.baseUrl } : model, legacyContext, {
-			...options, apiKey: auth.apiKey, headers: auth.headers, env: auth.env,
-		}).result();
-	}
+	const options = {
+		signal, cacheRetention: "short" as const, sessionId,
+		reasoning: thinkingLevel === "off" ? undefined : thinkingLevel,
+		onPayload: (payload: unknown) => fitClaudeRequest(model, payload),
+	};
+	const response = await ctx.modelRegistry.streamSimple(model, context, options).result();
 	if (response.stopReason === "aborted") return undefined;
 	if (response.stopReason !== "stop") {
 		ctx.ui.notify(response.errorMessage ?? `Writer stopped (${response.stopReason})`, "error");
@@ -240,12 +222,10 @@ async function runWriter(
 		return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
 			const view = new BorderedLoader(tui, theme, loader);
 			view.onAbort = () => done(undefined);
-			const activity = writerActivity();
-			activity.active++;
 			completeWriter(ctx, model, thinkingLevel, systemPrompt, messages, userText, sessionId, view.signal)
-				.finally(() => { activity.active--; })
 				.then(done)
 				.catch((error: unknown) => {
+					if (view.signal.aborted) return;
 					ctx.ui.notify(error instanceof Error ? error.message : failed, "error");
 					done(undefined);
 				});
@@ -325,21 +305,9 @@ function prepare(ctx: ExtensionCommandContext, sessionThinking: ThinkingLevel, a
 }
 
 export default function writePrompt(pi: ExtensionAPI): void {
-	const activity = writerActivity();
-	pi.events.on("fitch:write-prompt:status", (request) => {
-		const reply = (request as { reply?: unknown } | null)?.reply;
-		if (typeof reply === "function") reply(activity.active);
-	});
-	function track(handler: RegisteredCommand["handler"]): RegisteredCommand["handler"] {
-		return async (args, ctx) => {
-			activity.active++;
-			try { await handler(args, ctx); }
-			finally { activity.active--; }
-		};
-	}
 	pi.registerCommand("draft", {
 		description: "Rewrite text into a better agent request; omit text to reopen the last accepted draft",
-		handler: track(async (args, ctx) => {
+		handler: async (args, ctx) => {
 			const saved = args.trim() ? undefined : savedDraft(ctx);
 			const source = saved?.source ?? args;
 			if (!source.trim()) {
@@ -401,12 +369,12 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				if (!next) continue;
 				draft = next;
 			}
-		}),
+		},
 	});
 
 	pi.registerCommand("side-question", {
 		description: "Ask a question off-transcript using the current session, then copy, ask again, or dismiss",
-		handler: track(async (args, ctx) => {
+		handler: async (args, ctx) => {
 			const source = args.trim();
 			if (!source) {
 				ctx.ui.notify("Usage: /side-question <text>", "warning");
@@ -459,6 +427,6 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				if (!next) continue;
 				answer = next;
 			}
-		}),
+		},
 	});
 }

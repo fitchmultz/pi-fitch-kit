@@ -1,8 +1,32 @@
 # Changelog
 
-## Unreleased — 23 September 2026
+## Unreleased
 
 - Add a bounded native reader for long, sectioned explanations. `/reader` resumes the saved page, `/reader list` browses prior documents, and `/reader demo` works without a model. Local section drafts enter model context only on explicit send; busy feedback waits for successful agent settlement and cannot leak after cancellation. Linked replies wait behind the current page until opened, while incomplete or ambiguous responses remain readable in the library.
+
+## 0.14.0 — 26 September 2026
+
+- **Breaking:** require Pi 0.87.1 or newer (official or the fork) and Node.js 24.15 or newer. The Pi 0.84.2 shims are gone: `/draft` and `/side-question` always use the registry's native simple streaming, fast mode relies on Pi's own tool-choice serialization, and session naming always uses the system-aware context hook. Fork-only checkpoints and entry revisions stay behind feature checks, so official Pi is unaffected.
+- CI qualifies official Pi 0.87.1 and fork `b1b4ac34` on Node 24 with the tagged `fitchmultz/.github` v1.0.0 automation; the historical 0.84.2 job is removed.
+- Pin all development tooling exactly and regenerate the lockfile from scratch against the public npm registry.
+
+## 0.13.0 — 25 September 2026
+
+- Remove the kit's `/restart` helper. On official Pi it could only refuse, and on the maintained fork Pi's native launcher already owns `/restart`; official Pi users quit and relaunch after extension updates. The writer activity counter, which only answered that helper, is removed too.
+- Prefer a ChatGPT/Codex subscription for GPT-6 Astra and fall back to an OpenAI API key. Required models are ordered alternative lists: Astra via `openai-codex` then `openai`, and Claude via reviewer-claude's chain of Opus 5.5, Fable 5.1, and Cloudflare AI Gateway Opus 5. The settings example defaults to the subscription route, and setup offers the first available alternative. Matches pi-subagents 0.41.0 role routing.
+- Update development tooling to TypeScript 7, npm 12, and `@types/node` 24.19.0.
+
+## 0.12.0 — 25 September 2026
+
+- Sync setup with the current harness. Require Claude Fable 5.1 alongside Opus 5 and GPT-6 Astra, and offer Opus 5.5, GPT-6 Sol, and Grok 4.7. The settings example now defaults to medium thinking with a 150-second provider timeout, and setup offers flat 300k context budgets. Retired private routes (cf-google Gemini, gateway Grok 4.6, Fireworks GLM/Kimi) are no longer proposed. Existing user settings and budgets are preserved.
+- Pair the browser wrapper with its recommended Agent Browser 0.38.1, and qualify against official Pi 0.87.1 and fork `be5fc2ec`. Complete core needs Pi 0.87.0 or newer; the kit's own floor stays at 0.84.2. `/anthropic-fast` covers Opus 5.5.
+- Restore `pi-ask-question` as a core package and install Ponytail from the maintained fork, carrying existing Ponytail filters across the move. A core package can no longer also be listed as retired.
+- Check setup models through the running session's read-only `fitch_setup_models` tool instead of a migration-capable `pi --list-models` run. Retiring an old package no longer runs a blanket `pi update --extensions`.
+- Fit image-bearing Claude requests, including writer calls, within Anthropic's 32 MB payload limit. The guard resizes further before omitting anything, keeps the newest images, and preserves conversation order and saved originals.
+- Preserve Claude reasoning when a request also sets tool choice.
+- Keep an explicit fast-mode OFF across reload, new, resume, and fork; `--fast` applies only at process startup. OpenAI labels now describe the request policy (`priority requests ON/OFF`, `priority enabled`).
+- Cancelling `/draft` or `/side-question` during image preparation no longer crashes a later `/reload` or `/new`.
+- The legacy restart helper recovers a one-run `--api-key` provider from Pi's runtime auth record instead of guessing by model name.
 
 ## 0.11.2 — 22 September 2026
 

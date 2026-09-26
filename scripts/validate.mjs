@@ -13,8 +13,12 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-assert(manifest.schemaVersion === 7, "setup manifest schema must match the patch-free context-window shape");
-const manifestModelRoutes = new Set([...manifest.requiredModels, ...manifest.optionalModels]);
+assert(manifest.schemaVersion === 8, "setup manifest schema must match the ordered required-alternatives shape");
+assert(
+  manifest.requiredModels.every((routes) => Array.isArray(routes) && routes.length > 0 && routes.every((route) => typeof route === "string" && route.includes("/"))),
+  "each requiredModels entry must be a non-empty ordered list of provider/model routes",
+);
+const manifestModelRoutes = new Set([...manifest.requiredModels.flat(), ...manifest.optionalModels]);
 const compaction = settingsExample.compaction;
 for (const key of ["reserveTokens", "keepRecentTokens"]) {
   assert(Number.isSafeInteger(compaction?.[key]) && compaction[key] > 0, `compaction.${key} must be a positive safe integer`);
@@ -31,7 +35,7 @@ for (const [route, value] of Object.entries(manifest.modelContextWindows)) {
   );
 }
 const piFloor = /^>=(\d+\.\d+\.\d+)$/.exec(manifest.runtime.pi)?.[1];
-assert(piFloor === "0.84.2", "the kit must accept Pi 0.84.2 or newer");
+assert(piFloor === "0.87.1", "the kit must accept Pi 0.87.1 or newer");
 assert(packageJson.engines.node === manifest.runtime.node, "package and manifest Node floors must match");
 assert(/^\d+\.\d+\.\d+$/.test(packageJson.version), "package version must be a release version");
 assert(packageLock.version === packageJson.version && packageLock.packages[""].version === packageJson.version, "lockfile version must match package.json");
@@ -92,17 +96,18 @@ assert(
       "extensions/session-name.ts",
       "extensions/setup-models.ts",
       "extensions/write-prompt.ts",
-      "extensions/session-restart.ts",
       "extensions/paged-reader.ts",
     ]),
-  "the kit must bundle its active extensions including the paged reader",
+  "the kit must bundle the image-guard, clean-footer, fast-mode, session-name, setup-models, write-prompt, and paged-reader extensions",
 );
+assert(!existsSync(join(root, "extensions", "session-restart.ts")), "the fork's native /restart replaces the retired kit helper");
 
 for (const pkg of manifest.corePackages) {
   assert(
     /^npm:(?:@[\w.-]+\/)?[\w.-]+$/.test(pkg.source) || /^git:github\.com\/[\w-]+\/[\w-]+$/.test(pkg.source),
     `corePackages ${pkg.id} must use an unpinned npm or Git source: ${pkg.source}`,
   );
+  assert(!manifest.retiredPackageSources.includes(pkg.source), `corePackages ${pkg.id} cannot also be retired`);
 }
 const subagents = manifest.corePackages.find(({ id }) => id === "subagents");
 assert(
@@ -129,14 +134,20 @@ assert(ctxInfo?.source === "git:github.com/fitchmultz/pi-ctx-info", "ctx-info mu
 
 assert(!manifest.corePackages.some(({ id }) => id === "codex-context"), "codex-context is retired, not a core package");
 assert(!manifest.corePackages.some(({ id }) => id === "session-name"), "session-name now belongs to the kit");
-assert(!manifest.corePackages.some(({ id }) => id === "ask-question"), "ask-question is retired in favor of the clarification skill");
+const askQuestion = manifest.corePackages.find(({ id }) => id === "ask-question");
+assert(
+  askQuestion?.source === "git:github.com/fitchmultz/pi-ask-question",
+  "ask-question supplies the structured question tool the clarification skill prefers",
+);
+const ponytail = manifest.corePackages.find(({ id }) => id === "ponytail");
+assert(ponytail?.source === "git:github.com/fitchmultz/ponytail", "ponytail must use the maintained fork");
 assert(!manifest.corePackages.some(({ id }) => id === "fff"), "fff is retired in favor of native repository search");
 for (const source of [
   "git:github.com/fitchmultz/pi-codex-context",
   "git:github.com/fitchmultz/pi-session-name",
-  "git:github.com/fitchmultz/pi-ask-question",
   "npm:@ff-labs/pi-fff",
   "npm:pi-verbosity-control",
+  "git:github.com/DietrichGebert/ponytail",
 ]) {
   assert(
     manifest.retiredPackageSources.includes(source),
@@ -172,10 +183,10 @@ const editSession = manifest.corePackages.find(({ id }) => id === "edit-session"
 assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");
 
 const browser = manifest.corePackages.find(({ id }) => id === "agent-browser")?.externalPrerequisite;
-assert(browser?.version === "0.36.0", "Agent Browser prerequisite must match the wrapper's tested 0.36.0 baseline");
+assert(/^\d+\.\d+\.\d+$/.test(browser?.version), "Agent Browser prerequisite must pin an exact version");
 assert(
-  browser?.installCommand === "npm install --global agent-browser@0.36.0",
-  "Agent Browser install must use the exact tested version",
+  browser.installCommand === `npm install --global agent-browser@${browser.version}`,
+  "Agent Browser install must use the pinned version",
 );
 
 const setupPromptPath = manifest.kitResources.prompts.find((path) => path.endsWith("/fitch-setup.md"));
@@ -192,7 +203,7 @@ assert(setupPrompt.includes("fitch_setup_models"), "setup must inspect models th
 assert(setupPrompt.includes("keep-or-overwrite"), "setup prompt must define rerun semantics for existing overrides");
 assert(setupPrompt.includes("long-context tier"), "setup prompt must disclose the OpenAI pricing consequence");
 const defaultRoute = `${settingsExample.defaultProvider}/${settingsExample.defaultModel}`;
-assert(manifest.requiredModels.includes(defaultRoute), "settings default model must be a required route");
+assert(manifest.requiredModels.some(([preferred]) => preferred === defaultRoute), "settings default model must be the preferred route of a required entry");
 assert(settingsExample.enabledModels.includes(defaultRoute), "settings default model must be enabled");
 assert(["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(settingsExample.defaultThinkingLevel), "settings thinking level must be valid");
 assert(settingsExample.compactView === true, "settings example must carry the optional compact-view preference");
@@ -201,8 +212,8 @@ assert(new Set(settingsExample.enabledModels).size === settingsExample.enabledMo
 for (const route of settingsExample.enabledModels) {
   assert(manifestModelRoutes.has(route), `settings enabled model ${route} must be a manifest-managed route`);
 }
-assert(settingsExample.retry?.maxRetries === 5, "settings example must carry the active retry budget");
-assert(settingsExample.retry?.provider?.timeoutMs === 120000, "settings example must carry the active provider timeout");
+assert(Number.isSafeInteger(settingsExample.retry?.maxRetries) && settingsExample.retry.maxRetries > 0, "settings example must carry a retry budget");
+assert(Number.isSafeInteger(settingsExample.retry?.provider?.timeoutMs) && settingsExample.retry.provider.timeoutMs > 0, "settings example must carry a provider timeout");
 
 assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");
 assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
@@ -211,6 +222,7 @@ assert(setupPrompt.includes("openai-codex-fast.json"), "setup prompt must preser
 assert(setupPrompt.includes("retiredExtensionLinks"), "setup prompt must migrate approved extension collisions");
 assert(setupPrompt.includes("targetSuffix"), "setup prompt must verify retired link provenance");
 assert(setupPrompt.includes("pi-codex-context.json"), "setup prompt must preserve legacy compaction consent files");
+assert(setupPrompt.includes("apply the same filters to the fork"), "setup prompt must keep upstream Ponytail filters on the fork");
 assert(setupPrompt.includes("enable, disable, or keep"), "setup must offer explicit consent revocation");
 assert(setupPrompt.includes("filtered, pinned, or duplicate"), "setup must normalize stale kit package entries");
 assert(

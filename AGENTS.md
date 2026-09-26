@@ -12,7 +12,6 @@
   - `extensions/paged-reader.ts` for bounded reader pages, section notes, native session state, and linked replies.
   - `extensions/setup-models.ts` for read-only model availability in the running Pi session during setup.
   - `extensions/write-prompt.ts` for `/draft` rewrite, `/side-question` off-transcript answers, accept/copy/tweak/deny, and `write-prompt.json` model override.
-  - `extensions/session-restart.ts` for `/restart`, private process-local control sockets, exact saved-session preservation, and default busy skipping.
   - `examples/settings.json` for the safe, non-secret behavioral settings subset.
   - `setup-manifest.json` for unpinned package sources, required model routes, and kit resources.
   - `templates/working-agreement.md` for the optional managed working-agreement blocks.
@@ -30,7 +29,9 @@
 
 ## Editing rules
 
-- Use npm and Node `>=24.0.0`; do not introduce another package manager.
+- Use npm and Node `>=24.15.0`; do not introduce another package manager.
+- Pi floor is official 0.87.1; do not add shims for older hosts. Fork-only APIs stay behind feature checks so official Pi keeps working.
+- The lockfile must resolve only to `https://registry.npmjs.org/`; rewrite any private mirror host after installing.
 - Keep this package an opinionated composition layer. Independent extensions and skill packages must not depend on it.
 - Keep only active public resources registered in `package.json#pi` and `setup-manifest.json`.
 - Do not add duplicate subagent or skill copies. Point to the public owning package without pinning extension installs to a ref or version.
@@ -49,9 +50,9 @@
 - Keep `extensions/clean-footer.ts` free of cumulative token, cache, and cost counters; preserve context usage, model details, extension statuses, and wrapping without truncation. Verbosity comes from the controller's native `verbosity` status, never another config reader.
 - Keep `extensions/fast-mode.ts` scoped and preserve `/fast` plus `--fast` as aliases for the shared OpenAI toggle: OpenAI and xAI priority ride `before_provider_request` for `openai`/`openai-codex`/`xai` plus `cloudflare-ai-gateway` models whose id starts with `gpt-` or is `o3`/`o4-mini` (including their exact `2025-04-16` snapshots) for the OpenAI toggle, or starts with `grok-` for the xAI toggle; other gateway o-series and namespaced Workers AI models stay excluded; Anthropic fast mode owns the `anthropic-messages` override for only the `anthropic` and `cloudflare-ai-gateway` providers, appends the beta at fetch time, and never sends `speed` when the header cannot be attached. Keep the gateway endpoint-placeholder resolution in `fastStream`, the existing state filenames, and the doubled Anthropic fast cost rates.
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
-- Keep `extensions/write-prompt.ts` off the main transcript: native provider-neutral streaming completion without tools, session provider/model/thinking inheritance with optional `write-prompt.json` overrides, flattened tool history retaining result images, built-in dialogs, and `copyToClipboard` for Copy. Preserve the native Pi 0.84.2 provider fallback. Only `/draft` Accept calls `sendUserMessage`; preserve busy steering and original/draft recovery. `/side-question` never sends.
-- Keep the Agent Browser prerequisite aligned with the released wrapper's tested compatibility baseline.
-- Keep restart on public Pi APIs and Node exit/execve, never a daemon or terminal keystroke bridge. Require the fork's native Bash/pending-input/nextTurn activity facts; unsupported hosts must refuse, not guess idle. No argv/environment in socket replies or persisted state. See `docs/pi-setup.md`.
+- Keep `extensions/write-prompt.ts` off the main transcript: native provider-neutral streaming completion without tools, session provider/model/thinking inheritance with optional `write-prompt.json` overrides, flattened tool history retaining result images, built-in dialogs, and `copyToClipboard` for Copy. Only `/draft` Accept calls `sendUserMessage`; preserve busy steering and original/draft recovery. `/side-question` never sends.
+- Keep the Agent Browser prerequisite aligned with the released wrapper's recommended baseline.
+- Do not reintroduce a kit `/restart`; the fork supplies native restart and official Pi users quit and relaunch.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.
 
 ## Validation
@@ -61,7 +62,6 @@
 - Run `node --test scripts/validate-regression.mjs` after changing context-policy validation or its inputs.
 - Run `npm run regression:session-name` after changing naming guidance, metadata injection, protected identities, or its migration gate.
 - Run `npm run regression:paged-reader` after changing reader pagination, drafts, feedback delivery, reply linkage, or native controls.
-- Run `npm run regression:write-prompt` after changing `/draft` config parsing, writer history, activity reporting, or accept/copy/tweak/deny behavior.
-- Run `npm run regression:session-restart` and the disposable `npm run smoke:restart` recipe in `README.md` after restart changes; include the real optional-integration fixtures when touching child status or virtual cwd.
+- Run `npm run regression:write-prompt` after changing `/draft` config parsing, writer history, cancellation, or accept/copy/tweak/deny behavior.
 - For runtime-facing changes, also verify Pi loads the package through `pi install ...` and a fresh Pi process when practical.
 - Keep this file short and project-specific; point to `README.md` or Pi docs instead of copying generic coding rules.

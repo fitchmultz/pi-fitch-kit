@@ -100,24 +100,18 @@ try {
 	assert.equal(control.stopReason, "stop");
 	assert.equal(responses ? requests.at(-1).tools[0].name : requests.at(-1).tools[0].function.name, "historical_tool");
 	assert.match(JSON.stringify(requests.at(-1)), /CURRENT_WRITER_INSTRUCTIONS/);
-	// Pi 0.84.2 Codex omits off on the wire; newer Pi emits "none".
 	// Compare the writer to the native simple API, independently of its config.
 	const offControl = await runtime.completeSimple(model, { messages: [{ role: "user", content: "off control", timestamp: 0 }] });
 	assert.equal(offControl.stopReason, "stop");
 	const nativeOffEffort = responses ? requests.at(-1).reasoning?.effort : requests.at(-1).reasoning_effort;
 	const manager = sdk.SessionManager.inMemory(cwd);
-	// System entries are supported only by transcript-capable hosts. Legacy hosts
-	// exercise the same conversational history without unsupported journal inputs.
-	const supportsSystemMessages = typeof ai.getCurrentSystemMessage === "function";
-	if (supportsSystemMessages) {
-		manager.appendMessage({ role: "system", content: "", sections: { preamble: "OLD_INSTRUCTIONS" }, toolsAdded: [historicalTool], timestamp: 1 });
-		manager.appendMessage({ role: "system", content: "", sections: { preamble: sentinel }, toolsRemoved: [{ name: "historical_tool" }], timestamp: 2 });
-	}
+	manager.appendMessage({ role: "system", content: "", sections: { preamble: "OLD_INSTRUCTIONS" }, toolsAdded: [historicalTool], timestamp: 1 });
+	manager.appendMessage({ role: "system", content: "", sections: { preamble: sentinel }, toolsRemoved: [{ name: "historical_tool" }], timestamp: 2 });
 	manager.appendMessage({ role: "user", content: "CONVERSATION_SENTINEL", timestamp: 3 });
 	const assistant = { ...ai.fauxAssistantMessage("HISTORY_REPLY"), api: model.api, provider: model.provider, model: model.id };
 	manager.appendMessage({ ...assistant, content: [...(responses ? [{ type: "thinking", thinking: "", thinkingSignature: JSON.stringify(encrypted) }] : []), { type: "text", text: "HISTORY_REPLY" }, { type: "toolCall", id: "call-1", name: "historical_tool", arguments: { query: "ARG_SENTINEL" } }], stopReason: "toolUse" });
 	manager.appendMessage({ role: "toolResult", toolName: "historical_tool", toolCallId: "call-1", content: [{ type: "text", text: "RESULT_SENTINEL" }, { type: "image", data: png, mimeType: "image/png" }, { type: "text", text: "AFTER_IMAGE" }], isError: true, timestamp: 4 });
-	if (supportsSystemMessages) manager.appendMessage({ role: "system", content: "", toolsAdded: [historicalTool], timestamp: 5 });
+	manager.appendMessage({ role: "system", content: "", toolsAdded: [historicalTool], timestamp: 5 });
 	const branchLeaf = manager.getLeafId();
 	manager.appendMessage({ role: "user", content: "OFF_BRANCH_SENTINEL", timestamp: 6 });
 	manager.branch(branchLeaf);

@@ -8,6 +8,7 @@ import {
 } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { fitClaudeRequest } from "./anthropic-image-guard.ts";
 
 // Anthropic's fast-mode research preview bills double and rejects the `speed`
 // field without its beta header, so payload and header must travel together.
@@ -169,22 +170,6 @@ function fastOptions(options: SimpleStreamOptions | undefined): SimpleStreamOpti
 	};
 }
 
-function preserveToolChoice(options: SimpleStreamOptions | undefined): SimpleStreamOptions | undefined {
-	if (!options || !("toolChoice" in options) || options.toolChoice === undefined) return options;
-	const choice = options.toolChoice;
-	return {
-		...options,
-		onPayload: async (payload, model) => {
-			// Pi 0.84.2's simple Anthropic serializer does not forward toolChoice.
-			const body = typeof payload === "object" && payload !== null && "tool_choice" in payload
-				? payload
-				: { ...(payload as Record<string, unknown>), tool_choice: typeof choice === "string" ? { type: choice } : choice };
-			const replaced = await options.onPayload?.(body, model);
-			return replaced === undefined ? body : replaced;
-		},
-	};
-}
-
 function fastStream(
 	model: Model<Api>,
 	context: Parameters<typeof messagesApi.streamSimple>[1],
@@ -199,13 +184,20 @@ function fastStream(
 		!(options !== undefined && "client" in options) &&
 		anthropicEligible(resolved);
 	const target = fast ? fastModel(resolved) : resolved;
-	const streamOptions = fast ? fastOptions(options) : options;
+	const baseOptions = fast ? fastOptions(options) : options;
+	const streamOptions: SimpleStreamOptions = {
+		...baseOptions,
+		onPayload: async (payload, requestModel) => {
+			const replaced = await baseOptions?.onPayload?.(payload, requestModel);
+			return fitClaudeRequest(requestModel, replaced === undefined ? payload : replaced);
+		},
+	};
 	// toolChoice is shared by both APIs; explicit reasoning identifies a simple call.
 	const fullStream = FULL_STREAM_KEYS.some((key) => options !== undefined && key in options) ||
 		(options !== undefined && "toolChoice" in options && options.reasoning === undefined);
 	return fullStream
 		? messagesApi.stream(target, context, streamOptions)
-		: messagesApi.streamSimple(target, context, preserveToolChoice(streamOptions));
+		: messagesApi.streamSimple(target, context, streamOptions);
 }
 
 // Mirrors the per-request gates, so the footer never claims fast mode on a
@@ -217,7 +209,8 @@ function updateFooterStatus(ctx: ExtensionContext): void {
 				ctx.ui.setStatus(toggle.name, undefined);
 				continue;
 			}
-			ctx.ui.setStatus(toggle.name, ctx.hasUI ? ctx.ui.theme.fg("accent", "fast") : "fast");
+			const label = toggle === OPENAI_TOGGLE ? "priority enabled" : "fast";
+			ctx.ui.setStatus(toggle.name, ctx.hasUI ? ctx.ui.theme.fg("accent", label) : label);
 		} catch {
 			// Headless hosts do not expose a footer.
 		}
@@ -273,7 +266,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 	});
 	pi.on("model_select", (_event, ctx) => updateFooterStatus(ctx));
 
-	// Additive fork event; older hosts keep their normal lifecycle and stock API types.
+	// Fork-only event; official Pi never emits it and its types do not declare it.
 	(pi.on as unknown as (event: "session_checkpoint", handler: () => {
 		sleepReady: boolean;
 	}) => void)("session_checkpoint", () => {
@@ -300,7 +293,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 				}
 				updateFooterStatus(ctx);
 				ctx.ui.notify(
-					`${toggle.label} fast mode ${enabled(toggle.statePath) ? "ON" : "OFF"}`,
+					`${toggle.label} ${toggle === OPENAI_TOGGLE ? "priority requests" : "fast mode"} ${enabled(toggle.statePath) ? "ON" : "OFF"}`,
 					"info",
 				);
 			},

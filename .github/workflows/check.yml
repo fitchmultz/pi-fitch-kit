@@ -16,53 +16,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FORK_REF: afed789dded723566b6ecb1c77a06e8561504f7a
+  PI_AUTOMATION_REF: fe049ea97a8c91d1a4c3a0958a85b37c7759dcc6 # v1.0.0
+  FORK_REF: 06a195979349ae6da54752b562b5c8b4cfc32f35
 
 jobs:
-  historical-pi-floor:
-    name: Official Pi 0.84.2 / Ubuntu / Node 24
-    runs-on: ubuntu-latest
-    timeout-minutes: 6
-    env:
-      PI_OFFLINE: '1'
-      PI_TELEMETRY: '0'
-      PI_COMPAT_HOST: official
-      PI_COMPAT_EXPECTED_VERSION: '0.84.2'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Select the complete historical official cohort without changing public metadata
-        run: |
-          npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund \
-            @earendil-works/pi-coding-agent@0.84.2 @earendil-works/pi-ai@0.84.2 \
-            @earendil-works/pi-agent-core@0.84.2 @earendil-works/pi-tui@0.84.2
-          node --input-type=module <<'JS'
-          import assert from 'node:assert/strict';
-          import { findPackageJSON } from 'node:module';
-          import { readFileSync } from 'node:fs';
-          for (const name of ['pi-coding-agent', 'pi-ai', 'pi-agent-core', 'pi-tui']) {
-            const file = findPackageJSON(`@earendil-works/${name}`, import.meta.url);
-            const version = JSON.parse(readFileSync(file, 'utf8')).version;
-            assert.equal(version, '0.84.2', `${name} must select the advertised floor`);
-            console.log(JSON.stringify({ name, file, version }));
-          }
-          JS
-          git diff --exit-code -- package.json package-lock.json
-      - name: Require the advertised floor, not just today's development baseline
-        shell: bash
-        run: |
-          fixture="$(mktemp -d /tmp/pi-kit-floor.XXXXXX)"
-          mkdir -p "$fixture/home" "$fixture/agent" "$fixture/tmp"
-          env -i PATH="$PATH" HOME="$fixture/home" TMPDIR="$fixture/tmp" \
-            PI_CODING_AGENT_DIR="$fixture/agent" PI_OFFLINE=1 PI_TELEMETRY=0 \
-            PI_COMPAT_HOST=official PI_COMPAT_EXPECTED_VERSION=0.84.2 npm run check:compat
-
   official:
     name: Current official Pi / Ubuntu / Node 24
     runs-on: ubuntu-latest
@@ -77,7 +34,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: fitchmultz/.github
-          ref: 117b227140265329055bcda5927ac170c6301d75 # v1.0.0
+          ref: ${{ env.PI_AUTOMATION_REF }}
           path: automation
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -107,7 +64,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: fitchmultz/.github
-          ref: 117b227140265329055bcda5927ac170c6301d75 # v1.0.0
+          ref: ${{ env.PI_AUTOMATION_REF }}
           path: automation
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -155,7 +112,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: fitchmultz/.github
-          ref: 117b227140265329055bcda5927ac170c6301d75 # v1.0.0
+          ref: ${{ env.PI_AUTOMATION_REF }}
           path: automation
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

@@ -1,19 +1,16 @@
 {
-  "defaultProvider": "openai",
+  "defaultProvider": "openai-codex",
   "defaultModel": "gpt-6-astra",
-  "defaultThinkingLevel": "max",
+  "defaultThinkingLevel": "medium",
   "compactView": true,
   "enabledModels": [
-    "cloudflare-ai-gateway/claude-fable-5",
+    "anthropic/claude-opus-5-5",
+    "cloudflare-ai-gateway/claude-opus-5-5",
     "cloudflare-ai-gateway/claude-opus-5",
-    "cloudflare-ai-gateway/grok-4.6",
-    "anthropic/claude-fable-5",
-    "anthropic/claude-opus-5",
+    "openai-codex/gpt-6-astra",
     "openai/gpt-6-astra",
-    "xai/grok-4.6",
-    "fireworks/accounts/fireworks/routers/kimi-k3-fast",
-    "fireworks/accounts/fireworks/routers/glm-5p2-fast",
-    "cf-google/gemini-3.7-flash"
+    "openai/gpt-6-sol",
+    "xai/grok-4.7"
   ],
   "images": {
     "autoResize": false
@@ -26,7 +23,7 @@
     "enabled": true,
     "maxRetries": 5,
     "provider": {
-      "timeoutMs": 120000
+      "timeoutMs": 150000
     }
   },
   "compaction": {
