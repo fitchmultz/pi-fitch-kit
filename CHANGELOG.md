@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.14.0 — 26 September 2026
 
 - **Breaking:** require Pi 0.87.1 or newer (official or the fork) and Node.js 24.15 or newer. The Pi 0.84.2 shims are gone: `/draft` and `/side-question` always use the registry's native simple streaming, fast mode relies on Pi's own tool-choice serialization, and session naming always uses the system-aware context hook. Fork-only checkpoints and entry revisions stay behind feature checks, so official Pi is unaffected.
 - CI qualifies official Pi 0.87.1 and fork `b1b4ac34` on Node 24 with the tagged `fitchmultz/.github` v1.0.0 automation; the historical 0.84.2 job is removed.
