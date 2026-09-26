@@ -13,8 +13,12 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-assert(manifest.schemaVersion === 7, "setup manifest schema must match the patch-free context-window shape");
-const manifestModelRoutes = new Set([...manifest.requiredModels, ...manifest.optionalModels]);
+assert(manifest.schemaVersion === 8, "setup manifest schema must match the ordered required-alternatives shape");
+assert(
+  manifest.requiredModels.every((routes) => Array.isArray(routes) && routes.length > 0 && routes.every((route) => typeof route === "string" && route.includes("/"))),
+  "each requiredModels entry must be a non-empty ordered list of provider/model routes",
+);
+const manifestModelRoutes = new Set([...manifest.requiredModels.flat(), ...manifest.optionalModels]);
 const compaction = settingsExample.compaction;
 for (const key of ["reserveTokens", "keepRecentTokens"]) {
   assert(Number.isSafeInteger(compaction?.[key]) && compaction[key] > 0, `compaction.${key} must be a positive safe integer`);
@@ -92,10 +96,10 @@ assert(
       "extensions/session-name.ts",
       "extensions/setup-models.ts",
       "extensions/write-prompt.ts",
-      "extensions/session-restart.ts",
     ]),
-  "the kit must bundle the image-guard, clean-footer, fast-mode, session-name, write-prompt, and session-restart extensions",
+  "the kit must bundle the image-guard, clean-footer, fast-mode, session-name, setup-models, and write-prompt extensions",
 );
+assert(!existsSync(join(root, "extensions", "session-restart.ts")), "the fork's native /restart replaces the retired kit helper");
 
 for (const pkg of manifest.corePackages) {
   assert(
@@ -198,7 +202,7 @@ assert(setupPrompt.includes("fitch_setup_models"), "setup must inspect models th
 assert(setupPrompt.includes("keep-or-overwrite"), "setup prompt must define rerun semantics for existing overrides");
 assert(setupPrompt.includes("long-context tier"), "setup prompt must disclose the OpenAI pricing consequence");
 const defaultRoute = `${settingsExample.defaultProvider}/${settingsExample.defaultModel}`;
-assert(manifest.requiredModels.includes(defaultRoute), "settings default model must be a required route");
+assert(manifest.requiredModels.some(([preferred]) => preferred === defaultRoute), "settings default model must be the preferred route of a required entry");
 assert(settingsExample.enabledModels.includes(defaultRoute), "settings default model must be enabled");
 assert(["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(settingsExample.defaultThinkingLevel), "settings thinking level must be valid");
 assert(settingsExample.compactView === true, "settings example must carry the optional compact-view preference");

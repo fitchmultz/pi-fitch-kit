@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "runtime": {
     "pi": ">=0.84.2",
     "node": ">=24.0.0"
@@ -10,23 +10,19 @@
     "installSource": "git:github.com/fitchmultz/pi-fitch-kit"
   },
   "requiredModels": [
-    "anthropic/claude-fable-5-1",
-    "anthropic/claude-opus-5",
-    "openai/gpt-6-astra"
+    ["openai-codex/gpt-6-astra", "openai/gpt-6-astra"],
+    ["anthropic/claude-opus-5-5", "anthropic/claude-fable-5-1", "cloudflare-ai-gateway/claude-opus-5"]
   ],
+  "requiredModelsNote": "Each entry is an ordered list of alternatives; the first available route satisfies it. Claude matches pi-subagents' reviewer-claude chain; gateway Opus 5 is the newest Claude that official Pi's gateway catalog names with a working id.",
   "optionalModels": [
-    "anthropic/claude-opus-5-5",
     "cloudflare-ai-gateway/claude-opus-5-5",
     "cloudflare-ai-gateway/claude-fable-5-1",
-    "cloudflare-ai-gateway/claude-opus-5",
-    "openai-codex/gpt-6-astra",
     "openai/gpt-6-sol",
     "xai/grok-4.7"
   ],
   "optionalModelsNote": "Optional routes require the user's own authentication and, where needed, provider configuration. Missing routes are reported and omitted from the selected setup; existing user profiles and fallbacks are preserved.",
   "modelContextWindows": {
     "anthropic/claude-fable-5-1": 300000,
-    "anthropic/claude-opus-5": 300000,
     "anthropic/claude-opus-5-5": 300000,
     "cloudflare-ai-gateway/claude-fable-5-1": 300000,
     "cloudflare-ai-gateway/claude-opus-5": 300000,
@@ -43,8 +39,7 @@
       "extensions/fast-mode.ts",
       "extensions/session-name.ts",
       "extensions/setup-models.ts",
-      "extensions/write-prompt.ts",
-      "extensions/session-restart.ts"
+      "extensions/write-prompt.ts"
     ],
     "prompts": [
       "prompts/fitch-setup.md",
