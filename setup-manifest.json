@@ -11,11 +11,10 @@
   },
   "requiredModels": [
     ["openai-codex/gpt-6-astra", "openai/gpt-6-astra"],
-    ["anthropic/claude-opus-5-5", "cloudflare-ai-gateway/claude-opus-5"]
+    ["anthropic/claude-opus-5-5", "anthropic/claude-fable-5-1", "cloudflare-ai-gateway/claude-opus-5"]
   ],
   "requiredModelsNote": "Each entry is an ordered list of alternatives; the first available route satisfies it. Claude matches pi-subagents' reviewer-claude chain; gateway Opus 5 is the newest Claude that official Pi's gateway catalog names with a working id.",
   "optionalModels": [
-    "anthropic/claude-fable-5-1",
     "cloudflare-ai-gateway/claude-opus-5-5",
     "cloudflare-ai-gateway/claude-fable-5-1",
     "openai/gpt-6-sol",
