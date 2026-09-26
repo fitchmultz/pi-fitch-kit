@@ -7,8 +7,6 @@ import { pathToFileURL } from "node:url";
 
 import { getPackageDir, VERSION } from "@earendil-works/pi-coding-agent";
 
-const contextHook = "context_with_system";
-
 const { createExtensionRuntime, loadExtensions } = await import(
 	pathToFileURL(join(getPackageDir(), "dist/core/extensions/loader.js")).href
 );
@@ -65,7 +63,7 @@ for (const paths of [
 		["name_session"],
 		"the effective standalone tool must remain the sole owner",
 	);
-	const bundledContext = bundled.handlers.get(contextHook)?.[0];
+	const bundledContext = bundled.handlers.get("context_with_system")?.[0];
 	assert.ok(bundledContext);
 	assert.equal(await bundledContext({ messages: [] }, {}), undefined);
 }
@@ -99,7 +97,7 @@ type ContextResult = {
 	messages: Array<{ role?: string; content?: unknown }>;
 };
 assert.equal(extension.handlers.has("context"), false);
-const context = extension.handlers.get(contextHook)?.[0] as
+const context = extension.handlers.get("context_with_system")?.[0] as
 	| ((event: { messages: unknown[] }) => ContextResult | undefined)
 	| undefined;
 assert.ok(context);
