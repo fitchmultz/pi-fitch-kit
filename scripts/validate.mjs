@@ -96,8 +96,9 @@ assert(
       "extensions/session-name.ts",
       "extensions/setup-models.ts",
       "extensions/write-prompt.ts",
+      "extensions/paged-reader.ts",
     ]),
-  "the kit must bundle the image-guard, clean-footer, fast-mode, session-name, setup-models, and write-prompt extensions",
+  "the kit must bundle the image-guard, clean-footer, fast-mode, session-name, setup-models, write-prompt, and paged-reader extensions",
 );
 assert(!existsSync(join(root, "extensions", "session-restart.ts")), "the fork's native /restart replaces the retired kit helper");
 

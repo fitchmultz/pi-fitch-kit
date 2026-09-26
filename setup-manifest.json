@@ -39,7 +39,8 @@
       "extensions/fast-mode.ts",
       "extensions/session-name.ts",
       "extensions/setup-models.ts",
-      "extensions/write-prompt.ts"
+      "extensions/write-prompt.ts",
+      "extensions/paged-reader.ts"
     ],
     "prompts": [
       "prompts/fitch-setup.md",
