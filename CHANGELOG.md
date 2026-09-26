@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.0 — 25 September 2026
+
+- Sync setup with the current harness. Require Claude Fable 5.1 alongside Opus 5 and GPT-6 Astra, and offer Opus 5.5, GPT-6 Sol, and Grok 4.7. The settings example now defaults to medium thinking with a 150-second provider timeout, and setup offers flat 300k context budgets. Retired private routes (cf-google Gemini, gateway Grok 4.6, Fireworks GLM/Kimi) are no longer proposed. Existing user settings and budgets are preserved.
+- Pair the browser wrapper with its recommended Agent Browser 0.38.1, and qualify against official Pi 0.87.1 and fork `be5fc2ec`. Complete core needs Pi 0.87.0 or newer; the kit's own floor stays at 0.84.2. `/anthropic-fast` covers Opus 5.5.
+- Restore `pi-ask-question` as a core package and install Ponytail from the maintained fork, carrying existing Ponytail filters across the move. A core package can no longer also be listed as retired.
+- Check setup models through the running session's read-only `fitch_setup_models` tool instead of a migration-capable `pi --list-models` run. Retiring an old package no longer runs a blanket `pi update --extensions`.
+- Fit image-bearing Claude requests, including writer calls, within Anthropic's 32 MB payload limit. The guard resizes further before omitting anything, keeps the newest images, and preserves conversation order and saved originals.
+- Preserve Claude reasoning when a request also sets tool choice.
+- Keep an explicit fast-mode OFF across reload, new, resume, and fork; `--fast` applies only at process startup. OpenAI labels now describe the request policy (`priority requests ON/OFF`, `priority enabled`).
+- Cancelling `/draft` or `/side-question` during image preparation no longer crashes a later `/reload` or `/new`.
+- The legacy restart helper recovers a one-run `--api-key` provider from Pi's runtime auth record instead of guessing by model name.
+
 ## 0.11.2 — 22 September 2026
 
 - Inherit the selected session provider, model, and thinking level for `/draft` and `/side-question` off-transcript calls. Optional writer configuration can override each; saved conversation history and session model selection remain unchanged.
