@@ -740,6 +740,7 @@ type DocumentInput = {
 	documentId?: string;
 	revision?: number;
 	replyToFeedbackId?: string;
+	unlinkedFeedbackIds?: string[];
 };
 
 export default function pagedReader(pi: ExtensionAPI): void {
@@ -847,6 +848,7 @@ export default function pagedReader(pi: ExtensionAPI): void {
 		const doc: ReaderDocument = {
 			id, revision, title: input.title, sections,
 			...(input.replyToFeedbackId ? { replyToFeedbackId: input.replyToFeedbackId } : {}),
+			...(input.unlinkedFeedbackIds?.length ? { unlinkedFeedbackIds: input.unlinkedFeedbackIds } : {}),
 		};
 		const key = docKey(doc);
 		const existing = state.documents.get(key);
@@ -877,7 +879,10 @@ export default function pagedReader(pi: ExtensionAPI): void {
 			if (!params.replyToFeedbackId && responseScope?.ids.size === 1 && !responseScope.otherInput) {
 				throw new Error(`This turn is answering reader feedback ${[...responseScope.ids][0]}; set replyToFeedbackId so its reply appears on the original section.`);
 			}
-			const { doc, created } = publish(params, ctx);
+			// Mixed turns cannot be linked to one note; file them like the plain-text path.
+			const unlinkedFeedbackIds = params.replyToFeedbackId ? undefined
+				: [...(responseScope?.ids ?? [])].filter((id) => !state.replies(id).length);
+			const { doc, created } = publish({ ...params, unlinkedFeedbackIds }, ctx);
 			const text = `${created ? "Saved" : "Already saved"} reader document ${doc.id} revision ${doc.revision} (${doc.sections.length} sections). ${doc.replyToFeedbackId ? "Reply ready." : "Open with /reader."}`;
 			return { content: [{ type: "text", text }], details: { documentId: doc.id, revision: doc.revision, replyToFeedbackId: doc.replyToFeedbackId } };
 		},

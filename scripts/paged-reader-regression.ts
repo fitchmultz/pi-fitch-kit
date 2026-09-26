@@ -403,6 +403,26 @@ try {
 	assert.equal(sent.length, sentBeforeAmbiguous + 2, "restart never auto-resends ambiguous or unanswered feedback");
 	assert.equal(docs()[1].unlinkedFeedbackIds.length, 2);
 
+	currentSession = SessionManager.create(join(root, "steered-tool"), join(root, "steered-tool-sessions"));
+	currentSession.appendMessage(fauxAssistantMessage("Steered tool baseline"));
+	await event("session_start");
+	await execute({ title: "Steered", sections: [{ heading: "Question", text: "Original." }] });
+	press("n");
+	press("S");
+	press("\x1b[13;5u");
+	const steeredId = sent.at(-1).message.details.feedbackId;
+	press("\x1b");
+	await settle();
+	await event("message_start", { message: { role: "custom", customType: "fitch-paged-reader-feedback", details: { feedbackId: steeredId } } });
+	await event("message_start", { message: { role: "user", content: "steer", timestamp: 1 } });
+	await execute({ title: "Mixed answer", sections: [{ heading: "Response", text: "Answers the note and the steer." }] });
+	const mixed = docs().find((doc) => doc.title === "Mixed answer");
+	assert.equal(mixed.replyToFeedbackId, undefined);
+	assert.deepEqual(mixed.unlinkedFeedbackIds, [steeredId], "a tool reply on a mixed turn is filed like the text path, not as an orphan");
+	press("\x1b");
+	await settle();
+	await event("agent_settled");
+
 	currentSession = SessionManager.create(join(root, "partial"), join(root, "partial-sessions"));
 	currentSession.appendMessage(fauxAssistantMessage("Length-stopped baseline"));
 	await event("session_start");
