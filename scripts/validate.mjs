@@ -14,12 +14,10 @@ const assert = (condition, message) => {
 };
 
 assert(manifest.schemaVersion === 8, "setup manifest schema must match the ordered required-alternatives shape");
-for (const alternatives of manifest.requiredModels) {
-  assert(
-    Array.isArray(alternatives) && alternatives.length > 0 && alternatives.every((route) => typeof route === "string" && route.includes("/")),
-    "each requiredModels entry must be a non-empty ordered list of provider/model routes",
-  );
-}
+assert(
+  manifest.requiredModels.every((routes) => Array.isArray(routes) && routes.length > 0 && routes.every((route) => typeof route === "string" && route.includes("/"))),
+  "each requiredModels entry must be a non-empty ordered list of provider/model routes",
+);
 const manifestModelRoutes = new Set([...manifest.requiredModels.flat(), ...manifest.optionalModels]);
 const compaction = settingsExample.compaction;
 for (const key of ["reserveTokens", "keepRecentTokens"]) {

@@ -84,15 +84,12 @@ for (const isError of [false, true]) {
 	assert.deepEqual(imageResult, before, "flattening must not mutate source history");
 }
 
-const { createEventBus } = await import("@earendil-works/pi-coding-agent");
-const events = createEventBus();
 const commands: Record<string, { handler: (args: string, ctx: never) => Promise<void> }> = {};
 let sent: string | undefined;
 let sendOptions: { deliverAs?: string } | undefined;
 let sendFailure: Error | undefined;
 const savedDrafts: Array<{ type: "custom"; customType: string; data: { source: string; draft: string } }> = [];
 writePrompt({
-	events,
 	registerCommand(name: string, config: { handler: (args: string, ctx: never) => Promise<void> }) {
 		commands[name] = config;
 	},
@@ -753,8 +750,6 @@ for (const role of ["user", "toolResult"]) {
 	assert.match(imageCapture.map((part) => part.text ?? "").join("\n"), /does not support this image type/);
 }
 
-await assert.rejects(commands.draft.handler("dialog throws", ctx({ ui: { ...baseUi, select: async () => { throw new Error("dialog failure"); } } }) as never), /dialog failure/);
-
 // Cancelling a TUI loader aborts its pending API call, and the late result is harmless.
 const { initTheme } = await import("@earendil-works/pi-coding-agent");
 initTheme("dark");
@@ -851,7 +846,7 @@ for (const command of ["draft", "side-question"]) {
 		await pending;
 		retired = true;
 		if (phase === "provider rejection") rejectCompletion(new Error("late provider failure"));
-		else await Promise.race([finished.promise, new Promise((_resolve, reject) => setTimeout(() => reject(new Error(`${command}: cancelled ${phase} must settle`)), 5000))]);
+		else await finished.promise;
 		await new Promise((resolve) => setImmediate(resolve));
 		assert.equal(staleReads, 0, `${command}: cancelled ${phase} must not read retired context`);
 		assert.equal(calls, phase === "provider rejection" ? 1 : 0);

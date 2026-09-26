@@ -188,10 +188,7 @@ try {
 	// The checkpoint hook persists only the instance toggle, not derived footer data.
 	await session.prompt("/clean-footer");
 	assert.equal(footer, undefined);
-	const context = session.extensionRunner.createContext();
-	if (process.env.PI_COMPAT_HOST === "fork") {
-		assert.equal(typeof session.acquireCheckpoint, "function", "Fork qualification requires native checkpoints");
-	}
+	if (process.env.PI_COMPAT_HOST === "fork") assert.equal(typeof session.acquireCheckpoint, "function", "Fork qualification requires native checkpoints");
 	if (typeof session.acquireCheckpoint === "function") {
 		const hold = await session.acquireCheckpoint({ boundary: "settled", quiesce: () => () => {}, signal: AbortSignal.timeout(5000) });
 		try {
@@ -204,7 +201,7 @@ try {
 		// Official has no native checkpoint dispatch; retain the persistence unit contract.
 		const barrier = loader.getExtensions().extensions[0].handlers.get("session_checkpoint");
 		const event = { type: "session_checkpoint", boundary: "settled", signal: new AbortController().signal, invalidate() {} };
-		assert.deepEqual(await barrier[0](event, context), { sleepReady: true });
+		assert.deepEqual(await barrier[0](event, session.extensionRunner.createContext()), { sleepReady: true });
 	}
 	assert.deepEqual(manager.getEntries().at(-1).data, { sessionId: manager.getSessionId(), enabled: false });
 	await session.reload();
