@@ -11,7 +11,6 @@
   - `extensions/session-name.ts` for stable, searchable session naming and protected role identifiers.
   - `extensions/setup-models.ts` for read-only model availability in the running Pi session during setup.
   - `extensions/write-prompt.ts` for `/draft` rewrite, `/side-question` off-transcript answers, accept/copy/tweak/deny, and `write-prompt.json` model override.
-  - `extensions/session-restart.ts` for `/restart`, private process-local control sockets, exact saved-session preservation, and default busy skipping.
   - `examples/settings.json` for the safe, non-secret behavioral settings subset.
   - `setup-manifest.json` for unpinned package sources, required model routes, and kit resources.
   - `templates/working-agreement.md` for the optional managed working-agreement blocks.
@@ -50,7 +49,7 @@
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
 - Keep `extensions/write-prompt.ts` off the main transcript: native provider-neutral streaming completion without tools, session provider/model/thinking inheritance with optional `write-prompt.json` overrides, flattened tool history retaining result images, built-in dialogs, and `copyToClipboard` for Copy. Preserve the native Pi 0.84.2 provider fallback. Only `/draft` Accept calls `sendUserMessage`; preserve busy steering and original/draft recovery. `/side-question` never sends.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's recommended baseline.
-- Keep restart on public Pi APIs and Node exit/execve, never a daemon or terminal keystroke bridge. Require the fork's native Bash/pending-input/nextTurn activity facts; unsupported hosts must refuse, not guess idle. No argv/environment in socket replies or persisted state. See `docs/pi-setup.md`.
+- Do not reintroduce a kit `/restart`; the fork supplies native restart and official Pi users quit and relaunch.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.
 
 ## Validation
@@ -59,7 +58,6 @@
 - Run `npm run regression:fast-mode` after changing fast-mode toggles, eligibility, payload or header injection, or state handling.
 - Run `node --test scripts/validate-regression.mjs` after changing context-policy validation or its inputs.
 - Run `npm run regression:session-name` after changing naming guidance, metadata injection, protected identities, or its migration gate.
-- Run `npm run regression:write-prompt` after changing `/draft` config parsing, writer history, activity reporting, or accept/copy/tweak/deny behavior.
-- Run `npm run regression:session-restart` and the disposable `npm run smoke:restart` recipe in `README.md` after restart changes; include the real optional-integration fixtures when touching child status or virtual cwd.
+- Run `npm run regression:write-prompt` after changing `/draft` config parsing, writer history, cancellation, or accept/copy/tweak/deny behavior.
 - For runtime-facing changes, also verify Pi loads the package through `pi install ...` and a fresh Pi process when practical.
 - Keep this file short and project-specific; point to `README.md` or Pi docs instead of copying generic coding rules.

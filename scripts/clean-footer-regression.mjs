@@ -191,9 +191,6 @@ try {
 	const context = session.extensionRunner.createContext();
 	if (process.env.PI_COMPAT_HOST === "fork") {
 		assert.equal(typeof session.acquireCheckpoint, "function", "Fork qualification requires native checkpoints");
-		for (const method of ["isBashRunning", "getPendingNextTurnCount", "getPendingInputCount"]) {
-			assert.equal(typeof context[method], "function", `Fork restart requires native ${method}`);
-		}
 	}
 	if (typeof session.acquireCheckpoint === "function") {
 		const hold = await session.acquireCheckpoint({ boundary: "settled", quiesce: () => () => {}, signal: AbortSignal.timeout(5000) });

@@ -92,10 +92,10 @@ assert(
       "extensions/session-name.ts",
       "extensions/setup-models.ts",
       "extensions/write-prompt.ts",
-      "extensions/session-restart.ts",
     ]),
-  "the kit must bundle the image-guard, clean-footer, fast-mode, session-name, write-prompt, and session-restart extensions",
+  "the kit must bundle the image-guard, clean-footer, fast-mode, session-name, setup-models, and write-prompt extensions",
 );
+assert(!existsSync(join(root, "extensions", "session-restart.ts")), "the fork's native /restart replaces the retired kit helper");
 
 for (const pkg of manifest.corePackages) {
   assert(
