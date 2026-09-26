@@ -28,7 +28,9 @@
 
 ## Editing rules
 
-- Use npm and Node `>=24.0.0`; do not introduce another package manager.
+- Use npm and Node `>=24.15.0`; do not introduce another package manager.
+- Pi floor is official 0.87.1; do not add shims for older hosts. Fork-only APIs stay behind feature checks so official Pi keeps working.
+- The lockfile must resolve only to `https://registry.npmjs.org/`; rewrite any private mirror host after installing.
 - Keep this package an opinionated composition layer. Independent extensions and skill packages must not depend on it.
 - Keep only active public resources registered in `package.json#pi` and `setup-manifest.json`.
 - Do not add duplicate subagent or skill copies. Point to the public owning package without pinning extension installs to a ref or version.
@@ -47,7 +49,7 @@
 - Keep `extensions/clean-footer.ts` free of cumulative token, cache, and cost counters; preserve context usage, model details, extension statuses, and wrapping without truncation. Verbosity comes from the controller's native `verbosity` status, never another config reader.
 - Keep `extensions/fast-mode.ts` scoped and preserve `/fast` plus `--fast` as aliases for the shared OpenAI toggle: OpenAI and xAI priority ride `before_provider_request` for `openai`/`openai-codex`/`xai` plus `cloudflare-ai-gateway` models whose id starts with `gpt-` or is `o3`/`o4-mini` (including their exact `2025-04-16` snapshots) for the OpenAI toggle, or starts with `grok-` for the xAI toggle; other gateway o-series and namespaced Workers AI models stay excluded; Anthropic fast mode owns the `anthropic-messages` override for only the `anthropic` and `cloudflare-ai-gateway` providers, appends the beta at fetch time, and never sends `speed` when the header cannot be attached. Keep the gateway endpoint-placeholder resolution in `fastStream`, the existing state filenames, and the doubled Anthropic fast cost rates.
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
-- Keep `extensions/write-prompt.ts` off the main transcript: native provider-neutral streaming completion without tools, session provider/model/thinking inheritance with optional `write-prompt.json` overrides, flattened tool history retaining result images, built-in dialogs, and `copyToClipboard` for Copy. Preserve the native Pi 0.84.2 provider fallback. Only `/draft` Accept calls `sendUserMessage`; preserve busy steering and original/draft recovery. `/side-question` never sends.
+- Keep `extensions/write-prompt.ts` off the main transcript: native provider-neutral streaming completion without tools, session provider/model/thinking inheritance with optional `write-prompt.json` overrides, flattened tool history retaining result images, built-in dialogs, and `copyToClipboard` for Copy. Only `/draft` Accept calls `sendUserMessage`; preserve busy steering and original/draft recovery. `/side-question` never sends.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's recommended baseline.
 - Do not reintroduce a kit `/restart`; the fork supplies native restart and official Pi users quit and relaunch.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.

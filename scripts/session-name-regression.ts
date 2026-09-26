@@ -7,8 +7,7 @@ import { pathToFileURL } from "node:url";
 
 import { getPackageDir, VERSION } from "@earendil-works/pi-coding-agent";
 
-const [major, minor] = VERSION.split(".").map(Number);
-const contextHook = major > 0 || minor >= 87 ? "context_with_system" : "context";
+const contextHook = "context_with_system";
 
 const { createExtensionRuntime, loadExtensions } = await import(
 	pathToFileURL(join(getPackageDir(), "dist/core/extensions/loader.js")).href
@@ -99,7 +98,7 @@ assert.equal(tool.executionMode, "sequential");
 type ContextResult = {
 	messages: Array<{ role?: string; content?: unknown }>;
 };
-assert.equal(extension.handlers.has(contextHook === "context" ? "context_with_system" : "context"), false);
+assert.equal(extension.handlers.has("context"), false);
 const context = extension.handlers.get(contextHook)?.[0] as
 	| ((event: { messages: unknown[] }) => ContextResult | undefined)
 	| undefined;
@@ -317,5 +316,5 @@ await assert.rejects(
 active = false;
 assert.equal(await context({ messages: [userMessage] }), undefined);
 
-console.log(`kit session-name checks passed (${VERSION}, ${contextHook})`);
+console.log(`kit session-name checks passed (${VERSION})`);
 execFileSync(process.execPath, [join(process.cwd(), "scripts/session-name-boundary.mjs"), getPackageDir()], { stdio: "inherit" });

@@ -170,22 +170,6 @@ function fastOptions(options: SimpleStreamOptions | undefined): SimpleStreamOpti
 	};
 }
 
-function preserveToolChoice(options: SimpleStreamOptions | undefined): SimpleStreamOptions | undefined {
-	if (!options || !("toolChoice" in options) || options.toolChoice === undefined) return options;
-	const choice = options.toolChoice;
-	return {
-		...options,
-		onPayload: async (payload, model) => {
-			// Pi 0.84.2's simple Anthropic serializer does not forward toolChoice.
-			const body = typeof payload === "object" && payload !== null && "tool_choice" in payload
-				? payload
-				: { ...(payload as Record<string, unknown>), tool_choice: typeof choice === "string" ? { type: choice } : choice };
-			const replaced = await options.onPayload?.(body, model);
-			return replaced === undefined ? body : replaced;
-		},
-	};
-}
-
 function fastStream(
 	model: Model<Api>,
 	context: Parameters<typeof messagesApi.streamSimple>[1],
@@ -213,7 +197,7 @@ function fastStream(
 		(options !== undefined && "toolChoice" in options && options.reasoning === undefined);
 	return fullStream
 		? messagesApi.stream(target, context, streamOptions)
-		: messagesApi.streamSimple(target, context, preserveToolChoice(streamOptions));
+		: messagesApi.streamSimple(target, context, streamOptions);
 }
 
 // Mirrors the per-request gates, so the footer never claims fast mode on a
@@ -282,7 +266,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 	});
 	pi.on("model_select", (_event, ctx) => updateFooterStatus(ctx));
 
-	// Additive fork event; older hosts keep their normal lifecycle and stock API types.
+	// Fork-only event; official Pi never emits it and its types do not declare it.
 	(pi.on as unknown as (event: "session_checkpoint", handler: () => {
 		sleepReady: boolean;
 	}) => void)("session_checkpoint", () => {

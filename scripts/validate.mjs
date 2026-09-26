@@ -35,7 +35,7 @@ for (const [route, value] of Object.entries(manifest.modelContextWindows)) {
   );
 }
 const piFloor = /^>=(\d+\.\d+\.\d+)$/.exec(manifest.runtime.pi)?.[1];
-assert(piFloor === "0.84.2", "the kit must accept Pi 0.84.2 or newer");
+assert(piFloor === "0.87.1", "the kit must accept Pi 0.87.1 or newer");
 assert(packageJson.engines.node === manifest.runtime.node, "package and manifest Node floors must match");
 assert(/^\d+\.\d+\.\d+$/.test(packageJson.version), "package version must be a release version");
 assert(packageLock.version === packageJson.version && packageLock.packages[""].version === packageJson.version, "lockfile version must match package.json");
