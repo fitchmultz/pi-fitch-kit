@@ -6,6 +6,7 @@
   "enabledModels": [
     "anthropic/claude-opus-5-5",
     "cloudflare-ai-gateway/claude-opus-5-5",
+    "cloudflare-ai-gateway/claude-opus-5",
     "openai-codex/gpt-6-astra",
     "openai/gpt-6-astra",
     "openai/gpt-6-sol",
