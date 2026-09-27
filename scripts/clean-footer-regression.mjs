@@ -23,7 +23,8 @@ const { stripTerminalSequences, visibleWidth } = await import(new URL(JSON.parse
 console.log(JSON.stringify({ host: process.env.PI_COMPAT_HOST ?? "local", version: hostVersion, sdkPath }));
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const temp = mkdtempSync(join(tmpdir(), "pi-clean-footer-"));
+// Location text containing CH must not be mistaken for the cache indicator.
+const temp = mkdtempSync(join(tmpdir(), "pi-clean-footer-CH-"));
 const previousHome = process.env.HOME;
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 const previousOffline = process.env.PI_OFFLINE;
@@ -135,7 +136,7 @@ try {
 	manager.appendSessionInfo(" \n ");
 	manager.appendMessage(assistant(0, 0));
 	manager.branch(leaf);
-	assert.doesNotMatch(render(), /Renamed|Original|CH/);
+	assert.doesNotMatch(render(), /Renamed|Original|• CH/);
 
 	manager.createBranchedSession(leaf);
 	assert.match(render(), /Original/);
@@ -152,7 +153,7 @@ try {
 	assert.match(render(), /Reloaded/);
 	assert.match(render(), /CH75\.0%/);
 	manager.newSession();
-	assert.doesNotMatch(render(), /Reloaded|Original|CH/);
+	assert.doesNotMatch(render(), /Reloaded|Original|• CH/);
 
 	// Fresh SDK startup reads a saved journal, not the previous extension's live toggle.
 	for (const matchingId of [true, false]) {
