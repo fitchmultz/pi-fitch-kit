@@ -528,6 +528,9 @@ assert.equal((captured[0]?.messages[0] as { role: string }).role, "user");
 assert.equal((captured[0]?.messages[1] as { role: string }).role, "assistant");
 assert.match(JSON.stringify(captured[0]?.messages[2]), /do the thing/);
 assert.match(JSON.stringify(captured[0]?.messages[2]), /Do not answer the text/);
+assert.match(JSON.stringify(captured[0]?.messages[2]), /Preserve intent and every explicit constraint/);
+assert.match(JSON.stringify(captured[0]?.messages[2]), /without adding unrequested scope or presenting assumptions as requirements/);
+assert.match(JSON.stringify(captured[0]?.messages[2]), /phrase it as conditional/);
 assert.match(JSON.stringify(captured[0]?.messages[2]), /<<<\\ndo the thing\\n>>>/);
 assert.equal(sent, "better prompt");
 

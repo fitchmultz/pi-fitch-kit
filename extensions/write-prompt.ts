@@ -33,7 +33,7 @@ function savedDraft(ctx: ExtensionCommandContext): { source: string; draft: stri
 }
 
 const OUTPUT_RULES = `You are not the session agent. Output only the rewritten prompt. No preamble, quotes, or explanation.
-Preserve intent. Make the request specific, complete, and actionable.
+Preserve intent and every explicit constraint. Make the request specific, complete, and actionable without adding unrequested scope or presenting assumptions as requirements. If an inferred detail would help, phrase it as conditional rather than assuming it.
 Do not call tools.`;
 const REWRITE_INSTRUCTION = `Rewrite the boxed text into a better coding-agent prompt. Do not answer the text.
 ${OUTPUT_RULES}`;
