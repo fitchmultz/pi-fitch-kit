@@ -17,7 +17,6 @@ concurrency:
 
 env:
   PI_AUTOMATION_REF: fe049ea97a8c91d1a4c3a0958a85b37c7759dcc6 # v1.0.0
-  FORK_REF: b75da498cadced35be97185c191ee5d0e4f41b7d
 
 jobs:
   official:
@@ -60,6 +59,8 @@ jobs:
     name: Build pinned fork / Ubuntu / Node 24
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    outputs:
+      fork-ref: ${{ steps.fork.outputs.commit }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -68,9 +69,10 @@ jobs:
           path: automation
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        id: fork
         with:
           repository: fitchmultz/pi
-          ref: ${{ env.FORK_REF }}
+          ref: main
           path: fork
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -81,6 +83,7 @@ jobs:
       - name: Build the selected fork once
         working-directory: fork
         env:
+          FORK_REF: ${{ steps.fork.outputs.commit }}
           PI_OFFLINE: '1'
           PI_TELEMETRY: '0'
         run: |
@@ -126,7 +129,7 @@ jobs:
           path: ${{ runner.temp }}/fork-package
       - name: Check against the fork and a clean Git consumer
         env:
-          PI_COMPAT_FORK_REF: ${{ env.FORK_REF }}
+          PI_COMPAT_FORK_REF: ${{ needs.fork-package.outputs.fork-ref }}
         run: |
           npm install --global "$(node -p 'require("./automation/package.json").packageManager')"
           node automation/scripts/qualify.mjs --repo pi-fitch-kit --source "$GITHUB_WORKSPACE/extension" \
