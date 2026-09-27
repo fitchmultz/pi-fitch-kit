@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.15.1 — 26 September 2026
+
+- Batch session naming with useful tool calls when possible instead of encouraging a separate naming-only model round. Text-only naming, stable names, inert metadata, and protected-role confirmation remain unchanged on official Pi 0.87.1 and the maintained fork.
+- Document optional host-owned integration discovery without adding a fork dependency, machine-specific paths, or automatic changes to tool exposure.
+
 ## 0.15.0 — 26 September 2026
 
 - Add a bounded native reader for long, sectioned explanations. `/reader` resumes the saved page, `/reader list` browses prior documents, and `/reader demo` works without a model. Local section drafts enter model context only on explicit send; busy feedback waits for successful agent settlement and cannot leak after cancellation. Linked replies wait behind the current page until opened, while incomplete or ambiguous responses remain readable in the library. Pointer controls use `pi-tui`'s native mouse regions when the host provides them; keyboard controls always work.
