@@ -102,6 +102,8 @@ const context = extension.handlers.get("context_with_system")?.[0] as
 	| undefined;
 assert.ok(context);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /must call name_session/);
+assert.match(tool.promptGuidelines?.join("\n") ?? "", /same tool-call batch rather than a separate naming-only round/);
+assert.match(tool.promptGuidelines?.join("\n") ?? "", /Do not add unrelated work/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /overall purpose/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /When unsure, keep the current name/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /exact numbered subagent identifier/);

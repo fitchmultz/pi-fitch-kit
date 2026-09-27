@@ -14,7 +14,7 @@ export default function sessionName(pi: ExtensionAPI): void {
 			promptSnippet: "Set or update the current Pi session's searchable display name",
 			executionMode: "sequential",
 			promptGuidelines: [
-				"Before your first final response in an unnamed session, you must call name_session once after the overall purpose is clear; session display-name metadata reports currentName as null when unnamed. Do not skip naming just because no other tools are needed.",
+				"Before your first final response in an unnamed session, you must call name_session once after the overall purpose is clear; session display-name metadata reports currentName as null when unnamed. Do not skip naming just because no other tools are needed. When useful tool calls are already needed, include name_session in the same tool-call batch rather than a separate naming-only round. Do not add unrelated work just to batch naming.",
 				"Choose a broad, durable name for the session's overall purpose, usually 2-4 short terms. Do not name the current subtask, implementation detail, file, issue, phase, or temporary activity.",
 				"Treat an existing session name as stable. Rename only when the overall purpose has clearly and permanently changed and the old name would be misleading. Do not rename for ordinary follow-ups, subtasks, phases, or temporary detours. When unsure, keep the current name.",
 				"If this session or agent is designated as a coordinator, ensure its name contains coordinator. Preserve coordinator and any exact numbered subagent identifier, such as subagent-1, in every later name_session name. Never attempt to remove a protected role or identifier unless the user explicitly says it no longer applies; Pi will require the user to confirm the removal.",
