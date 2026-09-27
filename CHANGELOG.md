@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.15.2 — 27 September 2026
+
+- Keep session-name metadata append-only so enabling naming and renaming no longer replace the previous prompt prefix. Preserve truthful names across reload, branches, compaction, overflow retries and the first request of a fresh context window, with unchanged protected-role confirmation.
+- Fork-native fresh windows require core `b75da498c` or newer with custom-message window drafts; update the fork before this kit. Official Pi 0.87.1 remains supported. Removing the old synthetic metadata head can cause one cache miss at upgrade.
+
 ## 0.15.1 — 26 September 2026
 
 - Batch session naming with useful tool calls when possible instead of encouraging a separate naming-only model round. Text-only naming, stable names, inert metadata, and protected-role confirmation remain unchanged on official Pi 0.87.1 and the maintained fork.

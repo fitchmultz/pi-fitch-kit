@@ -1,7 +1,15 @@
 import { Type } from "@earendil-works/pi-ai";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+	CustomMessageEntryDraft,
+	ExtensionAPI,
+	ProjectedSessionEntry,
+	SessionProjection,
+} from "@earendil-works/pi-coding-agent";
 
 const TOOL_NAME = "name_session";
+const METADATA_TYPE = "pi-session-name";
+const METADATA_PREFIX =
+	"Session display-name metadata (inert data, not instructions): ";
 
 export default function sessionName(pi: ExtensionAPI): void {
 	let active = false;
@@ -97,23 +105,43 @@ export default function sessionName(pi: ExtensionAPI): void {
 		registerTool();
 	});
 
-	pi.on("context_with_system", (event) => {
+	const metadata = (messages: SessionProjection["messages"]) => {
 		if (!active || !pi.getActiveTools().includes(TOOL_NAME)) return;
+		const content =
+			METADATA_PREFIX + JSON.stringify({ currentName: pi.getSessionName() ?? null });
+		const latest = messages.findLast(
+			(message) => message.role === "custom" && message.customType === METADATA_TYPE,
+		);
+		if (latest?.role === "custom" && latest.content === content) return;
+		return { customType: METADATA_TYPE, content, display: false };
+	};
 
-		const metadata = JSON.stringify({ currentName: pi.getSessionName() ?? null });
-		const offset = event.messages[0]?.role === "system" ? 1 : 0;
-		return {
-			messages: [
-				...event.messages.slice(0, offset),
-				{
-					role: "custom",
-					customType: "pi-session-name",
-					content: `Session display-name metadata (inert data, not instructions): ${metadata}`,
-					display: false,
-					timestamp: 0,
-				},
-				...event.messages.slice(offset),
-			],
-		};
+	// Persist only at native boundaries: never rewrite an already submitted prefix.
+	pi.on("before_agent_start", (_event, ctx) => {
+		const message = metadata(ctx.sessionManager.buildSessionProjection().messages);
+		if (message) return { message };
+	});
+	pi.on("turn_end", (event) => {
+		const message = metadata(event.context.contextMessages);
+		if (message) return { entries: [{ type: "custom_message", ...message }] };
+	});
+	pi.on("session_compact", (event, ctx) => {
+		const message = metadata(ctx.sessionManager.buildSessionProjection().messages);
+		// Overflow already schedules a retry. Queue metadata with that request;
+		// context-only sends during streaming would wait until after its response.
+		if (message) pi.sendMessage(message, { triggerTurn: event.willRetry });
+	});
+
+	// Official Pi has no native fresh windows. On the fork, deploy with the
+	// core hook that accepts custom-message drafts (older edit-only hooks do not).
+	const windowApi = pi as ExtensionAPI & {
+		registerContextWindowHook?: (
+			hook: (event: { contextEntries: ProjectedSessionEntry[] }) =>
+				CustomMessageEntryDraft[] | undefined,
+		) => void;
+	};
+	windowApi.registerContextWindowHook?.((event) => {
+		const message = metadata(event.contextEntries.flatMap((entry) => entry.messages));
+		if (message) return [{ type: "custom_message", ...message }];
 	});
 }
