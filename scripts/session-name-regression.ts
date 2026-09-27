@@ -63,17 +63,16 @@ for (const paths of [
 		["name_session"],
 		"the effective standalone tool must remain the sole owner",
 	);
-	const bundledContext = bundled.handlers.get("context_with_system")?.[0];
-	assert.ok(bundledContext);
-	assert.equal(await bundledContext({ messages: [] }, {}), undefined);
+	const bundledStart = bundled.handlers.get("before_agent_start")?.[0];
+	assert.ok(bundledStart);
+	assert.equal(await bundledStart({}, { sessionManager: { buildSessionProjection: () => ({ messages: [] }) } }), undefined);
 }
 rmSync(fixtureDir, { recursive: true, force: true });
 
 const runtime = createExtensionRuntime();
-let active = true;
 let currentName: string | undefined;
 const names: string[] = [];
-runtime.getActiveTools = () => (active ? ["name_session"] : []);
+runtime.getActiveTools = () => ["name_session"];
 runtime.getSessionName = () => currentName;
 runtime.setSessionName = (name: string) => {
 	currentName = name.replace(/[\r\n]+/g, " ").trim();
@@ -93,14 +92,7 @@ await start({}, {});
 const tool = [...extension.tools.values()].find(({ definition }) => definition.name === "name_session")?.definition;
 assert.ok(tool);
 assert.equal(tool.executionMode, "sequential");
-type ContextResult = {
-	messages: Array<{ role?: string; content?: unknown }>;
-};
-assert.equal(extension.handlers.has("context"), false);
-const context = extension.handlers.get("context_with_system")?.[0] as
-	| ((event: { messages: unknown[] }) => ContextResult | undefined)
-	| undefined;
-assert.ok(context);
+
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /must call name_session/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /same tool-call batch rather than a separate naming-only round/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /Do not add unrelated work/);
@@ -109,12 +101,6 @@ assert.match(tool.promptGuidelines?.join("\n") ?? "", /When unsure, keep the cur
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /exact numbered subagent identifier/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /require the user to confirm/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /avoid spaces/);
-
-const userMessage = { role: "user", content: "task", timestamp: 1 };
-const unnamedContext = await context({ messages: [userMessage] });
-assert.equal(unnamedContext?.messages[0]?.role, "custom");
-assert.match(String(unnamedContext?.messages[0]?.content), /"currentName":null/);
-assert.deepEqual(unnamedContext?.messages.slice(1), [userMessage]);
 
 const first = await tool.execute(
 	"first",
@@ -157,15 +143,6 @@ await assert.rejects(
 );
 assert.deepEqual(names, ["Fix auth refresh"]);
 
-const followUpMessages = [
-	userMessage,
-	{ role: "assistant", content: [{ type: "toolCall", name: "name_session" }] },
-	{ role: "toolResult", toolName: "name_session" },
-];
-const namedContext = await context({ messages: followUpMessages });
-assert.match(String(namedContext?.messages[0]?.content), /"currentName":"Fix auth refresh"/);
-assert.deepEqual(namedContext?.messages.slice(1), followUpMessages);
-
 await tool.execute(
 	"rename",
 	{ name: "Ship auth migration" },
@@ -174,10 +151,6 @@ await tool.execute(
 	{} as never,
 );
 assert.deepEqual(names, ["Fix auth refresh", "Ship auth migration"]);
-assert.match(
-	String((await context({ messages: followUpMessages }))?.messages[0]?.content),
-	/"currentName":"Ship auth migration"/,
-);
 
 await tool.execute(
 	"coordinator",
@@ -312,9 +285,6 @@ await assert.rejects(
 	),
 	/Session name cannot be blank/,
 );
-
-active = false;
-assert.equal(await context({ messages: [userMessage] }), undefined);
 
 console.log(`kit session-name checks passed (${VERSION})`);
 execFileSync(process.execPath, [join(process.cwd(), "scripts/session-name-boundary.mjs"), getPackageDir()], { stdio: "inherit" });

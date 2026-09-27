@@ -140,10 +140,10 @@ try {
 	if (JSON.stringify(toolNames) !== JSON.stringify(["fitch_setup_models", "name_session", "reader_present"])) {
 		throw new Error(`Unexpected kit tools: ${JSON.stringify(toolNames)}`);
 	}
-	const sessionContext = sessionName.handlers.get("context_with_system")?.[0] ?? sessionName.handlers.get("context")?.[0];
-	if (!sessionContext) throw new Error("Session-name context handler missing");
-	const contextResult = await sessionContext({ messages: [{ role: "system", content: "Smoke instructions", timestamp: 0 }] }, {});
-	if (!contextResult?.messages?.some((message) => String(message.content).includes('"currentName":null'))) {
+	const sessionContext = sessionName.handlers.get("before_agent_start")?.[0];
+	if (!sessionContext) throw new Error("Session-name startup handler missing");
+	const contextResult = await sessionContext({}, { sessionManager: SessionManager.inMemory(cwd) });
+	if (!String(contextResult?.message?.content).includes('"currentName":null')) {
 		throw new Error("Session-name context metadata missing");
 	}
 	const cleanFooterStart = cleanFooter.handlers.get("session_start")?.[0];
