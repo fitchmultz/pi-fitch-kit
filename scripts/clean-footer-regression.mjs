@@ -19,7 +19,7 @@ const { createAgentSession, DefaultResourceLoader, initTheme, ModelRuntime, Sess
 const aiManifest = pathToFileURL(findPackageJSON("@earendil-works/pi-ai", sdkPath));
 const tuiManifest = pathToFileURL(findPackageJSON("@earendil-works/pi-tui", sdkPath));
 const { fauxAssistantMessage, fauxProvider, InMemoryCredentialStore } = await import(new URL(JSON.parse(readFileSync(aiManifest, "utf8")).exports["."].import, aiManifest).href);
-const { stripTerminalSequences, visibleWidth } = await import(new URL(JSON.parse(readFileSync(tuiManifest, "utf8")).main, tuiManifest).href);
+const { getCapabilities, setCapabilities, stripTerminalSequences, visibleWidth } = await import(new URL(JSON.parse(readFileSync(tuiManifest, "utf8")).main, tuiManifest).href);
 console.log(JSON.stringify({ host: process.env.PI_COMPAT_HOST ?? "local", version: hostVersion, sdkPath }));
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -28,6 +28,7 @@ const temp = mkdtempSync(join(tmpdir(), "pi-clean-footer-CH-"));
 const previousHome = process.env.HOME;
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 const previousOffline = process.env.PI_OFFLINE;
+const previousCapabilities = getCapabilities();
 let session;
 let footer;
 
@@ -39,6 +40,8 @@ try {
 	process.env.HOME = temp;
 	process.env.PI_CODING_AGENT_DIR = agentDir;
 	process.env.PI_OFFLINE = "1";
+	// Keep theme changes visible instead of quantizing both dim colors to the same palette entry.
+	setCapabilities({ ...previousCapabilities, trueColor: true });
 	initTheme("dark", false);
 
 	const faux = fauxProvider({ models: [{ id: "footer-model", contextWindow: 200_000, reasoning: true }] });
@@ -217,6 +220,7 @@ try {
 	footer?.dispose?.();
 	session?.dispose();
 	mock.restoreAll();
+	setCapabilities(previousCapabilities);
 	if (previousHome === undefined) delete process.env.HOME;
 	else process.env.HOME = previousHome;
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
