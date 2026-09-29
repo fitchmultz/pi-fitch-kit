@@ -115,7 +115,7 @@ try {
 	const branchLeaf = manager.getLeafId();
 	manager.appendMessage({ role: "user", content: "OFF_BRANCH_SENTINEL", timestamp: 6 });
 	manager.branch(branchLeaf);
-	const settingsManager = sdk.SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } });
+	const settingsManager = sdk.SettingsManager.inMemory({ compaction: { enabled: false, keepRecentTokens: 1 }, retry: { enabled: false } });
 	loader = new sdk.DefaultResourceLoader({
 		cwd, agentDir, settingsManager,
 		additionalExtensionPaths: [join(root, "extensions/write-prompt.ts")],
@@ -126,6 +126,7 @@ try {
 			pi.on("session_start", (event) => { lifecycle.push(event.reason); });
 			pi.on("session_shutdown", (event) => { lifecycle.push(`shutdown:${event.reason}`); });
 			pi.on("input", (event) => { inputs.push(event); });
+			pi.on("session_before_compact", (event) => ({ compaction: { summary: "HANDOFF_SENTINEL", firstKeptEntryId: event.branchEntries.at(-1).id, tokensBefore: event.preparation.tokensBefore } }));
 		}],
 	});
 	async function open(sm) {
@@ -221,13 +222,11 @@ try {
 	writeFileSync(join(agentDir, "write-prompt.json"), JSON.stringify({ model: "writer-boundary/override" }));
 	await exercise(resumed, "file-backed resume + override");
 	assert.equal(requests.at(-1).model, "override");
-	if (process.env.PI_COMPAT_HOST === "fork") assert.equal(typeof session.newContext, "function", "Fork qualification requires native new-context rollover");
-	if (typeof session.newContext === "function") {
-		session.newContext({ handoff: "HANDOFF_SENTINEL" });
-		await exercise(resumed, "native new context", false);
-		assert.match(JSON.stringify(requests.at(-1)), /HANDOFF_SENTINEL/);
-		assert.doesNotMatch(JSON.stringify(requests.at(-1)), /CONVERSATION_SENTINEL/);
-	} else console.log("SKIP newContext: host does not expose it");
+	// Replace history through public compaction, without a model-generated summary.
+	await session.compact();
+	await exercise(resumed, "compacted context", false);
+	assert.match(JSON.stringify(requests.at(-1)), /HANDOFF_SENTINEL/);
+	assert.doesNotMatch(JSON.stringify(requests.at(-1)), /CONVERSATION_SENTINEL|HISTORY_REPLY|RESULT_SENTINEL|ARG_SENTINEL/);
 	await close();
 	const fresh = sdk.SessionManager.inMemory(cwd);
 	await open(fresh);
