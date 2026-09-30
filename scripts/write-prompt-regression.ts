@@ -306,6 +306,7 @@ const recovery = ctx({
 recovery.sessionManager.getBranch = () => savedDrafts as never;
 await commands.draft.handler("", recovery as never);
 assert.equal(restored, `/draft ${original}`);
+assert.equal(notices.at(-1), "Original restored to editor");
 
 // A broken writer override must not prevent recovering already-written input.
 writeFileSync(join(agentDir, WRITE_PROMPT_FILE), "invalid json");
