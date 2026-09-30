@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Qualify the exact Pi 0.99.1 development cohort and maintained `18acca18` fork without changing the Pi 0.87.1 or Node 24.15 floors.
+- Confirm `/draft` Restore original in the UI so the restored editor text is immediately rendered instead of appearing blank until the next keypress.
+
 ## 0.16.0 — 29 September 2026
 
 - Add `/ultrafast [on|off|toggle|status]`, global by default: blank means toggle, on selects Ultrafast, off disables kit OpenAI tiers, and toggle maps Ultrafast to off or another mode to Ultrafast. Optional `--session` stores a local Ultrafast/off override; `/ultrafast reset --session` clears it and follows the current shared mode. Local off suppresses kit priority/Ultrafast injection, not native Auto or project defaults. Read-only status accepts `--session` and shows shared and effective settings and mismatches.
