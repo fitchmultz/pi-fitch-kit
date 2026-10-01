@@ -110,6 +110,8 @@ The bundled [paged reader](../README.md#enabled-extensions) is a separate main-a
 
 The maintained 0.99.1 fork uses upstream request-boundary execution; live native steering, async tool successors, and the old native context-window framework are retired. Existing background subagents continue to use their durable launch handles and completion notifications. Installing this kit neither patches Pi nor changes provider execution policy.
 
+Provider error diagnostics, message types, and retry policy remain Pi-core responsibilities. The approved [patch retirement](https://github.com/fitchmultz/pi-fitch-kit/pull/24) removed the kit's Responses metadata implementation; its [hardening follow-up](https://github.com/fitchmultz/pi-fitch-kit/issues/19) is not planned in this package and should not be read as completed upstream.
+
 ## Optional OpenAI Ultrafast
 
 Installation never selects Ultrafast or changes setup's model policy. `/ultrafast [on|off|toggle|status]` controls the shared OpenAI setting by default: blank means toggle, on selects Ultrafast, off disables kit OpenAI tiers, and toggle changes Ultrafast to off or any other mode to Ultrafast. `/codex-fast ultrafast` remains a global alias, with no `--session` form. The existing `openai-codex-fast.json` still stores mutually exclusive off/priority/ultrafast; legacy `enabled: true` means priority. `/codex-fast on`, blank `/fast`, and existing Fast toggle semantics remain unchanged; blank `/codex-fast` reports status.

@@ -2,7 +2,7 @@
 
 This repository documents how I combine public extensions, model-routed subagents, skills, connected MCP services, and local policy.
 
-The kit installs public extension packages without patching [Pi](https://github.com/earendil-works/pi). The extensions work on stock Pi and [my Pi fork](https://github.com/fitchmultz/pi/blob/main/FORK.md). Optional host preferences such as compact view and integration discovery require a runtime that supports them; they are not extension dependencies. Credentials, private provider definitions, and user-local experiments stay user-managed.
+The kit installs public extension packages without patching [Pi](https://github.com/earendil-works/pi). The extensions work on stock Pi and [my Pi fork](https://github.com/fitchmultz/pi/blob/main/FORK.md). Optional host preferences such as compact view and integration discovery require a runtime that supports them; they are not extension dependencies. Credentials, private provider definitions, and user-local experiments stay user-managed. Provider error diagnostics, message types, and retry policy belong to Pi core; retiring the kit's provider patch did not implement its outstanding [metadata-hardening follow-up](https://github.com/fitchmultz/pi-fitch-kit/issues/19).
 
 ## Start here
 
