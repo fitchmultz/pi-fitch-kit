@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Updated 29 September 2026. The kit supports Pi 0.87.1 or newer on Node.js 24.15 or newer; qualified against official Pi 0.99.1 and the maintained 0.99.1 fork containing [commit `18acca18`](https://github.com/fitchmultz/pi/commit/18acca18fbc5d38e6fcf52da01bea8be2b4f3818)._
+_Updated 1 October 2026. The kit supports Pi 0.87.1 or newer on Node.js 24.15 or newer; qualified against official Pi 0.99.2 and the maintained 0.99.1 fork at [commit `0c2722b7`](https://github.com/fitchmultz/pi/commit/0c2722b72d2e71c2c5b98d81bc3fc5da57992300)._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 

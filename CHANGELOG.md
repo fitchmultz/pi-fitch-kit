@@ -1,9 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.16.1 — 1 October 2026
 
-- Qualify the exact Pi 0.99.1 development cohort and maintained `18acca18` fork without changing the Pi 0.87.1 or Node 24.15 floors.
+- Qualify the exact official Pi 0.99.2 development cohort and maintained `0c2722b7` fork without changing the Pi 0.87.1 or Node 24.15 floors.
 - Confirm `/draft` Restore original in the UI so the restored editor text is immediately rendered instead of appearing blank until the next keypress.
+- Read footer names and cache statistics through lightweight entry metadata when the host supports it, avoiding historical message-body reads. Keep the complete official-Pi fallback and revision-based redraw cache.
+- Update the pinned shared compatibility automation to v1.0.1 and development npm to 12.2.0.
+- Resolve the retired Responses metadata follow-up as not planned in the kit; provider diagnostics, message types, and retry policy remain Pi-core responsibilities. The original upstream hardening checklist is not claimed complete.
+- Keep distribution Git-only (`private: true`); there is no matching npm publication.
 
 ## 0.16.0 — 29 September 2026
 
