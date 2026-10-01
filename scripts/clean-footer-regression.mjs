@@ -121,6 +121,24 @@ try {
 	const redrawScans = entries.mock.callCount();
 	const hasRevision = typeof manager.getEntriesRevision === "function";
 
+	for (const [source, percent, expected] of [
+		[undefined, 45.2, "45.2%/200k"],
+		["reported", 45.2, "45.2%/200k"],
+		["estimated", 45.2, "~45.2%/200k"],
+		["estimated", 0, "~0.0%/200k"],
+		["unknown", null, "?/200k"],
+		[undefined, null, "?/200k"],
+	]) {
+		const contextUsage = mock.method(session, "getContextUsage", () => ({
+			...(source === undefined ? {} : { source }),
+			tokens: percent === null ? null : percent * 2000, contextWindow: 200_000, percent,
+		}));
+		assert.equal(render().split("\n")[1], `${expected} • CH80.0%`);
+		assert.equal(contextUsage.mock.callCount(), 1, "Each render reads context usage once");
+		for (const line of footer.render(12)) assert.ok(visibleWidth(line) <= 12);
+		contextUsage.mock.restore();
+	}
+
 	// Non-triggering messages update both session history and live context.
 	const beforeUsage = session.getContextUsage();
 	await session.sendCustomMessage({ customType: "footer-test", content: "x".repeat(40_000), display: false }, { triggerTurn: false });
