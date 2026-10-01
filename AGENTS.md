@@ -30,7 +30,7 @@
 ## Editing rules
 
 - Use npm and Node `>=24.15.0`; do not introduce another package manager.
-- Pi floor is official 0.87.1; do not add shims for older hosts. Fork-only APIs stay behind feature checks so official Pi keeps working.
+- Pi floor is official 1.0.0; do not add shims for older hosts. Use public 1.0 APIs on both hosts; do not restore dropped checkpoint, metadata/revision or usage-source APIs.
 - The lockfile must resolve only to `https://registry.npmjs.org/`; rewrite any private mirror host after installing.
 - Keep this package an opinionated composition layer. Independent extensions and skill packages must not depend on it.
 - Keep only active public resources registered in `package.json#pi` and `setup-manifest.json`.

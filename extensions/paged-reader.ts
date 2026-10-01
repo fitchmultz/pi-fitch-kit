@@ -16,6 +16,7 @@ import {
 	getCapabilities,
 	Key,
 	Markdown,
+	MouseRegion,
 	matchesKey,
 	sliceByColumn,
 	setCapabilities,
@@ -29,7 +30,6 @@ import {
 	type TUI,
 	type ImageProtocol,
 } from "@earendil-works/pi-tui";
-import * as nativeTui from "@earendil-works/pi-tui";
 
 const ENTRY_TYPE = "fitch-paged-reader";
 const FEEDBACK_TYPE = "fitch-paged-reader-feedback";
@@ -42,12 +42,8 @@ type MouseEvent = {
 	wheelDelta?: number; clickCount?: number;
 };
 type MouseResult = { handled?: boolean; capture?: boolean; focus?: boolean; render?: boolean };
-// ponytail: Pi before 0.85.1 has no native mouse routing; keep keyboard reading there.
-const MouseRegion = (nativeTui as unknown as {
-	MouseRegion?: new (child: Component, onMouse: (event: MouseEvent) => MouseResult | undefined) => Component;
-}).MouseRegion;
 const mouseRegion = (child: Component, onMouse: (event: MouseEvent) => MouseResult | undefined): Component =>
-	MouseRegion ? new MouseRegion(child, onMouse) : child;
+	new MouseRegion(child, onMouse);
 const displayBody = (text: string) =>
 	stripTerminalSequences(text.replace(/\r\n?/g, "\n")).replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "");
 const displayLabel = (text: string) => displayBody(text).replace(/\s+/g, " ").trim();
@@ -86,6 +82,8 @@ export class ReaderState {
 	readonly statuses = new Map<string, FeedbackStatus>();
 	readonly readReplies = new Set<string>();
 	lastKey: string | undefined;
+	private readonly notesBySection = new Map<string, Feedback[]>();
+	private readonly repliesByFeedback = new Map<string, ReaderDocument[]>();
 
 	apply(event: ReaderEvent): void {
 		switch (event.kind) {
@@ -100,6 +98,11 @@ export class ReaderState {
 				if (!this.documents.has(key)) {
 					this.documents.set(key, doc);
 					this.order.push(key);
+					if (doc.replyToFeedbackId) {
+						const replies = this.repliesByFeedback.get(doc.replyToFeedbackId) ?? [];
+						replies.push(doc);
+						this.repliesByFeedback.set(doc.replyToFeedbackId, replies);
+					}
 				}
 				break;
 			}
@@ -120,6 +123,10 @@ export class ReaderState {
 					&& this.documents.get(event.feedback.key)?.sections.some((section) => section.id === event.feedback.sectionId)
 					&& typeof event.feedback.note === "string" && !this.feedback.has(event.feedback.id)) {
 					this.feedback.set(event.feedback.id, event.feedback);
+					const key = noteKey(event.feedback.key, event.feedback.sectionId);
+					const notes = this.notesBySection.get(key) ?? [];
+					notes.push(event.feedback);
+					this.notesBySection.set(key, notes);
 					this.statuses.set(event.feedback.id, "requested");
 				}
 				break;
@@ -135,18 +142,15 @@ export class ReaderState {
 	}
 
 	latestFeedback(key: string, sectionId: string): Feedback | undefined {
-		return [...this.feedback.values()].reverse().find((item) => item.key === key && item.sectionId === sectionId);
+		return this.notesBySection.get(noteKey(key, sectionId))?.at(-1);
 	}
 
 	replies(id: string): ReaderDocument[] {
-		return this.order.flatMap((key) => {
-			const doc = this.documents.get(key)!;
-			return doc.replyToFeedbackId === id ? [doc] : [];
-		});
+		return [...this.repliesByFeedback.get(id) ?? []];
 	}
 
 	latestReply(key: string, sectionId: string): ReaderDocument | undefined {
-		const notes = [...this.feedback.values()].reverse().filter((item) => item.key === key && item.sectionId === sectionId);
+		const notes = [...this.notesBySection.get(noteKey(key, sectionId)) ?? []].reverse();
 		for (const note of notes) {
 			const replies = this.replies(note.id);
 			const unread = replies.findLast((doc) => !this.readReplies.has(docKey(doc)));

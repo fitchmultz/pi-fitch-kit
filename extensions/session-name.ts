@@ -2,6 +2,8 @@ import { Type } from "@earendil-works/pi-ai";
 import type {
 	ExtensionAPI,
 	SessionProjection,
+	SessionEntry,
+	ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 
 const TOOL_NAME = "name_session";
@@ -11,6 +13,28 @@ const METADATA_PREFIX =
 
 export default function sessionName(pi: ExtensionAPI): void {
 	let active = false;
+	let leaf: string | null | undefined;
+	let compaction: Extract<SessionEntry, { type: "compaction" }> | undefined;
+	const resetBranch = () => { leaf = undefined; compaction = undefined; };
+	const latestCompaction = (ctx: ExtensionContext) => {
+		const manager = ctx.sessionManager;
+		const nextLeaf = manager.getLeafId();
+		if (nextLeaf === leaf) return compaction;
+		let id = nextLeaf;
+		while (id && id !== leaf) {
+			const entry = manager.getEntry(id);
+			if (!entry) break;
+			if (entry.type === "compaction") {
+				compaction = entry;
+				break;
+			}
+			id = entry.parentId;
+		}
+		if (!id) compaction = undefined;
+		leaf = nextLeaf;
+		return compaction;
+	};
+	pi.on("session_tree", resetBranch);
 	const registerTool = () => {
 		pi.registerTool({
 			name: TOOL_NAME,
@@ -96,6 +120,7 @@ export default function sessionName(pi: ExtensionAPI): void {
 	};
 
 	pi.on("session_start", () => {
+		resetBranch();
 		if (active) return;
 		// Resolve ownership from Pi's effective tools, including package filters and scope overrides.
 		if (pi.getAllTools().some((tool) => tool.name === TOOL_NAME)) return;
@@ -134,7 +159,8 @@ export default function sessionName(pi: ExtensionAPI): void {
 		if (message) return { entries: [...event.entries, { type: "custom_message", ...message }] };
 	});
 	pi.on("context_with_system", (event, ctx) => {
-		const compaction = ctx.sessionManager.buildContextEntries().findLast((entry) => entry.type === "compaction");
+		// Returned turn_end compactions commit after handlers; reconcile the leaf here.
+		const compaction = latestCompaction(ctx);
 		if (!compaction || compaction.firstKeptEntryId !== compaction.id) return;
 		const recoveryIndex = event.messages.findIndex((message) => recoveryCompactionId(message) === compaction.id);
 		const assistantIndex = event.messages.findIndex((message) => message.role === "assistant");
@@ -159,6 +185,8 @@ export default function sessionName(pi: ExtensionAPI): void {
 		return { messages: [...event.messages, { ...recovery, role: "custom", timestamp: Date.parse(compaction.timestamp) }] };
 	});
 	pi.on("session_compact", (event, ctx) => {
+		compaction = event.compactionEntry;
+		leaf = ctx.sessionManager.getLeafId();
 		const message = metadata(ctx.sessionManager.buildSessionProjection().messages);
 		// Overflow already schedules a retry. Queue metadata with that request;
 		// context-only sends during streaming would wait until after its response.

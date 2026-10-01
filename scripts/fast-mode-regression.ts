@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { zstdDecompressSync } from "node:zlib";
+import { mock } from "node:test";
 import type { Api, Model } from "@earendil-works/pi-ai";
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-fast-mode-"));
@@ -344,7 +345,6 @@ mkdirSync(statePath);
 try {
 	await assert.rejects(commands["codex-fast"].handler("on", uiCtx(MODELS.openai)), /EISDIR/);
 	assert.equal(await requestPayload(MODELS.openai), undefined);
-	assert.deepEqual(await handlers.session_checkpoint[0]({}, {}), { sleepReady: true });
 } finally {
 	rmSync(statePath, { recursive: true });
 	renameSync(`${statePath}.saved`, statePath);
@@ -599,6 +599,27 @@ assert.equal(status.get("xai-fast"), undefined);
 await runHandlers("model_select", {}, uiCtx(MODELS.xai));
 assert.equal(status.get("codex-fast"), undefined);
 assert.equal(status.get("xai-fast"), undefined);
+
+// History size must not multiply repeated request/status work, including a missing override.
+for (const count of [781, 43_000]) {
+	const manager = SessionManager.inMemory(agentDir);
+	for (let i = 0; i < count; i++) manager.appendCustomEntry("history-fixture", {});
+	const entries = mock.method(manager, "getEntries");
+	await runHandlers("session_start", { reason: "resume" }, uiCtx(astra, manager));
+	assert.equal(entries.mock.callCount(), 1, "Session policy bootstraps once");
+	entries.mock.resetCalls();
+	for (let i = 0; i < 100; i++) {
+		await requestPayload(astra, { model: astra.id }, manager);
+		await runHandlers("model_select", {}, uiCtx(astra, manager));
+	}
+	assert.equal(entries.mock.callCount(), 0, "Requests/status retain known-absent session policy");
+	const before = readFileSync(statePath, "utf8");
+	writeFileSync(statePath, JSON.stringify({ enabled: true, tier: "ultrafast" }));
+	assert.equal((await requestPayload(astra, { model: astra.id }, manager) as Record<string, unknown>).service_tier, "ultrafast", "Shared billing policy is still read on the next request");
+	writeFileSync(statePath, before);
+	console.log(JSON.stringify({ historyEntries: count, bootstrapReads: 1, unchangedRequestAndStatusReads: entries.mock.callCount() }));
+	entries.mock.restore();
+}
 
 // A second start must not stack watchers: one shutdown has to release everything.
 await runHandlers("session_start", {}, uiCtx(gatewayOpus));

@@ -2,10 +2,11 @@ import { mkdirSync, readFileSync, unwatchFile, watchFile, writeFileSync } from "
 import { dirname, join } from "node:path";
 import {
 	type Api,
-	anthropicMessagesApi,
 	type Model,
 	type SimpleStreamOptions,
-} from "@earendil-works/pi-ai/compat";
+} from "@earendil-works/pi-ai";
+// ponytail: official 1.0's Jiti root alias breaks api/* subpaths. Use the public compat factory until the loader resolves narrow exports correctly.
+import { anthropicMessagesApi } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { fitClaudeRequest } from "./anthropic-image-guard.ts";
@@ -145,7 +146,7 @@ function openAIMode(): OpenAIMode {
 	}
 }
 
-function sessionOpenAIMode(ctx: ExtensionContext): SessionOpenAIMode | undefined {
+function restoreSessionOpenAIMode(ctx: ExtensionContext): SessionOpenAIMode | undefined {
 	const sessionId = ctx.sessionManager.getSessionId();
 	// This is session policy, not branch history: /tree must not silently change
 	// tiers, and copied entries in a fork must not enable its parent's override.
@@ -160,18 +161,13 @@ function sessionOpenAIMode(ctx: ExtensionContext): SessionOpenAIMode | undefined
 	return undefined;
 }
 
-function effectiveOpenAIMode(ctx: ExtensionContext): OpenAIMode {
-	return sessionOpenAIMode(ctx) ?? openAIMode();
-}
-
 function notify(ctx: ExtensionContext, message: string, level: "info" | "warning" | "error" = "info"): void {
 	if (ctx.hasUI) ctx.ui.notify(message, level);
 	else console.error(message);
 }
 
-function openAIStatus(ctx: ExtensionContext): string {
+function openAIStatus(ctx: ExtensionContext, local: SessionOpenAIMode | undefined): string {
 	const shared = openAIMode();
-	const local = sessionOpenAIMode(ctx);
 	const effective = local ?? shared;
 	const availability = effective === "ultrafast" && !ultrafastEligible(ctx.model) ? " (unavailable on this route)" : "";
 	return `OpenAI shared: ${shared}; session: ${local ?? "inherit"}; effective: ${effective}${availability}.` +
@@ -267,19 +263,19 @@ function fastStream(
 
 // Active labels mirror the request gates; an unsupported Ultrafast selection
 // stays visible as unavailable instead of silently becoming priority.
-function updateFooterStatus(ctx: ExtensionContext): void {
+function updateFooterStatus(ctx: ExtensionContext, local: SessionOpenAIMode | undefined): void {
 	for (const toggle of TOGGLES) {
 		try {
-			const mode = toggle === OPENAI_TOGGLE ? effectiveOpenAIMode(ctx) : undefined;
-			const local = toggle === OPENAI_TOGGLE ? sessionOpenAIMode(ctx) : undefined;
-			if (local === "off") {
+			const mode = toggle === OPENAI_TOGGLE ? local ?? openAIMode() : undefined;
+			const sessionMode = toggle === OPENAI_TOGGLE ? local : undefined;
+			if (sessionMode === "off") {
 				const label = toggle.eligible(ctx.model) ? "session OpenAI tiers off" : undefined;
 				ctx.ui.setStatus(toggle.name, label && ctx.hasUI ? ctx.ui.theme.fg("muted", label) : label);
 				continue;
 			}
 			if (mode === "ultrafast") {
 				const active = ultrafastEligible(ctx.model);
-				const label = `${local ? "session " : ""}ultrafast ${active ? "requested" : "unavailable"}`;
+				const label = `${sessionMode ? "session " : ""}ultrafast ${active ? "requested" : "unavailable"}`;
 				ctx.ui.setStatus(toggle.name, ctx.hasUI ? ctx.ui.theme.fg(active ? "accent" : "warning", label) : label);
 				continue;
 			}
@@ -297,6 +293,18 @@ function updateFooterStatus(ctx: ExtensionContext): void {
 }
 
 export default function fastMode(pi: ExtensionAPI): void {
+	let sessionId: string | undefined;
+	let localMode: SessionOpenAIMode | undefined;
+	const sessionOpenAIMode = (ctx: ExtensionContext) => {
+		if (sessionId !== ctx.sessionManager.getSessionId()) {
+			sessionId = ctx.sessionManager.getSessionId();
+			localMode = restoreSessionOpenAIMode(ctx);
+		}
+		return localMode;
+	};
+	const effectiveOpenAIMode = (ctx: ExtensionContext) => sessionOpenAIMode(ctx) ?? openAIMode();
+	const updateStatus = (ctx: ExtensionContext) => updateFooterStatus(ctx, sessionOpenAIMode(ctx));
+	const status = (ctx: ExtensionContext) => openAIStatus(ctx, sessionOpenAIMode(ctx));
 	pi.registerFlag("fast", {
 		description: "Start with OpenAI priority/fast mode enabled",
 		type: "boolean",
@@ -343,10 +351,12 @@ export default function fastMode(pi: ExtensionAPI): void {
 	// only redrawing after local toggles.
 	let footerContext: ExtensionContext | undefined;
 	const refreshFooter = () => {
-		if (footerContext) updateFooterStatus(footerContext);
+		if (footerContext) updateStatus(footerContext);
 	};
 	pi.on("session_start", (event, ctx) => {
 		footerContext = ctx;
+		sessionId = ctx.sessionManager.getSessionId();
+		localMode = restoreSessionOpenAIMode(ctx);
 		if (event.reason === "startup") {
 			const fast = pi.getFlag("fast") === true;
 			const ultrafast = pi.getFlag("ultrafast") === true;
@@ -363,8 +373,8 @@ export default function fastMode(pi: ExtensionAPI): void {
 				}
 			} else if (fast || ultrafast) writeEnabled(OPENAI_TOGGLE.statePath, true, ultrafast ? "ultrafast" : undefined);
 		}
-		if (!startup.error && (openAIMode() === "ultrafast" || sessionOpenAIMode(ctx) === "ultrafast")) notify(ctx, openAIStatus(ctx));
-		updateFooterStatus(ctx);
+		if (!startup.error && (openAIMode() === "ultrafast" || sessionOpenAIMode(ctx) === "ultrafast")) notify(ctx, status(ctx));
+		updateStatus(ctx);
 		for (const toggle of TOGGLES) {
 			// Unwatch first: a repeated session_start must not stack listeners, or a
 			// single shutdown would leave one behind holding the process open.
@@ -376,18 +386,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 		for (const toggle of TOGGLES) unwatchFile(toggle.statePath, refreshFooter);
 		footerContext = undefined;
 	});
-	pi.on("model_select", (_event, ctx) => updateFooterStatus(ctx));
-
-	// Fork-only event; official Pi never emits it and its types do not declare it.
-	(pi.on as unknown as (event: "session_checkpoint", handler: () => {
-		sleepReady: boolean;
-	}) => void)("session_checkpoint", () => {
-		// There is no adopted in-memory toggle: every request/status reads native entries and the same files,
-		// including enabled()'s existing off fallback on read errors. Native dispatch joins
-		// synchronous command/startup writes and provider work. Watchers only read/redraw;
-		// they neither accept work nor change settings. Files and session entries belong in the host archive.
-		return { sleepReady: true };
-	});
+	pi.on("model_select", (_event, ctx) => updateStatus(ctx));
 
 	const registerToggleCommand = (name: string, toggle: Toggle, emptyMeansToggle = false): void => {
 		pi.registerCommand(name, {
@@ -411,10 +410,10 @@ export default function fastMode(pi: ExtensionAPI): void {
 					writeEnabled(toggle.statePath, next, command === "ultrafast" ? "ultrafast" : undefined);
 					if (openai) startup.error = undefined;
 				}
-				updateFooterStatus(ctx);
+				updateStatus(ctx);
 				const mode = openai ? openAIMode() : undefined;
 				if (openai && (mode === "ultrafast" || sessionOpenAIMode(ctx) !== undefined || command === "status" || command === "")) {
-					notify(ctx, openAIStatus(ctx));
+					notify(ctx, status(ctx));
 					return;
 				}
 				const policy = openai
@@ -450,12 +449,14 @@ export default function fastMode(pi: ExtensionAPI): void {
 					notify(ctx, ULTRAFAST_UNAVAILABLE, "warning");
 					return;
 				}
-				if (local) pi.appendEntry(SESSION_MODE_ENTRY, { sessionId: ctx.sessionManager.getSessionId(), mode: next });
-				else writeEnabled(OPENAI_TOGGLE.statePath, next === "ultrafast", next === "ultrafast" ? "ultrafast" : undefined);
+				if (local) {
+					pi.appendEntry(SESSION_MODE_ENTRY, { sessionId: ctx.sessionManager.getSessionId(), mode: next });
+					localMode = next ?? undefined;
+				} else writeEnabled(OPENAI_TOGGLE.statePath, next === "ultrafast", next === "ultrafast" ? "ultrafast" : undefined);
 				startup.error = undefined;
 			}
-			updateFooterStatus(ctx);
-			notify(ctx, openAIStatus(ctx));
+			updateStatus(ctx);
+			notify(ctx, status(ctx));
 		},
 	});
 }
