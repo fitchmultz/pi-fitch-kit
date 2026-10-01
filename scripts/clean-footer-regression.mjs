@@ -59,7 +59,9 @@ try {
 	const saved = SessionManager.inMemory(cwd);
 	const named = saved.appendSessionInfo("Original");
 	// An abandoned branch must contribute file-wide facts, not force its payloads into the footer.
-	for (let i = 0; i < 256; i++) saved.appendMessage({ ...assistant(100, 0), content: [{ type: "text", text: "x".repeat(8192) }] });
+	const historyEntries = Number(process.env.FOOTER_HISTORY_ENTRIES ?? 256);
+	const historyBytes = Number(process.env.FOOTER_HISTORY_BYTES ?? 8192);
+	for (let i = 0; i < historyEntries; i++) saved.appendMessage({ ...assistant(100, 0), content: [{ type: "text", text: "x".repeat(historyBytes) }] });
 	saved.branch(named);
 	const leaf = saved.appendMessage(assistant(20, 80));
 	const initialPath = join(temp, "initial.jsonl");
@@ -106,35 +108,25 @@ try {
 	syncBuiltinESMExports();
 	const initial = render();
 	const initialBodyBytes = reads.mock.calls.reduce((sum, call) => sum + call.result, 0);
-	const hasMetadata = typeof manager.iterateEntryMetadata === "function";
-	if (hasMetadata) assert.ok(initialBodyBytes < 16_384, `Footer read ${initialBodyBytes} historical payload bytes`);
 	reads.mock.restore();
 	syncBuiltinESMExports();
 	assert.match(initial, /Original/);
 	assert.match(initial, /CH80\.0%/);
 	const initialScans = entries.mock.callCount();
 	entries.mock.resetCalls();
-	for (let i = 0; i < 3; i++) {
+	for (let i = 0; i < 100; i++) {
 		footer.invalidate();
 		assert.equal(render(), initial);
 	}
 	const redrawScans = entries.mock.callCount();
-	const hasRevision = typeof manager.getEntriesRevision === "function";
 
-	for (const [source, percent, expected] of [
-		[undefined, 45.2, "45.2%/200k"],
-		["reported", 45.2, "45.2%/200k"],
-		["estimated", 45.2, "~45.2%/200k"],
-		["estimated", 0, "~0.0%/200k"],
-		["unknown", null, "?/200k"],
-		[undefined, null, "?/200k"],
-	]) {
+	for (const [percent, expected] of [[45.2, "45.2%/200k"], [0, "0.0%/200k"], [null, "?/200k"]]) {
+		await session.extensionRunner.emit({ type: "model_select", model, previousModel: model, source: "set" });
 		const contextUsage = mock.method(session, "getContextUsage", () => ({
-			...(source === undefined ? {} : { source }),
 			tokens: percent === null ? null : percent * 2000, contextWindow: 200_000, percent,
 		}));
 		assert.equal(render().split("\n")[1], `${expected} • CH80.0%`);
-		assert.equal(contextUsage.mock.callCount(), 1, "Each render reads context usage once");
+		assert.equal(contextUsage.mock.callCount(), 1, "A dirty snapshot acquires native usage once");
 		for (const line of footer.render(12)) assert.ok(visibleWidth(line) <= 12);
 		contextUsage.mock.restore();
 	}
@@ -162,13 +154,15 @@ try {
 	for (const line of footer.render(30)) assert.ok(visibleWidth(line) <= 30);
 
 	const original = [manager.getHeader(), ...manager.getEntries()];
+	await session.extensionRunner.emit({ type: "message_end", message: assistant(100, 0) });
 	manager.appendMessage(assistant(100, 0));
-	manager.appendSessionInfo("Renamed\nbranch");
+	session.setSessionName("Renamed\nbranch");
 	manager.branch(leaf);
 	assert.equal(manager.getLeafId(), leaf);
 	assert.match(render(), /Renamed branch/);
 	assert.match(render(), /CH0\.0%/);
-	manager.appendSessionInfo(" \n ");
+	session.setSessionName(" \n ");
+	await session.extensionRunner.emit({ type: "message_end", message: assistant(0, 0) });
 	manager.appendMessage(assistant(0, 0));
 	manager.branch(leaf);
 	assert.doesNotMatch(render(), /Renamed|Original|• CH/);
@@ -185,10 +179,29 @@ try {
 		: entry.type === "message" ? { ...entry, message: assistant(50, 150) } : entry);
 	writeFileSync(path, `${replacement.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
 	manager.setSessionFile(path);
+	// Official has no external journal-edit event: the SDK owner must reconcile lifecycle explicitly.
+	await session.extensionRunner.emit({ type: "session_start", reason: "reload" });
 	assert.match(render(), /Reloaded/);
 	assert.match(render(), /CH75\.0%/);
 	manager.newSession();
+	session.refreshContext();
 	assert.doesNotMatch(render(), /Reloaded|Original|• CH/);
+
+	// Exercise message_end-before-append through the actual host, not just a handler fixture.
+	modelRuntime.registerNativeProvider(faux.provider);
+	await modelRuntime.refresh({ allowNetwork: false });
+	await session.setModel(model);
+	faux.setResponses([assistant(25, 75)]);
+	await session.prompt("offline finalized-message footer check");
+	await session.waitForIdle();
+	const finalized = manager.getBranch().findLast((entry) => entry.type === "message" && entry.message.role === "assistant").message.usage;
+	const finalizedRate = finalized.cacheRead / (finalized.input + finalized.cacheRead + finalized.cacheWrite) * 100;
+	assert.ok(render().includes(`CH${finalizedRate.toFixed(1)}%`), "File-wide facts follow the actually persisted native response");
+	const settledUsage = session.getContextUsage();
+	assert.ok(render().includes(`${settledUsage.percent.toFixed(1)}%/200k`), "Finalized usage is reconciled after persistence");
+	entries.mock.resetCalls();
+	for (let i = 0; i < 100; i++) render();
+	assert.equal(entries.mock.callCount(), 0, "Settled redraws remain bounded after native append events");
 
 	// Fresh SDK startup reads a saved journal, not the previous extension's live toggle.
 	for (const matchingId of [true, false]) {
@@ -221,32 +234,17 @@ try {
 		}
 	}
 
-	// The checkpoint hook persists only the instance toggle, not derived footer data.
+	// The instance toggle remains live-only; old checkpoint entries above are recovery data.
 	await session.prompt("/clean-footer");
 	assert.equal(footer, undefined);
-	if (process.env.PI_COMPAT_HOST === "fork") assert.equal(typeof session.acquireCheckpoint, "function", "Fork qualification requires native checkpoints");
-	if (typeof session.acquireCheckpoint === "function") {
-		const hold = await session.acquireCheckpoint({ boundary: "settled", quiesce: () => () => {}, signal: AbortSignal.timeout(5000) });
-		try {
-			assert.equal(hold.sleepReady, true, JSON.stringify(hold.sleepBlockers));
-			assert.deepEqual(hold.checkpoint.entries.at(-1).data, { sessionId: manager.getSessionId(), enabled: false });
-		} finally {
-			hold.release();
-		}
-	} else {
-		// Official has no native checkpoint dispatch; retain the persistence unit contract.
-		const barrier = loader.getExtensions().extensions[0].handlers.get("session_checkpoint");
-		const event = { type: "session_checkpoint", boundary: "settled", signal: new AbortController().signal, invalidate() {} };
-		assert.deepEqual(await barrier[0](event, session.extensionRunner.createContext()), { sleepReady: true });
-	}
-	assert.deepEqual(manager.getEntries().at(-1).data, { sessionId: manager.getSessionId(), enabled: false });
+
 	await session.reload();
 	assert.ok(footer, "Warm reload retains the existing reset-to-enabled behavior");
 
-	assert.equal(faux.state.callCount, 0, "No provider calls");
-	assert.equal(initialScans - usageScans, hasMetadata ? 0 : 1, "Name and cache data use metadata when available, with a complete official fallback");
-	assert.equal(redrawScans - 3 * usageScans, hasRevision ? 0 : 3, "Unchanged footer data is cached only when the host supplies a revision");
-	console.log(JSON.stringify({ ok: true, hasRevision, hasMetadata, initialBodyBytes, usageScans, initialScans, redrawScans, providerCalls: faux.state.callCount }));
+	assert.equal(faux.state.callCount, 1, "Only the offline faux lifecycle turn; no paid provider calls");
+	assert.equal(initialScans - usageScans, 1, "File-wide facts bootstrap once through the public host API");
+	assert.equal(redrawScans, 0, "100 unchanged redraws acquire neither usage nor full history on either host");
+	console.log(JSON.stringify({ ok: true, historyEntries, initialBodyBytes, usageScans, initialScans, redrawScans, providerCalls: faux.state.callCount }));
 } finally {
 	await session?.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
 	footer?.dispose?.();

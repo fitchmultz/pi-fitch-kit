@@ -59,16 +59,51 @@ function sanitize(text: string): string {
 	return text.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
 }
 
-function installFooter(ctx: ExtensionContext): void {
+// File-wide facts include abandoned branches; usage belongs to the selected leaf.
+class FooterSnapshot {
+	sessionName: string | undefined;
+	hasCacheActivity = false;
+	latestCacheHitRate: number | undefined;
+	dirty = true;
+	private identity: string | undefined;
+	private usageKey: string | undefined;
+	private usage: ReturnType<ExtensionContext["getContextUsage"]>;
+
+	apply(entry: Pick<FooterEntry, "type" | "name" | "message">): void {
+		if (entry.type === "session_info") this.sessionName = entry.name?.trim() || undefined;
+		if (entry.type !== "message" || entry.message?.role !== "assistant" || !entry.message.usage) return;
+		const { input, cacheRead, cacheWrite } = entry.message.usage;
+		this.hasCacheActivity ||= cacheRead > 0 || cacheWrite > 0;
+		const promptTokens = input + cacheRead + cacheWrite;
+		this.latestCacheHitRate = promptTokens > 0 ? cacheRead / promptTokens * 100 : undefined;
+	}
+
+	read(ctx: ExtensionContext) {
+		const manager = ctx.sessionManager;
+		const identity = JSON.stringify([manager.getSessionId(), manager.getSessionFile()]);
+		if (identity !== this.identity) {
+			this.sessionName = undefined;
+			this.hasCacheActivity = false;
+			this.latestCacheHitRate = undefined;
+			// ponytail: Pi 1.0 has no out-of-band journal mutation signal. SDK edits need a lifecycle refresh; normal appends arrive through events.
+			for (const entry of manager.getEntries()) this.apply(entry);
+			this.identity = identity;
+			this.dirty = true;
+		}
+		const key = JSON.stringify([identity, manager.getLeafId(), ctx.model?.provider, ctx.model?.id, ctx.model?.api, ctx.model?.baseUrl, ctx.model?.contextWindow]);
+		if (this.dirty || key !== this.usageKey) {
+			this.usage = ctx.getContextUsage();
+			this.usageKey = key;
+			this.dirty = false;
+		}
+		return this.usage;
+	}
+}
+
+function installFooter(ctx: ExtensionContext, snapshot: FooterSnapshot): void {
 	ctx.ui.setFooter((tui, theme, footerData) => {
 		const unsubscribe = footerData.onBranchChange(() => tui.requestRender());
 		let repoCache: { cwd: string; name?: { text: string; key: string } } | undefined;
-		let sessionStats: {
-			revision: number | undefined;
-			sessionName: string | undefined;
-			hasCacheActivity: boolean;
-			latestCacheHitRate: number | undefined;
-		} | undefined;
 
 		return {
 			dispose: unsubscribe,
@@ -85,39 +120,13 @@ function installFooter(ctx: ExtensionContext): void {
 				// getGitBranch crawls into the home dotfiles repo; only show a branch for a real project repo.
 				const branch = footerData.getGitBranch();
 				if (branch && repoCache.name) location += theme.fg("dim", ` (${branch})`);
-				const manager = ctx.sessionManager;
-				// The revision getter is fork-only; official Pi takes an uncached pass.
-				const entryRevision: unknown = "getEntriesRevision" in manager && typeof manager.getEntriesRevision === "function"
-					? manager.getEntriesRevision()
-					: undefined;
-				const revision = typeof entryRevision === "number" ? entryRevision : undefined;
-				if (revision === undefined || sessionStats?.revision !== revision) {
-					// These values cover the whole file, including abandoned branches.
-					let sessionName: string | undefined;
-					let latestCacheHitRate: number | undefined;
-					let hasCacheActivity = false;
-					const metadata = "iterateEntryMetadata" in manager ? manager.iterateEntryMetadata : undefined;
-					const entries: Iterable<FooterEntry> = typeof metadata === "function"
-						? (metadata as () => Iterable<FooterEntry>).call(manager)
-						: manager.getEntries();
-					for (const entry of entries) {
-						if (entry.type === "session_info") sessionName = entry.name?.trim() || undefined;
-						if (entry.type !== "message" || entry.message?.role !== "assistant" || !entry.message.usage) continue;
-						const { input, cacheRead, cacheWrite } = entry.message.usage;
-						hasCacheActivity ||= cacheRead > 0 || cacheWrite > 0;
-						const promptTokens = input + cacheRead + cacheWrite;
-						latestCacheHitRate = promptTokens > 0 ? (cacheRead / promptTokens) * 100 : undefined;
-					}
-					sessionStats = { revision, sessionName, hasCacheActivity, latestCacheHitRate };
-				}
-				const { sessionName, hasCacheActivity, latestCacheHitRate } = sessionStats;
+				const usage = snapshot.read(ctx);
+				const { sessionName, hasCacheActivity, latestCacheHitRate } = snapshot;
 				if (sessionName) location += theme.fg("dim", ` • ${sessionName}`);
 
-				const usage = ctx.getContextUsage();
 				const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
 				const percent = usage?.percent;
-				const estimatePrefix = usage && "source" in usage && usage.source === "estimated" ? "~" : "";
-				const contextText = percent == null ? `?/${formatCount(contextWindow)}` : `${estimatePrefix}${percent.toFixed(1)}%/${formatCount(contextWindow)}`;
+				const contextText = percent == null ? `?/${formatCount(contextWindow)}` : `${percent.toFixed(1)}%/${formatCount(contextWindow)}`;
 				const context = percent != null && percent > 90
 					? theme.fg("error", contextText)
 					: percent != null && percent > 70
@@ -164,8 +173,22 @@ function installFooter(ctx: ExtensionContext): void {
 
 export default function (pi: ExtensionAPI) {
 	let enabled = true;
+	let snapshot = new FooterSnapshot();
+
+	pi.on("message_end", (event) => {
+		snapshot.apply({ type: "message", message: event.message });
+		// message_end precedes append; reconcile usage at the next render, not here.
+		snapshot.dirty = true;
+	});
+	pi.on("session_info_changed", (event) => snapshot.apply({ type: "session_info", name: event.name }));
+	const dirtyUsage = () => { snapshot.dirty = true; };
+	pi.on("session_tree", dirtyUsage);
+	pi.on("session_compact", dirtyUsage);
+	pi.on("model_select", dirtyUsage);
+	pi.on("agent_settled", dirtyUsage);
 
 	pi.on("session_start", (event, ctx) => {
+		snapshot = new FooterSnapshot();
 		// This is an instance toggle, not a global or branch preference. Warm reload/new/
 		// resume/fork still start enabled; tree navigation leaves the live choice alone.
 		// Only cold startup restores the file-wide choice saved by a checkpoint, and
@@ -175,16 +198,7 @@ export default function (pi: ExtensionAPI) {
 			const saved = entry?.type === "custom" ? entry.data as { sessionId?: unknown; enabled?: unknown } | null : undefined;
 			if (saved?.sessionId === ctx.sessionManager.getSessionId() && typeof saved.enabled === "boolean") enabled = saved.enabled;
 		}
-		if (enabled && ctx.mode === "tui") installFooter(ctx);
-	});
-
-	// Additive fork event; no dependency on fork-only exported types or a second state store.
-	(pi.on as unknown as (event: "session_checkpoint", handler: (
-		event: unknown, ctx: ExtensionContext,
-	) => { sleepReady: boolean }) => void)("session_checkpoint", (_event, ctx) => {
-		pi.appendEntry(CHECKPOINT_ENTRY, { sessionId: ctx.sessionManager.getSessionId(), enabled });
-		// Native command ownership settles the toggle; presentation is reconstructed.
-		return { sleepReady: true };
+		if (enabled && ctx.mode === "tui") installFooter(ctx, snapshot);
 	});
 
 	pi.registerCommand("clean-footer", {
@@ -192,7 +206,7 @@ export default function (pi: ExtensionAPI) {
 		handler: async (_args, ctx) => {
 			if (ctx.mode !== "tui") return;
 			enabled = !enabled;
-			if (enabled) installFooter(ctx);
+			if (enabled) installFooter(ctx, snapshot);
 			else ctx.ui.setFooter(undefined);
 			ctx.ui.notify(`Clean footer ${enabled ? "enabled" : "disabled"}`, "info");
 		},

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { getPackageDir, VERSION } from "@earendil-works/pi-coding-agent";
+import { getPackageDir, SessionManager, VERSION } from "@earendil-works/pi-coding-agent";
 
 const { createExtensionRuntime, loadExtensions } = await import(
 	pathToFileURL(join(getPackageDir(), "dist/core/extensions/loader.js")).href
@@ -285,6 +285,35 @@ await assert.rejects(
 	),
 	/Session name cannot be blank/,
 );
+
+// Request-time boundary lookup must stop at a nearby compaction and remember absence.
+// This exercises the registered handler with real native entries, not exported cache internals.
+const contextHook = extension.handlers.get("context_with_system")?.[0];
+assert.ok(contextHook);
+for (const count of [781, 43_000]) {
+	const manager = SessionManager.inMemory(process.cwd());
+	for (let i = 0; i < count; i++) manager.appendCustomEntry("history-fixture", {});
+	let visits = 0;
+	const getEntry = manager.getEntry.bind(manager);
+	manager.getEntry = (id: string) => { visits++; return getEntry(id); };
+	const event = { messages: [{ role: "assistant" }] };
+	const ctx = { sessionManager: manager };
+	await extension.handlers.get("session_tree")?.[0]({}, ctx as never);
+	await contextHook(event as never, ctx as never);
+	assert.equal(visits, count, "Cold absence walks ancestry once");
+	visits = 0;
+	for (let i = 0; i < 100; i++) await contextHook(event as never, ctx as never);
+	assert.equal(visits, 0, "Unchanged absent boundary does not rescan history");
+	manager.appendCompaction("", null, 0);
+	manager.appendCustomEntry("new-tail", {});
+	visits = 0;
+	await contextHook({ messages: [{ role: "assistant" }] } as never, ctx as never);
+	assert.equal(visits, 2, "Retain-none draft discovered from the next committed leaf stops at its compaction");
+	visits = 0;
+	for (let i = 0; i < 100; i++) await contextHook(event as never, ctx as never);
+	assert.equal(visits, 0);
+	console.log(JSON.stringify({ historyEntries: count, coldAbsentVisits: count, unchangedVisits: visits, newBoundaryVisits: 2 }));
+}
 
 console.log(`kit session-name checks passed (${VERSION})`);
 execFileSync(process.execPath, [join(process.cwd(), "scripts/session-name-boundary.mjs"), getPackageDir()], { stdio: "inherit" });
