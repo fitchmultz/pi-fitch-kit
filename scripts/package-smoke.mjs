@@ -121,6 +121,7 @@ try {
 	const fastStatuses = new Map();
 	await fastModeStart({}, {
 		model: { provider: "openai-codex", id: "gpt-6-astra", api: "openai-codex-responses" },
+		sessionManager: SessionManager.inMemory(cwd),
 		hasUI: false,
 		ui: {
 			setStatus: (key, value) => fastStatuses.set(key, value),
@@ -238,7 +239,7 @@ try {
 	const commandNames = extensions.extensions
 		.flatMap(({ commands }) => [...commands.keys()])
 		.sort();
-	const expectedCommands = ["anthropic-fast", "clean-footer", "codex-fast", "draft", "fast", "reader", "side-question", "xai-fast"];
+	const expectedCommands = ["anthropic-fast", "clean-footer", "codex-fast", "draft", "fast", "reader", "side-question", "ultrafast", "xai-fast"];
 	if (JSON.stringify(commandNames) !== JSON.stringify(expectedCommands)) {
 		throw new Error(`Expected ${JSON.stringify(expectedCommands)}, got ${JSON.stringify(commandNames)}`);
 	}

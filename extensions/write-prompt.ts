@@ -349,6 +349,7 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				}
 				if (action === "Restore original") {
 					ctx.ui.setEditorText(`/draft ${source}`);
+					ctx.ui.notify("Original restored to editor", "info");
 					return;
 				}
 				if (action === "Copy prompt") {

@@ -6,6 +6,12 @@ import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
 const CHECKPOINT_ENTRY = "clean-footer-checkpoint";
 
+type FooterEntry = {
+	type: string;
+	name?: string;
+	message?: { role: string; usage?: { input: number; cacheRead: number; cacheWrite: number } };
+};
+
 function formatCount(count: number): string {
 	if (count < 1_000) return String(count);
 	if (count < 10_000) return `${(count / 1_000).toFixed(1)}k`;
@@ -90,9 +96,13 @@ function installFooter(ctx: ExtensionContext): void {
 					let sessionName: string | undefined;
 					let latestCacheHitRate: number | undefined;
 					let hasCacheActivity = false;
-					for (const entry of manager.getEntries()) {
+					const metadata = "iterateEntryMetadata" in manager ? manager.iterateEntryMetadata : undefined;
+					const entries: Iterable<FooterEntry> = typeof metadata === "function"
+						? (metadata as () => Iterable<FooterEntry>).call(manager)
+						: manager.getEntries();
+					for (const entry of entries) {
 						if (entry.type === "session_info") sessionName = entry.name?.trim() || undefined;
-						if (entry.type !== "message" || entry.message.role !== "assistant") continue;
+						if (entry.type !== "message" || entry.message?.role !== "assistant" || !entry.message.usage) continue;
 						const { input, cacheRead, cacheWrite } = entry.message.usage;
 						hasCacheActivity ||= cacheRead > 0 || cacheWrite > 0;
 						const promptTokens = input + cacheRead + cacheWrite;

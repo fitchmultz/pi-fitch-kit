@@ -1,8 +1,6 @@
 import { Type } from "@earendil-works/pi-ai";
 import type {
-	CustomMessageEntryDraft,
 	ExtensionAPI,
-	ProjectedSessionEntry,
 	SessionProjection,
 } from "@earendil-works/pi-coding-agent";
 
@@ -105,11 +103,21 @@ export default function sessionName(pi: ExtensionAPI): void {
 		registerTool();
 	});
 
+	const recoveryCompactionId = (message: SessionProjection["messages"][number]) => {
+		if (message.role !== "custom" || message.customType !== METADATA_TYPE) return;
+		const details = message.details;
+		if (details && typeof details === "object" && "recoveryCompactionId" in details &&
+			typeof details.recoveryCompactionId === "string") return details.recoveryCompactionId;
+	};
 	const metadata = (messages: SessionProjection["messages"]) => {
 		if (!active || !pi.getActiveTools().includes(TOOL_NAME)) return;
 		const content =
 			METADATA_PREFIX + JSON.stringify({ currentName: pi.getSessionName() ?? null });
+		// A recovery can persist after a rename in its first response, but was
+		// submitted before that response. A later ordinary name still wins.
 		const latest = messages.findLast(
+			(message) => message.role === "custom" && message.customType === METADATA_TYPE && !recoveryCompactionId(message),
+		) ?? messages.findLast(
 			(message) => message.role === "custom" && message.customType === METADATA_TYPE,
 		);
 		if (latest?.role === "custom" && latest.content === content) return;
@@ -122,26 +130,38 @@ export default function sessionName(pi: ExtensionAPI): void {
 		if (message) return { message };
 	});
 	pi.on("turn_end", (event) => {
-		const message = metadata(event.context.contextMessages);
-		if (message) return { entries: [{ type: "custom_message", ...message }] };
+		const message = metadata([...event.context.contextMessages, ...event.context.pendingMessages]);
+		if (message) return { entries: [...event.entries, { type: "custom_message", ...message }] };
+	});
+	pi.on("context_with_system", (event, ctx) => {
+		const compaction = ctx.sessionManager.buildContextEntries().findLast((entry) => entry.type === "compaction");
+		if (!compaction || compaction.firstKeptEntryId !== compaction.id) return;
+		const recoveryIndex = event.messages.findIndex((message) => recoveryCompactionId(message) === compaction.id);
+		const assistantIndex = event.messages.findIndex((message) => message.role === "assistant");
+		// Context-only sends persist after the response. Keep this one recovery
+		// at its originally submitted position, without rewriting its saved name.
+		if (recoveryIndex >= 0) {
+			if (assistantIndex >= 0 && recoveryIndex > assistantIndex) {
+				const messages = [...event.messages];
+				const [recovery] = messages.splice(recoveryIndex, 1);
+				messages.splice(assistantIndex, 0, recovery);
+				return { messages };
+			}
+			return;
+		}
+		if (assistantIndex >= 0) return;
+		const message = metadata(event.messages);
+		if (!message) return;
+		const recovery = { ...message, details: { recoveryCompactionId: compaction.id } };
+		// A later boundary producer may have removed the turn_end draft. Queue
+		// native persistence without another turn, and cover this request now.
+		pi.sendMessage(recovery, { triggerTurn: false });
+		return { messages: [...event.messages, { ...recovery, role: "custom", timestamp: Date.parse(compaction.timestamp) }] };
 	});
 	pi.on("session_compact", (event, ctx) => {
 		const message = metadata(ctx.sessionManager.buildSessionProjection().messages);
 		// Overflow already schedules a retry. Queue metadata with that request;
 		// context-only sends during streaming would wait until after its response.
 		if (message) pi.sendMessage(message, { triggerTurn: event.willRetry });
-	});
-
-	// Official Pi has no native fresh windows. On the fork, deploy with the
-	// core hook that accepts custom-message drafts (older edit-only hooks do not).
-	const windowApi = pi as ExtensionAPI & {
-		registerContextWindowHook?: (
-			hook: (event: { contextEntries: ProjectedSessionEntry[] }) =>
-				CustomMessageEntryDraft[] | undefined,
-		) => void;
-	};
-	windowApi.registerContextWindowHook?.((event) => {
-		const message = metadata(event.contextEntries.flatMap((entry) => entry.messages));
-		if (message) return [{ type: "custom_message", ...message }];
 	});
 }

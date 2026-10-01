@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { findPackageJSON } from "node:module";
+import fs, { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { findPackageJSON, syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mock } from "node:test";
@@ -19,14 +19,16 @@ const { createAgentSession, DefaultResourceLoader, initTheme, ModelRuntime, Sess
 const aiManifest = pathToFileURL(findPackageJSON("@earendil-works/pi-ai", sdkPath));
 const tuiManifest = pathToFileURL(findPackageJSON("@earendil-works/pi-tui", sdkPath));
 const { fauxAssistantMessage, fauxProvider, InMemoryCredentialStore } = await import(new URL(JSON.parse(readFileSync(aiManifest, "utf8")).exports["."].import, aiManifest).href);
-const { stripTerminalSequences, visibleWidth } = await import(new URL(JSON.parse(readFileSync(tuiManifest, "utf8")).main, tuiManifest).href);
+const { getCapabilities, setCapabilities, stripTerminalSequences, visibleWidth } = await import(new URL(JSON.parse(readFileSync(tuiManifest, "utf8")).main, tuiManifest).href);
 console.log(JSON.stringify({ host: process.env.PI_COMPAT_HOST ?? "local", version: hostVersion, sdkPath }));
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const temp = mkdtempSync(join(tmpdir(), "pi-clean-footer-"));
+// Location text containing CH must not be mistaken for the cache indicator.
+const temp = mkdtempSync(join(tmpdir(), "pi-clean-footer-CH-"));
 const previousHome = process.env.HOME;
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 const previousOffline = process.env.PI_OFFLINE;
+const previousCapabilities = getCapabilities();
 let session;
 let footer;
 
@@ -38,6 +40,8 @@ try {
 	process.env.HOME = temp;
 	process.env.PI_CODING_AGENT_DIR = agentDir;
 	process.env.PI_OFFLINE = "1";
+	// Keep theme changes visible instead of quantizing both dim colors to the same palette entry.
+	setCapabilities({ ...previousCapabilities, trueColor: true });
 	initTheme("dark", false);
 
 	const faux = fauxProvider({ models: [{ id: "footer-model", contextWindow: 200_000, reasoning: true }] });
@@ -52,9 +56,15 @@ try {
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 		},
 	});
-	const manager = SessionManager.inMemory(cwd);
-	manager.appendSessionInfo("Original");
-	const leaf = manager.appendMessage(assistant(20, 80));
+	const saved = SessionManager.inMemory(cwd);
+	const named = saved.appendSessionInfo("Original");
+	// An abandoned branch must contribute file-wide facts, not force its payloads into the footer.
+	for (let i = 0; i < 256; i++) saved.appendMessage({ ...assistant(100, 0), content: [{ type: "text", text: "x".repeat(8192) }] });
+	saved.branch(named);
+	const leaf = saved.appendMessage(assistant(20, 80));
+	const initialPath = join(temp, "initial.jsonl");
+	writeFileSync(initialPath, `${[saved.getHeader(), ...saved.getEntries()].map((entry) => JSON.stringify(entry)).join("\n")}\n`);
+	const manager = SessionManager.open(initialPath);
 	const settingsManager = SettingsManager.inMemory({ compaction: { enabled: false } });
 	const resourceOptions = {
 		cwd, agentDir, settingsManager,
@@ -87,11 +97,19 @@ try {
 	});
 	assert.ok(footer, "Native session_start installs the footer");
 	const render = (width = 120) => footer.render(width).map(stripTerminalSequences).join("\n");
+	session.getContextUsage();
 	const entries = mock.method(manager, "getEntries");
 	session.getContextUsage();
 	const usageScans = entries.mock.callCount();
 	entries.mock.resetCalls();
+	const reads = mock.method(fs, "readSync");
+	syncBuiltinESMExports();
 	const initial = render();
+	const initialBodyBytes = reads.mock.calls.reduce((sum, call) => sum + call.result, 0);
+	const hasMetadata = typeof manager.iterateEntryMetadata === "function";
+	if (hasMetadata) assert.ok(initialBodyBytes < 16_384, `Footer read ${initialBodyBytes} historical payload bytes`);
+	reads.mock.restore();
+	syncBuiltinESMExports();
 	assert.match(initial, /Original/);
 	assert.match(initial, /CH80\.0%/);
 	const initialScans = entries.mock.callCount();
@@ -135,7 +153,7 @@ try {
 	manager.appendSessionInfo(" \n ");
 	manager.appendMessage(assistant(0, 0));
 	manager.branch(leaf);
-	assert.doesNotMatch(render(), /Renamed|Original|CH/);
+	assert.doesNotMatch(render(), /Renamed|Original|• CH/);
 
 	manager.createBranchedSession(leaf);
 	assert.match(render(), /Original/);
@@ -152,7 +170,7 @@ try {
 	assert.match(render(), /Reloaded/);
 	assert.match(render(), /CH75\.0%/);
 	manager.newSession();
-	assert.doesNotMatch(render(), /Reloaded|Original|CH/);
+	assert.doesNotMatch(render(), /Reloaded|Original|• CH/);
 
 	// Fresh SDK startup reads a saved journal, not the previous extension's live toggle.
 	for (const matchingId of [true, false]) {
@@ -208,14 +226,16 @@ try {
 	assert.ok(footer, "Warm reload retains the existing reset-to-enabled behavior");
 
 	assert.equal(faux.state.callCount, 0, "No provider calls");
-	assert.equal(initialScans - usageScans, 1, "Name and cache data use one entry pass beyond native context usage");
+	assert.equal(initialScans - usageScans, hasMetadata ? 0 : 1, "Name and cache data use metadata when available, with a complete official fallback");
 	assert.equal(redrawScans - 3 * usageScans, hasRevision ? 0 : 3, "Unchanged footer data is cached only when the host supplies a revision");
-	console.log(JSON.stringify({ ok: true, hasRevision, usageScans, initialScans, redrawScans, providerCalls: faux.state.callCount }));
+	console.log(JSON.stringify({ ok: true, hasRevision, hasMetadata, initialBodyBytes, usageScans, initialScans, redrawScans, providerCalls: faux.state.callCount }));
 } finally {
 	await session?.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
 	footer?.dispose?.();
 	session?.dispose();
 	mock.restoreAll();
+	syncBuiltinESMExports();
+	setCapabilities(previousCapabilities);
 	if (previousHome === undefined) delete process.env.HOME;
 	else process.env.HOME = previousHome;
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
