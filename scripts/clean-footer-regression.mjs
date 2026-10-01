@@ -68,9 +68,19 @@ try {
 	writeFileSync(initialPath, `${[saved.getHeader(), ...saved.getEntries()].map((entry) => JSON.stringify(entry)).join("\n")}\n`);
 	const manager = SessionManager.open(initialPath);
 	const settingsManager = SettingsManager.inMemory({ compaction: { enabled: false } });
+	let observeBeforePersist;
 	const resourceOptions = {
 		cwd, agentDir, settingsManager,
 		additionalExtensionPaths: [join(root, "extensions/clean-footer.ts")],
+		extensionFactories: [(pi) => pi.on("message_end", (event) => {
+			if (!observeBeforePersist || event.message.role !== "assistant") return;
+			pi.appendEntry("footer-finalization-marker", null);
+			observeBeforePersist();
+			return { message: {
+				...event.message,
+				usage: { ...event.message.usage, input: 1, cacheRead: 999, cacheWrite: 0, totalTokens: 1000 + event.message.usage.output },
+			} };
+		})],
 		noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
 	};
 	const loader = new DefaultResourceLoader(resourceOptions);
@@ -165,6 +175,7 @@ try {
 	await session.extensionRunner.emit({ type: "message_end", message: assistant(0, 0) });
 	manager.appendMessage(assistant(0, 0));
 	manager.branch(leaf);
+	await session.extensionRunner.emit({ type: "session_tree", oldLeafId: leaf, newLeafId: leaf });
 	assert.doesNotMatch(render(), /Renamed|Original|• CH/);
 
 	manager.createBranchedSession(leaf);
@@ -191,12 +202,25 @@ try {
 	modelRuntime.registerNativeProvider(faux.provider);
 	await modelRuntime.refresh({ allowNetwork: false });
 	await session.setModel(model);
+	render();
+	let prePersistFooter;
+	let prePersistReads;
+	observeBeforePersist = () => {
+		prePersistFooter = render();
+		entries.mock.resetCalls();
+		for (let i = 0; i < 100; i++) render();
+		prePersistReads = entries.mock.callCount();
+	};
 	faux.setResponses([assistant(25, 75)]);
 	await session.prompt("offline finalized-message footer check");
 	await session.waitForIdle();
+	assert.doesNotMatch(prePersistFooter, /• CH/, "An earlier handler must not publish unfinished assistant facts");
+	assert.equal(prePersistReads, 0, "Pre-append redraws do not repeatedly reconcile pending facts");
 	const finalized = manager.getBranch().findLast((entry) => entry.type === "message" && entry.message.role === "assistant").message.usage;
+	assert.equal(finalized.cacheRead, 999, "The later message_end replacement is actually persisted");
 	const finalizedRate = finalized.cacheRead / (finalized.input + finalized.cacheRead + finalized.cacheWrite) * 100;
 	assert.ok(render().includes(`CH${finalizedRate.toFixed(1)}%`), "File-wide facts follow the actually persisted native response");
+	assert.match(render(), /CH99\.9%/, "Later message_end replacements own the cache statistics");
 	const settledUsage = session.getContextUsage();
 	assert.ok(render().includes(`${settledUsage.percent.toFixed(1)}%/200k`), "Finalized usage is reconciled after persistence");
 	entries.mock.resetCalls();

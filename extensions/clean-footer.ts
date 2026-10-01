@@ -66,8 +66,22 @@ class FooterSnapshot {
 	latestCacheHitRate: number | undefined;
 	dirty = true;
 	private identity: string | undefined;
+	private entryCount = 0;
+	private factsDirty = false;
+	private pendingLeaf: string | null | undefined;
 	private usageKey: string | undefined;
 	private usage: ReturnType<ExtensionContext["getContextUsage"]>;
+
+	invalidateFacts(ctx?: ExtensionContext): void {
+		this.factsDirty = true;
+		this.pendingLeaf = ctx?.sessionManager.getLeafId();
+		this.dirty = true;
+	}
+
+	settle(): void {
+		this.pendingLeaf = undefined;
+		this.dirty = true;
+	}
 
 	apply(entry: Pick<FooterEntry, "type" | "name" | "message">): void {
 		if (entry.type === "session_info") this.sessionName = entry.name?.trim() || undefined;
@@ -81,16 +95,29 @@ class FooterSnapshot {
 	read(ctx: ExtensionContext) {
 		const manager = ctx.sessionManager;
 		const identity = JSON.stringify([manager.getSessionId(), manager.getSessionFile()]);
-		if (identity !== this.identity) {
+		const bootstrap = identity !== this.identity;
+		const leaf = manager.getLeafId();
+		if (bootstrap) {
 			this.sessionName = undefined;
 			this.hasCacheActivity = false;
 			this.latestCacheHitRate = undefined;
-			// ponytail: Pi 1.0 has no out-of-band journal mutation signal. SDK edits need a lifecycle refresh; normal appends arrive through events.
-			for (const entry of manager.getEntries()) this.apply(entry);
+			this.entryCount = 0;
 			this.identity = identity;
 			this.dirty = true;
 		}
-		const key = JSON.stringify([identity, manager.getLeafId(), ctx.model?.provider, ctx.model?.id, ctx.model?.api, ctx.model?.baseUrl, ctx.model?.contextWindow]);
+		if (bootstrap || this.factsDirty && (this.pendingLeaf === undefined || leaf !== this.pendingLeaf)) {
+			// message_end is replaceable and precedes append. Read only the persisted suffix
+			// after the leaf advances (or settlement/tree navigation confirms finalization).
+			// ponytail: getEntries copies history once per reconciliation; Pi 1.0 has no public file-wide suffix iterator or out-of-band edit signal.
+			const entries = manager.getEntries();
+			for (let i = this.entryCount; i < entries.length; i++) this.apply(entries[i]!);
+			this.entryCount = entries.length;
+			// Another handler may append before the assistant is persisted. Keep pending
+			// reconciliation until settlement, but never reread an unchanged leaf.
+			if (this.pendingLeaf === undefined) this.factsDirty = false;
+			else this.pendingLeaf = leaf;
+		}
+		const key = JSON.stringify([identity, leaf, ctx.model?.provider, ctx.model?.id, ctx.model?.api, ctx.model?.baseUrl, ctx.model?.contextWindow]);
 		if (this.dirty || key !== this.usageKey) {
 			this.usage = ctx.getContextUsage();
 			this.usageKey = key;
@@ -175,17 +202,16 @@ export default function (pi: ExtensionAPI) {
 	let enabled = true;
 	let snapshot = new FooterSnapshot();
 
-	pi.on("message_end", (event) => {
-		snapshot.apply({ type: "message", message: event.message });
-		// message_end precedes append; reconcile usage at the next render, not here.
+	pi.on("message_end", (event, ctx) => {
+		if (event.message.role === "assistant") snapshot.invalidateFacts(ctx);
 		snapshot.dirty = true;
 	});
 	pi.on("session_info_changed", (event) => snapshot.apply({ type: "session_info", name: event.name }));
 	const dirtyUsage = () => { snapshot.dirty = true; };
-	pi.on("session_tree", dirtyUsage);
-	pi.on("session_compact", dirtyUsage);
+	pi.on("session_tree", () => snapshot.invalidateFacts());
+	pi.on("session_compact", () => snapshot.invalidateFacts());
 	pi.on("model_select", dirtyUsage);
-	pi.on("agent_settled", dirtyUsage);
+	pi.on("agent_settled", () => snapshot.settle());
 
 	pi.on("session_start", (event, ctx) => {
 		snapshot = new FooterSnapshot();

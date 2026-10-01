@@ -1,9 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.17.0 — 1 October 2026
 
 - Require and qualify official Pi 1.0.0; keep real fork capabilities optional and distribution Git/GitHub-only.
-- Bootstrap the footer's file-wide name/cache facts once, then update normal appends from events. Cache native usage by dirty/session/leaf/model state; unchanged redraws do no history work. Lifecycle refresh is required for unsignalled SDK journal edits.
+- Bootstrap the footer's file-wide name/cache facts once, then reconcile only appended facts from the persisted suffix after leaf advancement or settlement, including later `message_end` replacements. Cache native usage by dirty/session/leaf/model state; unchanged redraws do no history work. Lifecycle refresh is required for unsignalled SDK journal edits.
 - Cache naming's latest branch compaction using a backward stop-at-first walk, including next-request reconciliation of retain-none drafts. Preserve supplied request metadata, prefix placement and protected names.
 - Restore OpenAI session policy once per session lifecycle and update it after successful local commands; retain fresh shared-file reads for every request and all tier/billing gates. Official 1.0 still lacks native Ultrafast accounting; the kit does not manufacture costs.
 - Index reader notes/replies in its existing reducer; use native mouse regions on the supported floor, preserving unread-first selection and keyboard navigation.
