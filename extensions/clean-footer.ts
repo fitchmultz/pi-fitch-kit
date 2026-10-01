@@ -116,7 +116,8 @@ function installFooter(ctx: ExtensionContext): void {
 				const usage = ctx.getContextUsage();
 				const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
 				const percent = usage?.percent;
-				const contextText = percent == null ? `?/${formatCount(contextWindow)}` : `${percent.toFixed(1)}%/${formatCount(contextWindow)}`;
+				const estimatePrefix = usage && "source" in usage && usage.source === "estimated" ? "~" : "";
+				const contextText = percent == null ? `?/${formatCount(contextWindow)}` : `${estimatePrefix}${percent.toFixed(1)}%/${formatCount(contextWindow)}`;
 				const context = percent != null && percent > 90
 					? theme.fg("error", contextText)
 					: percent != null && percent > 70
