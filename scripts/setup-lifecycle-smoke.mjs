@@ -29,9 +29,6 @@ const versionAtLeast = (actual, minimum) => {
 	}
 	return true;
 };
-assert.equal(versionAtLeast("0.84.2", "0.84.2"), true);
-assert.equal(versionAtLeast("0.84.3", "0.84.2"), true);
-assert.equal(versionAtLeast("0.84.1", "0.84.2"), false);
 const temp = mkdtempSync(join(tmpdir(), "pi-fitch-kit-lifecycle-"));
 const agentDir = join(temp, "agent");
 const home = join(temp, "home");

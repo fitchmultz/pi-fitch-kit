@@ -17,8 +17,8 @@ import { Container, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
 import { fitClaudeRequest, prepareClaudeImages } from "./anthropic-image-guard.ts";
 
 export const WRITE_PROMPT_FILE = "write-prompt.json";
-export const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Restore original", "Deny"] as const;
-export const SIDE_QUESTION_ACTIONS = ["Copy answer", "Ask again", "Dismiss"] as const;
+const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Restore original", "Deny"] as const;
+const SIDE_QUESTION_ACTIONS = ["Copy answer", "Ask again", "Dismiss"] as const;
 const SAVED_DRAFT = "fitch-kit.draft";
 
 function savedDraft(ctx: ExtensionCommandContext): { source: string; draft: string } | undefined {
@@ -64,7 +64,7 @@ type ThinkingLevel = ReturnType<ExtensionAPI["getThinkingLevel"]>;
 const THINKING_LEVELS: readonly ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 type WriterConfig = { provider?: string; model?: string; thinkingLevel?: ThinkingLevel };
 
-export function configuredWriter(raw: string): WriterConfig {
+function configuredWriter(raw: string): WriterConfig {
 	const value: unknown = JSON.parse(raw);
 	if (!value || typeof value !== "object" || Array.isArray(value)) {
 		throw new Error("Expected an object with optional provider, model, and thinkingLevel fields");

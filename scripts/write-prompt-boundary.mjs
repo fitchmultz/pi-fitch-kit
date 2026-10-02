@@ -138,9 +138,12 @@ try {
 		await session.bindExtensions({ mode: "rpc", uiContext: {
 			...ui,
 			notify: (text, level) => { notices.push({ text, level }); },
-			select: async (text) => {
+			select: async (text, options) => {
 				assert.equal(text, "WRITER_REPLY");
 				const action = actions.shift();
+				assert.deepEqual(options, action === "Ask again" || action === "Dismiss"
+					? ["Copy answer", "Ask again", "Dismiss"]
+					: ["Accept", "Copy prompt", "Tweak", "Restore original", "Deny"]);
 				return typeof action === "function" ? action() : action;
 			},
 			editor: async () => "FOLLOWUP_SENTINEL",

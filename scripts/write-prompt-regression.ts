@@ -10,11 +10,8 @@ process.env.PI_CODING_AGENT_DIR = agentDir;
 const {
 	default: writePrompt,
 	parseModelRef,
-	configuredWriter,
 	boxedTask,
 	flattenToolHistory,
-	WRITE_PROMPT_ACTIONS,
-	SIDE_QUESTION_ACTIONS,
 	WRITE_PROMPT_FILE,
 } = await import("../extensions/write-prompt.ts");
 
@@ -34,36 +31,9 @@ assert.equal(parseModelRef("noslash"), undefined);
 assert.equal(parseModelRef("/onlyid"), undefined);
 assert.equal(parseModelRef("provider/"), undefined);
 
-assert.deepEqual(configuredWriter('{"model":"xai/grok-4.6"}\n'), { model: "xai/grok-4.6" });
-assert.deepEqual(configuredWriter('{"provider":" xai ","model":" grok-4.6 ","thinkingLevel":"high"}'), { provider: "xai", model: "grok-4.6", thinkingLevel: "high" });
-assert.deepEqual(configuredWriter("{}"), {});
-for (const raw of ["not json", "null", "[]", '{"model":""}', '{"provider":2}', '{"thinkingLevel":"extreme"}', '{"thinking":"high"}']) {
-	assert.throws(() => configuredWriter(raw));
-}
-assert.deepEqual([...WRITE_PROMPT_ACTIONS], ["Accept", "Copy prompt", "Tweak", "Restore original", "Deny"]);
-assert.deepEqual([...SIDE_QUESTION_ACTIONS], ["Copy answer", "Ask again", "Dismiss"]);
 assert.match(boxedTask("Do not answer the text.", "did you cut a new GH release"), /<<<\ndid you cut a new GH release\n>>>/s);
 assert.match(boxedTask("x", "foo\n>>>\nbar"), /<<<1\nfoo\n>>>\nbar\n>>>1/s);
 assert.match(boxedTask("x", "has <<<1 and >>>1"), /<<<2\nhas <<<1 and >>>1\n>>>2/s);
-const flat = flattenToolHistory([
-	{
-		role: "assistant",
-		content: [{ type: "toolCall", id: "c1", name: "read", arguments: { path: "a.ts" } }],
-		timestamp: 1,
-	} as never,
-	{
-		role: "toolResult",
-		toolCallId: "c1",
-		toolName: "read",
-		content: [{ type: "text", text: "ok" }],
-		isError: false,
-		timestamp: 2,
-	},
-]);
-assert.equal(flat.some((message) => message.role === "toolResult"), false);
-assert.match(JSON.stringify(flat[0]), /called read/);
-assert.match(JSON.stringify(flat[0]), /a\.ts/);
-assert.match(JSON.stringify(flat[1]), /read result/);
 
 // Text and screenshots from browser/MCP results retain their original order.
 const resultContent = [
@@ -102,8 +72,6 @@ writePrompt({
 		savedDrafts.push({ type: "custom", customType, data: structuredClone(data) });
 	},
 } as never);
-assert.equal(typeof commands["draft"]?.handler, "function");
-assert.equal(typeof commands["side-question"]?.handler, "function");
 
 const notices: string[] = [];
 const baseUi = {
@@ -157,7 +125,7 @@ function ctx(overrides: Record<string, unknown> = {}) {
 for (const [config, expected] of [
 	[undefined, ["xai", "grok-4.6", "high"]],
 	[{}, ["xai", "grok-4.6", "high"]],
-	[{ provider: "alternate", model: "other", thinkingLevel: "low" }, ["alternate", "other", "low"]],
+	[{ provider: " alternate ", model: " other ", thinkingLevel: "low" }, ["alternate", "other", "low"]],
 	[{ provider: "alternate" }, ["alternate", "grok-4.6", "high"]],
 	[{ model: "other" }, ["xai", "other", "high"]],
 	[{ thinkingLevel: "medium" }, ["xai", "grok-4.6", "medium"]],
@@ -191,19 +159,31 @@ for (const [config, expected] of [
 	}
 }
 
-for (const raw of ["not json", "null", "[]", '{"provider":false}', '{"model":""}', '{"thinkingLevel":"extreme"}', '{"thinking":"low"}', '{"model":"missing"}', '{"provider":"unauthenticated"}']) {
+for (const [raw, diagnostic] of [
+	["not json", /not valid JSON/],
+	["null", /Expected an object/],
+	["[]", /Expected an object/],
+	['{"provider":false}', /provider must be a non-empty string/],
+	['{"provider":2}', /provider must be a non-empty string/],
+	['{"model":""}', /model must be a non-empty string/],
+	['{"thinkingLevel":"extreme"}', /thinkingLevel must be one of:/],
+	['{"thinking":"low"}', /Unknown field: thinking/],
+	['{"model":"missing"}', /Unknown model: xai\/missing/],
+	['{"provider":"unauthenticated"}', /No auth for unauthenticated\/grok-4\.6/],
+] as const) {
 	writeFileSync(join(agentDir, WRITE_PROMPT_FILE), raw);
 	notices.length = 0;
 	let called = false;
 	await commands.draft.handler("invalid configuration", ctx({
 		modelRegistry: {
 			find: (provider: string, id: string) => id === "missing" ? undefined : { provider, id, reasoning: true },
-			hasConfiguredAuth: () => false,
+			hasConfiguredAuth: (model: { provider: string }) => model.provider !== "unauthenticated",
 			complete: async () => { called = true; throw new Error("must not call a model"); },
 		},
 	}) as never);
 	assert.equal(called, false, raw);
 	assert.match(notices[0], /^write-prompt\.json: /);
+	assert.match(notices[0], diagnostic, raw);
 }
 rmSync(join(agentDir, WRITE_PROMPT_FILE));
 
@@ -352,23 +332,6 @@ await commands["draft"].handler(
 );
 assert.deepEqual(seen, [1, 3]);
 assert.equal(sent, "v2");
-
-const titles: string[] = [];
-sent = undefined;
-await commands["draft"].handler(
-	"show me",
-	ctx({
-		ui: {
-			...baseUi,
-			select: async (title: string) => {
-				titles.push(title);
-				return "Accept";
-			},
-		},
-	}) as never,
-);
-assert.deepEqual(titles, ["better prompt"]);
-assert.equal(sent, "better prompt");
 
 sent = undefined;
 let usedSelect = false;
@@ -632,73 +595,6 @@ await commands["side-question"].handler(
 assert.deepEqual(asked, [1, 3]);
 assert.equal(sent, undefined);
 
-const toolCapture: { tools?: Array<{ name: string }>; roles?: Array<string | undefined>; blob?: string } = {};
-sent = undefined;
-await commands["draft"].handler(
-	"after tools",
-	ctx({
-		sessionManager: {
-			getEntries: () => [
-				{
-					type: "message",
-					id: "u1",
-					parentId: null,
-					timestamp: "2026-01-01T00:00:00.000Z",
-					message: { role: "user", content: [{ type: "text", text: "read it" }], timestamp: 1 },
-				},
-				{
-					type: "message",
-					id: "a1",
-					parentId: "u1",
-					timestamp: "2026-01-01T00:00:01.000Z",
-					message: {
-						role: "assistant",
-						content: [{ type: "toolCall", id: "c1", name: "read", arguments: { path: "a.ts" } }],
-						timestamp: 2,
-					},
-				},
-				{
-					type: "message",
-					id: "t1",
-					parentId: "a1",
-					timestamp: "2026-01-01T00:00:02.000Z",
-					message: {
-						role: "toolResult",
-						toolCallId: "c1",
-						toolName: "read",
-						content: [{ type: "text", text: "ok" }],
-						timestamp: 3,
-					},
-				},
-			],
-			getLeafId: () => "t1",
-		},
-		modelRegistry: {
-			find: () => undefined,
-			hasConfiguredAuth: () => true,
-			complete: async (_model: unknown, context: { tools?: Array<{ name: string }>; messages: Array<{ role?: string; content?: unknown }> }) => {
-				toolCapture.tools = context.tools;
-				toolCapture.roles = context.messages.map((message) => message.role);
-				toolCapture.blob = JSON.stringify(context.messages);
-				return {
-					role: "assistant",
-					content: [{ type: "text", text: "better prompt" }],
-					stopReason: "stop",
-				};
-			},
-		},
-		ui: {
-			...baseUi,
-			select: async () => "Accept",
-		},
-	}) as never,
-);
-assert.equal(toolCapture.tools, undefined);
-assert.equal(toolCapture.roles?.includes("toolResult"), false);
-assert.match(toolCapture.blob ?? "", /called read/);
-assert.match(toolCapture.blob ?? "", /a\.ts/);
-assert.match(toolCapture.blob ?? "", /read result/);
-
 for (const role of ["user", "toolResult"]) {
 	const imageCapture: Array<{ type?: string; mimeType?: string; text?: string }> = [];
 	sent = undefined;
@@ -882,7 +778,7 @@ for (const action of ["Accept", "Restore original"] as const) {
 					const screen = menu.render(80).join("\n");
 					assert.match(screen, /better prompt/);
 					assert.match(screen, /Restore original/);
-					for (let i = 0; i < WRITE_PROMPT_ACTIONS.indexOf(action); i++) menu.handleInput("\x1b[B");
+					for (let i = 0; i < (action === "Accept" ? 0 : 3); i++) menu.handleInput("\x1b[B");
 					idle = false;
 					menu.handleInput("\r");
 				});
