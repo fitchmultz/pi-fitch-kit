@@ -59,6 +59,8 @@
 
 ## Validation
 
+- Writer native HTTP fixtures own transcript, tool isolation, and asynchronous delivery/recovery; command fixtures retain config denial, cancellation, synchronous failure, and real keyboard menu actions. Extend those keepers instead of copying helper/export inventories; menu navigation expectations must be independent of the production action array.
+
 - Run `npm run check` after edits to `package.json`, `setup-manifest.json`, `extensions/`, `scripts/`, or registered prompts; add `npm run smoke` when package resources changed.
 - Run `npm run regression:fast-mode` after changing fast-mode toggles, eligibility, payload or header injection, or state handling.
 - Run `node --test scripts/validate-regression.mjs` after changing context-policy validation or its inputs.
