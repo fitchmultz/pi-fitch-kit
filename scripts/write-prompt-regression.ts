@@ -159,19 +159,31 @@ for (const [config, expected] of [
 	}
 }
 
-for (const raw of ["not json", "null", "[]", '{"provider":false}', '{"provider":2}', '{"model":""}', '{"thinkingLevel":"extreme"}', '{"thinking":"low"}', '{"model":"missing"}', '{"provider":"unauthenticated"}']) {
+for (const [raw, diagnostic] of [
+	["not json", /not valid JSON/],
+	["null", /Expected an object/],
+	["[]", /Expected an object/],
+	['{"provider":false}', /provider must be a non-empty string/],
+	['{"provider":2}', /provider must be a non-empty string/],
+	['{"model":""}', /model must be a non-empty string/],
+	['{"thinkingLevel":"extreme"}', /thinkingLevel must be one of:/],
+	['{"thinking":"low"}', /Unknown field: thinking/],
+	['{"model":"missing"}', /Unknown model: xai\/missing/],
+	['{"provider":"unauthenticated"}', /No auth for unauthenticated\/grok-4\.6/],
+] as const) {
 	writeFileSync(join(agentDir, WRITE_PROMPT_FILE), raw);
 	notices.length = 0;
 	let called = false;
 	await commands.draft.handler("invalid configuration", ctx({
 		modelRegistry: {
 			find: (provider: string, id: string) => id === "missing" ? undefined : { provider, id, reasoning: true },
-			hasConfiguredAuth: () => false,
+			hasConfiguredAuth: (model: { provider: string }) => model.provider !== "unauthenticated",
 			complete: async () => { called = true; throw new Error("must not call a model"); },
 		},
 	}) as never);
 	assert.equal(called, false, raw);
 	assert.match(notices[0], /^write-prompt\.json: /);
+	assert.match(notices[0], diagnostic, raw);
 }
 rmSync(join(agentDir, WRITE_PROMPT_FILE));
 
