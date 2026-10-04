@@ -264,11 +264,11 @@ A typical substantial change looks like this:
 
 1. The main session reads repository instructions and pulls the relevant issue or service context through MCP.
 2. Native repository search and, when useful, a fresh `scout` map the real code path before editing.
-3. The main session makes the design decision and usually implements it with the editor package's mutation tools; independent `worker` tasks are the exception, not the default.
+3. The main session owns design and integration, using its editor tools or independent `worker` tasks as useful. Delegate scouting, implementation, testing, and review freely when it helps; preserve isolated worktrees and clear ownership.
 4. Agent Browser verifies browser-visible behavior when tests cannot prove the user experience.
 5. Repository checks and deterministic tools establish current evidence.
-6. A fresh reviewer reconstructs the claim from the diff and evidence. Any changed diff gets a new reviewer pass; old reviewer judgment is never cached as sign-off.
-7. The main session closes the loop, records remaining risk, and performs only the external actions the user authorized.
+6. Complete required reviews and use independent reviewers when helpful. Reviewers reconstruct the claim from the diff and evidence; refresh analysis when substantive changes invalidate it, not for unchanged behavior or metadata alone.
+7. The main session closes the loop through authorized PR delivery, check and review remediation, merge, local checkout/installation refresh, and task worktree cleanup. Current or standing authority covers ordinary prerequisites; explicit holds remain binding.
 
 The architecture stays modular:
 
@@ -316,7 +316,7 @@ The older prompt files remain in `prompts/` as source material, but the package 
 - The kit contains no keys, OAuth state, private endpoints, browser profiles, raw sessions, generated catalogs, or copied service responses.
 - Extension packages use bare Git or npm sources. Agent Browser's separate CLI prerequisite stays on the wrapper's recommended upstream version.
 - The settings example deliberately omits personal paths, package filters, credentials, and the trust default. Choose project trust explicitly.
-- External writes, deployments, merges, account changes, and production actions remain user-authorized decisions.
+- External writes, deployments, merges, account changes, and production actions follow current or standing user authority and enforced platform boundaries; do not ask again for covered actions or treat setup consent as authority for unrelated service mutations.
 
 ## Repository map
 

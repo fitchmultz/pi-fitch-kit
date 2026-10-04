@@ -1,5 +1,5 @@
 ---
-description: Triage a task first, then either proceed safely or hand off clearly
+description: Triage a task, resolve uncertainty, and complete the authorized outcome
 argument-hint: "<task>"
 ---
 
@@ -7,96 +7,21 @@ argument-hint: "<task>"
 $@
 </task>
 
-If <task> is blank or only whitespace, stop and ask for the task. Do not guess.
+If <task> is blank or only whitespace, ask for the task. Do not guess.
 
-Your job is to:
-1. Analyze the task.
-2. Attempt safe, shallow progress where appropriate.
-3. Continuously evaluate whether the task exceeds the current session’s confidence envelope.
-4. Escalate or hand off instead of guessing or making risky decisions.
+## Triage and execute
 
-You must not push forward blindly.
-Be skeptical and evidence-based. Do not invent confidence or claim safety without verification.
+1. Read the task's original requirements, settled decisions, project guidance, and current state. Review and planning requests remain read-only unless changes are also requested.
+2. Trace relevant behavior and callers, discover available facts, and reproduce defects before choosing a fix. Use safe experiments and useful specialist help to resolve uncertainty; complexity, cross-file scope, or several plausible approaches alone are not reasons to stop.
+3. Make ordinary reversible implementation, dependency, and layout choices yourself. Use existing project mechanisms or maintained OSS when they cover the required semantics; do not build custom substitutes merely to avoid dependencies.
+4. Complete the authorized outcome, supporting setup, and proportional verification. For repository delivery, use isolated worktrees and PRs, resolve required checks and actionable reviews, merge under current or standing authority, refresh the primary checkout and required local installation, then check for uncommitted and untracked work and remove only this task's clean, completed worktrees and obsolete branches; preserve unsaved or unrelated work.
 
-## Operating Modes
+## Real boundaries
 
-### Phase 1: Analysis (default)
-- Understand the task deeply.
-- Identify risks, unknowns, and dependencies.
-- Determine complexity level.
-- Attempt only low-risk, reversible actions.
+Pause only dependent work when a material decision or access cannot be discovered and must come from the user, an unrequested action risks irreversible loss, private-data disclosure, or substantial new cost, or an explicit hold or enforced safeguard blocks progress. Preserve unrelated work and continue independent authorized work. Do not repeat settled approvals or abandon a task because it needs deep reasoning.
 
-### Phase 2: Execution (only if safe)
-- Proceed only if confidence is high and scope is clear.
-- Avoid irreversible or large-scope changes.
+If a specialist can resolve the gap, delegate a bounded task with exact context, scope, and verification while retaining integration ownership. If a genuine blocker remains, report the attempted paths, evidence, remaining requirement, and exact recovery action. A requested handoff must preserve the real state and authority; do not claim the unfinished outcome is delivered.
 
-## Hard Escalation Triggers
+## Finish
 
-If any of the following are true, stop execution and produce a handoff:
-- You are unsure about correctness of an approach.
-- Multiple plausible approaches exist with trade-offs you cannot confidently evaluate.
-- The task involves complex system design.
-- The task requires cross-file or cross-system refactors.
-- The task involves non-trivial debugging with unclear root cause.
-- The task touches performance-critical or security-sensitive logic.
-- You are making assumptions that are not verified.
-- You feel the need to “try something and see if it works.”
-- The solution requires deep reasoning or a long causal chain.
-- There is meaningful risk of breaking existing behavior.
-- You are about to introduce significant new code or abstractions.
-
-When in doubt, escalate.
-
-## Escalation Output
-
-When escalation is triggered, stop and output:
-1. Task summary.
-2. What you analyzed.
-3. Attempted progress.
-4. Why escalation is required.
-5. Recommended next step:
-   - continue in the current model with higher thinking, or
-   - hand off to a named subagent if that role is a better fit.
-6. Handoff context:
-   - relevant files
-   - commands run
-   - assumptions
-   - blockers
-   - state the next agent should pick up from
-7. When handing off to a subagent, pass `context: "fresh"` and artifact paths (`context.md`, `plan.md`, `review.md`) instead of relying on inherited parent transcript.
-
-Do not continue execution after that handoff.
-
-## Allowed Behavior
-
-You may:
-- read code
-- run safe commands
-- inspect and summarize
-- make small, reversible changes
-
-You must not:
-- perform large refactors
-- introduce complex new logic on shaky assumptions
-- guess on unclear behavior
-- continue past meaningful uncertainty
-
-## Decision Rule
-
-Before taking any meaningful action, ask:
-“Am I certain this is correct and low-risk?”
-
-- If yes, proceed carefully.
-- If no, escalate immediately.
-
-## Goal
-
-Maximize:
-- correctness
-- safety
-- clarity of handoff
-
-Minimize:
-- wasted tokens
-- bad assumptions
-- rework
+Report the result, relevant changed files, actual verification, delivery/local-refresh state, and any concrete remaining blocker. Stop when the requested outcome is complete or the remaining boundary genuinely requires user action.

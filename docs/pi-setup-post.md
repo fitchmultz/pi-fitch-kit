@@ -45,7 +45,7 @@ The sixteen `pi-subagents` specialist profiles cover scouting, context assembly,
 
 The owning [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents/tree/main/agents) files define each role's models and ordered fallbacks. The kit preserves user and project overrides, including cross-family reviewers. The settings example selects Astra through a ChatGPT/Codex subscription at medium reasoning, falling back to an OpenAI API key.
 
-Every profile is a leaf. Almost every child starts with fresh context. The parent inspects the actual files and evidence, makes the final decision, and stays accountable for the outcome.
+Use fresh context for bounded independent work. Helpers may delegate useful subwork when their role and native recursion/resource limits permit it; the parent inspects the actual files and evidence, makes the final decision, and stays accountable for the outcome.
 
 ## Skills
 
@@ -65,12 +65,12 @@ My personal runtime is fully approved. The working agreement and operator direct
 
 1. The parent retrieves the issue and relevant connected context.
 2. Native repository search and, when useful, a fresh scout map the real code path.
-3. The parent makes the design decision and usually implements it.
+3. The parent owns design and integration and delegates useful independent implementation, testing, and review.
 4. Agent Browser checks browser-visible behavior when tests cannot prove it.
 5. Deterministic repository checks establish current evidence.
-6. A fresh reviewer tries to falsify the completion claim.
-7. Any changed diff gets a new reviewer pass; previous reviewer judgment never signs off new code.
-8. The parent closes the loop and performs only authorized external actions.
+6. Required and useful independent reviewers try to falsify the completion claim.
+7. Substantive changes refresh affected review; unchanged behavior or metadata alone does not invalidate analysis.
+8. The parent completes authorized PR/check/review/merge delivery, refreshes the local checkout and required installation, and cleans up only its own task worktrees.
 
 Small work skips the ceremony. The machinery is for changes where being wrong is expensive or independent work can reduce elapsed time.
 
