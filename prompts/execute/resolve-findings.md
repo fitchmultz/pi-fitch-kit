@@ -18,10 +18,10 @@ Resolve all findings with the smallest safe number of short-lived branches and P
 Operating rules:
 - The unit of work is an independently mergeable batch, not an individual finding.
 - First cluster the findings by file overlap, subsystem overlap, dependency order, and risk.
-- Default to serial execution from the latest main branch.
-- Only allow parallel PRs when the batches are clearly disjoint in files, behavior, and merge risk. Cap parallelism at 2.
+- Start each batch from the latest main in an isolated task worktree and branch.
+- Parallelize independent scouting, implementation, testing, and review when useful; serialize overlapping mutations and dependencies. Choose concurrency for the actual work and native resource limits, not an arbitrary agent count.
 - One coordinator lane owns merge order and re-plans after each merge.
-- Use the repo’s existing local validation gates: tests, lint, typecheck, build, scripts, make targets, task runners, pre-commit hooks, or equivalent. Do not add or depend on hosted CI.
+- Use the repo’s existing local validation gates: tests, lint, typecheck, build, scripts, make targets, task runners, pre-commit hooks, or equivalent. Complete existing required PR checks and remediate failures; do not invent a new hosted CI requirement where the repository has none.
 - Use reviewer agents on each batch diff or PR diff before merge.
 - Launch reviewers and workers with `context: "fresh"` and explicit `reads:` / diff scope. For fix-after-review continuity, resume the same child or use fresh context with a compact handoff.
 - Merge only after relevant local validation passes and reviewer feedback is addressed or rejected with rationale.
@@ -51,8 +51,8 @@ Process:
    f. Dispatch reviewer agents on the diff or PR and incorporate worthwhile feedback.
    g. Re-run validation.
    h. Mark the PR ready and merge it.
-   i. Delete the branch if appropriate.
-   j. Pull the latest main and verify the merged result.
+   i. Refresh the primary checkout without overwriting unrelated work; update any required local installation through the canonical workflow and verify the shipped result.
+   j. After that verification, clean up only this batch's completed worktree and branch, checking for unsaved work first.
    k. Reassess the remaining findings against the new main and adjust batching if needed.
 5. Continue until no findings remain.
 

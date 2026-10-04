@@ -28,7 +28,7 @@ Consider a behavior change that crosses an API and a browser-visible product. Th
 
 I start Pi in the repository and give it the issue or ask it to retrieve the issue through an authenticated integration.
 
-The session reads my global working agreement and repository instructions. Those rules establish the boundaries: inspect before guessing, preserve unrelated work, ask before consequential external actions, and verify the real end state before claiming completion.
+The session reads my global working agreement and repository instructions. Those rules establish the boundaries: inspect before guessing, preserve unrelated work, act under current or standing authority without repeated permission prompts, and verify the real end state before claiming completion. Ask only for a material unresolved decision or user-only access, and honor explicit holds and enforced safety boundaries.
 
 Delegating part of the work does not delegate responsibility for the outcome.
 
@@ -51,9 +51,9 @@ For an unfamiliar or broad surface it may launch fresh specialists in parallel:
 
 Fresh context is deliberate. Each child receives a bounded brief rather than inheriting the parent's assumptions.
 
-### 4. The parent decides and usually implements
+### 4. The parent owns design and integration
 
-Most changes stay in the main session, which keeps design, implementation, and validation in one accountable place. The [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) package provides `apply_patch`, `replace_text`, and `write_files` for mutations, with `preview_patch` for read-only inspection. Its own documentation defines the tool arguments and filesystem guarantees. Pair editor 1.0 with `pi-subagents` 0.39.1 or newer so completion tracking recognizes the new tools and committed paths from partial errors.
+The parent makes ordinary reversible decisions and uses direct implementation or useful independent helpers, keeping integration and validation accountable in one place. The [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) package provides `apply_patch`, `replace_text`, and `write_files` for mutations, with `preview_patch` for read-only inspection. Its own documentation defines the tool arguments and filesystem guarantees. Pair editor 1.0 with `pi-subagents` 0.39.1 or newer so completion tracking recognizes the new tools and committed paths from partial errors.
 
 A `worker` is useful when an implementation item is independent enough for an isolated worktree or true parallelism. A `fixer` receives a confirmed finding list and changes only those items. The parent then inspects the real files and diff; a child success report is evidence, not proof.
 
@@ -70,11 +70,11 @@ A reviewer starts without the implementation conversation and reconstructs the c
 - `reviewer-security` focuses on trust boundaries, authorization, secrets, privacy, and abuse paths.
 - `ui-designer` reviews visual and interaction quality.
 
-Reviewer findings and verdicts are review history, never reusable validation evidence. Any diff change requires every currently required reviewer to analyze the updated diff again.
+Reviewer judgment does not replace validation. Complete required reviews and refresh affected analysis when substantive changes or concrete unresolved concerns invalidate it; a mechanical base sync or metadata-only change with unchanged reviewed behavior does not require every reviewer to start over.
 
 ### 7. The main session closes the loop
 
-The parent fixes valid findings, reruns the evidence that proves the behavior, reports remaining risk, and performs only external actions the user already authorized.
+The parent fixes valid findings or rebuts incorrect ones with evidence, completes required checks and reviews, and ships through the authorized PR and merge workflow. It then refreshes the primary checkout and required local installation without overwriting unrelated work, verifies the shipped result, and removes only its own completed task worktrees and branches. Explicit holds remain binding.
 
 That is the recurring shape: connected evidence, focused help, parent ownership, and independent verification.
 
@@ -198,9 +198,9 @@ Disabling global resize preserves original detail for image analysis. [`anthropi
 
 Reusable evidence means deterministic, machine-produced validation: command output, instrumented runtime checks, and CI tied to the same clean tree and environment.
 
-Manual observations are current-only. Reviewer findings, verdicts, and sign-off are review history. They may be carried forward as context, but they cannot satisfy a later reviewer pass or sign off a changed diff.
+Reuse manual observations only when their build, environment, and tested journey still match. Reviewer findings and verdicts are analysis, not validation. Confirm unchanged reviewed behavior before carrying that analysis across mechanical base synchronization; substantive changes require affected review.
 
-That distinction matters because fresh review is valuable precisely when the implementation story looks complete. A green test suite does not turn previous reviewer judgment into a cacheable artifact.
+A green test suite does not replace required reviews, and old analysis cannot sign off new behavior.
 
 ## Usage evidence
 
@@ -229,7 +229,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), checks model routes through the running session's `fitch_setup_models` tool, shows one preview, and installs only the selected unpinned sources. A new Pi CLI invocation for model listing would run startup migrations before printing results, so verification does not use one. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. The prompt offers the safe settings keys and the context-window overrides as separate consent steps, preserves unrelated configuration, stops on the first failed command with completed and remaining steps, and verifies loaded resources in a fresh Pi process after extension-code or dependency changes. `/reload` refreshes settings and resources; the maintained 0.99.1 fork also reloads extension code. Use a fresh process for core changes or already-loaded package dependencies; a new conversation in the same process is insufficient. Use native `/restart` on a supporting fork, or quit and relaunch the saved session.
+The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), checks model routes through the running session's `fitch_setup_models` tool, shows one preview, and installs only the selected unpinned sources. A new Pi CLI invocation for model listing would run startup migrations before printing results, so verification does not use one. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. The prompt offers the safe settings keys and the context-window overrides as separate consent steps, preserves unrelated configuration, pauses on failure, diagnoses and repairs covered prerequisites, reconciles partial effects before resuming, and reports completed and remaining steps when a genuine boundary prevents recovery. It verifies loaded resources in a fresh Pi process after extension-code or dependency changes. `/reload` refreshes settings and resources; the maintained 0.99.1 fork also reloads extension code. Use a fresh process for core changes or already-loaded package dependencies; a new conversation in the same process is insufficient. Use native `/restart` on a supporting fork, or quit and relaunch the saved session.
 
 `/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, current-session model availability (including whether project resources are trusted), consent-gated route state, and `models.json` context-window overrides.
 
@@ -250,7 +250,7 @@ The settings example omits trust policy intentionally. Choose `defaultProjectTru
 
 Extension packages use bare Git or npm sources. The separate Agent Browser CLI version matches the wrapper's recommended baseline.
 
-Consequential external writes, production actions, account changes, and merges still require explicit authorization.
+Consequential external writes, production actions, account changes, and merges follow current or standing authorization. Do not repeat approval for covered actions; setup consent alone never authorizes unrelated service mutations.
 
 ## From this setup to an organization harness
 

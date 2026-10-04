@@ -57,7 +57,7 @@ Choose the smallest useful set of Pi agents from `subagent({ action: "list" })`.
 - `oracle`: second opinion, drift check, or high-level design critique.
 
 Use `delegate` only for truly generic work when no specialist or `worker` fits. For tiny tasks, do the work directly.
-If an exact specialist is absent, choose the nearest listed agent and narrow the brief. If no suitable implementation-capable agent exists, report the blocker and do only safe planning/verification.
+If an exact specialist is absent, choose a suitable listed agent with a bounded brief or complete the authorized work directly with available tools. Report a capability blocker only when the requested outcome truly cannot be completed.
 </agent_selection>
 
 <workflow>
@@ -87,7 +87,7 @@ Each work item should include:
 - Dependencies: what must happen first.
 - Size/risk: small/large and validation needed.
 
-Most tasks should be 2-3 items. Use up to 5 only when the split is real. If it is naturally 1 item, skip orchestration ceremony and dispatch one bounded child.
+Use only real work items and as many useful independent helpers as the task needs within native resource limits. If it is naturally one item, skip unnecessary orchestration ceremony.
 
 ## Phase 3: Dispatch work
 Default: **separate child per work item**. The parent provides continuity through the plan/checklist and brief, not by making every child inherit one long worker thread.
@@ -155,7 +155,7 @@ Fix every blocking finding, plus every non-blocking one whose fix is small and l
 Before claiming done:
 - Sweep diff/status for accidental churn, temp/debug junk, stale artifacts, generated files, docs/config drift, and unrelated changes.
 - If parallel worktree isolation was used, inspect the per-child diff stats and patch artifacts, apply/merge the intended changes into the main working branch, resolve conflicts there, and verify the merged result. Do not assume `worktree: true` auto-lands changes in the parent checkout.
-- Clean or explicitly report temporary plan/review/context artifacts, worktree patch artifacts, preserved worktrees, and temporary branches. Run `git worktree prune` and delete/prune child branches when no longer needed.
+- Complete authorized PR delivery, required checks/reviews, merge, primary-checkout refresh, and required local installation/activation verification. Preserve explicit holds. Then clean only this task's completed worktrees, branches, and temporary artifacts after checking for unsaved work; report intentionally retained evidence or activation needs.
 - Run final relevant checks.
 - If durable work tracking is active, map every explicit requirement to evidence before completing the corresponding `todo_list` items.
 </workflow>

@@ -21,4 +21,4 @@ Return a concise review with:
 
 Be skeptical and evidence-based. Do not invent issues.
 
-Do not make code changes unless the user explicitly asks for remediation after the review.
+Keep a review-only request read-only. If the user also requested remediation, record the findings first, then complete the authorized fixes and relevant verification without asking again.

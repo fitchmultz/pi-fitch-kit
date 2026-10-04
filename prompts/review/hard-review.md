@@ -19,7 +19,7 @@ Process:
    - `outputMode: "file-only"`
    - enough `timeoutMs` for a real review
 5. For high-risk code quality, lifecycle, auth, permissions, data-loss, release, or large-refactor changes, add an independent strict reviewer such as `thermo-nuclear-code-quality-review` when available, also writing to the temp artifact directory.
-6. Read the review artifact files yourself. If any blocker is valid, fix it or hand it to `fixer`, then run a targeted re-review with a new temp artifact path.
+6. Read the review artifact files yourself. For a review-only request, report valid blockers without edits. If remediation is also authorized, fix valid findings or rebut incorrect ones with evidence, then refresh affected review using a new temp artifact path; do not ask again for already requested fixes.
 7. Do not claim green unless the reviewed scope, required validation, and reviewer evidence are enough for the strict bar. If coverage is incomplete, say exactly what evidence is missing.
 
 Required subagent task wording:

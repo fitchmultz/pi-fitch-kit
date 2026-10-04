@@ -59,7 +59,7 @@ Workflow:
    - For each track, define done as merged/released/closed or formally blocked with evidence.
 
 4. Implement and delegate
-   - Create clean branches for focused changes when shipping through PRs.
+   - Use isolated task worktrees and clean branches for focused PRs; preserve unrelated work and coordinate overlapping owners.
    - Gather context before editing.
    - Delegate implementation/scouting to the configured worker, scout, researcher, or context-builder defaults when useful.
    - Keep the parent orchestrator responsible for final decisions.
@@ -98,7 +98,8 @@ Workflow:
      - behavior changes
      - validation evidence
      - risks/notes
-   - Merge only after required review and verification pass.
+   - Merge under current or standing authority only after required checks, review, and verification pass; honor explicit holds.
+   - Refresh the primary checkout and required local installation through the canonical workflow without overwriting unrelated work. Verify the shipped result, then clean up only this task's completed worktrees and branches after checking for uncommitted and untracked work. Guidance-only changes do not require unchanged executable rebuilds or package releases.
    - Update issues with exact evidence.
    - Close issues only when closure criteria are satisfied.
    - If release/publish is needed:
