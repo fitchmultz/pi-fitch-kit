@@ -111,8 +111,8 @@ for (const pkg of manifest.corePackages) {
 }
 const subagents = manifest.corePackages.find(({ id }) => id === "subagents");
 assert(
-  subagents?.source === "git:github.com/fitchmultz/pi-subagents",
-  "subagents must use the consolidated public source",
+  subagents?.source === "npm:@fitchmultz/pi-subagents",
+  "subagents must use the consolidated owned scoped npm source",
 );
 assert(!manifest.corePackages.some(({ id }) => id === "intercom"), "standalone intercom is retired into pi-subagents");
 assert(manifest.optionalIntegrations.includes("GitHub"), "active GitHub MCP integration must be selectable");
@@ -136,8 +136,8 @@ assert(!manifest.corePackages.some(({ id }) => id === "codex-context"), "codex-c
 assert(!manifest.corePackages.some(({ id }) => id === "session-name"), "session-name now belongs to the kit");
 const askQuestion = manifest.corePackages.find(({ id }) => id === "ask-question");
 assert(
-  askQuestion?.source === "git:github.com/fitchmultz/pi-ask-question",
-  "ask-question supplies the structured question tool the clarification skill prefers",
+  askQuestion?.source === "npm:@fitchmultz/pi-ask-question",
+  "ask-question must use the owned scoped npm source for the structured question tool",
 );
 const ponytail = manifest.corePackages.find(({ id }) => id === "ponytail");
 assert(ponytail?.source === "git:github.com/fitchmultz/ponytail", "ponytail must use the maintained fork");
@@ -177,7 +177,10 @@ assert(manifest.piCorePatch === undefined, "the retired Pi core patch must not r
 assert(manifest.kit.packageName === "@fitch/pi-kit", "setup must identify duplicate kit package entries");
 
 const verbosity = manifest.corePackages.find(({ id }) => id === "verbosity");
-assert(verbosity?.source === "git:github.com/fitchmultz/pi-verbosity-control", "verbosity must use the native-status owner");
+assert(verbosity?.source === "npm:@fitchmultz/pi-verbosity-control", "verbosity must use the owned scoped npm native-status controller");
+
+const calculator = manifest.corePackages.find(({ id }) => id === "calculator");
+assert(calculator?.source === "npm:@fitchmultz/pi-calculator", "calculator must use the owned scoped npm source");
 
 const editSession = manifest.corePackages.find(({ id }) => id === "edit-session");
 assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");

@@ -73,7 +73,7 @@
   "corePackages": [
     {
       "id": "subagents",
-      "source": "git:github.com/fitchmultz/pi-subagents"
+      "source": "npm:@fitchmultz/pi-subagents"
     },
     {
       "id": "apply-edits",
@@ -81,7 +81,7 @@
     },
     {
       "id": "ask-question",
-      "source": "git:github.com/fitchmultz/pi-ask-question"
+      "source": "npm:@fitchmultz/pi-ask-question"
     },
     {
       "id": "todo-list",
@@ -115,7 +115,7 @@
     },
     {
       "id": "verbosity",
-      "source": "git:github.com/fitchmultz/pi-verbosity-control"
+      "source": "npm:@fitchmultz/pi-verbosity-control"
     },
     {
       "id": "tool-duration",
@@ -131,7 +131,7 @@
     },
     {
       "id": "calculator",
-      "source": "git:github.com/fitchmultz/pi-calculator"
+      "source": "npm:@fitchmultz/pi-calculator"
     },
     {
       "id": "ctx-info",

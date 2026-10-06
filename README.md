@@ -51,7 +51,7 @@ These are the extensions loaded in my current setup. Every external extension li
 
 ### Extensions bundled by this kit
 
-[`clean-footer`](extensions/clean-footer.ts) removes cumulative token, cache, and cost counters while retaining the latest prompt cache hit rate, working directory, session name, context usage, model, thinking level, and extension statuses. The maintained [verbosity controller](https://github.com/fitchmultz/pi-verbosity-control) supplies the same status used by the built-in footer; the kit does not read its configuration. `/fitch-setup` upgrades the old npm controller while preserving `verbosity.json`; that older controller cannot supply this native indicator. It uses two lines when everything fits and wraps whole status items onto additional lines instead of truncating them. `/clean-footer` toggles the compact and built-in footers for comparison.
+[`clean-footer`](extensions/clean-footer.ts) removes cumulative token, cache, and cost counters while retaining the latest prompt cache hit rate, working directory, session name, context usage, model, thinking level, and extension statuses. The maintained [verbosity controller](https://github.com/fitchmultz/pi-verbosity-control), `npm:@fitchmultz/pi-verbosity-control`, supplies the same status used by the built-in footer; the kit does not read its configuration. `/fitch-setup` offers replacement of the foreign unscoped `npm:pi-verbosity-control` only when the maintained controller is selected, preserving `verbosity.json`; that older controller cannot supply this native indicator. It uses two lines when everything fits and wraps whole status items onto additional lines instead of truncating them. `/clean-footer` toggles the compact and built-in footers for comparison.
 
 The footer bootstraps file-wide name/cache facts once and reconciles appended facts from the persisted journal after the leaf advances or the run settles, including abandoned branches and later `message_end` replacements. Each reconciliation acquires history once and processes only its new suffix; unchanged redraws do no history work. Native usage is a dirty snapshot keyed by session, leaf and model; resizing, themes and status-only redraws do not rescan history. An SDK owner making out-of-band journal edits must emit a lifecycle refresh; there is no public universal mutation signal. Git, provider/model/thinking and extension statuses remain live.
 
@@ -299,6 +299,19 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 
 The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. [`examples/settings.json`](examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump. It selects Astra through a ChatGPT/Codex subscription at medium reasoning; setup falls back to an OpenAI API key when there is no subscription and filters optional routes by availability. The manifest offers 300k context budgets.
 
+### Scoped core installs
+
+These four linked extensions use owned, unpinned scoped npm channels:
+
+```bash
+pi install npm:@fitchmultz/pi-subagents
+pi install npm:@fitchmultz/pi-ask-question
+pi install npm:@fitchmultz/pi-calculator
+pi install npm:@fitchmultz/pi-verbosity-control
+```
+
+The unscoped npm names are **not these maintained projects**. Git remains a supported manual fallback: use `pi install git:github.com/fitchmultz/<repo>` with the corresponding repository name above. Do not install both channels for the same extension: npm and Git have different Pi package identities. `/fitch-setup` previews source switches, backs up affected package entries, and preserves resource filters and controller configuration. Workflows has its own scoped package, `npm:@fitchmultz/pi-workflows`, but is not a kit core default.
+
 ## Prompts
 
 The package registers only two prompts:
@@ -338,7 +351,7 @@ npm ci --ignore-scripts
 npm run check:compat
 ```
 
-- `npm run check:compat` reuses `check` plus `smoke` against the actually installed host graph. The exact official development cohort and supported floor are 1.0.0. CI qualifies the development cohort and the maintained fork's current `main` on Node 24; optional fork capabilities are detected, not required. The fork checkout resolves one exact commit, which is reused for the build and macOS qualification receipt. The compatibility runner selects independent official/fork SDK, declaration and CLI graphs; lifecycle checks use the manifest's bundled bin, never Pi from PATH. This does not install the full setup-manifest composition or run paid providers.
+- `npm run check:compat` reuses `check` plus `smoke` against the actually installed host graph. The locked official development cohort and supported floor are 1.0.0, not CI qualification targets. CI resolves the latest stable official cohort and maintained fork's current `main` once per run, then freezes that version and full commit SHA through every build and qualification lane. Both hosts run on Ubuntu with Node 24 and 26 and on macOS with Node 24; optional fork capabilities are detected, not required. The compatibility runner selects independent official/fork SDK, declaration and CLI graphs; lifecycle checks use the manifest's bundled bin, never Pi from PATH. This does not install the full setup-manifest composition or run paid providers.
 - `npm run check` type-checks the bundled extensions, exercises the image guard boundary, the fast toggles, session naming, the paged reader, and writer commands, then validates unpinned package sources, manifest resources, package metadata alignment, the absence of retired patch and duplicate surfaces, the settings example's model, retry, and compaction consistency, and that every enabled or context-window route is manifest-managed with room for the configured compaction reserve and recent context. It also runs the validator against invalid manifest and compaction inputs; policy values live in the manifest and settings example rather than a second frozen validator table.
 - `npm run regression:clean-footer` loads the real footer with an offline SDK session. It checks file-wide names and cache hit rates across redraws, append, rename, branch extraction, reload, and new sessions; live context, model, theme, and wrapping stay fresh. It asserts zero history reads on 100 unchanged redraws before persistence and after a real offline response replaced by a later `message_end` handler, and retains cold recovery of legacy footer preferences. An optional host-root argument supports focused read-only SDK probing, not declaration qualification.
 - `npm run regression:fast-mode` verifies real serialized requests with fake fetches: Anthropic speed/beta atomicity and gateway dispatch, OpenAI/xAI priority, exact Astra Ultrafast routing and exclusions, shared/session precedence, native persistence and fork isolation, startup validation across factory recreation, cost notices, footer eligibility, and watcher cleanup.
