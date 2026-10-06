@@ -233,6 +233,8 @@ The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), checks m
 
 `/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, current-session model availability (including whether project resources are trusted), consent-gated route state, and `models.json` context-window overrides.
 
+The linked subagents, ask-question, calculator, and verbosity extensions install primarily from `npm:@fitchmultz/pi-subagents`, `npm:@fitchmultz/pi-ask-question`, `npm:@fitchmultz/pi-calculator`, and `npm:@fitchmultz/pi-verbosity-control`. Their unscoped npm names are not these projects. The corresponding `git:github.com/fitchmultz/<repo>` sources remain supported manual fallbacks; see [scoped core installs](../README.md#scoped-core-installs). A source switch must be previewed because Pi treats npm and Git as different identities: back up affected package entries, carry resource filters across, and avoid loading both. Replacing the foreign legacy `npm:pi-verbosity-control` remains conditional on selecting the maintained controller and preserves `verbosity.json`. `npm:@fitchmultz/pi-workflows` is a separate optional project package, not a kit core default.
+
 ## Trust and security boundaries
 
 Pi extensions run with the permissions of the user who started Pi. Project trust controls whether project-local configuration loads; it is not a sandbox. My personal setup runs fully approved, so the working agreement and operator oversight are policy controls rather than per-tool technical enforcement.

@@ -72,6 +72,22 @@ test("required models are ordered alternative lists", () => {
   rejects(({ manifest }) => { manifest.requiredModels.push([]); }, "each requiredModels entry must be a non-empty ordered list of provider/model routes");
 });
 
+test("core npm channels reject foreign, mismatched, and pinned identities", () => {
+  for (const [id, name, message] of [
+    ["subagents", "pi-subagents", "subagents must use the consolidated owned scoped npm source"],
+    ["ask-question", "pi-ask-question", "ask-question must use the owned scoped npm source for the structured question tool"],
+    ["verbosity", "pi-verbosity-control", "verbosity must use the owned scoped npm native-status controller"],
+    ["calculator", "pi-calculator", "calculator must use the owned scoped npm source"],
+  ]) {
+    for (const source of [`npm:${name}`, `npm:@other/${name}`, "npm:@fitchmultz/unrelated", `npm:@fitchmultz/${name}@1.0.0`]) {
+      rejects(({ manifest }) => { manifest.corePackages.find((pkg) => pkg.id === id).source = source; },
+        source.endsWith("@1.0.0")
+          ? `corePackages ${id} must use an unpinned npm or Git source: ${source}`
+          : source === "npm:pi-verbosity-control" ? "corePackages verbosity cannot also be retired" : message);
+    }
+  }
+});
+
 test("missing recent-token setting has its own diagnostic", () => {
   rejects(({ settings }) => { delete settings.compaction.keepRecentTokens; },
     "compaction.keepRecentTokens must be a positive safe integer");
