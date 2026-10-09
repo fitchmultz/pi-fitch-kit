@@ -1,7 +1,10 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { formatDimensionNote, resizeImage } from "@earendil-works/pi-coding-agent";
 
-const MAX_CACHE_ENTRIES = 8;
+// ponytail: Retain up to 128 MiB of estimated source/result storage, not every
+// historical image. Larger requests reuse a bounded snapshot; raise the byte
+// budget only with measured memory headroom, never restore an entry-count cap.
+const MAX_CACHE_BYTES = 128 * 1024 * 1024;
 const MAX_IMAGE_BASE64_CHARS = 32 * 1024 * 1024;
 const MAX_CONTEXT_IMAGE_BASE64_CHARS = 64 * 1024 * 1024;
 // Messages requests, including text, tools, and JSON framing: https://platform.claude.com/docs/en/api/errors
@@ -13,7 +16,30 @@ const ANTHROPIC_IMAGE_MIME_TYPES = new Set([
 	"image/webp",
 ]);
 
-type ImageGuardCache = Map<string, { mimeType: string; pending: ReturnType<typeof resizeImage> }>;
+type CachedImage = { mimeType: string; pending: ReturnType<typeof resizeImage>; bytes: number };
+
+class ImageGuardCache {
+	readonly entries = new Map<string, CachedImage>();
+	private bytes = 0;
+
+	clear(): void {
+		this.entries.clear();
+		this.bytes = 0;
+	}
+
+	delete(data: string): void {
+		const entry = this.entries.get(data);
+		if (entry) this.bytes -= entry.bytes;
+		this.entries.delete(data);
+	}
+
+	set(data: string, entry: CachedImage): void {
+		this.delete(data);
+		this.entries.set(data, entry);
+		this.bytes += entry.bytes;
+		while (this.bytes > MAX_CACHE_BYTES) this.delete(this.entries.keys().next().value!);
+	}
+}
 type ImageModel = { api?: string; id?: string } | undefined;
 
 function isClaude(model: ImageModel): boolean {
@@ -29,7 +55,7 @@ function anthropicMimeType(mimeType: string): string | undefined {
 export async function prepareClaudeImages(
 	model: ImageModel,
 	messages: Array<{ role?: string; content?: unknown }>,
-	cache: ImageGuardCache = new Map(),
+	cache: ImageGuardCache = new ImageGuardCache(),
 ): Promise<boolean> {
 	// Anthropic's image limits follow the model, not one provider name:
 	// Claude behind cloudflare-ai-gateway or github-copilot hits the same
@@ -44,6 +70,9 @@ export async function prepareClaudeImages(
 
 	let changed = false;
 	let contextImageChars = 0;
+	// Keep the request's reusable results alive even if a miss evicts their LRU
+	// entries before this newest-first traversal reaches them.
+	const reusable = new Map(cache.entries);
 	// Admission favors the newest captures; only the request copy is transformed.
 	for (const message of messages.toReversed()) {
 		if (message.role === "assistant" || !("content" in message) || !Array.isArray(message.content)) continue;
@@ -80,28 +109,29 @@ export async function prepareClaudeImages(
 			}
 			contextImageChars += image.data.length;
 
-			const cached = cache.get(image.data);
+			const cached = cache.entries.get(image.data) ?? reusable.get(image.data);
 			let pending: ReturnType<typeof resizeImage>;
 			if (cached?.mimeType === mimeType) {
 				pending = cached.pending;
-				cache.delete(image.data);
 				cache.set(image.data, cached);
 			} else {
 				pending = resizeImage(Buffer.from(image.data, "base64"), mimeType).catch(() => null);
-				cache.set(image.data, { mimeType, pending });
-				// ponytail: Eight recent images bound memory; use a byte budget only if image-heavy sessions need more reuse.
-				const oldest = cache.keys().next().value;
-				if (cache.size > MAX_CACHE_ENTRIES && oldest !== undefined) cache.delete(oldest);
+				cache.set(image.data, { mimeType, pending, bytes: 2 * image.data.length + 512 });
 			}
 			const resized = await pending;
 			if (!resized) {
-				if (cache.get(image.data)?.pending === pending) cache.delete(image.data);
+				if (cache.entries.get(image.data)?.pending === pending) cache.delete(image.data);
 				content.push({
 					type: "text",
 					text: "[Image omitted: could not be resized below Anthropic's inline image limits.]",
 				});
 				messageChanged = true;
 				continue;
+			}
+			if (cache.entries.get(image.data)?.pending === pending) {
+				// Native results own base64 strings even when unchanged. Budget both
+				// strings conservatively as UTF-16, plus an entry/promise allowance.
+				cache.set(image.data, { mimeType, pending, bytes: 2 * (image.data.length + resized.data.length) + 512 });
 			}
 			if (!resized.wasResized) {
 				if (image.mimeType === resized.mimeType) {
@@ -198,7 +228,7 @@ export async function fitClaudeRequest(model: ImageModel, payload: unknown): Pro
 }
 
 export default function anthropicImageGuard(pi: ExtensionAPI): void {
-	const cache: ImageGuardCache = new Map();
+	const cache = new ImageGuardCache();
 	const clearCache = () => cache.clear();
 	pi.on("session_start", clearCache);
 	pi.on("session_compact", clearCache);
