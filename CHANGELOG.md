@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.17.1 — 9 October 2026
+
+- Point bundled calm's editor metadata at Pi's current published theme schema; retain its location, palette and native optional-color fallbacks.
+- Load calm in the existing package smoke and validate it through the selected Pi host's offline native CLI, where the full schema validator is installed. Observe the actual active theme to reject silent fallback, and verify a missing required color is rejected; SDK-only loading still checks resource presence and diagnostics.
+- Correct Ultrafast setup guidance: the current c2031ab fork already applies an exact-Astra 6× monetary estimate on native OpenAI/Codex Responses only after terminal tier confirmation. Retain the official Pi 1.0 caveat, authoritative provider billing, and lack of live billing or speed proof. Installation still does not select Ultrafast or change any resource filters.
+- Keep distribution Git/GitHub-only (`private: true`); this patch has no npm publication.
+
 ## 0.17.0 — 1 October 2026
 
 - Require and qualify official Pi 1.0.0; keep real fork capabilities optional and distribution Git/GitHub-only.
