@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Loads this repo as a real Pi package in a throwaway agent dir and asserts
-// its active prompts and bundled extensions load cleanly. Catches resource
+// its active prompts, themes and bundled extensions load cleanly. Catches resource
 // breakage that static validation cannot see. Requires `npm install` first.
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -36,13 +36,17 @@ try {
 		agentDir,
 		settingsManager,
 		noSkills: true,
-		noThemes: true,
 		noContextFiles: true,
 	});
 	await loader.reload();
 
 	const prompts = loader.getPrompts();
+	const themes = loader.getThemes();
 	const extensions = loader.getExtensions();
+	const themeNames = themes.themes.map(({ name }) => name).sort();
+	if (JSON.stringify(themeNames) !== JSON.stringify(["calm"]) || themes.diagnostics.length > 0) {
+		throw new Error(`Theme load failed: ${JSON.stringify({ themes: themeNames, diagnostics: themes.diagnostics })}`);
+	}
 	const promptNames = prompts.prompts.map(({ name }) => name).sort();
 	const expectedPrompts = ["fitch-setup", "github-open-issues-prs"];
 	if (JSON.stringify(promptNames) !== JSON.stringify(expectedPrompts)) {
@@ -251,7 +255,7 @@ try {
 		if (count !== 1) throw new Error(`Expected one ${event} handler, got ${count}`);
 	}
 
-	console.log(JSON.stringify({ ok: true, prompts: promptNames, commands: commandNames, tools: toolNames, extensions: extensions.extensions.length }, null, 2));
+	console.log(JSON.stringify({ ok: true, prompts: promptNames, themes: themeNames, commands: commandNames, tools: toolNames, extensions: extensions.extensions.length }, null, 2));
 } finally {
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
