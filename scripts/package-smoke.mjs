@@ -2,6 +2,7 @@
 // Loads this repo as a real Pi package in a throwaway agent dir and asserts
 // its active prompts, themes and bundled extensions load cleanly. Catches resource
 // breakage that static validation cannot see. Requires `npm install` first.
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -46,6 +47,53 @@ try {
 	const themeNames = themes.themes.map(({ name }) => name).sort();
 	if (JSON.stringify(themeNames) !== JSON.stringify(["calm"]) || themes.diagnostics.length > 0) {
 		throw new Error(`Theme load failed: ${JSON.stringify({ themes: themeNames, diagnostics: themes.diagnostics })}`);
+	}
+	// SDK-only loaders resolve colors but do not install Pi's full theme schema validator.
+	// The native CLI does; observe its selected theme because invalid themes silently fall back.
+	const hostDir = fileURLToPath(new URL("..", import.meta.resolve("@earendil-works/pi-coding-agent")));
+	const hostPackage = JSON.parse(readFileSync(join(hostDir, "package.json"), "utf8"));
+	const cliAgentDir = join(temp, "cli-agent");
+	mkdirSync(join(cliAgentDir, "themes"), { recursive: true });
+	writeFileSync(join(cliAgentDir, "settings.json"), JSON.stringify({ theme: "calm" }));
+	const themeProbe = join(temp, "theme-probe.ts");
+	writeFileSync(themeProbe, `export default function (pi) {
+		pi.on("session_start", (_event, ctx) => {
+			pi.appendEntry("kit-theme-smoke", { name: ctx.ui.theme.name });
+		});
+	}\n`);
+	const shippedTheme = JSON.parse(readFileSync(join(root, "themes", "calm.json"), "utf8"));
+	const missingRequiredColor = structuredClone(shippedTheme);
+	delete missingRequiredColor.colors.mdHeading;
+	for (const [label, document, shouldLoad] of [
+		["shipped calm", shippedTheme, true],
+		["missing required mdHeading", missingRequiredColor, false],
+	]) {
+		writeFileSync(join(cliAgentDir, "themes", "calm.json"), JSON.stringify(document));
+		const result = spawnSync(process.execPath, [
+			resolve(hostDir, hostPackage.bin.pi), "--mode", "rpc", "--offline", "--no-session",
+			"--no-extensions", "-e", themeProbe, "--no-skills", "--no-prompt-templates",
+			"--no-context-files", "--no-tools", "--no-approve",
+			"--provider", "openai", "--model", "gpt-6-astra", "--api-key", "fixture-only",
+		], {
+			cwd,
+			env: {
+				PATH: process.env.PATH, HOME: home, PI_CODING_AGENT_DIR: cliAgentDir,
+				PI_TELEMETRY: "0", PI_SKIP_VERSION_CHECK: "1",
+			},
+			input: '{"id":"theme","type":"get_entries"}\n',
+			encoding: "utf8",
+			timeout: 30_000,
+		});
+		if (result.error) throw result.error;
+		if (result.status !== 0) throw new Error(`Native theme probe failed: ${result.stderr}`);
+		const response = result.stdout.split("\n").filter(Boolean).map((line) => JSON.parse(line))
+			.find(({ id, type }) => id === "theme" && type === "response");
+		if (!response?.success) throw new Error(`Native theme probe had no successful response: ${result.stdout}`);
+		const observed = response.data.entries.find(({ customType }) => customType === "kit-theme-smoke")?.data?.name;
+		if (typeof observed !== "string") throw new Error("Native theme probe did not observe the active theme");
+		if ((observed === "calm") !== shouldLoad) {
+			throw new Error(`Native theme schema check failed for ${label}: selected ${observed}`);
+		}
 	}
 	const promptNames = prompts.prompts.map(({ name }) => name).sort();
 	const expectedPrompts = ["fitch-setup", "github-open-issues-prs"];
@@ -255,7 +303,7 @@ try {
 		if (count !== 1) throw new Error(`Expected one ${event} handler, got ${count}`);
 	}
 
-	console.log(JSON.stringify({ ok: true, prompts: promptNames, themes: themeNames, commands: commandNames, tools: toolNames, extensions: extensions.extensions.length }, null, 2));
+	console.log(JSON.stringify({ ok: true, prompts: promptNames, themes: themeNames, themeSchema: "native CLI accepted calm and rejected missing mdHeading", commands: commandNames, tools: toolNames, extensions: extensions.extensions.length }, null, 2));
 } finally {
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
