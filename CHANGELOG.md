@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.2 — 9 October 2026
+
+- Fix repeated Claude image decoding once a request contains more than eight distinct captures. Cache by an estimated 128 MiB source-and-result byte budget, and retain a bounded request-start snapshot so LRU eviction cannot turn the entire next request into cache misses.
+- Preserve original images, Claude-only routes, newest-first source admission, coordinate notes, request-size handling, failure retries and lifecycle clearing. Requests larger than the cache still reuse retained results without dropping images to save cache memory.
+- Exercise the real native loader/resizer with worker-count regressions for full reuse, over-budget partial reuse, failed decoding and lifecycle clearing. Keep distribution Git/GitHub-only (`private: true`); there is no npm publication.
+
 ## 0.17.1 — 9 October 2026
 
 - Point bundled calm's editor metadata at Pi's current published theme schema; retain its location, palette and native optional-color fallbacks.

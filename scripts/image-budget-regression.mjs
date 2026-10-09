@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-image-budget-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
@@ -40,12 +41,21 @@ const messages = (data, count) => Array.from({ length: count }, (_, index) => ({
 }));
 const selected = process.argv[2];
 if (!selected || selected === "source") {
+	const { DefaultResourceLoader, SettingsManager } = await import("@earendil-works/pi-coding-agent");
+	const loader = new DefaultResourceLoader({
+		cwd: agentDir, agentDir, settingsManager: SettingsManager.inMemory({}),
+		additionalExtensionPaths: [fileURLToPath(new URL("../extensions/anthropic-image-guard.ts", import.meta.url))],
+		noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
+	});
+	await loader.reload();
+	assert.deepEqual(loader.getExtensions().errors, []);
+	const context = loader.getExtensions().extensions[0].handlers.get("context")[0];
+	const prepare = (messages) => context({ messages }, { model });
 	const data = png(2400, 1400);
 	const originals = messages(data, 7);
-	const cache = new Map();
 	for (const count of [6, 7]) {
 		const outgoing = structuredClone(originals.slice(0, count));
-		await prepareClaudeImages(model, outgoing, cache);
+		await prepare(outgoing);
 		assert.deepEqual(outgoing.map((message) => message.timestamp), originals.slice(0, count).map((message) => message.timestamp));
 		assert.deepEqual(outgoing.filter((message) => message.content.some((part) => part.type === "image")).map((message) => message.timestamp),
 			[count - 2, count - 1, count], "source safety budget must admit newest screenshots");
@@ -54,7 +64,7 @@ if (!selected || selected === "source") {
 	assert.ok(originals.every((message) => message.content[1].data === data), "saved sources stay full resolution");
 	// Several captures in one tool result must retain their original content ordering too.
 	const tool = [{ role: "toolResult", content: originals.flatMap((message) => message.content) }];
-	await prepareClaudeImages(model, tool, cache);
+	await prepare(tool);
 	assert.deepEqual(tool[0].content.filter((part) => part.type === "text" && part.text.startsWith("Screenshot")).map((part) => part.text), originals.map((message) => message.content[0].text));
 	assert.equal(tool[0].content.filter((part) => part.type === "image").length, 3);
 	console.log("source budget: newest three admitted on repeated requests; chronology and original sources preserved");
