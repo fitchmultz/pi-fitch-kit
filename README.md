@@ -16,12 +16,13 @@ If you already use Pi, install the kit:
 pi install git:github.com/fitchmultz/pi-fitch-kit
 ```
 
-Start a fresh Pi process, then run these in Pi's editor:
+Start a fresh Pi process, then run this in Pi's editor:
 
 ```text
 /fitch-setup
-/fitch-setup verify
 ```
+
+When setup finishes, start another fresh Pi process if it installed extensions, then run `/fitch-setup verify` to check the result.
 
 `/fitch-setup` walks through setup with your main agent. You'll see the package installs and file changes before they're applied, and you can choose the full core setup or individual components. `verify` checks your setup without changing anything. See the [setup reference](docs/reference.md#install-the-kit) for model requirements and migration details.
 
