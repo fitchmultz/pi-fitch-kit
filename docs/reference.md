@@ -246,7 +246,7 @@ The current setup has authenticated, read-only-discovery-verified connections fo
 | Notion | Workspace search, pages, databases, comments, and meeting notes |
 | Granola | Meeting notes, summaries, folders, and transcripts |
 
-The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](../setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session. The optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary. The setup configures only integrations listed in the manifest and never persists mutable npm specs such as `@latest`.
+The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](../setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session. The optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary. The setup configures only integrations listed in the manifest and uses canonical package names for local stdio servers.
 
 ## How the workflow fits together
 
@@ -317,7 +317,7 @@ The older prompt files remain in `prompts/` as source material, but the package 
 - My personal setup runs with full approvals and does not put a confirmation dialog in front of each MCP call. The working agreement is model policy, not a technical authorization boundary.
 - Every person authenticates their own model providers and services.
 - The kit contains no keys, OAuth state, private endpoints, browser profiles, raw sessions, generated catalogs, or copied service responses.
-- Extension packages use bare Git or npm sources. Agent Browser's separate CLI prerequisite stays on the wrapper's recommended CLI version.
+- Extension packages use bare Git or npm sources. Agent Browser's separate CLI prerequisite must satisfy the wrapper's documented requirements.
 - The settings example deliberately omits personal paths, package filters, credentials, and the trust default. Choose project trust explicitly.
 - External writes, deployments, merges, account changes, and production actions follow current or standing user authority and enforced platform boundaries; do not ask again for covered actions or treat setup consent as authority for unrelated service mutations.
 

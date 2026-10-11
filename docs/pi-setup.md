@@ -152,7 +152,7 @@ The current connected services cover:
 - Notion knowledge;
 - Granola meetings.
 
-`pi-mcp-adapter` provides searchable tool discovery so hundreds of service tools do not have to sit in the model's prompt at once. The gateway can expose direct tools for common operations and nested catalogs for rarer ones. Its optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary. The setup uses only manifest-listed integrations and refuses mutable npm specs such as `@latest` for local stdio servers.
+`pi-mcp-adapter` provides searchable tool discovery so hundreds of service tools do not have to sit in the model's prompt at once. The gateway can expose direct tools for common operations and nested catalogs for rarer ones. Its optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary. The setup uses only manifest-listed integrations and canonical package names for local stdio servers.
 
 Authentication remains user-scoped. The setup process may inspect non-secret connection status, but it does not read credential stores or service payloads merely to claim that setup worked.
 
@@ -250,7 +250,7 @@ A shared setup must not distribute:
 
 The settings example omits trust policy intentionally. Choose `defaultProjectTrust` and subagent child trust for the environment rather than copying mine. Untrusted repositories should use `no-approve`.
 
-Extension packages use bare Git or npm sources. The separate Agent Browser CLI version matches the wrapper's recommended baseline.
+Extension packages use bare Git or npm sources. The separate Agent Browser CLI must satisfy the wrapper's documented requirements.
 
 Consequential external writes, production actions, account changes, and merges follow current or standing authorization. Do not repeat approval for covered actions; setup consent alone never authorizes unrelated service mutations.
 
