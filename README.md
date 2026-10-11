@@ -1,96 +1,96 @@
 # pi-fitch-kit
 
-This is my [Pi](https://github.com/earendil-works/pi) setup, packaged so you can use it too. It gives you my everyday session tools and a guided way to choose extensions, specialist agents, skills, and service connections for your own coding workflow.
+Fitch Kit adds session tools and a setup prompt to [Pi](https://github.com/earendil-works/pi), a terminal coding agent. Use the setup prompt to select public extensions, specialist agents, skills, and service connections.
 
-![The Fitch kit loads bundled tools into your main Pi session, which uses selected public extensions, task-specific skills, and optional authenticated MCP services.](.github/readme/kit-overview.png)
+![The kit loads session tools into Pi, which uses selected public extensions, task-specific skills, and optional authenticated MCP services.](.github/readme/kit-overview.png)
 
-*The kit adds tools to your main Pi session; `/fitch-setup` helps you choose the rest.*
+*The kit loads its tools into Pi. Setup adds the components you select.*
 
-## Install and start
+## Install
 
-You need **Node.js 24.15+** and **Pi 1.0.0+**. The kit works with official Pi and [Fitch's Pi runtime](https://github.com/fitchmultz/pi).
+Use **Node.js 24.15+** and **Pi 1.0.0+**. The kit supports official Pi and [Fitch Pi](https://github.com/fitchmultz/pi).
 
-If you already use Pi, install the kit:
+1. Install Pi if you do not have it.
 
-```bash
-pi install git:github.com/fitchmultz/pi-fitch-kit
-```
+   ```bash
+   npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+   ```
 
-Start a fresh Pi process, then run this in Pi's editor:
+2. Start Pi. Complete your provider login.
 
-```text
-/fitch-setup
-```
+   ```bash
+   pi
+   ```
 
-When setup finishes, start another fresh Pi process if it installed extensions, then run `/fitch-setup verify` to check the result.
+3. Install the kit.
 
-`/fitch-setup` walks through setup with your main agent. You'll see the package installs and file changes before they're applied, and you can choose the full core setup or individual components. `verify` checks your setup without changing anything. See the [setup reference](docs/reference.md#install-the-kit) for model requirements and migration details.
+   ```bash
+   pi install git:github.com/fitchmultz/pi-fitch-kit
+   ```
 
-**New to Pi?** Install it with `npm install -g --ignore-scripts @earendil-works/pi-coding-agent`, launch `pi`, and complete your provider login before installing the kit.
+4. Start a new Pi process. Run this command in the Pi editor.
 
-Setup needs an available route from each [required model group](setup-manifest.json): Astra through OpenAI/Codex, and Claude through a supported route. Optional services need your own accounts and authentication. The kit is installed from Git; it is not published to npm.
+   ```text
+   /fitch-setup
+   ```
 
-## Try the bundled tools
+Setup previews package installs and file changes. Select the complete core or individual components.
 
-The kit includes seven extensions, two prompt templates, and the `calm` theme. These load with the package; the wider extension stack is selected during setup.
+Start a new Pi process if setup changes extension code or dependencies. Run `/fitch-setup verify` to check setup without changes.
 
-| Try this in Pi | What happens |
+Setup needs `gpt-6-astra` through OpenAI/Codex and Claude through a supported route. See the [model groups](setup-manifest.json) for the allowed routes.
+
+## Commands
+
+The package loads seven extensions, two prompts, and the `calm` theme. Setup installs the external components you select.
+
+| Command | Use |
 |---|---|
-| `/draft Explain why the test flakes and fix the cause` | Rewrites your request in a separate dialog. Review it, copy it, tweak it, or accept it into the conversation. |
-| `/side-question What does this error mean?` | Answers using the session context in a separate dialog, without sending a new message to the main agent. |
-| `/reader demo` | Opens a sample paged explanation without a model call. Right/Space advances, Left goes back, Escape closes. |
-| `/reader` or `/reader list` | Reopens your saved reading place or browses earlier documents. Press `N` to write a section note; Ctrl+Enter asks the main agent to respond. |
-| `/clean-footer` | Switches between the compact and built-in footers. The compact footer keeps context, model, session name, and extension status visible. |
-| `/codex-fast status`, `/anthropic-fast status`, `/xai-fast status` | Checks the shared fast-mode settings. Read the cost and route limits before enabling them. |
-| `/github-open-issues-prs` | Starts the bundled prompt for auditing open GitHub issues and pull requests. |
+| `/draft <text>` | Rewrite a request in a separate dialog. Review the result before you accept it. |
+| `/side-question <text>` | Ask a question with session context. The answer stays outside the main conversation. |
+| `/reader demo` | Open a sample document without a model call. Press Right/Space for the next page. Press Left for the previous page. Press Escape to close. |
+| `/reader` or `/reader list` | Show the saved page or document list. Press `N` to write a section note. Use Ctrl+Enter to request a response. |
+| `/clean-footer` | Switch between the compact and built-in footers. |
+| `/codex-fast status`, `/anthropic-fast status`, `/xai-fast status` | Check the shared fast-mode settings. |
+| `/github-open-issues-prs` | Start the prompt for an audit of open GitHub issues and pull requests. |
 
-Session naming keeps `/resume` searchable. The Claude image guard adapts Claude-bound images to provider limits while preserving source detail for other models when global auto-resize is off. The setup model tool checks the running session's model registry without opening credential files or calling a provider.
+Session names help you find saved sessions. The Claude image guard adapts Claude images to provider limits. The setup model tool reads the current model registry without a provider call.
 
-Both writer commands use your current provider, model, and thinking level and make model calls. [Writer overrides](docs/reference.md#draft-provider-model-and-thinking), [reader controls and recovery](docs/reference.md#extensions-bundled-by-this-kit), and [image limits](docs/reference.md#why-the-image-guard-exists) are documented in the reference.
+`/draft` and `/side-question` make model calls with your current provider, model, and thinking level. See [writer settings](docs/reference.md#draft-provider-model-and-thinking) and [reader controls](docs/reference.md#extensions-bundled-by-this-kit) for details.
 
-### Fast modes and cost
+## Settings
 
-Fast modes are optional. Installing or updating the kit never selects Ultrafast or changes your default model routes.
+Setup offers the [settings example](examples/settings.json) and model context windows as separate choices. Setup preserves existing values unless you select a change.
 
-- OpenAI priority: `/codex-fast on`; `/codex-fast off` disables the shared kit tier.
-- OpenAI Ultrafast: `/ultrafast on` changes the shared mode; add `--session` for a session override. `/ultrafast reset --session` returns to the shared setting.
-- Anthropic and xAI: `/anthropic-fast on` and `/xai-fast on` request their supported fast/priority modes.
-
-**These modes can cost more.** Anthropic's supported Opus fast mode is a research preview with doubled token rates. Ultrafast is limited to exact `gpt-6-astra` on supported native OpenAI/Codex routes, with 6× API/credit pricing or 8× Codex included usage and specific access requirements. Footer labels show requested policy; provider billing is authoritative. See the [full fast-mode reference](docs/reference.md#fast-modes) before opting in.
-
-## What setup adds
-
-I keep the larger setup in separate public packages. `/fitch-setup` offers the packages in the [setup manifest](setup-manifest.json), and you can also install each one on its own.
-
-| Add this capability | Project |
+| Setting | Choice |
 |---|---|
-| Parallel specialists, isolated worktrees, and local session coordination | [pi-subagents](https://github.com/fitchmultz/pi-subagents) |
-| Reliable file edits and previews | [pi-apply-edits](https://github.com/fitchmultz/pi-apply-edits) |
-| Searchable access to configured MCP services | [pi-mcp-adapter](https://github.com/fitchmultz/pi-mcp-adapter) |
-| Browser automation, screenshots, and product QA | [pi-agent-browser-native](https://github.com/fitchmultz/pi-agent-browser-native) |
-| Task-specific procedures for debugging, QA, diagrams, and review | [pi-agent-skills](https://github.com/fitchmultz/pi-agent-skills) |
-| A focus on small, useful implementations | [ponytail](https://github.com/fitchmultz/ponytail) |
+| `images.autoResize` | Set `false` to preserve source image detail. The Claude image guard still applies. |
+| `compactView` | Optional. Requires a Pi runtime that supports compact view. |
+| `compaction` | The example reserves 64,000 tokens and retains 40,000 recent tokens. |
+| `modelContextWindows` | The manifest offers 300,000 tokens per route. Check route pricing before you increase a window. |
 
-The wider stack includes structured questions, persistent todos, working-directory changes, a calculator, context inspection, verbosity, timing, session editing, draft stash, and message copy. Browse the [complete extension catalog](docs/reference.md#enabled-extensions), [specialist profiles](docs/reference.md#subagent-bench), and [skill catalog](docs/reference.md#active-skills).
+Use `/reload` after changes to settings or other non-code resources. See the [configuration reference](docs/reference.md) for exact limits and options.
 
-MCP connections can bring GitHub, Linear, Slack, Cloudflare, Sentry, Datadog, Plain, Notion, Granola, or your organization's gateway into the coding workflow. Connections are optional and user-authenticated; setup does not provide service access. [Connection and trust details](docs/reference.md#connected-mcp-services) explain the boundaries.
+## Limits and safety
 
-[macuse](https://github.com/fitchmultz/macuse) is an experimental macOS add-on outside the core setup. It relies on private interfaces in ChatGPT's Computer Use runtime, which OpenAI can change without notice.
+Fast modes can increase provider charges. Read the [fast-mode reference](docs/reference.md#fast-modes) before you enable a fast mode.
 
-## Settings and safety
+Anthropic Opus fast mode is a research preview with doubled token rates. Ultrafast uses 6× API/credit pricing or 8× Codex included usage. Only exact `gpt-6-astra` on supported native OpenAI/Codex routes can use Ultrafast. Installation does not enable Ultrafast.
 
-Read the [settings example](examples/settings.json) before adopting it. Setup offers its keys separately, including image resizing and context-window budgets, and keeps existing choices unless you select a change. Compact view and integration instruction discovery need a Pi runtime that supports them; the kit doesn't patch or replace Pi to enable them.
+Footer status shows the requested policy. Check provider billing for actual charges.
 
-Extensions run with your operating-system permissions. Project trust and a working agreement aren't a sandbox, so choose trust settings for your environment. Your credentials, OAuth state, private endpoints, browser profiles, and raw sessions stay with you; the kit doesn't include or copy them.
+Extensions use your operating-system permissions. Project trust and working agreements do not create a sandbox. Select trust settings for your environment.
 
-After setup changes extension code or dependencies, start a fresh Pi process. Use `/reload` for settings and non-code resources.
+Service connections need your accounts and authentication. Credentials, private endpoints, browser profiles, and sessions stay outside the public kit. Setup does not patch or replace Pi.
 
-## Go deeper
+[macuse](https://github.com/fitchmultz/macuse) is an experimental macOS add-on outside the core setup. Its private ChatGPT runtime interfaces can change. Review its limits before installation.
 
-- [Configuration and workflow reference](docs/reference.md): exact commands, package channels, runtime behavior, migration notes, and full catalogs.
-- [How I actually use Pi](docs/pi-setup.md): a substantial task from connected context through implementation and delivery.
-- [Short setup overview](docs/pi-setup-post.md): the reasoning behind the composition.
-- [Development and validation](docs/development.md): local checks, regression commands, and CI host qualification.
+## Reference
+
+- [Configuration and workflow](docs/reference.md): commands, package sources, migration notes, and extension, agent, and skill catalogs.
+- [Full setup guide](docs/pi-setup.md): a task from service context through code changes and delivery.
+- [Setup overview](docs/pi-setup-post.md): how the components fit together.
+- [Development and validation](docs/development.md): local checks and CI details.
 - [Changelog](CHANGELOG.md): version history.
 
 ## License
