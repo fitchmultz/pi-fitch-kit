@@ -120,7 +120,7 @@ assert(manifest.optionalIntegrations.includes("GitHub"), "active GitHub MCP inte
 const mcp = manifest.corePackages.find(({ id }) => id === "mcp");
 assert(
   mcp?.source === "git:github.com/fitchmultz/pi-mcp-adapter",
-  "MCP adapter must use the secured public fork",
+  "MCP adapter must use its public source",
 );
 
 const agentSkills = manifest.corePackages.find(({ id }) => id === "agent-skills");
@@ -140,7 +140,7 @@ assert(
   "ask-question must use the owned scoped npm source for the structured question tool",
 );
 const ponytail = manifest.corePackages.find(({ id }) => id === "ponytail");
-assert(ponytail?.source === "git:github.com/fitchmultz/ponytail", "ponytail must use the maintained fork");
+assert(ponytail?.source === "git:github.com/fitchmultz/ponytail", "ponytail must use its public source");
 assert(!manifest.corePackages.some(({ id }) => id === "fff"), "fff is retired in favor of native repository search");
 for (const source of [
   "git:github.com/fitchmultz/pi-codex-context",
@@ -186,10 +186,10 @@ const editSession = manifest.corePackages.find(({ id }) => id === "edit-session"
 assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");
 
 const browser = manifest.corePackages.find(({ id }) => id === "agent-browser")?.externalPrerequisite;
-assert(/^\d+\.\d+\.\d+$/.test(browser?.version), "Agent Browser prerequisite must pin an exact version");
+assert(/^\d+\.\d+\.\d+$/.test(browser?.minimumVersion), "Agent Browser prerequisite must declare its minimum version");
 assert(
-  browser.installCommand === `npm install --global agent-browser@${browser.version}`,
-  "Agent Browser install must use the pinned version",
+  browser.installCommand === "npm install --global agent-browser",
+  "Agent Browser install must use the canonical package name without a version",
 );
 
 const setupPromptPath = manifest.kitResources.prompts.find((path) => path.endsWith("/fitch-setup.md"));
@@ -225,7 +225,7 @@ assert(setupPrompt.includes("openai-codex-fast.json"), "setup prompt must preser
 assert(setupPrompt.includes("retiredExtensionLinks"), "setup prompt must migrate approved extension collisions");
 assert(setupPrompt.includes("targetSuffix"), "setup prompt must verify retired link provenance");
 assert(setupPrompt.includes("pi-codex-context.json"), "setup prompt must preserve legacy compaction consent files");
-assert(setupPrompt.includes("apply the same filters to the fork"), "setup prompt must keep upstream Ponytail filters on the fork");
+assert(setupPrompt.includes("apply the same filters to the selected package"), "setup prompt must preserve Ponytail filters when replacing a retired source");
 assert(setupPrompt.includes("enable, disable, or keep"), "setup must offer explicit consent revocation");
 assert(setupPrompt.includes("filtered, pinned, or duplicate"), "setup must normalize stale kit package entries");
 assert(

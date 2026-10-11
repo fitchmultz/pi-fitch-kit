@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="640" viewBox="0 0 1600 640" role="img" aria-labelledby="title desc">
+  <title id="title">How the Fitch kit fits with Pi</title>
+  <desc id="desc">The kit loads bundled session tools, a theme, and setup prompts into the main Pi session. That session uses selected independent extensions including subagents, task-selected skills, and optional MCP services authenticated by the user. The three supporting branches are independent.</desc>
+  <defs>
+    <linearGradient id="canvas" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#060A12"/><stop offset="0.52" stop-color="#0B1120"/><stop offset="1" stop-color="#080C16"/>
+    </linearGradient>
+    <radialGradient id="blueBloom" cx="0.18" cy="0.18" r="0.8">
+      <stop stop-color="#2563EB" stop-opacity="0.20"/><stop offset="1" stop-color="#2563EB" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="violetBloom" cx="0.64" cy="0.46" r="0.7">
+      <stop stop-color="#8B5CF6" stop-opacity="0.14"/><stop offset="1" stop-color="#8B5CF6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#172238" stop-opacity="0.96"/><stop offset="1" stop-color="#0E1525" stop-opacity="0.98"/>
+    </linearGradient>
+    <linearGradient id="focus" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#172554" stop-opacity="0.90"/><stop offset="1" stop-color="#312E81" stop-opacity="0.64"/>
+    </linearGradient>
+    <pattern id="dotGrid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1.2" fill="#94A3B8" fill-opacity="0.08"/>
+    </pattern>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#02040A" flood-opacity="0.45"/>
+    </filter>
+    <marker id="arrowBlue" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 11 6 1 11Z" fill="#60A5FA"/></marker>
+    <marker id="arrowViolet" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 11 6 1 11Z" fill="#A78BFA"/></marker>
+    <marker id="arrowGreen" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 11 6 1 11Z" fill="#86EFAC"/></marker>
+    <style>
+      .sans { font-family: Inter, ui-sans-serif, Arial, sans-serif; }
+      .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+      .title { font: 700 38px Inter, ui-sans-serif, Arial, sans-serif; fill: #F8FAFC; letter-spacing: -0.8px; }
+      .card-title { font: 650 32px Inter, ui-sans-serif, Arial, sans-serif; fill: #F8FAFC; }
+      .copy { font: 450 26px Inter, ui-sans-serif, Arial, sans-serif; fill: #B9C7DD; }
+      .chip { font: 600 23px "JetBrains Mono", ui-monospace, monospace; }
+      .connector { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+  </defs>
+
+  <!-- Solid canvas and restrained depth use the fleet's dark glass tokens. -->
+  <rect width="1600" height="640" fill="url(#canvas)"/>
+  <rect width="1600" height="640" fill="url(#blueBloom)"/>
+  <rect width="1600" height="640" fill="url(#violetBloom)"/>
+  <rect width="1600" height="640" fill="url(#dotGrid)"/>
+  <text x="64" y="88" class="sans" font-size="48" font-weight="700" letter-spacing="-1" fill="#F8FAFC">One Pi session. A connected toolkit.</text>
+
+  <!-- Loads and uses are the only directed relationships; support branches are independent. -->
+  <g class="connector">
+    <path d="M440 376H532" stroke="#60A5FA" marker-end="url(#arrowBlue)"/>
+    <path d="M980 376H1024V227H1092" stroke="#60A5FA" marker-end="url(#arrowBlue)"/>
+    <path d="M980 376H1092" stroke="#A78BFA" marker-end="url(#arrowViolet)"/>
+    <path d="M980 376H1024V525H1092" stroke="#86EFAC" marker-end="url(#arrowGreen)"/>
+  </g>
+  <text x="486" y="352" text-anchor="middle" class="copy">loads</text>
+  <text x="1024" y="172" text-anchor="middle" class="copy">uses</text>
+
+  <!-- Package resources are distinct from separately selected components. -->
+  <g class="sans" filter="url(#shadow)">
+    <rect x="64" y="208" width="376" height="338" rx="26" fill="url(#glass)" stroke="#293750"/>
+    <rect x="64" y="208" width="5" height="338" rx="2.5" fill="#60A5FA"/>
+    <rect x="96" y="240" width="168" height="38" rx="19" fill="#172554" stroke="#3B82F6" stroke-opacity="0.5"/>
+    <text x="180" y="266" text-anchor="middle" class="chip" fill="#93C5FD">THE KIT</text>
+    <text x="96" y="328" class="title">pi-fitch-kit</text>
+    <text x="96" y="378" class="copy">Bundled session tools</text>
+    <text x="96" y="418" class="copy">Calm theme</text>
+    <text x="96" y="458" class="copy">Setup + audit prompts</text>
+    <text x="96" y="508" class="chip" fill="#93C5FD">/fitch-setup</text>
+
+    <rect x="540" y="208" width="440" height="338" rx="28" fill="url(#focus)" stroke="#6D7DFF" stroke-opacity="0.62"/>
+    <circle cx="594" cy="264" r="23" fill="#60A5FA" fill-opacity="0.16" stroke="#60A5FA" stroke-opacity="0.55"/>
+    <path d="m594 251 4 9 9 4-9 4-4 9-4-9-9-4 9-4Z" fill="#BFDBFE"/>
+    <text x="636" y="274" class="chip" fill="#AFC6FF">MAIN SESSION</text>
+    <text x="574" y="346" class="title">Your Pi session</text>
+    <text x="574" y="393" class="copy">Owns the task and result</text>
+    <text x="574" y="433" class="copy">Choose your components</text>
+    <rect x="574" y="476" width="372" height="38" rx="19" fill="#0C1425" stroke="#38517A"/>
+    <text x="760" y="502" text-anchor="middle" class="chip" fill="#B9C7DD">Official Pi / Fitch Pi</text>
+
+    <rect x="1100" y="164" width="436" height="126" rx="22" fill="url(#glass)" stroke="#293750"/>
+    <rect x="1100" y="164" width="5" height="126" rx="2.5" fill="#60A5FA"/>
+    <text x="1130" y="212" class="card-title">Public extensions</text>
+    <text x="1130" y="259" class="copy">Tools, browser, subagents</text>
+
+    <rect x="1100" y="313" width="436" height="126" rx="22" fill="url(#glass)" stroke="#3D3556"/>
+    <rect x="1100" y="313" width="5" height="126" rx="2.5" fill="#A78BFA"/>
+    <text x="1130" y="361" class="card-title">Task-selected skills</text>
+    <text x="1130" y="408" class="copy">Reusable working procedures</text>
+
+    <rect x="1100" y="462" width="436" height="126" rx="22" fill="url(#glass)" stroke="#285043"/>
+    <rect x="1100" y="462" width="5" height="126" rx="2.5" fill="#86EFAC"/>
+    <text x="1130" y="510" class="card-title">Optional MCP services</text>
+    <text x="1130" y="557" class="copy">Your accounts + authentication</text>
+  </g>
+</svg>

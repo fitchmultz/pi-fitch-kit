@@ -100,8 +100,8 @@
       "source": "git:github.com/fitchmultz/pi-agent-browser-native",
       "externalPrerequisite": {
         "package": "agent-browser",
-        "version": "0.38.1",
-        "installCommand": "npm install --global agent-browser@0.38.1",
+        "minimumVersion": "0.38.1",
+        "installCommand": "npm install --global agent-browser",
         "runtimeDownloadCommand": "agent-browser install"
       }
     },
