@@ -4,8 +4,6 @@ Fitch Kit adds session tools and a setup prompt to [Pi](https://github.com/earen
 
 ![The kit loads session tools into Pi, which uses selected public extensions, task-specific skills, and optional authenticated MCP services.](.github/readme/kit-overview.png)
 
-*The kit loads its tools into Pi. Setup adds the components you select.*
-
 ## Install
 
 Use **Node.js 24.15+** and **Pi 1.0.0+**. The kit supports official Pi and [Fitch Pi](https://github.com/fitchmultz/pi).
