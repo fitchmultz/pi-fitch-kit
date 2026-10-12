@@ -14,7 +14,7 @@ import {
 	type ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
 import { Container, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
-import { fitClaudeRequest, prepareClaudeImages } from "./anthropic-image-guard.ts";
+import { fitClaudeRequest, prepareClaudeImages, sharedImageCache } from "./anthropic-image-guard.ts";
 
 export const WRITE_PROMPT_FILE = "write-prompt.json";
 const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Restore original", "Deny"] as const;
@@ -163,7 +163,8 @@ export function flattenToolHistory(messages: Message[]): Message[] {
 			});
 			continue;
 		}
-		out.push(message);
+		// Image preparation replaces only message.content; a shallow copy keeps history intact.
+		out.push({ ...message });
 	}
 	return out;
 }
@@ -183,14 +184,14 @@ async function completeWriter(
 		content: [{ type: "text", text: userText }],
 		timestamp: Date.now(),
 	};
-	const outgoing = flattenToolHistory(structuredClone([...messages, pending]));
-	await prepareClaudeImages(model, outgoing);
+	const outgoing = flattenToolHistory([...messages, pending]);
+	await prepareClaudeImages(model, outgoing, sharedImageCache());
 	if (signal?.aborted) return undefined;
 	const context = { systemPrompt, messages: outgoing };
 	const options = {
 		signal, cacheRetention: "short" as const, sessionId,
 		reasoning: thinkingLevel === "off" ? undefined : thinkingLevel,
-		onPayload: (payload: unknown) => fitClaudeRequest(model, payload),
+		onPayload: (payload: unknown) => fitClaudeRequest(model, payload, sharedImageCache()),
 	};
 	const response = await ctx.modelRegistry.streamSimple(model, context, options).result();
 	if (response.stopReason === "aborted") return undefined;

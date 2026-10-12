@@ -1,6 +1,6 @@
 {
   "name": "@fitch/pi-kit",
-  "version": "0.17.2",
+  "version": "0.17.3",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -10,7 +10,7 @@
   "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "npm run typecheck && node scripts/image-guard-smoke.mjs && node scripts/image-budget-regression.mjs && npm run regression:clean-footer && npm run regression:fast-mode && npm run regression:session-name && npm run regression:write-prompt && npm run regression:paged-reader && npm run smoke:lifecycle && node scripts/validate.mjs && node --test scripts/validate-regression.mjs",
+    "check": "tsc --noEmit && node --test scripts/image-guard-smoke.mjs scripts/image-budget-regression.mjs scripts/clean-footer-regression.mjs scripts/fast-mode-regression.ts scripts/session-name-regression.ts scripts/write-prompt-regression.ts scripts/write-prompt-boundary.mjs scripts/paged-reader-regression.ts scripts/setup-lifecycle-smoke.mjs scripts/validate.mjs scripts/validate-regression.mjs",
     "check:compat": "npm run check && npm run smoke",
     "typecheck": "tsc --noEmit",
     "regression:clean-footer": "node scripts/clean-footer-regression.mjs",

@@ -597,32 +597,34 @@ assert.equal(sent, undefined);
 
 for (const role of ["user", "toolResult"]) {
 	const imageCapture: Array<{ type?: string; mimeType?: string; text?: string }> = [];
+	const history = [
+		{
+			type: "message",
+			id: "u1",
+			parentId: null,
+			timestamp: "2026-01-01T00:00:00.000Z",
+			message: {
+				role,
+				...(role === "toolResult" ? { toolCallId: "image", toolName: "browser", isError: false } : {}),
+				content: [
+					{
+						type: "image",
+						data: "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAATCwAAEwsAAAAAAAAAAAAAAAD/AA==",
+						mimeType: "image/bmp",
+					},
+				],
+				timestamp: 1,
+			},
+		},
+	];
+	const saved = structuredClone(history);
 	sent = undefined;
 	await commands["draft"].handler(
 		"after image",
 		ctx({
 			model: { id: "claude-opus-5", provider: "anthropic", api: "anthropic-messages" },
 			sessionManager: {
-				getEntries: () => [
-					{
-						type: "message",
-						id: "u1",
-						parentId: null,
-						timestamp: "2026-01-01T00:00:00.000Z",
-						message: {
-							role,
-							...(role === "toolResult" ? { toolCallId: "image", toolName: "browser", isError: false } : {}),
-							content: [
-								{
-									type: "image",
-									data: "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAATCwAAEwsAAAAAAAAAAAAAAAD/AA==",
-									mimeType: "image/bmp",
-								},
-							],
-							timestamp: 1,
-						},
-					},
-				],
+				getEntries: () => history,
 				getLeafId: () => "u1",
 			},
 			modelRegistry: {
@@ -648,6 +650,7 @@ for (const role of ["user", "toolResult"]) {
 	);
 	assert.equal(imageCapture.some((part) => part.type === "image"), false);
 	assert.match(imageCapture.map((part) => part.text ?? "").join("\n"), /does not support this image type/);
+	assert.deepEqual(history, saved, "writer image preparation must not rewrite saved history");
 }
 
 // Cancelling a TUI loader aborts its pending API call, and the late result is harmless.

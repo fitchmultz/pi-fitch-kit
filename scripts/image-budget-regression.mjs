@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Offline regressions through the real resizer and Anthropic serializer. No network.
 import assert from "node:assert/strict";
+import { createHook } from "node:async_hooks";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,13 +10,15 @@ import { fileURLToPath } from "node:url";
 const agentDir = mkdtempSync(join(tmpdir(), "pi-image-budget-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
 process.on("exit", () => rmSync(agentDir, { recursive: true, force: true }));
-const { prepareClaudeImages, fitClaudeRequest } = await import("../extensions/anthropic-image-guard.ts");
+const { prepareClaudeImages, fitClaudeRequest, sharedImageCache } = await import("../extensions/anthropic-image-guard.ts");
 const { default: fastMode } = await import("../extensions/fast-mode.ts");
 const { anthropicMessagesApi } = await import("@earendil-works/pi-ai/compat");
 const ai = await import("@earendil-works/pi-ai");
 const { loadPhoton } = await import(new URL("./utils/photon.js", import.meta.resolve("@earendil-works/pi-coding-agent")));
 const photon = await loadPhoton();
 assert.ok(photon);
+let workers = 0;
+createHook({ init(_id, type) { if (type === "WORKER") workers++; } }).enable();
 const model = {
 	api: "anthropic-messages", id: "claude-opus-5", provider: "anthropic",
 	baseUrl: "https://offline.invalid", reasoning: false, input: ["text", "image"],
@@ -112,6 +115,13 @@ if (!selected || selected === "wire") {
 	// The writer's native callback also works without the fast-mode provider override.
 	const writer = await capture(native.streamSimple, { onPayload: (payload) => fitClaudeRequest(model, payload) });
 	assert.ok(writer.bytes <= 32_000_000);
+	// Every over-limit turn resends the same captures; the shared cache must spare them native work.
+	const repeated = { onPayload: (payload) => fitClaudeRequest(model, payload, sharedImageCache()) };
+	const first = await capture(native.streamSimple, repeated);
+	const beforeRepeat = workers;
+	const repeat = await capture(native.streamSimple, repeated);
+	assert.equal(workers - beforeRepeat, 0, "a repeated over-limit request must reuse its native results");
+	assert.deepEqual(repeat.body, first.body, "repeated requests resend identical image bytes");
 	const toolPayload = { messages: [{ role: "user", content: [{ type: "tool_result", tool_use_id: "capture", content: originals.flatMap((message) => message.content).map((part) => part.type === "image" ? { type: "image", source: { type: "base64", data: part.data, media_type: part.mimeType } } : part) }] }] };
 	await fitClaudeRequest(model, toolPayload);
 	assert.ok(Buffer.byteLength(JSON.stringify(toolPayload)) <= 32_000_000);

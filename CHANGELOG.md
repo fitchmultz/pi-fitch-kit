@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.17.3 — 12 October 2026
+
+- Stop re-resizing every capture on each Claude request over Anthropic's 32 MB limit. A capture keeps its request-size result while it still fits, the running size is tracked without reserializing the request after every resize, and idle workers start the next largest captures early. With thirty 1080p captures, each later request drops from about 10 s to 73 ms and the first from 10 s to 2.9 s. In a session growing from 24 to 30 captures, every request matched the previous output byte for byte while dropping from 4.6–11.2 s to 0.06–1.1 s.
+- Decode cold Claude context images in up to four native workers at once (twelve mixed captures: 3.7 s to 1.2 s). `/draft` and `/side-question` reuse the guard's results instead of decoding every capture again (3.6 s to about 1 ms) and no longer clone the session history.
+- Add worker-count regressions for writer reuse and repeated over-limit requests, and check that writer image preparation leaves saved history untouched.
+- Run `npm run check` in parallel through Node's built-in test runner after type-checking: 16.8 s to 4.4 s locally. The individual regression commands are unchanged.
+
 ## 0.17.2 — 9 October 2026
 
 - Fix repeated Claude image decoding once a request contains more than eight distinct captures. Cache by an estimated 128 MiB source-and-result byte budget, and retain a bounded request-start snapshot so LRU eviction cannot turn the entire next request into cache misses.

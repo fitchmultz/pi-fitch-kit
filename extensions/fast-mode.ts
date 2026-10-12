@@ -9,7 +9,7 @@ import {
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { fitClaudeRequest } from "./anthropic-image-guard.ts";
+import { fitClaudeRequest, sharedImageCache } from "./anthropic-image-guard.ts";
 
 // Anthropic's fast-mode research preview bills double and rejects the `speed`
 // field without its beta header, so payload and header must travel together.
@@ -250,7 +250,7 @@ function fastStream(
 		...baseOptions,
 		onPayload: async (payload, requestModel) => {
 			const replaced = await baseOptions?.onPayload?.(payload, requestModel);
-			return fitClaudeRequest(requestModel, replaced === undefined ? payload : replaced);
+			return fitClaudeRequest(requestModel, replaced === undefined ? payload : replaced, sharedImageCache());
 		},
 	};
 	// toolChoice is shared by both APIs; explicit reasoning identifies a simple call.
