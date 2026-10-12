@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHook } from "node:async_hooks";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 // Optional host root and extension path support read-only native host/RED probes.
@@ -18,17 +18,18 @@ mkdirSync(agentDir);
 process.env.PI_CODING_AGENT_DIR = agentDir;
 process.env.PI_OFFLINE = "1";
 process.on("exit", () => rmSync(temp, { recursive: true, force: true }));
-const { DefaultResourceLoader, SettingsManager } = await import(sdkPath);
+const { DefaultResourceLoader, SessionManager, SettingsManager } = await import(sdkPath);
+const guardPath = process.argv[3] ?? fileURLToPath(new URL("../extensions/anthropic-image-guard.ts", import.meta.url));
 const loader = new DefaultResourceLoader({
 	cwd, agentDir, settingsManager: SettingsManager.inMemory({}),
-	additionalExtensionPaths: [process.argv[3] ?? fileURLToPath(new URL("../extensions/anthropic-image-guard.ts", import.meta.url))],
+	additionalExtensionPaths: [guardPath, join(dirname(guardPath), "write-prompt.ts")],
 	noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
 });
 await loader.reload();
 const loaded = loader.getExtensions();
 assert.deepEqual(loaded.errors, []);
-assert.equal(loaded.extensions.length, 1);
-const handlers = loaded.extensions[0].handlers;
+assert.equal(loaded.extensions.length, 2);
+const [{ handlers }, writer] = loaded.extensions;
 const { loadPhoton } = await import(new URL("./utils/photon.js", sdkPath));
 const photon = await loadPhoton();
 assert.ok(photon);
@@ -106,6 +107,33 @@ for (const count of [16, 40]) {
 	}
 }
 console.log(JSON.stringify({ nativeCache: cacheReceipts, sdkPath }));
+
+// Pi gives each extension its own module instance; the writer must still reuse
+// the guard's results instead of decoding the session's captures again.
+await runHandlers("session_start");
+const writerSession = SessionManager.inMemory(cwd);
+for (const [timestamp, data] of captures.slice(0, 4).entries()) {
+	writerSession.appendMessage({ role: "user", timestamp, content: [{ type: "image", data, mimeType: "image/png" }] });
+}
+const beforeGuard = workers;
+await context({ messages: writerSession.buildSessionContext().messages }, { model: anthropicModel });
+assert.equal(workers - beforeGuard, 4, "the guard decodes each capture once");
+let writerRequest;
+const beforeWriter = workers;
+await writer.commands.get("draft").handler("reuse guard results", {
+	hasUI: true, mode: "rpc", isIdle: () => true, model: anthropicModel, thinkingLevel: "off",
+	getSystemPrompt: () => "", sessionManager: writerSession,
+	modelRegistry: { streamSimple: (_model, request) => {
+		writerRequest = request;
+		return { result: async () => ({ role: "assistant", content: [{ type: "text", text: "draft" }], stopReason: "stop" }) };
+	} },
+	ui: { notify() {}, select: async () => "Deny" },
+});
+assert.equal(workers - beforeWriter, 0, "the writer reuses the guard's native results");
+assert.deepEqual(
+	writerRequest.messages.flatMap(({ content }) => content).filter(({ type }) => type === "image").map(({ data }) => data),
+	captures.slice(0, 4),
+);
 
 const nonAnthropic = [{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] }];
 const beforeNonClaude = workers;
