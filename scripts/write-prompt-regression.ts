@@ -521,7 +521,7 @@ const fakeTheme = { fg: (_color: string, text: string) => text };
 const smallTui = { requestRender() {}, terminal: { rows: 20 } };
 const scrolledView = dialogFactory!(smallTui, fakeTheme, {}, (value) => chosen.push(value));
 const firstPage = scrolledView.render(80);
-assert.ok(firstPage.length <= 20, `clipped dialog must fit a 20-row viewport, got ${firstPage.length}`);
+assert.ok(firstPage.length <= 15, `clipped dialog must fit a 20-row viewport minus the dock reserve, got ${firstPage.length}`);
 assert.ok(firstPage.some((line) => /line 1 of/.test(line)), "starts at the top of the draft");
 assert.ok(!firstPage.some((line) => /line 40 of/.test(line)), "the last line is initially below the fold");
 assert.ok(firstPage.some((line) => /below/.test(line) && /scroll/.test(line)), "clipped drafts show a position indicator with the scroll keys");
@@ -533,6 +533,17 @@ assert.ok(!bottom.join("\n").includes("below"), "no lines remain below at the en
 for (let i = 0; i < 10; i += 1) scrolledView.handleInput("\x1b[5~");
 const backToTop = scrolledView.render(80);
 assert.ok(backToTop.some((line) => /line 1 of/.test(line)), "PageUp returns to the top");
+// The dialog renders in the editor dock slot under the chat tail and the
+// footer; its budget must reserve for those dock-mates, and the indicator
+// must stay one line even at widths where its natural text would wrap.
+const narrowView = dialogFactory!({ requestRender() {}, terminal: { rows: 20 } }, fakeTheme, {}, (value) => chosen.push(value));
+narrowView.handleInput("\x1b[6~");
+const narrowPage = narrowView.render(50);
+assert.ok(narrowPage.length <= 15, `clipped dialog must fit rows minus the five-line dock reserve, got ${narrowPage.length}`);
+assert.ok(narrowPage.some((line) => /scroll/.test(line)), "the truncated indicator still names the scroll keys at width 50");
+const firstPageAgain = scrolledView.render(80);
+assert.ok(firstPageAgain.length <= 15, `wide clipped dialog must fit rows minus the dock reserve, got ${firstPageAgain.length}`);
+
 const tallView = dialogFactory!({ requestRender() {}, terminal: { rows: 200 } }, fakeTheme, {}, (value) => chosen.push(value));
 const full = tallView.render(80);
 assert.ok(full.some((line) => /line 1 of/.test(line)) && full.some((line) => /line 40 of/.test(line)), "tall terminals show the whole draft");

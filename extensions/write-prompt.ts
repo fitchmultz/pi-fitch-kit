@@ -13,7 +13,7 @@ import {
 	type ExtensionAPI,
 	type ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
-import { getKeybindings, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
+import { getKeybindings, SelectList, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { fitClaudeRequest, prepareClaudeImages, sharedImageCache } from "./anthropic-image-guard.ts";
 
 export const WRITE_PROMPT_FILE = "write-prompt.json";
@@ -288,6 +288,12 @@ function pickAction(ctx: ExtensionCommandContext, draft: string, actions: readon
 			0,
 		);
 		const children = [topBorder, draftText, scrollHint, spacer, list, hints, bottomBorder];
+		// The dialog renders inside the TUI's editor dock slot below the chat
+		// transcript (minimum one line) and the footer (two lines built-in,
+		// up to about four with extension statuses). The slot height is not
+		// queryable, so the budget reserves for those dock-mates; if a footer
+		// ever exceeds the reserve, the bottom border is the first line lost.
+		const DOCK_RESERVE = 5;
 		let scrollTop = 0;
 		let viewportLines = 1;
 		let contentLines = 0;
@@ -309,7 +315,7 @@ function pickAction(ctx: ExtensionCommandContext, draft: string, actions: readon
 					...hints.render(width),
 					...bottomBorder.render(width),
 				];
-				const free = rows - chrome.length;
+				const free = rows - chrome.length - (Number.isFinite(rows) ? DOCK_RESERVE : 0);
 				if (!Number.isFinite(free) || content.length <= free) {
 					// Everything fits (or no viewport is reported): original layout.
 					viewportLines = Number.isFinite(free) ? Math.max(1, free) : content.length;
@@ -317,15 +323,15 @@ function pickAction(ctx: ExtensionCommandContext, draft: string, actions: readon
 					return [chrome[0], ...content, ...chrome.slice(1)];
 				}
 				// One line of the free budget goes to the position indicator.
+				// It is truncated to a single line so it can never wrap and
+				// push the render past the budget on narrow terminals.
 				viewportLines = Math.max(1, free - 1);
 				scrollTop = Math.min(scrollTop, content.length - viewportLines);
 				const above = scrollTop;
 				const below = content.length - scrollTop - viewportLines;
+				const indicator = `${above > 0 ? `↑ ${above} line${above === 1 ? "" : "s"} above · ` : ""}${below > 0 ? `↓ ${below} line${below === 1 ? "" : "s"} below · ` : ""}${rawKeyHint("PgUp/PgDn", "scroll")}`;
 				scrollHint.setText(
-					theme.fg(
-						"muted",
-						`${above > 0 ? `↑ ${above} line${above === 1 ? "" : "s"} above · ` : ""}${below > 0 ? `↓ ${below} line${below === 1 ? "" : "s"} below · ` : ""}${rawKeyHint("PgUp/PgDn", "scroll")}`,
-					),
+					theme.fg("muted", truncateToWidth(indicator, Math.max(1, width - 2), "")),
 				);
 				return [
 					chrome[0],
