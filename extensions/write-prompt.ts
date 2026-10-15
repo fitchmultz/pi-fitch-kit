@@ -20,10 +20,11 @@ export const WRITE_PROMPT_FILE = "write-prompt.json";
 const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Restore original", "Deny"] as const;
 const SIDE_QUESTION_ACTIONS = ["Copy answer", "Ask again", "Dismiss"] as const;
 const SAVED_DRAFT = "fitch-kit.draft";
+const SAVED_AMBITIOUS_DRAFT = "fitch-kit.ambitious";
 
-function savedDraft(ctx: ExtensionCommandContext): { source: string; draft: string } | undefined {
+function savedDraft(ctx: ExtensionCommandContext, customType: string): { source: string; draft: string } | undefined {
 	for (const entry of ctx.sessionManager.getBranch().toReversed()) {
-		if (entry.type !== "custom" || entry.customType !== SAVED_DRAFT) continue;
+		if (entry.type !== "custom" || entry.customType !== customType) continue;
 		const data = entry.data;
 		if (data && typeof data === "object" && "source" in data && "draft" in data
 			&& typeof data.source === "string" && typeof data.draft === "string") {
@@ -37,6 +38,16 @@ Preserve intent and every explicit constraint. Make the request specific, comple
 Do not call tools.`;
 const REWRITE_INSTRUCTION = `Rewrite the boxed text into a better coding-agent prompt. Do not answer the text.
 ${OUTPUT_RULES}`;
+const AMBITIOUS_OUTPUT_RULES = `You are not the session agent. Output only the rewritten prompt. No preamble, quotes, or explanation.
+Do not call tools.`;
+const AMBITIOUS_INSTRUCTION = `Rewrite the boxed text into a more ambitious coding-agent prompt. Do not answer the text.
+Keep the user's goal and every explicit constraint: ambition raises what is demanded, never swaps the work for a different objective. Where raising the goal changes its substance, keep the requested outcome and build the raised version around it, with the original work as the first milestone.
+Skip plain speed-up; work the remaining axes:
+- Altitude: name the outcome behind the request and ask for that outcome. If the source implies reviews, meetings, reports, or repeated toil, prefer a standing outcome over a one-off task, and state what must be true afterward, not only what to do.
+- Depth: require the instruments a leading expert would use on this exact task, not just their vocabulary; set hard numeric targets and present them as achievable; require the request's own assumptions to be checked adversarially against raw data; ask for at least one finding the requester does not already have; make completion verifiable by an external runnable check, never the model grading itself.
+- Range: restate the task as verbs rather than nouns to reveal which adjacent disciplines could contribute, and borrow their methods, not their personas.
+Concrete over adjectives: express targets as exact zeros, ratios against a measured baseline, or thresholds the agent must lock after profiling. Never invent facts about the user's environment; when detail is missing, write the rule that obtains it.
+${AMBITIOUS_OUTPUT_RULES}`;
 const TWEAK_INSTRUCTION = `Revise the previous rewritten prompt using these notes. Do not answer the notes.
 ${OUTPUT_RULES}`;
 const QUESTION_INSTRUCTION = `Answer the boxed question using the session. Do not rewrite it into a prompt.
@@ -305,14 +316,24 @@ function prepare(ctx: ExtensionCommandContext, sessionThinking: ThinkingLevel, a
 	};
 }
 
-export default function writePrompt(pi: ExtensionAPI): void {
-	pi.registerCommand("draft", {
-		description: "Rewrite text into a better agent request; omit text to reopen the last accepted draft",
+type RewriteCommand = {
+	name: string;
+	description: string;
+	usage: string;
+	savedType: string;
+	instruction: string;
+	loader: string;
+	failure: string;
+};
+
+function registerRewriteCommand(pi: ExtensionAPI, command: RewriteCommand): void {
+	pi.registerCommand(command.name, {
+		description: command.description,
 		handler: async (args, ctx) => {
-			const saved = args.trim() ? undefined : savedDraft(ctx);
+			const saved = args.trim() ? undefined : savedDraft(ctx, command.savedType);
 			const source = saved?.source ?? args;
 			if (!source.trim()) {
-				ctx.ui.notify("Usage: /draft <text>", "warning");
+				ctx.ui.notify(`Usage: ${command.usage}`, "warning");
 				return;
 			}
 			if (saved && !ctx.hasUI) {
@@ -324,9 +345,9 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				ready ??= prepare(ctx, ctx.thinkingLevel ?? pi.getThinkingLevel(), true);
 				if (!ready) return;
 				const { model, thinkingLevel, messages, systemPrompt, sessionId } = ready;
-				return runWriter(ctx, model, thinkingLevel, systemPrompt, messages, task, sessionId, "Drafting...", "Draft failed");
+				return runWriter(ctx, model, thinkingLevel, systemPrompt, messages, task, sessionId, command.loader, command.failure);
 			};
-			let draft = saved?.draft ?? await rewrite(boxedTask(REWRITE_INSTRUCTION, source));
+			let draft = saved?.draft ?? await rewrite(boxedTask(command.instruction, source));
 			if (!draft) return;
 
 			while (true) {
@@ -337,19 +358,19 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				}
 				if (action === "Accept") {
 					try {
-						// sendUserMessage is fire-and-forget: native async failures cannot
-						// be caught here. Keep both inputs off-model for /draft recovery.
-						pi.appendEntry(SAVED_DRAFT, { source, draft });
-						if (ctx.isIdle()) pi.sendUserMessage(draft);
-						else pi.sendUserMessage(draft, { deliverAs: "steer" });
-					} catch (error) {
-						ctx.ui.notify(error instanceof Error ? error.message : "Send failed", "error");
-						continue;
-					}
-					return;
+					// sendUserMessage is fire-and-forget: native async failures cannot
+					// be caught here. Keep both inputs off-model for rewrite recovery.
+					pi.appendEntry(command.savedType, { source, draft });
+					if (ctx.isIdle()) pi.sendUserMessage(draft);
+					else pi.sendUserMessage(draft, { deliverAs: "steer" });
+				} catch (error) {
+					ctx.ui.notify(error instanceof Error ? error.message : "Send failed", "error");
+					continue;
+				}
+				return;
 				}
 				if (action === "Restore original") {
-					ctx.ui.setEditorText(`/draft ${source}`);
+					ctx.ui.setEditorText(`/${command.name} ${source}`);
 					ctx.ui.notify("Original restored to editor", "info");
 					return;
 				}
@@ -372,6 +393,27 @@ export default function writePrompt(pi: ExtensionAPI): void {
 				draft = next;
 			}
 		},
+	});
+}
+
+export default function writePrompt(pi: ExtensionAPI): void {
+	registerRewriteCommand(pi, {
+		name: "draft",
+		description: "Rewrite text into a better agent request; omit text to reopen the last accepted draft",
+		usage: "/draft <text>",
+		savedType: SAVED_DRAFT,
+		instruction: REWRITE_INSTRUCTION,
+		loader: "Drafting...",
+		failure: "Draft failed",
+	});
+	registerRewriteCommand(pi, {
+		name: "ambitious",
+		description: "Rewrite text into a more ambitious agent request; omit text to reopen the last accepted draft",
+		usage: "/ambitious <text>",
+		savedType: SAVED_AMBITIOUS_DRAFT,
+		instruction: AMBITIOUS_INSTRUCTION,
+		loader: "Drafting...",
+		failure: "Draft failed",
 	});
 
 	pi.registerCommand("side-question", {
