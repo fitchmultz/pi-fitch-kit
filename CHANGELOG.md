@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.18.2 — 15 October 2026
+
+- Teach the `/ambitious` writer how to use the session conversation. Both rewrite commands receive the conversation, but the ambition axes invite reasoning beyond the boxed request — and mid-conversation that "beyond" resolved to the chat history, so rewrites could reference earlier turns, drift toward the session's agenda, or argue with decisions already made. The instruction now states the conversation is context, not content: use it to resolve what the source refers to (project, entities, current state), never answer, restate, or re-litigate it, apply the axes to the boxed request only, and emit a standalone prompt with no references to earlier turns. `/draft` is unchanged.
+- Pin the conversation clause in the writer regression's instruction-content assertions.
+
 ## 0.18.1 — 15 October 2026
 
 - Keep the `/draft` and `/ambitious` review dialog fully readable in small terminals. The TUI dialog previously rendered the whole draft and let the terminal clip it with no way back to the cut-off text; it now sizes the draft region to the viewport, shows a position indicator (lines above/below), and scrolls with PageUp/PageDown through the standard `tui.select.pageUp`/`tui.select.pageDown` bindings while arrows, Enter, and Escape keep driving the action list. Tall terminals and hosts without a reported viewport keep the previous layout unchanged.

@@ -328,6 +328,8 @@ await commands["ambitious"].handler(
 );
 assert.match(ambitiousTask ?? "", /Altitude/);
 assert.match(ambitiousTask ?? "", /Range/);
+assert.match(ambitiousTask ?? "", /conversation is context, not content/, "conversation handling is part of the ambition instruction");
+assert.match(ambitiousTask ?? "", /no references to earlier turns/, "the rewrite must stand alone");
 assert.doesNotMatch(ambitiousTask ?? "", /Rewrite the boxed text into a better coding-agent prompt/);
 assert.equal(sent, "better prompt");
 assert.equal(sendOptions, undefined, "idle acceptance keeps normal delivery");
