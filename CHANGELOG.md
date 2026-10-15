@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.18.1 — 15 October 2026
+
+- Keep the `/draft` and `/ambitious` review dialog fully readable in small terminals. The TUI dialog previously rendered the whole draft and let the terminal clip it with no way back to the cut-off text; it now sizes the draft region to the viewport, shows a position indicator (lines above/below), and scrolls with PageUp/PageDown through the standard `tui.select.pageUp`/`tui.select.pageDown` bindings while arrows, Enter, and Escape keep driving the action list. Tall terminals and hosts without a reported viewport keep the previous layout unchanged.
+- The budget reserves five rows for the dialog's dock-mates (chat tail minimum plus a footer of up to about four lines, since the slot height is not queryable), and the position indicator is truncated to one line so it cannot wrap past the budget on narrow terminals. Extend the writer regressions with a small-viewport dialog pass: the clipped dialog fits the viewport minus the dock reserve, the indicator is present, PageDown reaches the last line, PageUp returns to the top, a 50-column render after paging still fits, tall terminals render everything with no indicator, Enter still confirms, and acceptance still sends the full draft.
+
 ## 0.18.0 — 15 October 2026
 
 - Add `/ambitious <text>` to the write-prompt writer: the same off-transcript rewrite, accept/copy/tweak/restore/deny dialog, busy steering, and `write-prompt.json` overrides as `/draft`, with a fixed ambition instruction instead of a neutral rewrite. It raises the request along altitude (outcome behind the request), depth (expert instruments, adversarial assumption checks, hard numeric targets, an external runnable judge), and range (methods from adjacent disciplines, not personas) while keeping the stated goal and constraints. Accepted ambitious drafts save under their own session entry type (`fitch-kit.ambitious`); blank `/ambitious` reopens the last accepted ambitious draft, and neither command reopens the other's drafts.

@@ -13,7 +13,7 @@ import {
 	type ExtensionAPI,
 	type ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
-import { Container, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
+import { getKeybindings, SelectList, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { fitClaudeRequest, prepareClaudeImages, sharedImageCache } from "./anthropic-image-guard.ts";
 
 export const WRITE_PROMPT_FILE = "write-prompt.json";
@@ -255,10 +255,14 @@ async function runWriter(
 function pickAction(ctx: ExtensionCommandContext, draft: string, actions: readonly string[]) {
 	if (ctx.mode !== "tui") return ctx.ui.select(draft, [...actions]);
 	return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
-		const root = new Container();
-		root.addChild(new DynamicBorder((s) => theme.fg("border", s)));
-		root.addChild(new Text(theme.fg("text", draft), 1, 0));
-		root.addChild(new Spacer(1));
+		// The dialog must stay fully readable in small terminals: the draft is
+		// clipped to the viewport and scrolled with PageUp/PageDown instead of
+		// being cut off by the TUI with no way back. Select keys are unchanged.
+		const topBorder = new DynamicBorder((s) => theme.fg("border", s));
+		const bottomBorder = new DynamicBorder((s) => theme.fg("border", s));
+		const draftText = new Text(theme.fg("text", draft), 1, 0);
+		const scrollHint = new Text(theme.fg("muted", ""), 1, 0);
+		const spacer = new Spacer(1);
 		const list = new SelectList(
 			actions.map((value) => ({ value, label: value })),
 			actions.length,
@@ -272,24 +276,77 @@ function pickAction(ctx: ExtensionCommandContext, draft: string, actions: readon
 		);
 		list.onSelect = (item) => done(item.value);
 		list.onCancel = () => done(undefined);
-		root.addChild(list);
-		root.addChild(new Spacer(1));
-		root.addChild(
-			new Text(
-				rawKeyHint("↑↓", "navigate") +
-					"  " +
-					keyHint("tui.select.confirm", "select") +
-					"  " +
-					keyHint("tui.select.cancel", "cancel"),
-				1,
-				0,
-			),
+		const hints = new Text(
+			rawKeyHint("↑↓", "navigate") +
+				"  " +
+				keyHint("tui.select.confirm", "select") +
+				"  " +
+				keyHint("tui.select.cancel", "cancel") +
+				"  " +
+				keyHint("tui.select.pageUp", "scroll long drafts"),
+			1,
+			0,
 		);
-		root.addChild(new DynamicBorder((s) => theme.fg("border", s)));
+		const children = [topBorder, draftText, scrollHint, spacer, list, hints, bottomBorder];
+		// The dialog renders inside the TUI's editor dock slot below the chat
+		// transcript (minimum one line) and the footer (two lines built-in,
+		// up to about four with extension statuses). The slot height is not
+		// queryable, so the budget reserves for those dock-mates; if a footer
+		// ever exceeds the reserve, the bottom border is the first line lost.
+		const DOCK_RESERVE = 5;
+		let scrollTop = 0;
+		let viewportLines = 1;
+		let contentLines = 0;
+		const scrollPage = (direction: 1 | -1) => {
+			const step = Math.max(1, viewportLines);
+			scrollTop = Math.max(0, Math.min(Math.max(0, contentLines - viewportLines), scrollTop + direction * step));
+			tui.requestRender();
+		};
 		return {
-			render: (width) => root.render(width),
-			invalidate: () => root.invalidate(),
-			handleInput: (data) => {
+			render: (width: number) => {
+				const rows = Number.isFinite(tui.terminal.rows) ? tui.terminal.rows : Number.POSITIVE_INFINITY;
+				const content = draftText.render(width);
+				contentLines = content.length;
+				const chrome = [
+					...topBorder.render(width),
+					...spacer.render(width),
+					...list.render(width),
+					...spacer.render(width),
+					...hints.render(width),
+					...bottomBorder.render(width),
+				];
+				const free = rows - chrome.length - (Number.isFinite(rows) ? DOCK_RESERVE : 0);
+				if (!Number.isFinite(free) || content.length <= free) {
+					// Everything fits (or no viewport is reported): original layout.
+					viewportLines = Number.isFinite(free) ? Math.max(1, free) : content.length;
+					scrollTop = 0;
+					return [chrome[0], ...content, ...chrome.slice(1)];
+				}
+				// One line of the free budget goes to the position indicator.
+				// It is truncated to a single line so it can never wrap and
+				// push the render past the budget on narrow terminals.
+				viewportLines = Math.max(1, free - 1);
+				scrollTop = Math.min(scrollTop, content.length - viewportLines);
+				const above = scrollTop;
+				const below = content.length - scrollTop - viewportLines;
+				const indicator = `${above > 0 ? `↑ ${above} line${above === 1 ? "" : "s"} above · ` : ""}${below > 0 ? `↓ ${below} line${below === 1 ? "" : "s"} below · ` : ""}${rawKeyHint("PgUp/PgDn", "scroll")}`;
+				scrollHint.setText(
+					theme.fg("muted", truncateToWidth(indicator, Math.max(1, width - 2), "")),
+				);
+				return [
+					chrome[0],
+					...content.slice(scrollTop, scrollTop + viewportLines),
+					...scrollHint.render(width),
+					...chrome.slice(1),
+				];
+			},
+			invalidate: () => {
+				for (const child of children) child.invalidate();
+			},
+			handleInput: (data: string) => {
+				const kb = getKeybindings();
+				if (kb.matches(data, "tui.select.pageUp")) return scrollPage(-1);
+				if (kb.matches(data, "tui.select.pageDown")) return scrollPage(1);
 				list.handleInput(data);
 				tui.requestRender();
 			},

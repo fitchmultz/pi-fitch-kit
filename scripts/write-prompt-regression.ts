@@ -478,6 +478,80 @@ await commands["draft"].handler(
 assert.ok(painted.some(([color, text]) => color === "text" && text === "better prompt"));
 assert.equal(sent, "better prompt");
 
+// Long drafts clip to the TUI viewport and scroll with PageUp/PageDown
+// instead of being cut off. Select keys keep working through the same view.
+const longDraft = Array.from({ length: 40 }, (_, i) => `line ${i + 1} of the rewritten prompt`).join("\n");
+const themeKey = Symbol.for("@earendil-works/pi-coding-agent:theme");
+const globalRecord = globalThis as unknown as Record<symbol, unknown>;
+const priorGlobalTheme = globalRecord[themeKey];
+globalRecord[themeKey] = { fg: (_color: string, text: string) => text };
+type DialogView = { render: (width: number) => string[]; invalidate: () => void; handleInput: (data: string) => unknown };
+let dialogFactory: ((tui: unknown, theme: unknown, kb: unknown, done: (value: string) => void) => DialogView) | undefined;
+const chosen: string[] = [];
+let customSequence = 0;
+sent = undefined;
+await commands.draft.handler(
+	"tall draft",
+	ctx({
+		mode: "tui",
+		modelRegistry: {
+			find: () => undefined,
+			hasConfiguredAuth: () => true,
+			complete: async () => ({
+				role: "assistant",
+				content: [{ type: "text", text: longDraft }],
+				stopReason: "stop",
+			}),
+		},
+		ui: {
+			...baseUi,
+			custom: (async (factory?: (tui: unknown, theme: unknown, kb: unknown, done: (value: string) => void) => DialogView) => {
+				// First custom call is the off-transcript loader; the second is the dialog.
+				customSequence += 1;
+				if (customSequence === 1) return longDraft;
+				if (factory) dialogFactory = factory;
+				return "Accept";
+			}) as never,
+		},
+	}) as never,
+);
+assert.equal(sent, longDraft, "dialog acceptance still sends the full draft");
+assert.ok(dialogFactory, "the dialog view factory was invoked");
+const fakeTheme = { fg: (_color: string, text: string) => text };
+const smallTui = { requestRender() {}, terminal: { rows: 20 } };
+const scrolledView = dialogFactory!(smallTui, fakeTheme, {}, (value) => chosen.push(value));
+const firstPage = scrolledView.render(80);
+assert.ok(firstPage.length <= 15, `clipped dialog must fit a 20-row viewport minus the dock reserve, got ${firstPage.length}`);
+assert.ok(firstPage.some((line) => /line 1 of/.test(line)), "starts at the top of the draft");
+assert.ok(!firstPage.some((line) => /line 40 of/.test(line)), "the last line is initially below the fold");
+assert.ok(firstPage.some((line) => /below/.test(line) && /scroll/.test(line)), "clipped drafts show a position indicator with the scroll keys");
+for (let i = 0; i < 10; i += 1) scrolledView.handleInput("\x1b[6~");
+const bottom = scrolledView.render(80);
+assert.ok(bottom.some((line) => /line 40 of/.test(line)), "PageDown reaches the last line");
+assert.ok(bottom.some((line) => /above/.test(line)), "bottom page reports lines above");
+assert.ok(!bottom.join("\n").includes("below"), "no lines remain below at the end");
+for (let i = 0; i < 10; i += 1) scrolledView.handleInput("\x1b[5~");
+const backToTop = scrolledView.render(80);
+assert.ok(backToTop.some((line) => /line 1 of/.test(line)), "PageUp returns to the top");
+// The dialog renders in the editor dock slot under the chat tail and the
+// footer; its budget must reserve for those dock-mates, and the indicator
+// must stay one line even at widths where its natural text would wrap.
+const narrowView = dialogFactory!({ requestRender() {}, terminal: { rows: 20 } }, fakeTheme, {}, (value) => chosen.push(value));
+narrowView.handleInput("\x1b[6~");
+const narrowPage = narrowView.render(50);
+assert.ok(narrowPage.length <= 15, `clipped dialog must fit rows minus the five-line dock reserve, got ${narrowPage.length}`);
+assert.ok(narrowPage.some((line) => /scroll/.test(line)), "the truncated indicator still names the scroll keys at width 50");
+const firstPageAgain = scrolledView.render(80);
+assert.ok(firstPageAgain.length <= 15, `wide clipped dialog must fit rows minus the dock reserve, got ${firstPageAgain.length}`);
+
+const tallView = dialogFactory!({ requestRender() {}, terminal: { rows: 200 } }, fakeTheme, {}, (value) => chosen.push(value));
+const full = tallView.render(80);
+assert.ok(full.some((line) => /line 1 of/.test(line)) && full.some((line) => /line 40 of/.test(line)), "tall terminals show the whole draft");
+assert.ok(!full.join("\n").match(/above|below/), "no indicator when nothing is clipped");
+scrolledView.handleInput("\r");
+assert.deepEqual(chosen, ["Accept"], "Enter still confirms the action through the scrollable scrolledView");
+globalRecord[themeKey] = priorGlobalTheme;
+
 notices.length = 0;
 sent = undefined;
 await commands["draft"].handler(
@@ -859,7 +933,7 @@ for (const action of ["Accept", "Restore original"] as const) {
 				if (++calls === 1) return "better prompt";
 				return new Promise((resolve) => {
 					const menu = factory(
-						{ requestRender() {} },
+						{ requestRender() {}, terminal: { rows: 40 } },
 						{ fg: (_color: string, text: string) => text },
 						{},
 						resolve,
