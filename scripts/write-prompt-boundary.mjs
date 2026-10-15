@@ -199,11 +199,14 @@ try {
 		const leaf = sm.getLeafId();
 		const file = sm.getSessionFile();
 		const journal = file && existsSync(file) ? readFileSync(file) : undefined;
-		for (const [command, followup, dismiss] of [["draft", "Tweak", "Deny"], ["side-question", "Ask again", "Dismiss"]]) {
+		for (const [command, followup, dismiss] of [["draft", "Tweak", "Deny"], ["ambitious", "Tweak", "Deny"], ["side-question", "Ask again", "Dismiss"]]) {
 			const start = requests.length;
 			actions.push(followup, dismiss);
 			await session.prompt(`/${command} SOURCE_SENTINEL`);
 			assert.equal(requests.length - start, 2, `${label} /${command} must complete and follow up`);
+			if (command !== "side-question") {
+				assert.match(JSON.stringify(requests[start]), new RegExp(`Rewrite the boxed text into a ${command === "ambitious" ? "more ambitious" : "better"} coding-agent prompt`), `${label} /${command} instruction`);
+			}
 			for (const body of requests.slice(start)) check(body, history);
 			assert.match(JSON.stringify(requests[start + 1]), /WRITER_REPLY.*FOLLOWUP_SENTINEL/);
 			assert.equal(actions.length, 0);
@@ -334,6 +337,26 @@ try {
 	await session.waitForIdle();
 	assert.equal(requests.length, beforeRecovery + 1, "retry sends the retained draft without rewriting it");
 	assert.equal(sendErrors.length, 1, "retry succeeds");
+	// /ambitious delivers through the same native path, saves under its own
+	// entry type, and recovers through its own command without a rewrite.
+	actions.push("Accept");
+	await session.prompt("/ambitious AMBITIOUS_ORIGINAL");
+	await until(() => recovered.getBranch().filter((entry) => entry.type === "message"
+		&& entry.message.role === "user" && ai.contentText(entry.message.content) === "WRITER_REPLY").length === 4);
+	await session.waitForIdle();
+	const ambitiousBackup = recovered.getBranch().findLast((entry) => entry.type === "custom" && entry.customType === "fitch-kit.ambitious");
+	assert.deepEqual(ambitiousBackup.data, { source: "AMBITIOUS_ORIGINAL", draft: "WRITER_REPLY" });
+	const ambitiousRecoveryFile = join(temp, "ambitious-recovery.jsonl");
+	writeFileSync(ambitiousRecoveryFile, [recovered.getHeader(), ...recovered.getBranch()].map((entry) => JSON.stringify(entry)).join("\n") + "\n");
+	await close();
+	const ambitiousRecovered = sdk.SessionManager.open(ambitiousRecoveryFile, temp);
+	await open(ambitiousRecovered);
+	const beforeAmbitiousRecovery = requests.length;
+	actions.push("Restore original");
+	await session.prompt("/ambitious");
+	assert.equal(editorText, "/ambitious AMBITIOUS_ORIGINAL");
+	assert.equal(requests.length, beforeAmbitiousRecovery, "ambitious recovery does not spend another writer call");
+	console.log(`PASS ${api}: ambitious accept, saved-entry scoping, and resumed recovery`);
 	console.log(`PASS ${api}: native idle send, busy steering, async failure preservation and resumed retry`);
 	assert.equal(notices.some((notice) => notice.level === "error"), false, JSON.stringify(notices));
 	assert.ok(lifecycle.includes("startup"));

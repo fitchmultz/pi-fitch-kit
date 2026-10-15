@@ -11,7 +11,7 @@
   - `extensions/session-name.ts` for stable, searchable session naming and protected role identifiers.
   - `extensions/paged-reader.ts` for bounded reader pages, section notes, native session state, and linked replies.
   - `extensions/setup-models.ts` for read-only model availability in the running Pi session during setup.
-  - `extensions/write-prompt.ts` for `/draft` rewrite, `/side-question` off-transcript answers, accept/copy/tweak/deny, and `write-prompt.json` model override.
+  - `extensions/write-prompt.ts` for `/draft` rewrite, `/ambitious` ambition rewrites, `/side-question` off-transcript answers, accept/copy/tweak/deny, and `write-prompt.json` model override.
   - `examples/settings.json` for the safe, non-secret behavioral settings subset.
   - `setup-manifest.json` for unpinned package sources, required model routes, and kit resources.
   - `templates/working-agreement.md` for the optional managed working-agreement blocks.
@@ -52,7 +52,7 @@
 - OpenAI Ultrafast is opt-in, global by default with optional `--session` metadata override and `reset --session` to inherit. Keep the existing shared state file and legacy priority meaning; global commands never clear local overrides. Preserve same-ID persistence and new-ID isolation. Local off suppresses kit tier injection, not native defaults. Follow [fast-mode reference](docs/reference.md#fast-modes) for the command, status, startup, access, and pricing contracts.
 - Gate Ultrafast by exact `gpt-6-astra`, native global/US OpenAI Responses or Codex Responses route, and serialized payload model. Unsupported routes never fall back to priority. Use the stock payload hook without an OpenAI provider override or routing header; native cost accounting/diagnostics remain separate Pi work. Installation never opts in.
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
-- Keep `extensions/write-prompt.ts` off the main transcript: native provider-neutral streaming completion without tools, session provider/model/thinking inheritance with optional `write-prompt.json` overrides, flattened tool history retaining result images, built-in dialogs, and `copyToClipboard` for Copy. Only `/draft` Accept calls `sendUserMessage`; preserve busy steering and original/draft recovery. `/side-question` never sends.
+- Keep `extensions/write-prompt.ts` off the main transcript: native provider-neutral streaming completion without tools, session provider/model/thinking inheritance with optional `write-prompt.json` overrides, flattened tool history retaining result images, built-in dialogs, and `copyToClipboard` for Copy. Only `/draft` and `/ambitious` Accept calls `sendUserMessage`; preserve busy steering and original/draft recovery, and keep ambitious saved drafts scoped to their own session entry type. `/side-question` never sends.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's recommended baseline.
 - Do not reintroduce a kit `/restart`; the fork supplies native restart and official Pi users quit and relaunch.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.

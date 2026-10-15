@@ -295,6 +295,92 @@ await commands.draft.handler("", recovery as never);
 assert.equal(restored, `/draft ${original}`, "saved recovery does not require a working writer configuration");
 rmSync(join(agentDir, WRITE_PROMPT_FILE));
 
+// /ambitious shares the writer and dialog with /draft but keeps its own
+// instruction, saved entries, and recovery. The two must stay isolated.
+notices.length = 0;
+sent = undefined;
+await commands["ambitious"].handler("", ctx() as never);
+assert.equal(notices[0], "Usage: /ambitious <text>");
+assert.equal(sent, undefined, "saved /draft entries must not reopen as /ambitious");
+
+notices.length = 0;
+await commands["ambitious"].handler("no UI", ctx({ hasUI: false }) as never);
+assert.match(notices[0] ?? "", /interactive UI/);
+
+sent = undefined;
+let ambitiousTask: string | undefined;
+await commands["ambitious"].handler(
+	"raise the thing",
+	ctx({
+		modelRegistry: {
+			find: () => undefined,
+			hasConfiguredAuth: () => true,
+			complete: async (_model: unknown, context: { messages: Array<{ content: Array<{ type: string; text?: string }> }> }) => {
+				ambitiousTask = (context.messages[0]?.content ?? []).map((part) => part.text ?? "").join("");
+				return { role: "assistant", content: [{ type: "text", text: "better prompt" }], stopReason: "stop" };
+			},
+		},
+		ui: {
+			...baseUi,
+			select: async () => "Accept",
+		},
+	}) as never,
+);
+assert.match(ambitiousTask ?? "", /Altitude/);
+assert.match(ambitiousTask ?? "", /Range/);
+assert.doesNotMatch(ambitiousTask ?? "", /Rewrite the boxed text into a better coding-agent prompt/);
+assert.equal(sent, "better prompt");
+assert.equal(sendOptions, undefined, "idle acceptance keeps normal delivery");
+
+sent = undefined;
+let ambitiousIdle = true;
+await commands["ambitious"].handler("busy raise", ctx({
+	isIdle: () => ambitiousIdle,
+	ui: {
+		...baseUi,
+		select: async () => {
+			ambitiousIdle = false;
+			return "Accept";
+		},
+	},
+}) as never);
+assert.equal(sent, "better prompt", "Accept must not discard an ambitious draft when the agent becomes busy");
+assert.deepEqual(sendOptions, { deliverAs: "steer" });
+
+// Recovery is scoped per command: an ambitious entry reopens through
+// /ambitious without a writer call and restores the /ambitious invocation.
+sent = undefined;
+let ambitiousRestored: string | undefined;
+const ambitiousOriginal = "ambitious original input";
+savedDrafts.push({ type: "custom", customType: "fitch-kit.ambitious", data: { source: ambitiousOriginal, draft: "ambitious prompt" } });
+const ambitiousRecovery = ctx({
+	modelRegistry: { complete: () => { throw new Error("ambitious recovery must not rewrite"); } },
+	ui: {
+		...baseUi,
+		select: async (title: string) => {
+			assert.equal(title, "ambitious prompt");
+			return "Restore original";
+		},
+		setEditorText: (text: string) => { ambitiousRestored = text; },
+	},
+});
+ambitiousRecovery.sessionManager.getBranch = () => savedDrafts as never;
+await commands["ambitious"].handler("", ambitiousRecovery as never);
+assert.equal(ambitiousRestored, `/ambitious ${ambitiousOriginal}`);
+assert.equal(notices.at(-1), "Original restored to editor");
+
+// The plain command ignores ambitious entries entirely.
+notices.length = 0;
+let draftSawAmbitious: string | undefined;
+const draftIsolation = ctx({
+	modelRegistry: { complete: () => { throw new Error("isolation must not rewrite"); } },
+	ui: { ...baseUi, select: async () => "Deny", setEditorText: (text: string) => { draftSawAmbitious = text; } },
+});
+draftIsolation.sessionManager.getBranch = () => [savedDrafts.findLast((entry) => entry.customType === "fitch-kit.ambitious")] as never;
+await commands.draft.handler("", draftIsolation as never);
+assert.equal(notices[0], "Usage: /draft <text>", "saved /ambitious entries must not reopen as /draft");
+assert.equal(draftSawAmbitious, undefined);
+
 notices.length = 0;
 await commands["side-question"].handler("busy question", ctx({ isIdle: () => false }) as never);
 assert.equal(notices[0], "Agent is busy", "side-question behavior is unchanged");

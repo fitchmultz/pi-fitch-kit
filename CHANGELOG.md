@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.18.0 — 15 October 2026
+
+- Add `/ambitious <text>` to the write-prompt writer: the same off-transcript rewrite, accept/copy/tweak/restore/deny dialog, busy steering, and `write-prompt.json` overrides as `/draft`, with a fixed ambition instruction instead of a neutral rewrite. It raises the request along altitude (outcome behind the request), depth (expert instruments, adversarial assumption checks, hard numeric targets, an external runnable judge), and range (methods from adjacent disciplines, not personas) while keeping the stated goal and constraints. Accepted ambitious drafts save under their own session entry type (`fitch-kit.ambitious`); blank `/ambitious` reopens the last accepted ambitious draft, and neither command reopens the other's drafts.
+- Cover the new command in the writer regressions (usage, UI requirement, idle and busy acceptance, instruction content, saved-entry isolation, recovery without a writer call) and in the native HTTP boundary for every API route, including instruction transport, accept delivery, saved-entry scoping, and journal-backed recovery.
+
 ## 0.17.3 — 12 October 2026
 
 - Stop re-resizing every capture on each Claude request over Anthropic's 32 MB limit. A capture keeps its request-size result while it still fits, the running size is tracked without reserializing the request after every resize, and idle workers start the next largest captures early. With thirty 1080p captures, each later request drops from about 10 s to 73 ms and the first from 10 s to 2.9 s. In a session growing from 24 to 30 captures, every request matched the previous output byte for byte while dropping from 4.6–11.2 s to 0.06–1.1 s.

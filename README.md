@@ -45,6 +45,7 @@ The package loads seven extensions, two prompts, and the `calm` theme. Setup ins
 | Command | Use |
 |---|---|
 | `/draft <text>` | Rewrite a request in a separate dialog. Review the result before you accept it. |
+| `/ambitious <text>` | Rewrite a request to be more ambitious: outcome over task, expert instruments, hard targets, and outside verification. Same dialog as `/draft`. |
 | `/side-question <text>` | Ask a question with session context. The answer stays outside the main conversation. |
 | `/reader demo` | Open a sample document without a model call. Press Right/Space for the next page. Press Left for the previous page. Press Escape to close. |
 | `/reader` or `/reader list` | Show the saved page or document list. Press `N` to write a section note. Use Ctrl+Enter to request a response. |
@@ -54,7 +55,7 @@ The package loads seven extensions, two prompts, and the `calm` theme. Setup ins
 
 Session names help you find saved sessions. The Claude image guard adapts Claude images to provider limits. The setup model tool reads the current model registry without a provider call.
 
-`/draft` and `/side-question` make model calls with your current provider, model, and thinking level. See [writer settings](docs/reference.md#draft-provider-model-and-thinking) and [reader controls](docs/reference.md#extensions-bundled-by-this-kit) for details.
+`/draft`, `/ambitious`, and `/side-question` make model calls with your current provider, model, and thinking level. See [writer settings](docs/reference.md#draft-provider-model-and-thinking) and [reader controls](docs/reference.md#extensions-bundled-by-this-kit) for details.
 
 ## Settings
 
