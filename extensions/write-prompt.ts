@@ -21,6 +21,7 @@ const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Restore origina
 const SIDE_QUESTION_ACTIONS = ["Copy answer", "Ask again", "Dismiss"] as const;
 const SAVED_DRAFT = "fitch-kit.draft";
 const SAVED_AMBITIOUS_DRAFT = "fitch-kit.ambitious";
+const AMBITIOUS_MAX_CHARACTERS = 1800;
 
 function savedDraft(ctx: ExtensionCommandContext, customType: string): { source: string; draft: string } | undefined {
 	for (const entry of ctx.sessionManager.getBranch().toReversed()) {
@@ -38,17 +39,20 @@ Preserve intent and every explicit constraint. Make the request specific, comple
 Do not call tools.`;
 const REWRITE_INSTRUCTION = `Rewrite the boxed text into a better coding-agent prompt. Do not answer the text.
 ${OUTPUT_RULES}`;
-const AMBITIOUS_OUTPUT_RULES = `You are not the session agent. Output only the rewritten prompt. No preamble, quotes, or explanation.
-Do not call tools.`;
 const AMBITIOUS_INSTRUCTION = `Rewrite the boxed text into a more ambitious coding-agent prompt. Do not answer the text.
-The session conversation is context, not content: use it only to resolve what the boxed text refers to — the project, entities, and current state it assumes. The rewrite must stand alone with no references to earlier turns ("as discussed above", "the same as before"); do not answer, restate, or argue with the conversation, and do not re-litigate decisions already made there. Every rule below applies to the boxed request only.
-Keep the goal stated in the boxed text and every explicit constraint: ambition raises what is demanded, never swaps the work for a different objective. Where raising the goal changes its substance, keep the requested outcome and build the raised version around it, with the original work as the first milestone.
-Skip plain speed-up; work the remaining axes:
-- Altitude: name the outcome behind the request and ask for that outcome. If the source implies reviews, meetings, reports, or repeated toil, prefer a standing outcome over a one-off task, and state what must be true afterward, not only what to do.
-- Depth: require the instruments a leading expert would use on this exact task, not just their vocabulary; set hard numeric targets and present them as achievable; require the boxed request's assumptions to be checked adversarially against raw data; ask for at least one finding the requester does not already have; make completion verifiable by an external runnable check, never the model grading itself.
-- Range: restate the task as verbs rather than nouns to reveal which adjacent disciplines could contribute, and borrow their methods, not their personas.
-Concrete over adjectives: express targets as exact zeros, ratios against a measured baseline, or thresholds the agent must lock after profiling. Never invent facts about the user's environment; when detail is missing, write the rule that obtains it.
-${AMBITIOUS_OUTPUT_RULES}`;
+The boxed request defines the task. Use project instructions and the session conversation as evidence, not as additional tasks to answer.
+At conversation start, use only the request and available project context; never invent prior decisions, work, measurements, or results.
+Mid-conversation, carry forward the relevant goal, latest settled decisions, constraints, and current state, including unfinished work. Distinguish verified facts from proposals, hypotheses, and reported progress that still needs checking. Ignore superseded and unrelated material. Respect settled choices unless the boxed request explicitly changes them.
+Make the prompt standalone: include the context needed to act, with no references to earlier turns ("as discussed", "continue the above") and no transcript recap.
+Raise ambition where it serves the user's outcome, not by adding work to tick every axis:
+- Altitude: state the outcome behind the task. For recurring toil, reports, or reviews, retain the requested deliverable and seek a reusable mechanism that achieves the underlying outcome; verify that its timing or triggers actually serve that outcome, rather than merely calling the artifact repeatable. For a deliberately bounded task, deepen execution rather than invent a standing workflow. Never replace the user's goal or override constraints.
+- Depth: demand task-appropriate expert methods on primary evidence, adversarial checks of consequential assumptions, and concrete acceptance criteria verified by an external runnable check, not self-assessment. Seek useful blind spots when they help this outcome, not a mandatory extra discovery.
+- Range: borrow a specific useful method from an adjacent discipline when it improves the result; omit forced disciplines, personas, and ceremony.
+Keep supplied numeric targets. For improvement work, demand a challenging, testable target justified by a measured baseline, not a token speed-up or a promise of feasibility. Use exact correctness invariants where appropriate. Never invent arbitrary numbers, tools, environment details, or claimed findings. For unspecified semantic choices such as identity or conflict resolution, require establishing the existing contract rather than choosing a policy for the user.
+Use compact direct prose, usually one to three short paragraphs. Every sentence must carry a necessary goal, constraint, method, or check. Omit ambition labels, repeated instructions, exhaustive speculative checklists, and commentary.
+Maximum ${AMBITIOUS_MAX_CHARACTERS} Unicode characters including whitespace; use less whenever sufficient. Compress wording and optional elaboration, never drop constraints or truncate the prompt.
+Preserve intent and every explicit constraint. Keep inferred details conditional rather than presenting assumptions as requirements; unconfirmed mechanisms and extra test dimensions apply only if inspection finds them in the project.
+You are not the session agent. Output only the rewritten prompt. No preamble, quotes, or explanation. Do not call tools.`;
 const TWEAK_INSTRUCTION = `Revise the previous rewritten prompt using these notes. Do not answer the notes.
 ${OUTPUT_RULES}`;
 const QUESTION_INSTRUCTION = `Answer the boxed question using the session. Do not rewrite it into a prompt.
@@ -380,6 +384,8 @@ type RewriteCommand = {
 	usage: string;
 	savedType: string;
 	instruction: string;
+	tweakInstruction: string;
+	maxCharacters?: number;
 	loader: string;
 	failure: string;
 };
@@ -403,7 +409,13 @@ function registerRewriteCommand(pi: ExtensionAPI, command: RewriteCommand): void
 				ready ??= prepare(ctx, ctx.thinkingLevel ?? pi.getThinkingLevel(), true);
 				if (!ready) return;
 				const { model, thinkingLevel, messages, systemPrompt, sessionId } = ready;
-				return runWriter(ctx, model, thinkingLevel, systemPrompt, messages, task, sessionId, command.loader, command.failure);
+				const originalTask = task;
+				for (let attempt = 0; attempt < 2; attempt++) {
+					const next = await runWriter(ctx, model, thinkingLevel, systemPrompt, messages, task, sessionId, command.loader, command.failure);
+					if (!next || !command.maxCharacters || [...next].length <= command.maxCharacters) return next;
+					task = `${originalTask}\n\nThe last draft exceeded ${command.maxCharacters} Unicode characters. Shorten it to fit. Preserve the boxed request, relevant session context, and revision notes. Remove optional elaboration, not requirements. Do not truncate.`;
+				}
+				ctx.ui.notify(`/${command.name} exceeded ${command.maxCharacters} characters twice; no new draft offered. Retry with a narrower request or use /draft for a longer prompt.`, "error");
 			};
 			let draft = saved?.draft ?? await rewrite(boxedTask(command.instruction, source));
 			if (!draft) return;
@@ -445,7 +457,7 @@ function registerRewriteCommand(pi: ExtensionAPI, command: RewriteCommand): void
 				const notes = await ctx.ui.editor("Tweak notes");
 				if (!notes?.trim()) continue;
 				const next = await rewrite(
-					boxedTask(TWEAK_INSTRUCTION, `Original request:\n${source}\n\nCurrent draft:\n${draft}\n\nRevision notes:\n${notes.trim()}`),
+					boxedTask(command.tweakInstruction, `Original request:\n${source}\n\nCurrent draft:\n${draft}\n\nRevision notes:\n${notes.trim()}`),
 				);
 				if (!next) continue;
 				draft = next;
@@ -461,6 +473,7 @@ export default function writePrompt(pi: ExtensionAPI): void {
 		usage: "/draft <text>",
 		savedType: SAVED_DRAFT,
 		instruction: REWRITE_INSTRUCTION,
+		tweakInstruction: TWEAK_INSTRUCTION,
 		loader: "Drafting...",
 		failure: "Draft failed",
 	});
@@ -470,6 +483,8 @@ export default function writePrompt(pi: ExtensionAPI): void {
 		usage: "/ambitious <text>",
 		savedType: SAVED_AMBITIOUS_DRAFT,
 		instruction: AMBITIOUS_INSTRUCTION,
+		tweakInstruction: `${AMBITIOUS_INSTRUCTION}\nRevise the current draft using the revision notes.`,
+		maxCharacters: AMBITIOUS_MAX_CHARACTERS,
 		loader: "Drafting...",
 		failure: "Draft failed",
 	});

@@ -45,7 +45,7 @@ The package loads seven extensions, two prompts, and the `calm` theme. Setup ins
 | Command | Use |
 |---|---|
 | `/draft <text>` | Rewrite a request in a separate dialog. Review the result before you accept it. |
-| `/ambitious <text>` | Rewrite a request to be more ambitious: outcome over task, expert instruments, hard targets, and outside verification. Same dialog as `/draft`. |
+| `/ambitious <text>` | A concise, context-aware, more ambitious request: outcome, expert methods, justified targets, and runnable verification. Maximum 1,800 characters; same dialog as `/draft`. |
 | `/side-question <text>` | Ask a question with session context. The answer stays outside the main conversation. |
 | `/reader demo` | Open a sample document without a model call. Press Right/Space for the next page. Press Left for the previous page. Press Escape to close. |
 | `/reader` or `/reader list` | Show the saved page or document list. Press `N` to write a section note. Use Ctrl+Enter to request a response. |
