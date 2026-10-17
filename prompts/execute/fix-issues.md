@@ -5,6 +5,11 @@ argument-hint: "[scope]"
 
 Act as the orchestrator for this project until all issues/tasks are cleared up. No bailing out.
 
+Manual workflow prerequisites:
+- This retained prompt is not registered by the kit. Delegated phases require a compatible installed delegation runtime with documented effective-profile discovery, bounded launches, fresh contexts, asynchronous completion/status, and review artifacts. Native Pi and the kit do not supply that runtime.
+- Inspect the available tools and installed owner's current docs, then discover executable effective profiles, instructions, routing, filters, and overrides. Select profiles by the task's capabilities, not presumed packaged names; do not create aliases or copies.
+- If a required delegation capability is unavailable, report the exact prerequisite and leave the dependent phase incomplete. If required independent review is unavailable, keep the review gate unsatisfied; never substitute parent self-review or silently waive an explicit named-reviewer or model-family requirement.
+
 You are the parent orchestrator:
 - Own the plan, sequencing, quality bar, issue/PR state, verification, release decisions, and final status.
 - Use subagents for delegated scouting, implementation, and review where useful.
@@ -15,7 +20,7 @@ You are the parent orchestrator:
 Model/delegation policy:
 - Use configured subagent defaults for delegated changes, scouting, implementation, and review.
 - Override model or thinking only when a concrete routing, provider-capability, model-diversity, or cost requirement justifies it.
-- Treat `anthropic/*` as this environment's subagents-only Claude Code CLI route for fresh-context UI/fallback diversity, not a global Pi provider model or fork-transcript import path; do not use it as primary or fallback routing for forked invocations. Use fresh context with a compact handoff instead.
+- When the installed delegation owner documents `anthropic/*` as a Claude Code CLI route, use it for fresh-context UI/fallback diversity, not as a global Pi provider model or fork-transcript import path. Do not use that route for forked invocations; use fresh context with a compact handoff instead.
 - Delegate bounded tasks with clear scope, target files/systems, constraints, expected output, and validation requirements.
 - The parent orchestrator must review all outputs, inspect diffs, run verification, decide what lands, and write the user-facing status.
 
@@ -61,7 +66,7 @@ Workflow:
 4. Implement and delegate
    - Use isolated task worktrees and clean branches for focused PRs; preserve unrelated work and coordinate overlapping owners.
    - Gather context before editing.
-   - Delegate implementation/scouting to the configured worker, scout, researcher, or context-builder defaults when useful.
+   - Delegate implementation, code mapping, research, or context assembly to suitable effective profiles when useful.
    - Keep the parent orchestrator responsible for final decisions.
    - Add or update tests for behavior changes.
    - Update docs/changelog/config/scripts when behavior or user workflow changes.
@@ -69,9 +74,9 @@ Workflow:
 
 5. Review loop
    - Run strict review before merge.
-   - Use the configured `reviewer-gpt` defaults; override them only for a concrete routing or provider-capability requirement. Add `reviewer-claude` only when the change warrants cross-model coverage.
+   - Select a fresh independent reviewer from the effective executable inventory with suitable instructions and routing. Preserve explicit named-reviewer and model-family requirements, required human reviews, and repository protections. Add a second model family when the change warrants cross-model coverage; verify the actual model used, including fallbacks.
    - Remediate every blocking finding, plus every non-blocking one whose fix is small and low risk; file the rest as follow-ups.
-   - Launch the reviewer with `async: true` and repeat review/fix/review until it reports no blocking finding.
+   - Launch the reviewer through the installed owner's documented asynchronous lifecycle and repeat review/fix/review until it reports no blocking finding. A missing, failed, stale, or incomplete review is not sign-off.
    - Do not merge on passing tests alone if review finds unresolved structural or behavior risk.
 
 6. Verification

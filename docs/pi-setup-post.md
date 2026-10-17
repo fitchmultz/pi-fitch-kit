@@ -23,7 +23,7 @@ The normal path includes:
 - small public tools for structured questions, persistent todos, working-directory changes, deterministic math, `/ctx` context inspection, timing, verbosity, stash, session editing, and raw message copy;
 - [`ponytail`](https://github.com/fitchmultz/ponytail) to keep the code path boring and small.
 
-The kit itself bundles stable session naming, read-only model status for setup, the Claude image boundary, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, `/ambitious`, and `/side-question`. The profiles ship directly with `pi-subagents`, so there is no second copy or sync layer.
+The kit itself bundles stable session naming, read-only model status for setup, the Claude image boundary, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, `/ambitious`, and `/side-question`. Delegation packages own their profile defaults; the kit neither requires them nor keeps a second copy or sync layer.
 
 OpenAI Ultrafast works globally by default, like Fast. `/ultrafast` means toggle; `on` selects Ultrafast, `off` disables kit OpenAI tiers, and `toggle` changes Ultrafast to off or any other shared mode to Ultrafast. Add `--session` to on/off/toggle to override only this session with Ultrafast or off; status also accepts `--session` but never writes an override. `/ultrafast reset --session` clears that override and follows the current shared setting; reset without `--session` is invalid.
 
@@ -41,9 +41,11 @@ I keep `images.autoResize` off so agents can inspect original image detail. Anth
 
 ## Subagents
 
-The sixteen `pi-subagents` specialist profiles cover scouting, context assembly, debugging, research, planning, monitoring, bounded implementation, focused fixes, general review, GPT review, Claude review, security review, over-engineering review, UI review, oracle decisions, and writing. Its general-purpose `delegate` remains available beside them.
+With a compatible delegation package, select effective executable profiles for scouting, implementation, review, and other useful briefs. Do not assume a fixed roster or infer review suitability from a profile name.
 
-The owning [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents) files define each role's models and ordered fallbacks. The kit preserves user and project overrides, including cross-family reviewers. The settings example selects Astra through a ChatGPT/Codex subscription at medium reasoning, falling back to an OpenAI API key.
+The owning package's current docs and effective inventory define routing and ordered fallbacks. The kit preserves user and project overrides, including cross-family reviewers. Setup inspects profiles, offers child-run settings, and considers legacy profile migration only when that owner is selected or confirmed installed; it checks existence and replacement provenance before reading trees or unlinking anything. The settings example selects Astra through a ChatGPT/Codex subscription at medium reasoning, falling back to an OpenAI API key.
+
+The optional process block requires independent review, not a sibling-only profile identifier. Explicit named-reviewer, model-family, human-review, and repository-protection requirements remain binding. If required review is unavailable, setup reports the missing prerequisite and the gate stays unsatisfied; self-review cannot replace it.
 
 Use fresh context for bounded independent work. Helpers may delegate useful subwork when their role and native recursion/resource limits permit it; the parent inspects the actual files and evidence, makes the final decision, and stays accountable for the outcome.
 
@@ -64,7 +66,7 @@ My personal runtime is fully approved. The working agreement and operator direct
 ## A typical larger change
 
 1. The parent retrieves the issue and relevant connected context.
-2. Native repository search and, when useful, a fresh scout map the real code path.
+2. Native repository search and, with compatible delegation available, a fresh code-mapping helper map the real code path.
 3. The parent owns design and integration and delegates useful independent implementation, testing, and review.
 4. Agent Browser checks browser-visible behavior when tests cannot prove it.
 5. Deterministic repository checks establish current evidence.

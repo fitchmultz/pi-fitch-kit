@@ -16,7 +16,7 @@
   - `setup-manifest.json` for unpinned package sources, required model routes, and kit resources.
   - `templates/working-agreement.md` for the optional managed working-agreement blocks.
   - `package.json#pi` for the resources Pi loads from this package.
-- The `pi-subagents` package owns the sixteen specialist profiles and model routing. Do not copy them back into this kit or restore agent-sync code.
+- Delegation packages own their runtime and packaged profiles; `pi-subagents` is an optional composition component, not a kit dependency. Discover effective executable profiles and routing instead of fixing a roster or requiring sibling-only names. Do not copy profiles into this kit or restore agent-sync code.
 - Keep `README.md`, `setup-manifest.json`, and `docs/pi-setup.md` aligned when prompts, packages, models, install flow, or source-of-truth rules change.
 
 ## Commands
@@ -69,3 +69,11 @@
 - Run `npm run regression:write-prompt` after changing `/draft` config parsing, writer history, cancellation, or accept/copy/tweak/deny behavior.
 - For runtime-facing changes, also verify Pi loads the package through `pi install ...` and a fresh Pi process when practical.
 - Keep this file short and project-specific; point to `README.md` or Pi docs instead of copying generic coding rules.
+
+## Dependency maintenance
+
+- Frequently review and proactively update maintained packages and all runtime, development, build, test, and tooling dependencies; routine in-scope updates are authorized. Prioritize the latest stable official Pi release and intended `fitchmultz/pi` revision, qualifying each separately without changing the supported floor.
+- Review release, changelog, migration, and security notes across the upgrade range and check actual supported contracts. Use the npm/registry/lockfile rules above and compatible dependency cohorts. Adopt beneficial current APIs, conventions, patterns, and functionality instead of extending deprecated or outdated approaches.
+- Align callers, setup instructions, documentation, generated resources, and fixtures. Preserve independent package boundaries, explicit review/model requirements, opt-in behavior, and existing user state.
+- Carry updates through the applicable checks above, package smokes, exact-host compatibility, review, and CI gates. Record exact target identities, results, skips, and limits; never weaken checkers, safety, or support floors to pass an update.
+- Roll out through existing approval, release, and installation gates with a recoverable prior version and rollback plan; honor explicit holds and fresh-process requirements. This authorization does not itself permit publication, active-runtime installation/restarts, private-data disclosure, or global model/auth changes.
