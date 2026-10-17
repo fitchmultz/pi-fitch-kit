@@ -208,14 +208,12 @@ Skills load task-specific operating instructions only when the work matches. [`p
 | Skill | What it adds |
 |---|---|
 | [`ask-clarifying-questions`](https://github.com/fitchmultz/pi-agent-skills) | Stop only for ambiguity that materially changes scope, safety, or reversibility |
-| [`bro`](https://github.com/fitchmultz/pi-agent-skills) | User-invoked plain-language rewrite with no jargon |
 | [`deslop`](https://github.com/fitchmultz/pi-agent-skills) | Remove AI-generated diff noise and ceremonial test tables without dropping real boundary coverage |
 | [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills) | Create editable SVG or D2 architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with rendered SVG/PNG review artifacts |
 | [`dogfood`](https://github.com/fitchmultz/pi-agent-skills) | Exploratory QA through real browser and terminal/TUI flows |
 | [`handoff`](https://github.com/fitchmultz/pi-agent-skills) | Paste-ready continuation or bounded delegation prompts for a new session |
 | [`pi-extension-development`](https://github.com/fitchmultz/pi-agent-skills) | Build, debug, validate, package, and release Pi extensions against current runtime contracts |
 | [`propose-then-ship-pi`](https://github.com/fitchmultz/pi-agent-skills) | Rank one repository improvement, stop for direction, then implement, review, and ship it |
-| [`tdd`](https://github.com/fitchmultz/pi-agent-skills) | Red-green-refactor when test-first behavior is explicitly required |
 | [`test-audit`](https://github.com/fitchmultz/pi-agent-skills) | Gate new tests and audit low-value, implementation-coupled, or duplicative ones |
 | [`thermo-nuclear-code-quality-review`](https://github.com/fitchmultz/pi-agent-skills) | Strict maintainability review for large or structurally risky diffs |
 | [`ux-review`](https://github.com/fitchmultz/pi-agent-skills) | Review user-visible workflows for completion, recovery, progress, and truthful outcomes |
@@ -225,11 +223,12 @@ Companion skills ship beside their extensions:
 
 | Source | Skills |
 |---|---|
+| [`pi-pstack`](https://github.com/fitchmultz/pi-pstack) | `poteto-mode` playbooks, 24 `principle-*` skills, `tdd`, `bro`, `how`, `why`, `architect`, `arena`, `swarm`, `interrogate`, `unslop`, `no-comments`, `ketchup`, `recall`, and `poteto-agent` / `comment-sicko` subagent profiles |
 | [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) | `pi-subagents` orchestration and `pi-intercom` coordination guidance |
 | [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter) | `mcp-scripting` for discovering and composing MCP calls |
 | [`ponytail`](https://github.com/fitchmultz/ponytail) | `ponytail`, `ponytail-audit`, `ponytail-review` (my runtime filters the debt, gain, and help variants) |
 
-`bro` is intentionally user-invoked only. The rest are selected by task fit rather than loaded into every prompt.
+Most `pi-pstack` leaf skills (including `bro`) are user-invoked or routed through `poteto-mode`, while `poteto-mode`, `tdd`, and the `pi-agent-skills` workflows are selected by task fit rather than loaded into every prompt.
 
 ## Connected MCP services
 

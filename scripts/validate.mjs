@@ -129,6 +129,12 @@ assert(
   "agent-skills must use its public source",
 );
 
+const pstack = manifest.corePackages.find(({ id }) => id === "pstack");
+assert(
+  pstack?.source === "git:github.com/fitchmultz/pi-pstack",
+  "pstack must use its public source",
+);
+
 const ctxInfo = manifest.corePackages.find(({ id }) => id === "ctx-info");
 assert(ctxInfo?.source === "git:github.com/fitchmultz/pi-ctx-info", "ctx-info must follow its public source");
 

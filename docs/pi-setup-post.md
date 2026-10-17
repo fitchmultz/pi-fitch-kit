@@ -49,7 +49,7 @@ Use fresh context for bounded independent work. Helpers may delegate useful subw
 
 ## Skills
 
-[`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) packages the reusable operating procedures: clarification, dogfooding, handoff prompts, TDD, test auditing, Pi extension development, end-to-end shipping, UX review, verification, and strict review. [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills) adds editable D2 plus rendered SVG/PNG technical diagrams and review crops. Subagents, Intercom, the MCP adapter, and Ponytail ship their own companion skills.
+[`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) packages the reusable operating procedures: clarification, dogfooding, handoff prompts, test auditing, Pi extension development, end-to-end shipping, UX review, verification, and strict review. [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills) adds editable D2 plus rendered SVG/PNG technical diagrams and review crops. [`pi-pstack`](https://github.com/fitchmultz/pi-pstack) adds `poteto-mode` playbooks, engineering principles, `tdd`, `bro`, and `poteto-agent` / `comment-sicko` subagents. Subagents, Intercom, the MCP adapter, and Ponytail ship their own companion skills.
 
 Skills load only when the task matches. They provide a procedure without bloating every prompt.
 

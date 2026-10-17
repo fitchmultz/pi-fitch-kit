@@ -140,6 +140,10 @@
     {
       "id": "agent-skills",
       "source": "git:github.com/fitchmultz/pi-agent-skills"
+    },
+    {
+      "id": "pstack",
+      "source": "git:github.com/fitchmultz/pi-pstack"
     }
   ],
   "optionalIntegrations": [
