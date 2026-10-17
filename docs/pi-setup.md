@@ -132,7 +132,8 @@ The kit uses the stock payload hook, with no custom OpenAI provider or routing h
 
 The public skills are source-managed rather than copied through a home directory:
 
-- [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries clarification, dogfooding, handoff prompts, TDD, test auditing, extension development, end-to-end shipping, UX review, completion verification, and strict review modes. Its [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills) skill produces editable D2 plus SVG/PNG architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with generated review images.
+- [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries clarification, dogfooding, handoff prompts, test auditing, extension development, end-to-end shipping, UX review, completion verification, and strict review modes. Its [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills) skill produces editable D2 plus SVG/PNG architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with generated review images.
+- [`pi-pstack`](https://github.com/fitchmultz/pi-pstack) adapts Cursor's `pstack` (`poteto-mode` playbooks, 24 engineering principles, `tdd`, `bro`, `how`, `why`, `architect`, `arena`, `swarm`, `interrogate`, `unslop`, `no-comments`, and `poteto-agent` / `comment-sicko` subagents) for Pi with automated upstream drift notifications.
 - `pi-subagents` ships both orchestration and Intercom usage skills; `pi-mcp-adapter` ships its scripting skill.
 - [`ponytail`](https://github.com/fitchmultz/ponytail) supplies the active minimalism mode plus its focused review and whole-repo audit skills; my runtime filters its debt, gain, and help variants.
 
