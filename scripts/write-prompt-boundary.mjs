@@ -39,6 +39,7 @@ const sdk = await import(pathToFileURL(sdkPath).href);
 const ai = await import(pathToFileURL(aiPath).href);
 const requests = [];
 const requestOrigins = [];
+const replies = [];
 let holdNextRequest;
 const originalFetch = globalThis.fetch;
 const originalWebSocket = globalThis.WebSocket;
@@ -60,8 +61,9 @@ globalThis.fetch = async (url, init) => {
 		hold.started.resolve();
 		await hold.release.promise;
 	}
+	const reply = replies.shift() ?? "WRITER_REPLY";
 	if (responses) {
-		const item = { id: "msg_writer", type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: "WRITER_REPLY", annotations: [] }] };
+		const item = { id: "msg_writer", type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: reply, annotations: [] }] };
 		const events = [
 			{ type: "response.output_item.added", output_index: 0, item: { ...item, content: [] } },
 			{ type: "response.output_item.done", output_index: 0, item },
@@ -69,7 +71,7 @@ globalThis.fetch = async (url, init) => {
 		];
 		return new Response(events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
 	}
-	const chunk = { id: "writer-response", object: "chat.completion.chunk", created: 1, model: "writer", choices: [{ index: 0, delta: { role: "assistant", content: "WRITER_REPLY" }, finish_reason: "stop" }] };
+	const chunk = { id: "writer-response", object: "chat.completion.chunk", created: 1, model: "writer", choices: [{ index: 0, delta: { role: "assistant", content: reply }, finish_reason: "stop" }] };
 	return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, { headers: { "content-type": "text/event-stream" } });
 };
 let session;
@@ -80,6 +82,7 @@ const lifecycle = [];
 const sendErrors = [];
 const inputs = [];
 let editorText = "";
+let expectedDraft = "WRITER_REPLY";
 const sentinel = "CURRENT_WRITER_INSTRUCTIONS";
 const historicalTool = { name: "historical_tool", description: "OLD_SCHEMA_SENTINEL", parameters: { type: "object", properties: {} } };
 let toolExecutions = 0;
@@ -139,7 +142,7 @@ try {
 			...ui,
 			notify: (text, level) => { notices.push({ text, level }); },
 			select: async (text, options) => {
-				assert.equal(text, "WRITER_REPLY");
+				assert.equal(text, expectedDraft, "only a complete, within-limit prompt may reach the action dialog");
 				const action = actions.shift();
 				assert.deepEqual(options, action === "Ask again" || action === "Dismiss"
 					? ["Copy answer", "Ask again", "Dismiss"]
@@ -238,6 +241,44 @@ try {
 	await open(fresh);
 	await exercise(fresh, "fresh session", false);
 	assert.doesNotMatch(JSON.stringify(requests.at(-1)), /CONVERSATION_SENTINEL/);
+	// Visible characters, not provider tokens or UTF-16 units. Never slice off
+	// a constraint at the end of a long completion; retry once, then fail closed.
+	const beforeLimits = structuredClone(fresh.getEntries());
+	const overflow = "x".repeat(1800) + " Do not deploy.";
+	expectedDraft = "🧪".repeat(1800);
+	replies.push(expectedDraft);
+	actions.push("Deny");
+	await session.prompt("/ambitious BOUNDARY_SOURCE");
+	expectedDraft = "WRITER_REPLY";
+	for (const tweak of [false, true]) {
+		const start = requests.length;
+		if (tweak) actions.push("Tweak");
+		replies.push(...(tweak ? ["WRITER_REPLY"] : []), overflow, "WRITER_REPLY");
+		actions.push("Deny");
+		await session.prompt("/ambitious RETRY_SOURCE");
+		assert.equal(requests.length - start, tweak ? 3 : 2, "one bounded shortening retry also applies to Tweak");
+		const retry = (responses ? requests.at(-1).input : requests.at(-1).messages).at(-1);
+		assert.equal(retry.role, "user");
+		assert.match(JSON.stringify(retry), /RETRY_SOURCE.*1800 Unicode characters.*Shorten/s, "retry must ask for shortening, not simply replay the same task");
+		if (tweak) assert.match(JSON.stringify(retry), /<<<\\nOriginal request:.*Revision notes:\\nFOLLOWUP_SENTINEL\\n>>>/s, "shortening must retain the revision notes inside the current task");
+	}
+	for (const tweak of [false, true]) {
+		const start = requests.length;
+		if (tweak) actions.push("Tweak", "Deny");
+		replies.push(...(tweak ? ["WRITER_REPLY"] : []), overflow, overflow);
+		// Initial failure must not offer an invalid draft. Failed Tweak keeps
+		// the last valid draft instead of replacing it with a truncated one.
+		await session.prompt("/ambitious REJECT_SOURCE");
+		assert.equal(requests.length - start, tweak ? 3 : 2);
+		assert.match(notices.findLast((notice) => notice.level === "error").text, /1800.*(?:characters|limit)/);
+		assert.equal(actions.length, 0);
+	}
+	assert.deepEqual(fresh.getEntries(), beforeLimits);
+	assert.equal(replies.length, 0);
+	// These expected guard errors must not mask unrelated fixture errors.
+	assert.equal(notices.filter((notice) => notice.level === "error").length, 2);
+	notices.length = 0;
+	console.log(`PASS ${api}: ambitious 1800-character boundary, bounded retry, overflow rejection and Tweak recovery`);
 	for (const [config, origin, id, effort] of [
 		[undefined, "writer.invalid", "writer", "high"],
 		[{ provider: "alternate-writer", model: "override", thinkingLevel: "low" }, "alternate-writer.invalid", "override", "low"],

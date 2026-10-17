@@ -18,6 +18,7 @@
     "regression:session-name": "node --experimental-strip-types scripts/session-name-regression.ts",
     "regression:paged-reader": "node --experimental-strip-types scripts/paged-reader-regression.ts",
     "regression:write-prompt": "node --experimental-strip-types scripts/write-prompt-regression.ts && node scripts/write-prompt-boundary.mjs",
+    "check:ambitious:live": "node scripts/ambitious-live.mjs",
     "smoke": "node scripts/package-smoke.mjs",
     "smoke:lifecycle": "node scripts/setup-lifecycle-smoke.mjs"
   },

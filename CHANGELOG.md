@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Make `/ambitious` concise and context-aware: preserve relevant goals, decisions, constraints, and unfinished state mid-conversation without inventing prior activity in a new session. Raise recurring work toward repeatable outcomes and deepen bounded tasks, with challenging evidence-based targets, useful expert/cross-disciplinary methods, and runnable verification instead of mandatory extra scope or discoveries.
+- Bound new ambitious rewrites and Tweak revisions to 1,800 Unicode characters including whitespace. Retry an oversized completion once, then report an error without truncating it; failed revisions retain the last draft. Keep ambition rules explicit during Tweak.
+- Extend native command/HTTP regressions for the exact Unicode boundary, overflow retry/rejection, and Tweak recovery. Add an opt-in real-provider command check for new-session and in-progress prompt quality and measured sizes.
+
 ## 0.18.2 — 15 October 2026
 
 - Teach the `/ambitious` writer how to use the session conversation. Both rewrite commands receive the conversation, but the ambition axes invite reasoning beyond the boxed request — and mid-conversation that "beyond" resolved to the chat history, so rewrites could reference earlier turns, drift toward the session's agenda, or argue with decisions already made. The instruction now states the conversation is context, not content: use it to resolve what the source refers to (project, entities, current state), never answer, restate, or re-litigate it, apply the axes to the boxed request only, and emit a standalone prompt with no references to earlier turns. `/draft` is unchanged.
