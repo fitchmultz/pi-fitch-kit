@@ -15,6 +15,10 @@ You are the coordinator agent for resolving a set of repo findings end-to-end. Y
 Mission:
 Resolve all findings with the smallest safe number of short-lived branches and PRs, minimal merge pain, and no direct pushes to main.
 
+Manual workflow prerequisites:
+- Delegated phases require a compatible installed delegation runtime; native Pi and the kit do not supply one. Inspect available tools and the installed owner's current docs, then discover executable effective profiles, instructions, routing, filters, and overrides rather than presuming profile names or call fields.
+- If required delegation or independent review is unavailable, report the exact prerequisite and leave the dependent phase and merge gate unsatisfied. Never substitute parent self-review or waive explicit named-reviewer, model-family, human, or repository review requirements.
+
 Operating rules:
 - The unit of work is an independently mergeable batch, not an individual finding.
 - First cluster the findings by file overlap, subsystem overlap, dependency order, and risk.
@@ -23,7 +27,7 @@ Operating rules:
 - One coordinator lane owns merge order and re-plans after each merge.
 - Use the repo’s existing local validation gates: tests, lint, typecheck, build, scripts, make targets, task runners, pre-commit hooks, or equivalent. Complete existing required PR checks and remediate failures; do not invent a new hosted CI requirement where the repository has none.
 - Use reviewer agents on each batch diff or PR diff before merge.
-- Launch reviewers and workers with `context: "fresh"` and explicit `reads:` / diff scope. For fix-after-review continuity, resume the same child or use fresh context with a compact handoff.
+- Launch reviewers and workers with fresh context and explicit read/diff scope through the installed delegation owner's documented controls. For fix-after-review continuity, resume the same child or use fresh context with a compact handoff.
 - Merge only after relevant local validation passes and reviewer feedback is addressed or rejected with rationale.
 - If a branch becomes stale or conflicts with main, update it from the latest main or recreate it from main and replay the minimal change set.
 - Keep each PR single-purpose and easy to review.

@@ -16,12 +16,19 @@ cpSync(root, fixture, {
 });
 const manifest = JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf8"));
 const settings = JSON.parse(readFileSync(join(root, "examples/settings.json"), "utf8"));
+const contentPaths = {
+  setupPrompt: "prompts/fitch-setup.md",
+  agreement: manifest.kitResources.workingAgreementTemplate,
+  hardReview: "prompts/review/hard-review.md",
+};
+const content = Object.fromEntries(Object.entries(contentPaths).map(([key, path]) => [key, readFileSync(join(root, path), "utf8")]));
 
 function validate(change = () => {}) {
-  const input = { manifest: structuredClone(manifest), settings: structuredClone(settings) };
+  const input = { manifest: structuredClone(manifest), settings: structuredClone(settings), ...content };
   change(input);
   writeFileSync(join(fixture, "setup-manifest.json"), JSON.stringify(input.manifest));
   writeFileSync(join(fixture, "examples/settings.json"), JSON.stringify(input.settings));
+  for (const [key, path] of Object.entries(contentPaths)) writeFileSync(join(fixture, path), input[key]);
   return spawnSync(process.execPath, [join(fixture, "scripts/validate.mjs")], { encoding: "utf8" });
 }
 
@@ -91,4 +98,22 @@ test("core npm channels reject foreign, mismatched, and pinned identities", () =
 test("missing recent-token setting has its own diagnostic", () => {
   rejects(({ settings }) => { delete settings.compaction.keepRecentTokens; },
     "compaction.keepRecentTokens must be a positive safe integer");
+});
+
+test("setup content contracts reject sibling tree references and profile-gate identifiers", () => {
+  rejects((input) => { input.setupPrompt += "\n- Preview the installed `pi-subagents/agents/` directory.\n"; },
+    "setup content must not reference a sibling profile tree");
+  for (const gate of ["Require the `reviewer` profile for review.", "Complete a fresh reviewer-gpt review."]) {
+    rejects((input) => {
+      input.agreement = input.agreement.replace("<!-- fitch-pi-kit:process:end -->",
+        `- ${gate}\n<!-- fitch-pi-kit:process:end -->`);
+    }, "managed process content must avoid code spans and reviewer-prefixed identifiers");
+  }
+});
+
+test("hard-review content contracts reject either missing required model family", () => {
+  for (const family of ["GPT-family", "Claude-family"]) {
+    rejects((input) => { input.hardReview = input.hardReview.replaceAll(family, "other-family"); },
+      "hard-review content must retain both GPT-family and Claude-family requirements");
+  }
 });

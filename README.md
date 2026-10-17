@@ -34,9 +34,11 @@ Use **Node.js 24.15+** and **Pi 1.0.0+**. The kit supports official Pi and [Fitc
 
 Setup previews package installs and file changes. Select the complete core or individual components.
 
+The kit works without `pi-subagents`. Delegation, profile inventory, and child-run settings belong to a selected or already installed delegation package. The optional process working agreement requires independent review, not a particular packaged profile name. An unavailable required reviewer or model family leaves that gate unsatisfied; self-review is not a substitute.
+
 Start a new Pi process if setup changes extension code or dependencies. Run `/fitch-setup verify` to check setup without changes.
 
-Setup needs `gpt-6-astra` through OpenAI/Codex and Claude through a supported route. See the [model groups](setup-manifest.json) for the allowed routes.
+Setup keeps the kit's opinionated model baseline: `gpt-6-astra` through OpenAI/Codex and Claude through a supported route for its OpenAI/Codex and Claude workflows, including the Claude-specific image/fast-mode boundary. This is kit policy, not a sibling-profile prerequisite or proof that independent review is available. See the [model groups](setup-manifest.json) for the unchanged allowed routes.
 
 ## Commands
 

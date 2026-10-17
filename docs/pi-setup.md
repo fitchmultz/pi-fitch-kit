@@ -18,7 +18,7 @@ Pi core
   └─ user-authenticated MCP services
 ```
 
-[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: seven bundled extensions, a safe settings example, unpinned package sources, and a setup prompt. The sixteen specialist profiles now ship with [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) instead of being duplicated here. Most reusable extensions and all skill packages remain independent public repositories; the kit directly owns only its harness-coupled runtime.
+[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: seven bundled extensions, a safe settings example, unpinned package sources, and a setup prompt. Delegation and packaged profile defaults belong to optional owners such as [`pi-subagents`](https://github.com/fitchmultz/pi-subagents), not the kit. Most reusable extensions and all skill packages remain independent public repositories; the kit directly owns only its harness-coupled runtime.
 
 ## A representative task
 
@@ -42,12 +42,12 @@ Every person authenticates their own connections. The kit contains service names
 
 Native repository search provides path and content discovery. The main session traces callers, tests, data boundaries, and repository conventions before it chooses where to change code.
 
-For an unfamiliar or broad surface it may launch fresh specialists in parallel:
+With a compatible delegation package installed, it may launch fresh specialists in parallel for an unfamiliar or broad surface. Select executable effective profiles by capability, for example:
 
-- `scout` maps the relevant code without editing;
-- `researcher` checks current external documentation or API behavior;
-- `context-builder` writes a compact evidence handoff across several systems;
-- `debugger` reproduces a failure and proves its root cause without fixing it.
+- read-only code mapping;
+- current external documentation or API research;
+- compact evidence handoffs across several systems;
+- failure reproduction and root-cause diagnosis without fixes.
 
 Fresh context is deliberate. Each child receives a bounded brief rather than inheriting the parent's assumptions.
 
@@ -55,7 +55,7 @@ Fresh context is deliberate. Each child receives a bounded brief rather than inh
 
 The parent makes ordinary reversible decisions and uses direct implementation or useful independent helpers, keeping integration and validation accountable in one place. The [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) package provides `apply_patch`, `replace_text`, and `write_files` for mutations, with `preview_patch` for read-only inspection. Its own documentation defines the tool arguments and filesystem guarantees. Pair editor 1.0 with `pi-subagents` 0.39.1 or newer so completion tracking recognizes the new tools and committed paths from partial errors.
 
-A `worker` is useful when an implementation item is independent enough for an isolated worktree or true parallelism. A `fixer` receives a confirmed finding list and changes only those items. The parent then inspects the real files and diff; a child success report is evidence, not proof.
+An implementation helper is useful when an item is independent enough for an isolated worktree or true parallelism. A focused remediation helper receives a confirmed finding list and changes only those items. These are briefs for suitable available profiles, not mandatory profile names. The parent then inspects the real files and diff; a child success report is evidence, not proof.
 
 ### 5. It verifies the behavior
 
@@ -65,10 +65,12 @@ The narrowest meaningful repository check runs first. Deterministic arithmetic g
 
 A reviewer starts without the implementation conversation and reconstructs the claim from requirements, current files, the diff, and validation output.
 
-- `reviewer-gpt` is the normal independent code review.
-- `reviewer-claude` adds a second model family when risk warrants it.
-- `reviewer-security` focuses on trust boundaries, authorization, secrets, privacy, and abuse paths.
-- `ui-designer` reviews visual and interaction quality.
+- Select a suitable executable effective reviewer for independent code review.
+- Add a second model family when risk warrants it; inspect effective routing and the model actually used rather than inferring family from a name.
+- Include security coverage for trust boundaries, authorization, secrets, privacy, and abuse paths.
+- Include visual and interaction review for user-visible work.
+
+The optional process block requires fresh independent review for shared-team changes, even on a kit-only installation. Before adoption, setup reports an available independent review path or the missing prerequisite. Explicit named-reviewer, model-family, human-review, and repository-protection requirements remain binding. If required review is unavailable, report it and leave the gate unsatisfied; self-review does not satisfy it.
 
 Reviewer judgment does not replace validation. Complete required reviews and refresh affected analysis when substantive changes or concrete unresolved concerns invalidate it; a mechanical base sync or metadata-only change with unchanged reviewed behavior does not require every reviewer to start over.
 
@@ -96,7 +98,7 @@ Most reusable extensions stay independent. The kit directly owns only the small 
 
 ## Model routing
 
-[`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents) owns the specialist defaults. Primary models, ordered fallbacks, thinking levels, and context policy live in those files. The generic delegate inherits the parent model. User and project profiles take precedence and are preserved during kit setup; the setup preview shows the installed mapping rather than a copied table.
+The installed delegation package owns its default profiles and routing. Inspect its current docs and effective executable inventory, including primary models, ordered fallbacks, thinking levels, and context policy. User and project profiles, resource filters, and trust can change that inventory. Setup preserves them and previews the effective mapping only when that owner is selected or confirmed installed; it never reads an absent sibling tree or treats a frozen roster as authoritative.
 
 The settings example selects `openai-codex/gpt-6-astra` (ChatGPT/Codex subscription) at medium reasoning, with `openai/gpt-6-astra` (OpenAI API key) as the fallback. Updating the kit does not change that choice or replace explicit cross-family reviewer routes.
 
@@ -187,12 +189,13 @@ Disabling global resize preserves original detail for image analysis. [`anthropi
 
 ## Subagent launch policy
 
-- Use `context: "fresh"` unless the task explicitly requires parent transcript history.
-- Use `context: "fork"` only for oracle consistency checks.
+With a compatible delegation owner installed, use its actual schema and lifecycle:
+
+- Use fresh context unless the task explicitly requires parent transcript history; inherited-context consistency checks need a compatible role and host.
 - Hand off with compact files such as `context.md`, `plan.md`, or `review.md` instead of inherited transcripts.
 - Use separate async reviewer runs so each completion can wake the parent without a polling loop.
 - Use foreground execution only when an incomplete active goal needs same-turn child evidence.
-- Use `outputMode: "file-only"` for bulky saved output and return only the decision-relevant summary inline.
+- Use the owner's supported file-output mode for bulky saved output and return only the decision-relevant summary inline.
 - Keep the parent responsible for final decisions, verification, and user-facing status.
 
 ## Evidence and review discipline
@@ -232,7 +235,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 
 The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), checks model routes through the running session's `fitch_setup_models` tool, shows one preview, and installs only the selected unpinned sources. A new Pi CLI invocation for model listing would run startup migrations before printing results, so verification does not use one. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. The prompt offers the safe settings keys and the context-window overrides as separate consent steps, preserves unrelated configuration, pauses on failure, diagnoses and repairs covered prerequisites, reconciles partial effects before resuming, and reports completed and remaining steps when a genuine boundary prevents recovery. It verifies loaded resources in a fresh Pi process after extension-code or dependency changes. `/reload` refreshes settings and resources; the maintained 0.99.1 Fitch runtime also reloads extension code. Use a fresh process for core changes or already-loaded package dependencies; a new conversation in the same process is insufficient. Use native `/restart` on a supporting Fitch runtime, or quit and relaunch the saved session.
 
-`/fitch-setup verify` is read-only. It reports drift in package identity and filters, profiles, extensions, prompts, skills, current-session model availability (including whether project resources are trusted), consent-gated route state, and `models.json` context-window overrides.
+`/fitch-setup verify` is read-only. It reports drift in package identity and filters, extensions, prompts, skills, current-session model availability (including whether project resources are trusted), consent-gated route state, and `models.json` context-window overrides. Profile inventory, child-run settings, and legacy profile migration apply only to a selected or confirmed installed owner, with existence and replacement checks before tree reads or link removal. An absent unselected owner is not kit drift; unavailable required independent review is reported separately.
 
 The linked subagents, ask-question, calculator, and verbosity extensions install primarily from `npm:@fitchmultz/pi-subagents`, `npm:@fitchmultz/pi-ask-question`, `npm:@fitchmultz/pi-calculator`, and `npm:@fitchmultz/pi-verbosity-control`. The corresponding `git:github.com/fitchmultz/<repo>` sources remain supported manual fallbacks; see [scoped core installs](reference.md#scoped-core-installs). A source switch must be previewed because Pi treats npm and Git as different identities: back up affected package entries, carry resource filters across, and avoid loading both. Controller migration remains conditional on selecting the maintained controller and preserves `verbosity.json`. `npm:@fitchmultz/pi-workflows` is a separate optional project package, not a kit core default.
 
@@ -249,7 +252,7 @@ A shared setup must not distribute:
 - generated model catalogs or caches;
 - copied service responses.
 
-The settings example omits trust policy intentionally. Choose `defaultProjectTrust` and subagent child trust for the environment rather than copying mine. Untrusted repositories should use `no-approve`.
+The settings example omits trust policy intentionally. Choose native `defaultProjectTrust` for the environment rather than copying mine; offer owner-specific child trust only with a selected or confirmed installed delegation package. Untrusted repositories should use `no-approve`.
 
 Extension packages use bare Git or npm sources. The separate Agent Browser CLI must satisfy the wrapper's documented requirements.
 

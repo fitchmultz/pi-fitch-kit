@@ -201,10 +201,23 @@ assert(
 const setupPromptPath = manifest.kitResources.prompts.find((path) => path.endsWith("/fitch-setup.md"));
 assert(setupPromptPath, "manifest must include prompts/fitch-setup.md");
 const setupPrompt = readFileSync(join(root, setupPromptPath), "utf-8");
+// Content contracts only; native resource smokes separately verify delivery, not model obedience.
+const agreement = readFileSync(join(root, manifest.kitResources.workingAgreementTemplate), "utf-8");
+const processBlock = agreement.match(/<!-- fitch-pi-kit:process:start -->([\s\S]*?)<!-- fitch-pi-kit:process:end -->/)?.[1] ?? "";
+assert(!setupPrompt.includes("pi-subagents/agents/"), "setup content must not reference a sibling profile tree");
+assert(!/`|\breviewer[-_][\w-]+/i.test(processBlock), "managed process content must avoid code spans and reviewer-prefixed identifiers");
+assert(
+  ["independent review", "unsatisfied", "self-review"].every((anchor) => processBlock.includes(anchor)),
+  "managed process content must retain the independent-review, unsatisfied, and self-review boundaries",
+);
+assert(setupPrompt.includes("selected or confirmed installed"), "setup content must scope optional ownership to selected or confirmed installed");
+const hardReview = readFileSync(join(root, "prompts/review/hard-review.md"), "utf-8");
+assert(
+  hardReview.includes("GPT-family") && hardReview.includes("Claude-family"),
+  "hard-review content must retain both GPT-family and Claude-family requirements",
+);
 assert(setupPrompt.includes("setup-manifest.json"), "setup prompt must reference the manifest");
 assert(setupPrompt.includes("pi-subagents"), "setup prompt must name the profile owner");
-assert(setupPrompt.includes("sixteen specialist"), "setup prompt must describe the current specialist count");
-assert(!setupPrompt.includes("fourteen specialist"), "setup prompt must not keep the retired specialist count");
 assert(setupPrompt.includes("${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"), "setup prompt must honor the active Pi agent directory");
 assert(setupPrompt.includes("modelContextWindows"), "setup prompt must offer the context-window override step");
 assert(!setupPrompt.includes("pi --list-models"), "setup verification must not launch Pi's migration-capable model listing");

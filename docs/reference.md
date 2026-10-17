@@ -186,20 +186,21 @@ That exposed stricter Anthropic image limits. The bundled guard fixes the bounda
 
 ## Subagent bench
 
-[`pi-subagents`](https://github.com/fitchmultz/pi-subagents) supplies both the orchestration runtime and the opinionated defaults: sixteen specialist profiles plus its general-purpose `delegate`. This kit uses that package instead of owning duplicate copies.
+[`pi-subagents`](https://github.com/fitchmultz/pi-subagents) is an optional composition component that owns delegation, coordination, and its packaged profile defaults. The kit is not an orchestration runtime and works without it. Native Pi does not supply delegation tools or specialist profiles. Use the installed owner's current docs and effective executable inventory, not a fixed roster of sibling-only names.
 
-| Job | Profiles |
+| Job | Selection requirement |
 |---|---|
-| Map and investigate | [`scout`](https://github.com/fitchmultz/pi-subagents), [`context-builder`](https://github.com/fitchmultz/pi-subagents), [`debugger`](https://github.com/fitchmultz/pi-subagents), [`researcher`](https://github.com/fitchmultz/pi-subagents) |
-| Monitor changing state | [`watcher`](https://github.com/fitchmultz/pi-subagents) |
-| Decide and plan | [`planner`](https://github.com/fitchmultz/pi-subagents), [`oracle`](https://github.com/fitchmultz/pi-subagents) |
-| Implement bounded work | [`worker`](https://github.com/fitchmultz/pi-subagents), [`fixer`](https://github.com/fitchmultz/pi-subagents) |
-| Challenge the result | [`reviewer`](https://github.com/fitchmultz/pi-subagents), [`reviewer-gpt`](https://github.com/fitchmultz/pi-subagents), [`reviewer-claude`](https://github.com/fitchmultz/pi-subagents), [`reviewer-security`](https://github.com/fitchmultz/pi-subagents), [`reviewer-ponytail`](https://github.com/fitchmultz/pi-subagents), [`ui-designer`](https://github.com/fitchmultz/pi-subagents) |
-| Human-facing output | [`writer`](https://github.com/fitchmultz/pi-subagents) |
+| Map, research, diagnose, or plan | A suitable available profile with a bounded, normally read-only brief |
+| Implement or remediate | A suitable available profile, explicit scope, and isolated writes where needed |
+| Challenge the result | Fresh independent review with the required correctness, security, maintainability, or UI coverage |
+| Cross-family review | Effective routing and actual review evidence meeting each required model family |
+| Human-facing output | A suitable available profile with the requested audience and deliverable |
 
 The parent session remains responsible for the task. Specialists return evidence; they do not become an autonomous hierarchy.
 
-The exact primary, fallback, thinking, context, tool, and output policy lives in [`pi-subagents/agents`](https://github.com/fitchmultz/pi-subagents). The generic delegate inherits the parent model. User and project profiles can override the packaged defaults; setup preserves those files and previews the actual resolved mapping rather than copying a second routing table. Cross-model reviews and explicit provider choices remain available.
+The owner defines primary, fallback, thinking, context, tool, and output policy. User/project overrides, resource filters, disabled profiles, and trust can change the effective inventory. Setup inspects it and offers child-run settings only for a selected or confirmed installed owner, checking paths before reading. For a selected owner not yet installed, its documented capabilities are a preview, not proof of effective availability. Legacy kit-profile links are eligible for removal only after the installed owner and replacement basename are verified; unrelated files and links stay untouched.
+
+The optional working-agreement process block requires fresh independent review for shared-team changes, not any packaged profile identifier. Setup previews an available independent path or its missing prerequisite before adoption. If required independent review is unavailable, report the missing capability, profile, or family and leave the gate unsatisfied; self-review is not equivalent. Explicit named-reviewer and model-family obligations, human reviews, repository protections, and delivery authority remain binding. A model catalog entry alone is not an executable reviewer.
 
 ## Active skills
 
@@ -256,8 +257,8 @@ The organization-specific endpoint and authentication configuration stay private
 A typical substantial change looks like this:
 
 1. The main session reads repository instructions and pulls the relevant issue or service context through MCP.
-2. Native repository search and, when useful, a fresh `scout` map the real code path before editing.
-3. The main session owns design and integration, using its editor tools or independent `worker` tasks as useful. Delegate scouting, implementation, testing, and review freely when it helps; preserve isolated worktrees and clear ownership.
+2. Native repository search and, with a compatible delegation package, a useful fresh read-only code-mapping helper map the real code path before editing.
+3. The main session owns design and integration, using its editor tools or, with compatible delegation, independent implementation helpers as useful. Delegate code mapping, implementation, testing, and review when it helps and the required capabilities are available; preserve isolated worktrees and clear ownership.
 4. Agent Browser verifies browser-visible behavior when tests cannot prove the user experience.
 5. Repository checks and deterministic tools establish current evidence.
 6. Complete required reviews and use independent reviewers when helpful. Reviewers reconstruct the claim from the diff and evidence; refresh analysis when substantive changes invalidate it, not for unchanged behavior or metadata alone.
@@ -288,7 +289,7 @@ pi install git:github.com/fitchmultz/pi-fitch-kit
 /fitch-setup
 ```
 
-`/fitch-setup` reads [`setup-manifest.json`](../setup-manifest.json), previews every package install and file change, and asks which parts to apply. It checks models through the running session's read-only `fitch_setup_models` tool, rather than starting a Pi CLI whose migrations can change files. It never reads or copies credentials. Reruns normalize filtered, pinned, or duplicate kit entries to one canonical source. They also preview removal of retired standalone packages, the archived Intercom package, approved Fold footer and fast-mode loader symlinks, and legacy kit-owned profile symlinks; symlink cleanup never removes regular files or links from another source. A separate consent step merges the manifest's flat context-window overrides into `models.json` per route, keeping existing values unless explicitly overwritten. `/fitch-setup verify` reports all drift without changing anything.
+`/fitch-setup` reads [`setup-manifest.json`](../setup-manifest.json), previews every package install and file change, and asks which parts to apply. It checks models through the running session's read-only `fitch_setup_models` tool, rather than starting a Pi CLI whose migrations can change files. It never reads or copies credentials. Reruns normalize filtered, pinned, or duplicate kit entries to one canonical source. They also preview eligible retired-package and verified symlink cleanup after the corresponding replacement is present. Archived Intercom removal is a dependent step in the same approved plan: install the selected owner, then verify after the required fresh process that its package metadata declares Intercom and Pi loaded that exact extension path. Pi's resource listing or a native conflict diagnostic naming both owner paths is acceptable pre-removal evidence; a same-named tool alone is not, because the archived registration can win. Back up the exact archived entry for rollback, perform the covered exact-source/scope removal, then verify the functional tool's installed-owner provenance and that only the replacement loads after the next fresh process. A failed pre-removal prerequisite leaves the archived source unchanged and the pending step reported, not silently discarded. A failed post-removal check stops with the failed migration and recorded rollback reported, never a completion claim. Legacy kit-profile cleanup needs a verified installed profile owner and same-basename replacement. Symlink cleanup never removes regular files or links from another source. A separate consent step merges the manifest's flat context-window overrides into `models.json` per route, keeping existing values unless explicitly overwritten. `/fitch-setup verify` reports scoped drift without changing anything; an absent unselected delegation owner is not kit drift.
 
 The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. [`examples/settings.json`](../examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump. It selects Astra through a ChatGPT/Codex subscription at medium reasoning; setup falls back to an OpenAI API key when there is no subscription and filters optional routes by availability. The manifest offers 300k context budgets.
 
@@ -313,6 +314,8 @@ The package registers only two prompts:
 - `/github-open-issues-prs` for the one prompt-backed operational flow still on my normal path.
 
 The older prompt files remain in `prompts/` as source material, but the package does not load them. Nothing is deleted; they simply no longer dominate autocomplete or the README.
+
+The retained `execute/orchestrate.md`, `execute/fix-issues.md`, and `review/hard-review.md` can be used manually only with the compatible delegation lifecycle and effective-profile capabilities they declare. They are not registered commands and do not install an orchestration runtime. Missing required independent review leaves their gate incomplete, never satisfied by inline self-review. Hard review retains separate GPT-family and Claude-family reviews; an unavailable required family is an explicit prerequisite failure, not permission to substitute another model.
 
 ## Trust and security boundaries
 
