@@ -25,7 +25,7 @@ const ANTHROPIC_FAST_MODEL_PREFIXES = ["claude-opus-5", "claude-opus-4-8"];
 // github-copilot or opencode also serve Opus over anthropic-messages but are
 // not overridden and stay stock.
 const ANTHROPIC_FAST_PROVIDERS = ["anthropic", "cloudflare-ai-gateway"];
-const OPENAI_PROVIDERS = new Set(["openai", "openai-codex"]);
+const OPENAI_PROVIDERS = new Set(["openai", "openai-codex", "chatgpt-rotate"]);
 // OpenAI Fast pricing supports these o-series models, not the whole family.
 const OPENAI_PRIORITY_O_MODELS = new Set(["o3", "o3-2025-04-16", "o4-mini", "o4-mini-2025-04-16"]);
 

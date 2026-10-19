@@ -387,6 +387,16 @@ async function openaiWireRequest(model: Model<Api>, selectedModel = model, sessi
 	return payload;
 }
 
+const rotatingSol = { ...astra, provider: "chatgpt-rotate", id: "gpt-6.1-sol" };
+for (const enabled of [false, true]) {
+	await commands["codex-fast"].handler(enabled ? "on" : "off", uiCtx(rotatingSol));
+	// The rotation provider delegates to native OpenAI while the session keeps its own provider ID.
+	const payload = await openaiWireRequest({ ...rotatingSol, provider: "openai" }, rotatingSol);
+	assert.equal(payload.service_tier, enabled ? "priority" : undefined);
+	assert.equal(payload.model, "gpt-6.1-sol");
+	assert.equal(status.get("codex-fast"), enabled ? "accent:priority enabled" : undefined);
+}
+
 // One mode in the existing file: legacy ON stays priority; explicit Ultrafast
 // reaches real Responses/Codex serialization without adding a provider override.
 writeFileSync(statePath, JSON.stringify({ enabled: true }));
@@ -410,6 +420,7 @@ for (const model of [
 	{ ...astra, id: "gpt-5.6-sol" }, { ...astra, id: "gpt-6.1-sol" },
 	{ ...astra, id: "gpt-6-astra-extra" }, { ...astra, api: "openai-completions" as const },
 	{ ...astra, provider: "cloudflare-ai-gateway" }, { ...astra, provider: "opencode" },
+	{ ...astra, provider: "chatgpt-rotate" },
 	{ ...astra, baseUrl: "https://eu.api.openai.com/v1" }, { ...astra, baseUrl: "https://proxy.invalid/v1" },
 ]) {
 	assert.equal((await openaiWireRequest(model)).service_tier, undefined, "unsupported routes must not fall back to priority");
