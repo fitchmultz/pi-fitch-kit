@@ -17,7 +17,7 @@ const authDir = getAgentDir();
 const temp = mkdtempSync(join(tmpdir(), `pi-${command}-live-`));
 const agentDir = join(temp, "agent");
 const cwd = join(temp, "project");
-const exportConstraints = [/CSV/i, /(?:CLI|command.line).{0,40}flags/is, /(?:no|without|do not|don't)\b[^.!?\n]*\bdependenc|existing dependencies only/i, /tenant/i];
+const exportConstraints = [/CSV/i, /(?:CLI|command.line).{0,40}\bflags?\b/is, /(?:no|zero|without|do not|don't)\b[^.!?\n]*\bdependenc|existing dependencies only/i, /tenant/i];
 const constraints = [...exportConstraints, /npm run test:exports/];
 const noDelivery = [/(?:no|do not|don't|neither)\b[^.!?\n]*\bcommit/i, /(?:no|do not|don't|nor)\b[^.!?\n]*\bdeploy/i];
 const ambitiousCases = [
@@ -72,7 +72,7 @@ const unreasonableCases = [
 			/(?:distinct|different|divergent|contrast|non.cosmetic)/i, /(?:comparison|compare|trade.?offs?)/i,
 			/(?:recommend|select|choose)/i,
 			/(?:no|do not|don't|without)\b[^.!?\n]*\bimplement/i,
-			/(?:no|do not|don't|without)\b[^.!?\n]*\b(?:edit|chang|modif)[^.!?\n]*\bfiles?/i,
+			/(?:no|do not|don't|without)\b[^.!?\n]*\b(?:edit|chang|modif)[^.!?\n]*\bfiles?|\bno file edits\b/i,
 			/(?:no|do not|don't|without)\b[^.!?\n]*\b(?:purchas|spend)/i,
 			/(?:no|do not|don't|without|unavailable)\b[^.!?\n]*(?:customer data|data access)|(?:customer data|data access)[^.!?\n]*(?:not|unavailable|unassumed)/i,
 		],
@@ -92,7 +92,7 @@ const unreasonableCases = [
 			/(?:nontechnical|plain.language|plain English|customer.facing|understandable)/i, /(?:notes|supplied|provided)/i,
 			/(?:unknown|unconfirmed|unestablished|undetermined)[^.!?\n]*cause|cause[^.!?\n]*(?:unknown|unconfirmed|unestablished|undetermined)/i,
 			/backfill[^.!?\n]*(?:not[^.!?\n]*run|pending|unexecuted)|(?:not[^.!?\n]*run|pending|unexecuted)[^.!?\n]*backfill/i,
-			/(?:no|do not|don't|without)\b[^.!?\n]*\b(?:edit|chang|modif)[^.!?\n]*\bfiles?/i,
+			/(?:no|do not|don't|without)\b[^.!?\n]*\b(?:edit|chang|modif)[^.!?\n]*\bfiles?|\bno file edits\b/i,
 			/(?:no|do not|don't|without)\b[^.!?\n]*\b(?:code changes|chang[^.!?\n]*code)/i,
 			/(?:no|do not|don't|without)\b[^.!?\n]*\bsend/i,
 			/(?:no|do not|don't|without)\b[^.!?\n]*\bdisclos/i,
