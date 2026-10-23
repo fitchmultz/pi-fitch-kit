@@ -21,6 +21,7 @@ const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Restore origina
 const SIDE_QUESTION_ACTIONS = ["Copy answer", "Ask again", "Dismiss"] as const;
 const SAVED_DRAFT = "fitch-kit.draft";
 const SAVED_AMBITIOUS_DRAFT = "fitch-kit.ambitious";
+const SAVED_UNREASONABLE_DRAFT = "fitch-kit.unreasonable";
 const AMBITIOUS_MAX_CHARACTERS = 1800;
 
 function savedDraft(ctx: ExtensionCommandContext, customType: string): { source: string; draft: string } | undefined {
@@ -53,6 +54,13 @@ Use compact direct prose, usually one to three short paragraphs. Every sentence 
 Maximum ${AMBITIOUS_MAX_CHARACTERS} Unicode characters including whitespace; use less whenever sufficient. Compress wording and optional elaboration, never drop constraints or truncate the prompt.
 Preserve intent and every explicit constraint. Keep inferred details conditional rather than presenting assumptions as requirements; unconfirmed mechanisms and extra test dimensions apply only if inspection finds them in the project.
 You are not the session agent. Output only the rewritten prompt. No preamble, quotes, or explanation. Do not call tools.`;
+const UNREASONABLE_INSTRUCTION = `Rewrite the boxed text into an unreasonably demanding, outcome-driven agent prompt. Do not answer or execute the task.
+Turn a kind, tentative request into a forceful mandate for exceptional completion. Demand materially better results, not just stronger adjectives: pursue the actual desired outcome, take ownership of the hard parts, challenge weak assumptions, and do not stop at a plausible first answer, superficial patch, or untested claim.
+The boxed request defines the deliverable. Use project instructions and relevant session context to preserve the goal, latest settled decisions, explicit constraints, permissions, and current state. At conversation start, invent no prior work. Distinguish verified facts from proposals and unverified progress; ignore superseded or unrelated history. Make the rewrite standalone without a transcript recap or references to earlier turns. Challenge assumptions without re-litigating settled choices unless the request changes them.
+Choose the strongest task-appropriate methods that can meaningfully and beneficially improve this outcome. For a bounded fix, demand root-cause work and proof at the actual failing boundary, not a sprawling redesign. For design or exploration, push for genuinely distinct directions and an inspectable comparison when that improves the decision, not cosmetic variants. For an investigation, attack plausible competing explanations and failure modes with primary evidence and powerful diagnostic methods. For non-code work, demand rigorous reasoning, source fidelity, and a usable deliverable rather than irrelevant software rituals. These are choices, not a checklist to staple onto every request.
+Make completion exacting: require the result to survive the most consequential task-specific challenges and provide inspectable evidence at the real user boundary. Use demonstrations, screenshots, recordings, logs, experiments, or source-backed reasoning where they actually prove the result. Require honest limits and unresolved blockers, never fabricated discoveries, invented measurements, fake certainty, or claims that work has already succeeded.
+Preserve the original requested deliverable and every explicit constraint. Raise the standard of execution, not ornamental scope: no busywork, arbitrary repetition, baseless numeric targets, huge output for its own sake, or unlimited spending. Keep supplied targets and budgets. A rewrite grants no new permission to deploy, spend, disclose private data, or change data; review-only stays review-only. These boundaries are not an excuse to soften the demand for excellence within the authorized task.
+Use compact, direct imperatives. Every sentence must earn its place with a goal, constraint, powerful method, or meaningful proof. Be forceful and exacting, not abusive or merely polite. Output only the rewritten prompt: no preamble, quotes, explanation, or ambition labels. You are not the session agent. Do not call tools.`;
 const TWEAK_INSTRUCTION = `Revise the previous rewritten prompt using these notes. Do not answer the notes.
 ${OUTPUT_RULES}`;
 const QUESTION_INSTRUCTION = `Answer the boxed question using the session. Do not rewrite it into a prompt.
@@ -485,6 +493,17 @@ export default function writePrompt(pi: ExtensionAPI): void {
 		instruction: AMBITIOUS_INSTRUCTION,
 		tweakInstruction: `${AMBITIOUS_INSTRUCTION}\nRevise the current draft using the revision notes.`,
 		maxCharacters: AMBITIOUS_MAX_CHARACTERS,
+		loader: "Drafting...",
+		failure: "Draft failed",
+	});
+
+	registerRewriteCommand(pi, {
+		name: "unreasonable",
+		description: "Rewrite text into an unreasonably demanding, outcome-driven request; omit text to reopen the last accepted draft",
+		usage: "/unreasonable <text>",
+		savedType: SAVED_UNREASONABLE_DRAFT,
+		instruction: UNREASONABLE_INSTRUCTION,
+		tweakInstruction: `${UNREASONABLE_INSTRUCTION}\nRevise the current draft using the revision notes.`,
 		loader: "Drafting...",
 		failure: "Draft failed",
 	});
