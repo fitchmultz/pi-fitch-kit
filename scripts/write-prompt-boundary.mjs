@@ -202,13 +202,19 @@ try {
 		const leaf = sm.getLeafId();
 		const file = sm.getSessionFile();
 		const journal = file && existsSync(file) ? readFileSync(file) : undefined;
-		for (const [command, followup, dismiss] of [["draft", "Tweak", "Deny"], ["ambitious", "Tweak", "Deny"], ["side-question", "Ask again", "Dismiss"]]) {
+		for (const [command, followup, dismiss] of [["draft", "Tweak", "Deny"], ["ambitious", "Tweak", "Deny"], ["unreasonable", "Tweak", "Deny"], ["side-question", "Ask again", "Dismiss"]]) {
 			const start = requests.length;
 			actions.push(followup, dismiss);
 			await session.prompt(`/${command} SOURCE_SENTINEL`);
 			assert.equal(requests.length - start, 2, `${label} /${command} must complete and follow up`);
 			if (command !== "side-question") {
-				assert.match(JSON.stringify(requests[start]), new RegExp(`Rewrite the boxed text into a ${command === "ambitious" ? "more ambitious" : "better"} coding-agent prompt`), `${label} /${command} instruction`);
+				const instruction = command === "unreasonable" ? "an unreasonably demanding, outcome-driven agent prompt"
+					: `a ${command === "ambitious" ? "more ambitious" : "better"} coding-agent prompt`;
+				assert.ok(JSON.stringify(requests[start]).includes(`Rewrite the boxed text into ${instruction}`), `${label} /${command} instruction`);
+				if (command === "unreasonable") {
+					const revision = (responses ? requests[start + 1].input : requests[start + 1].messages).at(-1);
+					assert.match(JSON.stringify(revision), /unreasonably demanding.*Revise the current draft.*Original request:.*SOURCE_SENTINEL.*Revision notes:.*FOLLOWUP_SENTINEL/s, "Tweak retains unreasonable instructions in the new request, not just prior history");
+				}
 			}
 			for (const body of requests.slice(start)) check(body, history);
 			assert.match(JSON.stringify(requests[start + 1]), /WRITER_REPLY.*FOLLOWUP_SENTINEL/);
@@ -218,7 +224,7 @@ try {
 			if (journal) assert.deepEqual(readFileSync(file), journal, "off-transcript commands must not write to the main journal");
 			assert.equal(toolExecutions, 0);
 		}
-		console.log(`PASS ${api} ${label}: draft/tweak/deny and side-question/ask-again/dismiss`);
+		console.log(`PASS ${api} ${label}: draft/ambitious/unreasonable tweak/deny and side-question/ask-again/dismiss`);
 	}
 	await open(manager);
 	await exercise(manager, "active branch");
@@ -320,6 +326,14 @@ try {
 	assert.equal(inputs.at(-1).streamingBehavior, undefined);
 	assert.equal(editorText, "", "successful acceptance must not replace editor input");
 
+	// A different flavor must not reopen the accepted /draft entry.
+	for (const command of ["ambitious", "unreasonable"]) {
+		const before = requests.length;
+		await session.prompt(`/${command}`);
+		assert.equal(requests.length, before);
+		assert.equal(notices.at(-1).text, `Usage: /${command} <text>`);
+	}
+
 	let activeRun;
 	const hold = { started: Promise.withResolvers(), release: Promise.withResolvers() };
 	actions.push(async () => {
@@ -330,7 +344,7 @@ try {
 		return "Accept";
 	});
 	try {
-		await session.prompt("/draft BUSY_ORIGINAL");
+		await session.prompt("/unreasonable BUSY_ORIGINAL");
 		await until(() => session.getSteeringMessages().includes("WRITER_REPLY"));
 		assert.equal(inputs.at(-1).source, "extension");
 		assert.equal(inputs.at(-1).streamingBehavior, "steer");
@@ -350,12 +364,12 @@ try {
 		session.agent.state.model = undefined;
 		return "Accept";
 	});
-	await session.prompt(`/draft ${original}`);
+	await session.prompt(`/unreasonable ${original}`);
 	await until(() => sendErrors.length === 1);
 	assert.match(sendErrors[0].error, /[Nn]o model/);
 	assert.equal(delivered(), 2);
 	assert.equal(editorText, "unrelated editor input", "failure preserves existing editor input");
-	const backup = fresh.getBranch().findLast((entry) => entry.type === "custom" && entry.customType === "fitch-kit.draft");
+	const backup = fresh.getBranch().findLast((entry) => entry.type === "custom" && entry.customType === "fitch-kit.unreasonable");
 	assert.deepEqual(backup.data, { source: original, draft: "WRITER_REPLY" });
 	assert.doesNotMatch(JSON.stringify(fresh.buildSessionContext().messages), /FAILED_ORIGINAL/, "backup stays out of model context");
 
@@ -368,11 +382,11 @@ try {
 	await open(recovered);
 	const beforeRecovery = requests.length;
 	actions.push("Restore original");
-	await session.prompt("/draft");
-	assert.equal(editorText, `/draft ${original}`);
+	await session.prompt("/unreasonable");
+	assert.equal(editorText, `/unreasonable ${original}`);
 	assert.equal(requests.length, beforeRecovery, "recovery does not spend another writer call");
 	actions.push("Accept");
-	await session.prompt("/draft");
+	await session.prompt("/unreasonable");
 	await until(() => recovered.getBranch().filter((entry) => entry.type === "message"
 		&& entry.message.role === "user" && ai.contentText(entry.message.content) === "WRITER_REPLY").length === 3);
 	await session.waitForIdle();
@@ -393,11 +407,16 @@ try {
 	const ambitiousRecovered = sdk.SessionManager.open(ambitiousRecoveryFile, temp);
 	await open(ambitiousRecovered);
 	const beforeAmbitiousRecovery = requests.length;
-	actions.push("Restore original");
-	await session.prompt("/ambitious");
-	assert.equal(editorText, "/ambitious AMBITIOUS_ORIGINAL");
-	assert.equal(requests.length, beforeAmbitiousRecovery, "ambitious recovery does not spend another writer call");
-	console.log(`PASS ${api}: ambitious accept, saved-entry scoping, and resumed recovery`);
+	// All namespaces coexist, including a later acceptance by another flavor.
+	// Native journal reopening must restore each command's exact original.
+	for (const [command, source] of [["draft", "IDLE_ORIGINAL"], ["unreasonable", original], ["ambitious", "AMBITIOUS_ORIGINAL"]]) {
+		actions.push("Restore original");
+		await session.prompt(`/${command}`);
+		assert.equal(editorText, `/${command} ${source}`);
+		assert.equal(requests.length, beforeAmbitiousRecovery, "per-command recovery does not spend another writer call");
+	}
+	assert.doesNotMatch(JSON.stringify(ambitiousRecovered.buildSessionContext().messages), /fitch-kit\.(?:draft|ambitious|unreasonable)|FAILED_ORIGINAL|AMBITIOUS_ORIGINAL/, "saved sources never enter model context");
+	console.log(`PASS ${api}: draft/ambitious/unreasonable saved-entry isolation and resumed recovery`);
 	console.log(`PASS ${api}: native idle send, busy steering, async failure preservation and resumed retry`);
 	assert.equal(notices.some((notice) => notice.level === "error"), false, JSON.stringify(notices));
 	assert.ok(lifecycle.includes("startup"));

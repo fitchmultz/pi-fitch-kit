@@ -23,7 +23,7 @@ The normal path includes:
 - small public tools for structured questions, persistent todos, working-directory changes, deterministic math, `/ctx` context inspection, timing, verbosity, stash, session editing, and raw message copy;
 - [`ponytail`](https://github.com/fitchmultz/ponytail) to keep the code path boring and small.
 
-The kit itself bundles stable session naming, read-only model status for setup, the Claude image boundary, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, `/ambitious`, and `/side-question`. Delegation packages own their profile defaults; the kit neither requires them nor keeps a second copy or sync layer.
+The kit itself bundles stable session naming, read-only model status for setup, the Claude image boundary, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, `/ambitious`, `/unreasonable`, and `/side-question`. Delegation packages own their profile defaults; the kit neither requires them nor keeps a second copy or sync layer.
 
 OpenAI Ultrafast works globally by default, like Fast. `/ultrafast` means toggle; `on` selects Ultrafast, `off` disables kit OpenAI tiers, and `toggle` changes Ultrafast to off or any other shared mode to Ultrafast. Add `--session` to on/off/toggle to override only this session with Ultrafast or off; status also accepts `--session` but never writes an override. `/ultrafast reset --session` clears that override and follows the current shared setting; reset without `--session` is invalid.
 

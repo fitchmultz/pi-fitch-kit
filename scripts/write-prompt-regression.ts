@@ -295,17 +295,19 @@ await commands.draft.handler("", recovery as never);
 assert.equal(restored, `/draft ${original}`, "saved recovery does not require a working writer configuration");
 rmSync(join(agentDir, WRITE_PROMPT_FILE));
 
-// /ambitious shares the writer and dialog with /draft but keeps its own
-// instruction, saved entries, and recovery. The two must stay isolated.
-notices.length = 0;
-sent = undefined;
-await commands["ambitious"].handler("", ctx() as never);
-assert.equal(notices[0], "Usage: /ambitious <text>");
-assert.equal(sent, undefined, "saved /draft entries must not reopen as /ambitious");
+// Rewrite flavors share UI guards. Native HTTP fixtures own the new
+// flavor's instruction transport, delivery, and journal-backed isolation.
+for (const command of ["ambitious", "unreasonable"]) {
+	notices.length = 0;
+	sent = undefined;
+	await commands[command].handler("", ctx() as never);
+	assert.equal(notices[0], `Usage: /${command} <text>`);
+	assert.equal(sent, undefined, "an empty rewrite must not send");
 
-notices.length = 0;
-await commands["ambitious"].handler("no UI", ctx({ hasUI: false }) as never);
-assert.match(notices[0] ?? "", /interactive UI/);
+	notices.length = 0;
+	await commands[command].handler("no UI", ctx({ hasUI: false }) as never);
+	assert.match(notices[0] ?? "", /interactive UI/);
+}
 
 sent = undefined;
 let ambitiousTask: string | undefined;
@@ -418,6 +420,31 @@ await commands["draft"].handler(
 );
 assert.deepEqual(seen, [1, 3]);
 assert.equal(sent, "v2");
+
+// Provider failure during unreasonable Tweak must keep the reviewed draft,
+// not silently send it or replace it with a partial failed response.
+notices.length = 0;
+sent = undefined;
+let revisionCalls = 0;
+let reviewCalls = 0;
+await commands.unreasonable.handler("review only; do not edit", ctx({
+	modelRegistry: { complete: async () => ++revisionCalls === 1
+		? { role: "assistant", content: [{ type: "text", text: "retained unreasonable draft" }], stopReason: "stop" }
+		: { role: "assistant", content: [{ type: "text", text: "partial" }], stopReason: "error", errorMessage: "revision unavailable" },
+	},
+	ui: {
+		...baseUi,
+		editor: async () => "make the review more exacting",
+		select: async (title: string) => {
+			assert.equal(title, "retained unreasonable draft");
+			return ++reviewCalls === 1 ? "Tweak" : "Deny";
+		},
+	},
+}) as never);
+assert.equal(revisionCalls, 2);
+assert.equal(reviewCalls, 2);
+assert.ok(notices.includes("revision unavailable"));
+assert.equal(sent, undefined);
 
 sent = undefined;
 let usedSelect = false;
@@ -850,7 +877,7 @@ releaseCompletion({ role: "assistant", content: [], stopReason: "aborted" });
 await settled;
 
 // Cancelled work must not touch a context retired by /reload or /new.
-for (const command of ["draft", "side-question"]) {
+for (const command of ["draft", "unreasonable", "side-question"]) {
 	for (const phase of ["image preparation", "provider rejection"]) {
 		let retired = false;
 		let staleReads = 0;
