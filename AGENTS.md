@@ -11,7 +11,7 @@
   - `extensions/session-name.ts` for stable, searchable session naming and protected role identifiers.
   - `extensions/paged-reader.ts` for bounded reader pages, section notes, native session state, and linked replies.
   - `extensions/setup-models.ts` for read-only model availability in the running Pi session during setup.
-  - `extensions/write-prompt.ts` for `/draft` rewrite, `/ambitious` ambition rewrites, `/side-question` off-transcript answers, accept/copy/tweak/deny, and `write-prompt.json` model override.
+  - `extensions/write-prompt.ts` for `/draft` rewrite, `/ambitious` concise ambition rewrites, `/unreasonable` demanding outcome-driven rewrites, `/side-question` off-transcript answers, accept/copy/tweak/deny, and `write-prompt.json` model override.
   - `examples/settings.json` for the safe, non-secret behavioral settings subset.
   - `setup-manifest.json` for unpinned package sources, required model routes, and kit resources.
   - `templates/working-agreement.md` for the optional managed working-agreement blocks.
@@ -52,21 +52,21 @@
 - OpenAI Ultrafast is opt-in, global by default with optional `--session` metadata override and `reset --session` to inherit. Keep the existing shared state file and legacy priority meaning; global commands never clear local overrides. Preserve same-ID persistence and new-ID isolation. Local off suppresses kit tier injection, not native defaults. Follow [fast-mode reference](docs/reference.md#fast-modes) for the command, status, startup, access, and pricing contracts.
 - Gate Ultrafast by exact `gpt-6-astra`, native global/US OpenAI Responses or Codex Responses route, and serialized payload model. Unsupported routes never fall back to priority. Use the stock payload hook without an OpenAI provider override or routing header; native cost accounting/diagnostics remain separate Pi work. Installation never opts in.
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
-- Keep `extensions/write-prompt.ts` off the main transcript: native provider-neutral streaming completion without tools, session provider/model/thinking inheritance with optional `write-prompt.json` overrides, flattened tool history retaining result images, built-in dialogs, and `copyToClipboard` for Copy. Only `/draft` and `/ambitious` Accept calls `sendUserMessage`; preserve busy steering and original/draft recovery, and keep ambitious saved drafts scoped to their own session entry type. `/side-question` never sends.
+- Keep `extensions/write-prompt.ts` off the main transcript: native provider-neutral streaming completion without tools, session provider/model/thinking inheritance with optional `write-prompt.json` overrides, flattened tool history retaining result images, built-in dialogs, and `copyToClipboard` for Copy. Only rewrite-command Accept calls `sendUserMessage`; preserve busy steering and original/draft recovery, with `/draft`, `/ambitious`, and `/unreasonable` saved drafts isolated by entry type. Keep ambitious at 1,800 Unicode characters; unreasonable has no kit-specific cap and raises execution standards without widening scope or authority. Its Tweak retains those rules. `/side-question` never sends.
 - Keep the Agent Browser prerequisite aligned with the released wrapper's recommended baseline.
 - Do not reintroduce a kit `/restart`; the fork supplies native restart and official Pi users quit and relaunch.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.
 
 ## Validation
 
-- Writer native HTTP fixtures own transcript, tool isolation, and asynchronous delivery/recovery; command fixtures retain config denial, cancellation, synchronous failure, and real keyboard menu actions. Extend those keepers instead of copying helper/export inventories; menu navigation expectations must be independent of the production action array.
+- Writer native HTTP fixtures own transcript, tool isolation, and asynchronous delivery/recovery; the opt-in live writer harness owns real-output quality checks, not mocked completions. Keep its task-specific constraints and review-only protections; command fixtures retain config denial, cancellation, synchronous failure, and real keyboard menu actions. Extend those keepers instead of copying helper/export inventories; menu navigation expectations must be independent of the production action array.
 
 - Run `npm run check` after edits to `package.json`, `setup-manifest.json`, `extensions/`, `scripts/`, or registered prompts; add `npm run smoke` when package resources changed.
 - Run `npm run regression:fast-mode` after changing fast-mode toggles, eligibility, payload or header injection, or state handling.
 - Run `node --test scripts/validate-regression.mjs` after changing context-policy validation or its inputs.
 - Run `npm run regression:session-name` after changing naming guidance, metadata injection, protected identities, or its migration gate.
 - Run `npm run regression:paged-reader` after changing reader pagination, drafts, feedback delivery, reply linkage, or native controls.
-- Run `npm run regression:write-prompt` after changing `/draft` config parsing, writer history, cancellation, or accept/copy/tweak/deny behavior.
+- Run `npm run regression:write-prompt` after changing writer commands, config parsing, history, cancellation, or accept/copy/tweak/deny behavior.
 - For runtime-facing changes, also verify Pi loads the package through `pi install ...` and a fresh Pi process when practical.
 - Keep this file short and project-specific; point to `README.md` or Pi docs instead of copying generic coding rules.
 
