@@ -241,9 +241,9 @@ function fastStream(
 	// A caller-supplied client bypasses options.fetch in pi-ai, so the mandatory beta header
 	// cannot be attached; never send speed without it.
 	const fast =
-		enabled(ANTHROPIC_TOGGLE.statePath) &&
+		anthropicEligible(resolved) &&
 		!(options !== undefined && "client" in options) &&
-		anthropicEligible(resolved);
+		enabled(ANTHROPIC_TOGGLE.statePath);
 	const target = fast ? fastModel(resolved) : resolved;
 	const baseOptions = fast ? fastOptions(options) : options;
 	const streamOptions: SimpleStreamOptions = {

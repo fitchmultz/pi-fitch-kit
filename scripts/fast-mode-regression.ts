@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import fs, { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire, syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { zstdDecompressSync } from "node:zlib";
 import { mock } from "node:test";
 import type { Api, Model } from "@earendil-works/pi-ai";
@@ -10,6 +11,15 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-fast-mode-"));
 process.on("exit", () => rmSync(agentDir, { recursive: true, force: true }));
 process.env.PI_CODING_AGENT_DIR = agentDir;
+
+// Keep one pass-through spy for the loaded extension's lifetime: Jiti may
+// capture a builtin import, rather than follow later replacement functions.
+const toggleFileReads = mock.method(fs, "readFileSync");
+syncBuiltinESMExports();
+process.on("exit", () => {
+	toggleFileReads.mock.restore();
+	syncBuiltinESMExports();
+});
 
 const { fastRates } = await import("../extensions/fast-mode.ts");
 const { discoverAndLoadExtensions, SessionManager } = await import("@earendil-works/pi-coding-agent");
@@ -73,6 +83,15 @@ const uiCtx = (model: unknown, sessionManager = defaultSession) => ({
 const GATEWAY_PLACEHOLDER_URL =
 	"https://gateway.ai.cloudflare.com/v1/{CLOUDFLARE_ACCOUNT_ID}/{CLOUDFLARE_GATEWAY_ID}/anthropic";
 const GATEWAY_ENV = { CLOUDFLARE_ACCOUNT_ID: "acct-123", CLOUDFLARE_GATEWAY_ID: "gw-456" };
+async function countToggleReads<T>(request: () => Promise<T>) {
+	const before = toggleFileReads.mock.callCount();
+	const result = await request();
+	return {
+		result,
+		reads: toggleFileReads.mock.calls.slice(before).filter(({ arguments: [path] }) => path === join(agentDir, "anthropic-fast.json")).length,
+	};
+}
+
 async function fastRequest(
 	provider: string,
 	id: string,
@@ -128,13 +147,34 @@ async function fastRequest(
 }
 
 const anthropicOpusCtx = uiCtx({ provider: "anthropic", id: "claude-opus-5" });
-const offOpus = await fastRequest("anthropic", "claude-opus-5");
+const { result: offOpus, reads: defaultOffReads } = await countToggleReads(() => fastRequest("anthropic", "claude-opus-5"));
+assert.equal(defaultOffReads, 1, "an eligible request reads the missing toggle once and defaults off");
 assert.equal(offOpus.payload?.speed, undefined);
 assert.deepEqual(offOpus.beta, ["pi-existing-beta"], "no fast beta while disabled");
 
 const { anthropicProvider } = await import("@earendil-works/pi-ai/providers/anthropic");
 const nativeOpus = anthropicProvider().getModels().find((model) => model.id === "claude-opus-4-8");
 assert.ok(nativeOpus);
+const nativeSonnet = anthropicProvider().getModels().find((model) => model.id === "claude-sonnet-4-6");
+assert.ok(nativeSonnet);
+const { cloudflareAIGatewayProvider } = await import("@earendil-works/pi-ai/providers/cloudflare-ai-gateway");
+const gatewayProvider = cloudflareAIGatewayProvider();
+const gatewaySonnet = gatewayProvider.getModels().find((model) => ["claude-sonnet-4.6", "claude-sonnet-4-6"].includes(model.id));
+assert.ok(gatewaySonnet);
+for (const enabled of [false, true]) {
+	writeFileSync(join(agentDir, "anthropic-fast.json"), JSON.stringify({ enabled }));
+	for (const model of [nativeSonnet, gatewaySonnet]) {
+		const { result, reads } = await countToggleReads(() => fastRequest(
+			model.provider, model.id, "pi-existing-beta", {},
+			{ ...model, headers: { "anthropic-beta": "pi-existing-beta" } },
+		));
+		console.log(JSON.stringify({ provider: model.provider, model: model.id, enabled, toggleReads: reads }));
+		assert.equal(reads, 0, "ineligible native Sonnet requests must not read the toggle");
+		assert.equal(result.payload?.speed, undefined);
+		assert.deepEqual(result.beta, ["pi-existing-beta"]);
+	}
+}
+rmSync(join(agentDir, "anthropic-fast.json"));
 const reasonedNoTools = await fastRequest(
 	"anthropic", nativeOpus.id, "pi-existing-beta",
 	{ reasoning: "high", toolChoice: "none" }, nativeOpus,
@@ -150,13 +190,14 @@ const fastReasoned = await fastRequest(
 	"anthropic", nativeOpus.id, "pi-existing-beta",
 	{ reasoning: "high", toolChoice: "none" }, nativeOpus,
 );
-assert.equal(fastReasoned.payload?.speed, "fast");
+assert.deepEqual(fastReasoned.payload, { ...reasonedNoTools.payload, speed: "fast" }, "fast must preserve the ordinary native payload except speed");
 assert.equal((fastReasoned.payload?.output_config as { effort?: string } | undefined)?.effort, "high");
 assert.deepEqual(fastReasoned.payload?.tool_choice, { type: "none" });
 // Direct route and gateway route get identical fast treatment.
 for (const provider of ["anthropic", "cloudflare-ai-gateway"]) {
 	for (const id of ["claude-opus-5-5", "claude-opus-5", "claude-opus-4-8"]) {
-		const fast = await fastRequest(provider, id);
+		const { result: fast, reads } = await countToggleReads(() => fastRequest(provider, id));
+		assert.equal(reads, 1, "each eligible request must read one current toggle snapshot");
 		assert.equal(fast.payload?.speed, "fast", `${provider}/${id} must request fast mode`);
 		assert.deepEqual(
 			fast.beta,
@@ -167,7 +208,8 @@ for (const provider of ["anthropic", "cloudflare-ai-gateway"]) {
 }
 const preBeta = await fastRequest("anthropic", "claude-opus-5", "pi-existing-beta,fast-mode-2026-02-01");
 assert.deepEqual(preBeta.beta, ["pi-existing-beta", "fast-mode-2026-02-01"], "no duplicate beta");
-const unsupported = await fastRequest("cloudflare-ai-gateway", "claude-fable-5");
+const { result: unsupported, reads: unsupportedReads } = await countToggleReads(() => fastRequest("cloudflare-ai-gateway", "claude-fable-5"));
+assert.equal(unsupportedReads, 0, "ineligible gateway requests must not read the toggle");
 assert.equal(unsupported.payload?.speed, undefined);
 assert.deepEqual(unsupported.beta, ["pi-existing-beta"], "no fast beta on models fast mode ignores");
 
@@ -185,26 +227,42 @@ assert.notEqual(
 	"a full call without thinkingEnabled must not be recomputed by the simple path",
 );
 
+// The selected Pi host owns this SDK; it need not be hoisted into the kit.
+const apiRequire = createRequire(import.meta.resolve("@earendil-works/pi-ai/compat"));
+const { default: Anthropic } = await import(pathToFileURL(apiRequire.resolve("@anthropic-ai/sdk")).href);
 let clientPayload: Record<string, unknown> | undefined;
-const prebuilt = await fastRequest("anthropic", "claude-opus-5", "pi-existing-beta", {
-	client: {
-		messages: {
-			create: (params: Record<string, unknown>) => {
-				clientPayload = params;
-				throw new Error("prebuilt client used");
-			},
+const { result: prebuilt, reads: clientReads } = await countToggleReads(() => fastRequest("anthropic", "claude-opus-5", "pi-existing-beta", {
+	client: new Anthropic({
+		apiKey: "test",
+		fetch: async (_input, init) => {
+			clientPayload = JSON.parse(String(init?.body));
+			throw new Error("prebuilt client used");
 		},
-	},
-});
+	}),
+}));
+assert.equal(clientReads, 0, "a supplied client must not read the toggle");
 assert.equal(prebuilt.payload, undefined, "a prebuilt client bypasses the wrapped fetch");
-assert.equal(clientPayload?.speed, undefined, "never request fast mode when the beta header cannot be attached");
+assert.ok(clientPayload, "the supplied client must actually receive the request");
+assert.equal(clientPayload.speed, undefined, "never request fast mode when the beta header cannot be attached");
 
 await commands["anthropic-fast"].handler("off", anthropicOpusCtx);
 assert.equal(notices.at(-1), "Anthropic fast mode OFF");
+const { result: freshOff, reads: freshOffReads } = await countToggleReads(() => fastRequest("anthropic", "claude-opus-5"));
+assert.equal(freshOffReads, 1, "the next eligible request must read current off state, not cache on");
+assert.equal(freshOff.payload?.speed, undefined);
+assert.deepEqual(freshOff.beta, ["pi-existing-beta"]);
+
+// A toggle changed by the caller's payload hook only affects the next request.
+writeFileSync(join(agentDir, "anthropic-fast.json"), JSON.stringify({ enabled: true }));
+const { result: snapshot, reads: snapshotReads } = await countToggleReads(() => fastRequest(
+	"anthropic", "claude-opus-5", "pi-existing-beta",
+	{ onPayload: () => { writeFileSync(join(agentDir, "anthropic-fast.json"), JSON.stringify({ enabled: false })); } },
+));
+assert.equal(snapshotReads, 1);
+assert.equal(snapshot.payload?.speed, "fast");
+assert.deepEqual(snapshot.beta, ["pi-existing-beta", "fast-mode-2026-02-01"]);
 assert.equal((await fastRequest("anthropic", "claude-opus-5")).payload?.speed, undefined);
 
-const { cloudflareAIGatewayProvider } = await import("@earendil-works/pi-ai/providers/cloudflare-ai-gateway");
-const gatewayProvider = cloudflareAIGatewayProvider();
 const gatewayO3 = gatewayProvider.getModels().find(({ id }) => id === "o3");
 assert.ok(gatewayO3, "the native gateway catalog must include o3");
 const supportedGatewayIds = ["o3", "o3-2025-04-16", "o4-mini", "o4-mini-2025-04-16"];
