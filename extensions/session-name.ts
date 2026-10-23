@@ -155,7 +155,8 @@ export default function sessionName(pi: ExtensionAPI): void {
 		if (message) return { message };
 	});
 	pi.on("turn_end", (event) => {
-		const message = metadata([...event.context.contextMessages, ...event.context.pendingMessages]);
+		const { contextMessages, pendingMessages } = event.context;
+		const message = metadata(pendingMessages.length === 0 ? contextMessages : [...contextMessages, ...pendingMessages]);
 		if (message) return { entries: [...event.entries, { type: "custom_message", ...message }] };
 	});
 	pi.on("context_with_system", (event, ctx) => {
