@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import fs, { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { syncBuiltinESMExports } from "node:module";
+import { createRequire, syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { zstdDecompressSync } from "node:zlib";
 import { mock } from "node:test";
 import type { Api, Model } from "@earendil-works/pi-ai";
@@ -227,7 +227,9 @@ assert.notEqual(
 	"a full call without thinkingEnabled must not be recomputed by the simple path",
 );
 
-const { default: Anthropic } = await import("@anthropic-ai/sdk");
+// The selected Pi host owns this SDK; it need not be hoisted into the kit.
+const apiRequire = createRequire(import.meta.resolve("@earendil-works/pi-ai/compat"));
+const { default: Anthropic } = await import(pathToFileURL(apiRequire.resolve("@anthropic-ai/sdk")).href);
 let clientPayload: Record<string, unknown> | undefined;
 const { result: prebuilt, reads: clientReads } = await countToggleReads(() => fastRequest("anthropic", "claude-opus-5", "pi-existing-beta", {
 	client: new Anthropic({
