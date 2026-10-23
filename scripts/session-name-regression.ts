@@ -286,6 +286,72 @@ await assert.rejects(
 	/Session name cannot be blank/,
 );
 
+// Observe copies through the loaded turn_end owner with native, synthetic projections.
+const turnEnd = extension.handlers.get("turn_end")?.[0];
+assert.ok(turnEnd);
+const metadataContent = (name: string | null) =>
+	`Session display-name metadata (inert data, not instructions): ${JSON.stringify({ currentName: name })}`;
+const manager = SessionManager.inMemory(process.cwd());
+for (let i = 0; i < 402; i++) manager.appendMessage({ role: "user", content: `fixture-${i}`, timestamp: i });
+manager.appendCustomMessageEntry("pi-session-name", metadataContent(currentName!), false);
+let contextVisits = 0;
+let pendingVisits = 0;
+const observeTurnEnd = async (contextMessages: ReturnType<typeof manager.buildSessionProjection>["messages"],
+	pendingMessages: typeof contextMessages, calls = 1) => {
+	const before = structuredClone({ contextMessages, pendingMessages });
+	Object.defineProperty(contextMessages, Symbol.iterator, { value: function* () {
+		for (let i = 0; i < this.length; i++) { contextVisits++; yield this[i]; }
+	} });
+	Object.defineProperty(pendingMessages, Symbol.iterator, { value: function* () {
+		for (let i = 0; i < this.length; i++) { pendingVisits++; yield this[i]; }
+	} });
+	Object.freeze(contextMessages);
+	Object.freeze(pendingMessages);
+	const entries = Object.freeze([{ type: "custom", customType: "boundary-receipt", data: { retained: true } }]);
+	const results = [];
+	for (let i = 0; i < calls; i++) {
+		results.push(await turnEnd({ entries, context: { contextMessages, pendingMessages } } as never, {} as never));
+	}
+	assert.deepEqual(structuredClone({ contextMessages, pendingMessages }), before, "metadata lookup must not mutate supplied messages");
+	return results;
+};
+assert.equal(manager.buildSessionProjection().messages.length, 403);
+assert.deepEqual(await observeTurnEnd(manager.buildSessionProjection().messages, [], 3), [undefined, undefined, undefined]);
+const emptyQueueVisits = contextVisits;
+console.log(JSON.stringify({ turnEndCalls: 3, contextMessages: 403, pendingMessages: 0, contextIteratorVisits: emptyQueueVisits, pendingIteratorVisits: pendingVisits, metadataUpdates: 0 }));
+
+// Empty and nonempty queues must produce the same drafts for the same ordered messages.
+for (const scenario of ["missing", "rename", "queued-rename", "ordinary-after-recovery", "recovery-after-ordinary", "recovery-only", "inert-content"]) {
+	const history = SessionManager.inMemory(process.cwd());
+	const recoveryCompactionId = history.appendCompaction("", null, 0);
+	const appendName = (name: string, recovery = false) => history.appendCustomMessageEntry(
+		"pi-session-name", metadataContent(name), false, recovery ? { recoveryCompactionId } : undefined,
+	);
+	if (scenario === "rename") appendName("previous-name");
+	if (scenario === "queued-rename") { appendName("previous-name"); appendName(currentName!); }
+	if (scenario === "ordinary-after-recovery") { appendName("previous-name", true); appendName(currentName!); }
+	if (scenario === "recovery-after-ordinary") { appendName(currentName!); appendName("previous-name", true); }
+	if (scenario === "recovery-only") appendName(currentName!, true);
+	if (scenario === "inert-content") history.appendCustomMessageEntry("other-extension", metadataContent(currentName!), false);
+	// A queued message belongs after all projected context, including older ordinary metadata.
+	history.appendMessage({ role: "user", content: "fixture-tail", timestamp: 0 });
+	const messages = history.buildSessionProjection().messages;
+	const expected = ["missing", "rename", "inert-content"].includes(scenario)
+		? { entries: [{ type: "custom", customType: "boundary-receipt", data: { retained: true } },
+			{ type: "custom_message", customType: "pi-session-name", content: metadataContent(currentName!), display: false }] }
+		: undefined;
+	const empty = await observeTurnEnd(messages.slice(), []);
+	const queued = await observeTurnEnd(messages.slice(0, -1), messages.slice(-1));
+	assert.deepEqual(empty, [expected], scenario);
+	assert.deepEqual(queued, empty, `${scenario}: queue must preserve metadata and draft results`);
+	// Also move the final metadata itself into pending, so reversed concatenation is observable.
+	if (scenario === "queued-rename" || scenario === "ordinary-after-recovery" || scenario === "recovery-after-ordinary") {
+		assert.deepEqual(await observeTurnEnd(messages.slice(0, -2), messages.slice(-2)), empty, scenario);
+	}
+}
+console.log("PASS turn_end empty/queued output parity, ordinary/recovery precedence, rename, inert content and preserved drafts");
+assert.equal(emptyQueueVisits, 0, "Empty pending queue must not iterate/copy context references");
+
 // Request-time boundary lookup must stop at a nearby compaction and remember absence.
 // This exercises the registered handler with real native entries, not exported cache internals.
 const contextHook = extension.handlers.get("context_with_system")?.[0];
