@@ -157,11 +157,15 @@ function sessionPrefix(ctx: ExtensionCommandContext): Message[] {
 }
 
 // One provider session per Pi session keeps prompt-cache affinity and accounting
-// across writer commands: resume keeps it, new and forked sessions change it.
-// Hashing keeps writer traffic out of the main agent's provider session, and the
-// fixed-length UUID survives native 64-character cache-key clamping.
+// across writer commands. A custom session ID can name unrelated sessions in other
+// projects or in-memory runs, so hash it with the persisted header's cwd and
+// creation time: resume and cwd overrides keep the result, new and forked sessions
+// change it. Hashing keeps writer traffic out of the main agent's provider session,
+// and the fixed-length UUID survives native 64-character cache-key clamping.
 function writerSessionId(ctx: ExtensionCommandContext): string {
-	const bytes = createHash("sha256").update(`fitch-kit.writer:${ctx.sessionManager.getSessionId()}`).digest();
+	const header = ctx.sessionManager.getHeader();
+	const session = JSON.stringify(["fitch-kit.writer", ctx.sessionManager.getSessionId(), header?.cwd, header?.timestamp]);
+	const bytes = createHash("sha256").update(session).digest();
 	bytes[6] = (bytes[6]! & 0x0f) | 0x80;
 	bytes[8] = (bytes[8]! & 0x3f) | 0x80;
 	const hex = bytes.toString("hex", 0, 16);

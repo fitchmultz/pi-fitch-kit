@@ -30,8 +30,10 @@ const aiPath = realpathSync(join(aiRoot, "dist/index.js"));
 const temp = mkdtempSync(join(tmpdir(), "pi-writer-boundary-"));
 const agentDir = join(temp, "agent");
 const cwd = join(temp, "project");
+const otherProject = join(temp, "other-project");
 mkdirSync(agentDir);
 mkdirSync(cwd);
+mkdirSync(otherProject);
 process.env.PI_CODING_AGENT_DIR = agentDir;
 process.env.PI_PACKAGE_DIR = host;
 process.env.PI_OFFLINE = "1";
@@ -254,6 +256,12 @@ try {
 	assert.match(JSON.stringify(requests.at(-1)), /HANDOFF_SENTINEL/);
 	assert.doesNotMatch(JSON.stringify(requests.at(-1)), /CONVERSATION_SENTINEL|HISTORY_REPLY|RESULT_SENTINEL|ARG_SENTINEL/);
 	await close();
+	// Native resume can replace a missing project directory with another cwd.
+	await open(sdk.SessionManager.open(file, temp, otherProject));
+	actions.push("Dismiss");
+	await session.prompt("/side-question CWD_OVERRIDE_SOURCE");
+	assert.equal(identities.at(-1), resumedId, "a cwd override at resume keeps the writer provider session");
+	await close();
 	const forked = sdk.SessionManager.forkFrom(file, cwd, join(temp, "forks"));
 	await open(forked);
 	const forkedId = await exercise(forked, "forked compacted session", false);
@@ -435,24 +443,24 @@ try {
 	assert.doesNotMatch(JSON.stringify(ambitiousRecovered.buildSessionContext().messages), /fitch-kit\.(?:draft|ambitious|unreasonable)|FAILED_ORIGINAL|AMBITIOUS_ORIGINAL/, "saved sources never enter model context");
 	console.log(`PASS ${api}: draft/ambitious/unreasonable saved-entry isolation and resumed recovery`);
 	console.log(`PASS ${api}: native idle send, busy steering, async failure preservation and resumed retry`);
-	// Custom session IDs can exceed the native 64-character OpenAI cache-key limit.
-	const longSessions = [];
-	for (const suffix of ["a", "b"]) {
+	// One custom ID can name unrelated sessions: one per project (--session-id),
+	// and a new one for each in-memory run (--no-session --session-id).
+	const sameId = [];
+	for (const project of [cwd, otherProject, cwd]) {
 		await close();
-		await open(sdk.SessionManager.inMemory(cwd, { id: `long-session-${"x".repeat(64)}-${suffix}` }));
+		await open(sdk.SessionManager.inMemory(project, { id: "release-review" }));
 		actions.push("Dismiss");
-		await session.prompt("/side-question LONG_ID_SOURCE");
+		await session.prompt("/side-question SAME_ID_SOURCE");
 		const writer = identities.at(-1);
 		await session.prompt("MAIN_SENTINEL");
-		longSessions.push({ writer, main: identities.at(-1) });
+		sameId.push({ writer, main: identities.at(-1) });
 	}
-	assert.notEqual(longSessions[0].writer, longSessions[1].writer, "long custom session IDs keep distinct writer provider sessions");
-	for (const { writer, main } of longSessions) {
+	assert.equal(new Set(sameId.map(({ writer }) => writer)).size, sameId.length, "sessions sharing a custom ID keep separate writer provider sessions");
+	for (const { writer, main } of sameId) {
 		assert.ok(main, "the main agent sends its provider session");
 		assert.notEqual(writer, main, "the writer never joins the main agent's provider session");
 	}
-	if (responses) assert.equal(longSessions[0].main, longSessions[1].main, "control: the native clamp merges these main-agent cache keys");
-	console.log(`PASS ${api}: one writer provider session per session across resume and compaction, separate from forks, new sessions, and the main agent`);
+	console.log(`PASS ${api}: one writer provider session per session across resume, cwd override and compaction, separate from forks, new or same-ID sessions, and the main agent`);
 	assert.equal(notices.some((notice) => notice.level === "error"), false, JSON.stringify(notices));
 	assert.ok(lifecycle.includes("startup"));
 	console.log(JSON.stringify({ host, api, version: JSON.parse(readFileSync(join(host, "package.json"))).version, aiVersion: JSON.parse(readFileSync(join(aiRoot, "package.json"))).version, sdkPath, aiPath, extension: loader.getExtensions().extensions[0].path, requests: requests.length, lifecycle }));

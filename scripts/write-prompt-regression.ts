@@ -114,7 +114,7 @@ function ctx(overrides: Record<string, unknown> = {}) {
 	const registry = context.modelRegistry;
 	return {
 		...context,
-		sessionManager: { getSessionId: () => "session", ...context.sessionManager },
+		sessionManager: { getSessionId: () => "session", getHeader: () => null, ...context.sessionManager },
 		modelRegistry: {
 			...registry,
 			streamSimple: (...args: unknown[]) => ({ result: () => Reflect.apply(registry.complete, registry, args) }),
