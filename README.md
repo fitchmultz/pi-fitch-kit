@@ -6,7 +6,7 @@ Fitch Kit adds session tools and a setup prompt to [Pi](https://github.com/earen
 
 ## Install
 
-Use **Node.js 24.15+** and **Pi 1.0.0+**. The kit supports official Pi and [Fitch Pi](https://github.com/fitchmultz/pi).
+Use **Node.js 24.15+** and **Pi 1.4.0+**. The kit supports official Pi and [Fitch Pi](https://github.com/fitchmultz/pi).
 
 1. Install Pi if you do not have it.
 

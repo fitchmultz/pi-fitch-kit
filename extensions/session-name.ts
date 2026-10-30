@@ -1,5 +1,4 @@
 import { Type } from "@earendil-works/pi-ai";
-import { VERSION } from "@earendil-works/pi-coding-agent";
 import type {
 	ExtensionAPI,
 	SessionProjection,
@@ -37,14 +36,13 @@ export default function sessionName(pi: ExtensionAPI): void {
 		return compaction;
 	};
 	pi.on("session_tree", resetBranch);
-	const registerTool = (sequential: boolean) => {
+	const registerTool = () => {
 		pi.registerTool({
 			name: TOOL_NAME,
 			label: "Name Session",
 			description:
 				"Set or update the current Pi session's display name to a broad, durable description of its overall purpose.",
 			promptSnippet: "Set or update the current Pi session's searchable display name",
-			...(sequential ? { executionMode: "sequential" as const } : {}),
 			promptGuidelines: [
 				"Before your first final response in an unnamed session, you must call name_session once after the overall purpose is clear; session display-name metadata reports currentName as null when unnamed. Do not skip naming just because no other tools are needed. When useful tool calls are already needed, include name_session in the same tool-call batch rather than a separate naming-only round. Do not add unrelated work just to batch naming.",
 				"Choose a broad, durable name for the session's overall purpose, usually 2-4 short terms. Do not name the current subtask, implementation detail, file, issue, phase, or temporary activity.",
@@ -132,15 +130,13 @@ export default function sessionName(pi: ExtensionAPI): void {
 		});
 	};
 
-	pi.on("session_start", (_event, ctx) => {
+	pi.on("session_start", () => {
 		resetBranch();
 		if (active) return;
 		// Resolve ownership from Pi's effective tools, including package filters and scope overrides.
 		if (pi.getAllTools().some((tool) => tool.name === TOOL_NAME)) return;
 		active = true;
-		// Official Pi 1.0-1.3 TUIs show one extension dialog at a time, so a sibling's dialog would
-		// strand a protected-name confirmation; Pi 1.4 stacks them (earendil-works/pi#11166). Keep native sequential batches there.
-		registerTool(ctx.mode === "tui" && /^1\.[0-3]\./.test(VERSION));
+		registerTool();
 	});
 
 	const recoveryCompactionId = (message: SessionProjection["messages"][number]) => {
