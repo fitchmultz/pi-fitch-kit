@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -24,6 +25,7 @@ const requests = [];
 let requestedName;
 let boundaryInput;
 let renameAfterBoundary;
+let batchCalls;
 let retainNoneNextTurn = false;
 let overflowNextRequest = false;
 globalThis.fetch = async (url, init) => {
@@ -33,17 +35,22 @@ globalThis.fetch = async (url, init) => {
 		overflowNextRequest = false;
 		return new Response(JSON.stringify({ error: { message: "maximum context length exceeded", code: "context_length_exceeded", type: "invalid_request_error" } }), { status: 400, headers: { "content-type": "application/json" } });
 	}
-	const item = requestedName || boundaryInput ? {
+	const items = batchCalls?.map(([name, args], index) => ({
+		type: "function_call", id: `fc_${requests.length}_${index}`, call_id: `call_${requests.length}_${index}`, name, arguments: JSON.stringify(args), status: "completed",
+	})) ?? [requestedName || boundaryInput ? {
 		type: "function_call", id: `fc_${requests.length}`, call_id: `call_${requests.length}`,
 		name: boundaryInput ? "boundary_case" : "name_session", arguments: JSON.stringify(boundaryInput ?? { name: requestedName }), status: "completed",
-	} : { id: `msg_${requests.length}`, type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: "DONE", annotations: [] }] };
+	} : { id: `msg_${requests.length}`, type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: "DONE", annotations: [] }] }];
+	batchCalls = undefined;
 	requestedName = boundaryInput ? renameAfterBoundary : undefined;
 	renameAfterBoundary = undefined;
 	boundaryInput = undefined;
 	const events = [
-		{ type: "response.output_item.added", output_index: 0, item: { ...item, ...(item.type === "message" ? { content: [] } : { arguments: "" }) } },
-		{ type: "response.output_item.done", output_index: 0, item },
-		{ type: "response.completed", response: { id: `resp_${requests.length}`, status: "completed", output: [item], usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } } },
+		...items.flatMap((item, index) => [
+			{ type: "response.output_item.added", output_index: index, item: { ...item, ...(item.type === "message" ? { content: [] } : { arguments: "" }) } },
+			{ type: "response.output_item.done", output_index: index, item },
+		]),
+		{ type: "response.completed", response: { id: `resp_${requests.length}`, status: "completed", output: items, usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } } },
 	];
 	return new Response(events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
 };
@@ -69,14 +76,14 @@ try {
 			pi.on("session_before_compact", (event) => ({ compaction: { summary: "OFFLINE_SUMMARY", firstKeptEntryId: event.preparation.firstKeptEntryId, tokensBefore: 10 } }));
 		}],
 	});
-	async function open(manager, paths = [namingPath]) {
+	async function open(manager, paths = [namingPath], uiContext) {
 		const loader = makeLoader(paths);
 		await loader.reload();
 		assert.deepEqual(loader.getExtensions().errors, []);
 		assert.ok(loader.getExtensions().extensions.some((e) => e.path.endsWith("session-name.ts")), JSON.stringify(loader.getExtensions().extensions.map((e) => e.path)));
 		assert.deepEqual(loader.getExtensions().extensions.filter((e) => paths.includes(e.path)).map((e) => e.path), paths, "resource paths must exercise the requested extension order");
 		({ session } = await sdk.createAgentSession({ cwd, agentDir: temp, model: registry.find("naming-boundary", "naming"), modelRuntime: runtime, resourceLoader: loader, settingsManager, sessionManager: manager, noTools: true }));
-		await session.bindExtensions({ onError: (error) => { throw new Error(error.error); } });
+		await session.bindExtensions({ uiContext, onError: (error) => { throw new Error(error.error); } });
 	}
 	async function close() { session.dispose(); session = undefined; }
 	const metadata = () => session.sessionManager.buildSessionProjection().messages.filter((m) => m.role === "custom" && m.customType === "pi-session-name");
@@ -265,10 +272,12 @@ try {
 			const beforeReopen = requests.at(-1);
 			await close();
 			await open(sdk.SessionManager.open(saved, temp), paths);
+			session.setActiveToolsByName(["name_session", "boundary_case"]);
 			await prompt("after boundary reopen");
 			extendsPrefix(beforeReopen);
 			assert.equal(latestName(), `${finalName}-renamed`);
 			const beforeLoadout = requests.at(-1);
+			assert.ok(!session.getActiveToolNames().includes("late_tool"), "fixture must deactivate the late tool before testing its activation");
 			session.setActiveToolsByName(["name_session", "boundary_case", "late_tool"]);
 			await prompt("after post-boundary tool activation");
 			extendsPrefix(beforeLoadout);
@@ -282,6 +291,49 @@ try {
 			console.log(`PASS ${order}/${mode}: mid-conversation tool update preserves full system/input prefix`);
 			await close();
 		}
+	}
+	const probe = join(temp, "sibling-probe.ts");
+	writeFileSync(probe, `export default function (pi) {
+		pi.registerTool({ name: "sibling_probe", label: "Sibling probe", description: "Offline sibling fixture",
+			parameters: { type: "object", properties: {} },
+			execute: async () => ({ content: [{ type: "text", text: "SIBLING_DONE" }], details: undefined })
+		});
+	}`);
+	for (const answer of ["accept", "deny", "cancel"]) {
+		if (process.env.PI_NAMING_CASE && process.env.PI_NAMING_CASE !== `batch-${answer}`) continue;
+		const dialogs = [];
+		const siblingEnded = Promise.withResolvers();
+		const ui = {
+			async confirm(_title, message, { signal }) {
+				const timeout = new AbortController();
+				const siblingDone = await Promise.race([siblingEnded.promise.then(() => true), delay(1000, false, { signal: timeout.signal })]);
+				timeout.abort();
+				dialogs.push({ message, siblingDone, name: session.sessionManager.getSessionName() });
+				if (answer !== "cancel") return answer === "accept";
+				// Native dialogs close unanswered when their signal aborts.
+				const closed = new Promise((resolve) => signal.addEventListener("abort", () => resolve(false), { once: true }));
+				void session.abort();
+				return closed;
+			},
+		};
+		await open(sdk.SessionManager.inMemory(cwd), [namingPath, probe], ui);
+		session.subscribe((event) => { if (event.type === "tool_execution_end" && event.toolName === "sibling_probe") siblingEnded.resolve(); });
+		session.setActiveToolsByName(["name_session", "sibling_probe"]);
+		session.setSessionName("release-coordinator");
+		batchCalls = [["name_session", { name: "release-planning" }], ["sibling_probe", {}], ["name_session", { name: "planning-coordinator" }]];
+		await prompt("rename while a sibling runs");
+		assert.deepEqual(dialogs, [{ message: 'Use the new name "release-planning"?', siblingDone: true, name: "release-coordinator" }],
+			`${answer}: the sibling finishes during the one protected confirmation, and the queued rename waits`);
+		const results = session.messages.filter((m) => m.role === "toolResult").map((m) => [m.toolName, m.isError, m.details]);
+		const later = { accept: [false, { name: "planning-coordinator", previousName: "release-planning" }], deny: [false, { name: "planning-coordinator", previousName: "release-coordinator" }], cancel: [true, {}] }[answer];
+		assert.deepEqual(results, [
+			["name_session", answer !== "accept", answer === "accept" ? { name: "release-planning", previousName: "release-coordinator" } : {}],
+			["sibling_probe", false, undefined],
+			["name_session", ...later],
+		], `${answer}: the later call reads the name its predecessor left, and a cancelled batch renames nothing`);
+		assert.equal(session.sessionManager.getSessionName(), answer === "cancel" ? "release-coordinator" : "planning-coordinator");
+		console.log(`PASS batch-${answer}: parallel sibling, serialized naming in call order`);
+		await close();
 	}
 	console.log(JSON.stringify({ host, version: JSON.parse(readFileSync(join(host, "package.json"))).version, aiRoot, requests: requests.length, network: "fixture only" }));
 } finally {
