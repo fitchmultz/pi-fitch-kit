@@ -76,14 +76,14 @@ try {
 			pi.on("session_before_compact", (event) => ({ compaction: { summary: "OFFLINE_SUMMARY", firstKeptEntryId: event.preparation.firstKeptEntryId, tokensBefore: 10 } }));
 		}],
 	});
-	async function open(manager, paths = [namingPath], uiContext) {
+	async function open(manager, paths = [namingPath], uiContext, mode) {
 		const loader = makeLoader(paths);
 		await loader.reload();
 		assert.deepEqual(loader.getExtensions().errors, []);
 		assert.ok(loader.getExtensions().extensions.some((e) => e.path.endsWith("session-name.ts")), JSON.stringify(loader.getExtensions().extensions.map((e) => e.path)));
 		assert.deepEqual(loader.getExtensions().extensions.filter((e) => paths.includes(e.path)).map((e) => e.path), paths, "resource paths must exercise the requested extension order");
 		({ session } = await sdk.createAgentSession({ cwd, agentDir: temp, model: registry.find("naming-boundary", "naming"), modelRuntime: runtime, resourceLoader: loader, settingsManager, sessionManager: manager, noTools: true }));
-		await session.bindExtensions({ uiContext, onError: (error) => { throw new Error(error.error); } });
+		await session.bindExtensions({ uiContext, mode, onError: (error) => { throw new Error(error.error); } });
 	}
 	async function close() { session.dispose(); session = undefined; }
 	const metadata = () => session.sessionManager.buildSessionProjection().messages.filter((m) => m.role === "custom" && m.customType === "pi-session-name");
@@ -299,8 +299,12 @@ try {
 			execute: async () => ({ content: [{ type: "text", text: "SIBLING_DONE" }], details: undefined })
 		});
 	}`);
-	for (const answer of ["accept", "deny", "cancel"]) {
-		if (process.env.PI_NAMING_CASE && process.env.PI_NAMING_CASE !== `batch-${answer}`) continue;
+	const version = JSON.parse(readFileSync(join(host, "package.json"))).version;
+	for (const [mode, answer] of [["rpc", "accept"], ["rpc", "deny"], ["rpc", "cancel"], ["tui", "accept"]]) {
+		const name = `batch-${mode}-${answer}`;
+		if (process.env.PI_NAMING_CASE && process.env.PI_NAMING_CASE !== name) continue;
+		// Official 1.0-1.3 TUIs hold one extension dialog at a time; Pi 1.4.0 added a stack (earendil-works/pi#11166).
+		const parallel = mode !== "tui" || !/^1\.[0-3]\./.test(version);
 		const dialogs = [];
 		const siblingEnded = Promise.withResolvers();
 		const ui = {
@@ -316,26 +320,26 @@ try {
 				return closed;
 			},
 		};
-		await open(sdk.SessionManager.inMemory(cwd), [namingPath, probe], ui);
+		await open(sdk.SessionManager.inMemory(cwd), [namingPath, probe], ui, mode);
 		session.subscribe((event) => { if (event.type === "tool_execution_end" && event.toolName === "sibling_probe") siblingEnded.resolve(); });
 		session.setActiveToolsByName(["name_session", "sibling_probe"]);
 		session.setSessionName("release-coordinator");
 		batchCalls = [["name_session", { name: "release-planning" }], ["sibling_probe", {}], ["name_session", { name: "planning-coordinator" }]];
 		await prompt("rename while a sibling runs");
-		assert.deepEqual(dialogs, [{ message: 'Use the new name "release-planning"?', siblingDone: true, name: "release-coordinator" }],
-			`${answer}: the sibling finishes during the one protected confirmation, and the queued rename waits`);
+		assert.deepEqual(dialogs, [{ message: 'Use the new name "release-planning"?', siblingDone: parallel, name: "release-coordinator" }],
+			`${name}: the sibling ${parallel ? "finishes during" : "waits for"} the one protected confirmation, and the queued rename waits`);
 		const results = session.messages.filter((m) => m.role === "toolResult").map((m) => [m.toolName, m.isError, m.details]);
 		const later = { accept: [false, { name: "planning-coordinator", previousName: "release-planning" }], deny: [false, { name: "planning-coordinator", previousName: "release-coordinator" }], cancel: [true, {}] }[answer];
 		assert.deepEqual(results, [
 			["name_session", answer !== "accept", answer === "accept" ? { name: "release-planning", previousName: "release-coordinator" } : {}],
 			["sibling_probe", false, undefined],
 			["name_session", ...later],
-		], `${answer}: the later call reads the name its predecessor left, and a cancelled batch renames nothing`);
+		], `${name}: the later call reads the name its predecessor left, and a cancelled batch renames nothing`);
 		assert.equal(session.sessionManager.getSessionName(), answer === "cancel" ? "release-coordinator" : "planning-coordinator");
-		console.log(`PASS batch-${answer}: parallel sibling, serialized naming in call order`);
+		console.log(`PASS ${name}: ${parallel ? "parallel sibling" : "native sequential batch"}, serialized naming in call order`);
 		await close();
 	}
-	console.log(JSON.stringify({ host, version: JSON.parse(readFileSync(join(host, "package.json"))).version, aiRoot, requests: requests.length, network: "fixture only" }));
+	console.log(JSON.stringify({ host, version, aiRoot, requests: requests.length, network: "fixture only" }));
 } finally {
 	if (session) session.dispose();
 	globalThis.fetch = originalFetch;
