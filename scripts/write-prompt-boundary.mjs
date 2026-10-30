@@ -30,14 +30,17 @@ const aiPath = realpathSync(join(aiRoot, "dist/index.js"));
 const temp = mkdtempSync(join(tmpdir(), "pi-writer-boundary-"));
 const agentDir = join(temp, "agent");
 const cwd = join(temp, "project");
+const otherProject = join(temp, "other-project");
 mkdirSync(agentDir);
 mkdirSync(cwd);
+mkdirSync(otherProject);
 process.env.PI_CODING_AGENT_DIR = agentDir;
 process.env.PI_PACKAGE_DIR = host;
 process.env.PI_OFFLINE = "1";
 const sdk = await import(pathToFileURL(sdkPath).href);
 const ai = await import(pathToFileURL(aiPath).href);
 const requests = [];
+const identities = [];
 const requestOrigins = [];
 const replies = [];
 let holdNextRequest;
@@ -53,8 +56,11 @@ globalThis.fetch = async (url, init) => {
 	const path = api === "openai-codex-responses" ? "codex/responses" : responses ? "responses" : "chat/completions";
 	assert.ok(["writer.invalid", "alternate-writer.invalid"].some((host) => String(url) === `https://${host}/v1/${path}`));
 	requestOrigins.push(new URL(url).hostname);
-	const body = new Headers(init.headers).get("content-encoding") === "zstd" ? zstdDecompressSync(init.body).toString() : init.body;
+	const headers = new Headers(init.headers);
+	const body = headers.get("content-encoding") === "zstd" ? zstdDecompressSync(init.body).toString() : init.body;
 	requests.push(JSON.parse(body));
+	// The provider-visible session: OpenAI's cache key, or the Completions affinity header.
+	identities.push(responses ? requests.at(-1).prompt_cache_key : headers.get("x-session-affinity"));
 	if (holdNextRequest) {
 		const hold = holdNextRequest;
 		holdNextRequest = undefined;
@@ -92,7 +98,7 @@ try {
 	const providerConfig = {
 		api, baseUrl: "https://writer.invalid/v1",
 		apiKey: `synthetic.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "offline" } })).toString("base64")}.synthetic`,
-		models: ["writer", "override"].map((id) => ({ id, name: id, reasoning: true, thinkingLevelMap: { off: "none", high: "high" }, input: ["text", "image"], contextWindow: 100000, maxTokens: 1000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } })),
+		models: ["writer", "override"].map((id) => ({ id, name: id, reasoning: true, thinkingLevelMap: { off: "none", high: "high" }, input: ["text", "image"], contextWindow: 100000, maxTokens: 1000, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, ...(responses ? {} : { compat: { sendSessionAffinityHeaders: true } }) })),
 	};
 	registry.registerProvider("writer-boundary", providerConfig);
 	registry.registerProvider("alternate-writer", { ...providerConfig, baseUrl: "https://alternate-writer.invalid/v1" });
@@ -202,6 +208,7 @@ try {
 		const leaf = sm.getLeafId();
 		const file = sm.getSessionFile();
 		const journal = file && existsSync(file) ? readFileSync(file) : undefined;
+		const first = requests.length;
 		for (const [command, followup, dismiss] of [["draft", "Tweak", "Deny"], ["ambitious", "Tweak", "Deny"], ["unreasonable", "Tweak", "Deny"], ["side-question", "Ask again", "Dismiss"]]) {
 			const start = requests.length;
 			actions.push(followup, dismiss);
@@ -224,10 +231,15 @@ try {
 			if (journal) assert.deepEqual(readFileSync(file), journal, "off-transcript commands must not write to the main journal");
 			assert.equal(toolExecutions, 0);
 		}
+		const sessions = new Set(identities.slice(first));
+		assert.equal(sessions.size, 1, `${label}: every writer command and follow-up shares one provider session`);
+		const [identity] = sessions;
+		assert.ok(identity, `${label}: writer requests carry a provider session`);
 		console.log(`PASS ${api} ${label}: draft/ambitious/unreasonable tweak/deny and side-question/ask-again/dismiss`);
+		return identity;
 	}
 	await open(manager);
-	await exercise(manager, "active branch");
+	const activeId = await exercise(manager, "active branch");
 	// Persist only our synthetic active branch, then use the native JSONL reader.
 	const file = join(temp, "saved.jsonl");
 	writeFileSync(file, [manager.getHeader(), ...manager.getBranch()].map((entry) => JSON.stringify(entry)).join("\n") + "\n");
@@ -235,17 +247,30 @@ try {
 	const resumed = sdk.SessionManager.open(file, temp);
 	await open(resumed);
 	writeFileSync(join(agentDir, "write-prompt.json"), JSON.stringify({ model: "writer-boundary/override" }));
-	await exercise(resumed, "file-backed resume + override");
+	const resumedId = await exercise(resumed, "file-backed resume + override");
+	assert.equal(resumedId, activeId, "resuming a session keeps its writer provider session");
 	assert.equal(requests.at(-1).model, "override");
 	// Replace history through public compaction, without a model-generated summary.
 	await session.compact();
-	await exercise(resumed, "compacted context", false);
+	assert.equal(await exercise(resumed, "compacted context", false), resumedId);
 	assert.match(JSON.stringify(requests.at(-1)), /HANDOFF_SENTINEL/);
 	assert.doesNotMatch(JSON.stringify(requests.at(-1)), /CONVERSATION_SENTINEL|HISTORY_REPLY|RESULT_SENTINEL|ARG_SENTINEL/);
 	await close();
+	// Native resume can replace a missing project directory with another cwd.
+	await open(sdk.SessionManager.open(file, temp, otherProject));
+	actions.push("Dismiss");
+	await session.prompt("/side-question CWD_OVERRIDE_SOURCE");
+	assert.equal(identities.at(-1), resumedId, "a cwd override at resume keeps the writer provider session");
+	await close();
+	const forked = sdk.SessionManager.forkFrom(file, cwd, join(temp, "forks"));
+	await open(forked);
+	const forkedId = await exercise(forked, "forked compacted session", false);
+	assert.notEqual(forkedId, resumedId, "a fork with identical history gets its own writer provider session");
+	await close();
 	const fresh = sdk.SessionManager.inMemory(cwd);
 	await open(fresh);
-	await exercise(fresh, "fresh session", false);
+	const freshId = await exercise(fresh, "fresh session", false);
+	assert.ok(![activeId, forkedId].includes(freshId), "a new session gets its own writer provider session");
 	assert.doesNotMatch(JSON.stringify(requests.at(-1)), /CONVERSATION_SENTINEL/);
 	// Visible characters, not provider tokens or UTF-16 units. Never slice off
 	// a constraint at the end of a long completion; retry once, then fail closed.
@@ -418,6 +443,24 @@ try {
 	assert.doesNotMatch(JSON.stringify(ambitiousRecovered.buildSessionContext().messages), /fitch-kit\.(?:draft|ambitious|unreasonable)|FAILED_ORIGINAL|AMBITIOUS_ORIGINAL/, "saved sources never enter model context");
 	console.log(`PASS ${api}: draft/ambitious/unreasonable saved-entry isolation and resumed recovery`);
 	console.log(`PASS ${api}: native idle send, busy steering, async failure preservation and resumed retry`);
+	// One custom ID can name unrelated sessions: one per project (--session-id),
+	// and a new one for each in-memory run (--no-session --session-id).
+	const sameId = [];
+	for (const project of [cwd, otherProject, cwd]) {
+		await close();
+		await open(sdk.SessionManager.inMemory(project, { id: "release-review" }));
+		actions.push("Dismiss");
+		await session.prompt("/side-question SAME_ID_SOURCE");
+		const writer = identities.at(-1);
+		await session.prompt("MAIN_SENTINEL");
+		sameId.push({ writer, main: identities.at(-1) });
+	}
+	assert.equal(new Set(sameId.map(({ writer }) => writer)).size, sameId.length, "sessions sharing a custom ID keep separate writer provider sessions");
+	for (const { writer, main } of sameId) {
+		assert.ok(main, "the main agent sends its provider session");
+		assert.notEqual(writer, main, "the writer never joins the main agent's provider session");
+	}
+	console.log(`PASS ${api}: one writer provider session per session across resume, cwd override and compaction, separate from forks, new or same-ID sessions, and the main agent`);
 	assert.equal(notices.some((notice) => notice.level === "error"), false, JSON.stringify(notices));
 	assert.ok(lifecycle.includes("startup"));
 	console.log(JSON.stringify({ host, api, version: JSON.parse(readFileSync(join(host, "package.json"))).version, aiVersion: JSON.parse(readFileSync(join(aiRoot, "package.json"))).version, sdkPath, aiPath, extension: loader.getExtensions().extensions[0].path, requests: requests.length, lifecycle }));

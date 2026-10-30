@@ -265,10 +265,12 @@ try {
 			const beforeReopen = requests.at(-1);
 			await close();
 			await open(sdk.SessionManager.open(saved, temp), paths);
+			session.setActiveToolsByName(["name_session", "boundary_case"]);
 			await prompt("after boundary reopen");
 			extendsPrefix(beforeReopen);
 			assert.equal(latestName(), `${finalName}-renamed`);
 			const beforeLoadout = requests.at(-1);
+			assert.ok(!session.getActiveToolNames().includes("late_tool"), "fixture must deactivate the late tool before testing its activation");
 			session.setActiveToolsByName(["name_session", "boundary_case", "late_tool"]);
 			await prompt("after post-boundary tool activation");
 			extendsPrefix(beforeLoadout);
