@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep one writer provider session per Pi session, so repeated `/draft`, `/ambitious`, `/unreasonable`, and `/side-question` commands can reuse prompt-cache affinity and cached-token accounting instead of starting a new provider session each time. Resume keeps it; new and forked sessions get their own. It is derived from the session ID, never the main agent's own provider session, and stays under the native 64-character cache-key limit for long custom session IDs. Providers still decide cache hits, so this does not guarantee a hit or a faster answer. Native HTTP regressions cover continuity and isolation on every route.
 - Add `/unreasonable <text>`: an off-transcript, forceful outcome-driven rewrite that raises task-appropriate methods and proof without widening the deliverable, constraints, budget, or authority. Bounded fixes stay bounded, design exploration seeks genuinely distinct directions, and non-code work demands reasoning and source fidelity. It shares the writer dialog, model configuration, Tweak, busy steering, and recovery path, with isolated `fitch-kit.unreasonable` saved drafts and no kit-specific character cap; `/ambitious` stays at 1,800 characters.
 - Extend the existing opt-in native live writer harness to select `/unreasonable`, with bounded-fix, design-exploration, and non-code review-only cases. Document local authenticated reproduction and the unverified live-quality gate; offline fixtures do not establish model compliance.
 

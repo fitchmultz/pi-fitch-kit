@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { clampThinkingLevel, contentText, uuidv7, type Message, type UserMessage } from "@earendil-works/pi-ai";
+import { clampThinkingLevel, contentText, type Message, type UserMessage } from "@earendil-works/pi-ai";
 import {
 	BorderedLoader,
 	buildSessionContext,
@@ -153,6 +154,18 @@ function sessionPrefix(ctx: ExtensionCommandContext): Message[] {
 	return convertToLlm(
 		buildSessionContext(ctx.sessionManager.getEntries(), ctx.sessionManager.getLeafId()).messages,
 	);
+}
+
+// One provider session per Pi session keeps prompt-cache affinity and accounting
+// across writer commands: resume keeps it, new and forked sessions change it.
+// Hashing keeps writer traffic out of the main agent's provider session, and the
+// fixed-length UUID survives native 64-character cache-key clamping.
+function writerSessionId(ctx: ExtensionCommandContext): string {
+	const bytes = createHash("sha256").update(`fitch-kit.writer:${ctx.sessionManager.getSessionId()}`).digest();
+	bytes[6] = (bytes[6]! & 0x0f) | 0x80;
+	bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+	const hex = bytes.toString("hex", 0, 16);
+	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 export function flattenToolHistory(messages: Message[]): Message[] {
@@ -382,7 +395,7 @@ function prepare(ctx: ExtensionCommandContext, sessionThinking: ThinkingLevel, a
 		...writer,
 		messages: sessionPrefix(ctx),
 		systemPrompt: ctx.getSystemPrompt(),
-		sessionId: uuidv7(),
+		sessionId: writerSessionId(ctx),
 	};
 }
 
