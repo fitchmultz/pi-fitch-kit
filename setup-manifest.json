@@ -1,7 +1,7 @@
 {
   "schemaVersion": 8,
   "runtime": {
-    "pi": ">=1.0.0",
+    "pi": ">=1.4.0",
     "node": ">=24.15.0"
   },
   "kit": {
@@ -13,7 +13,7 @@
     ["openai-codex/gpt-6-astra", "openai/gpt-6-astra"],
     ["anthropic/claude-opus-5-5", "anthropic/claude-fable-5-1", "cloudflare-ai-gateway/claude-opus-5"]
   ],
-  "requiredModelsNote": "Each entry is an ordered list of alternatives; the first available route satisfies it. Astra and Claude are this kit's opinionated composition baseline for OpenAI/Codex and Claude workflows, including the Claude-specific image/fast-mode boundary, not prerequisites imposed by a sibling profile or proof of an available independent reviewer. Gateway Opus 5 is the newest Claude that official Pi's gateway catalog names with a working id.",
+  "requiredModelsNote": "Each entry is an ordered list of alternatives; the first available route satisfies it. Astra and Claude are this kit's opinionated composition baseline for OpenAI/Codex and Claude workflows, including the Claude-specific image/fast-mode boundary, not prerequisites imposed by a sibling profile or proof of an available independent reviewer. Gateway Opus 5 is this kit's selected gateway fallback, a route-policy choice rather than the newest Claude in Pi's catalog.",
   "optionalModels": [
     "cloudflare-ai-gateway/claude-opus-5-5",
     "cloudflare-ai-gateway/claude-fable-5-1",

@@ -91,7 +91,6 @@ assert.ok(start);
 await start({}, {});
 const tool = [...extension.tools.values()].find(({ definition }) => definition.name === "name_session")?.definition;
 assert.ok(tool);
-assert.equal(tool.executionMode, "sequential");
 
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /must call name_session/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /same tool-call batch rather than a separate naming-only round/);

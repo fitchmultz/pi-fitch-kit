@@ -13,6 +13,7 @@ const METADATA_PREFIX =
 
 export default function sessionName(pi: ExtensionAPI): void {
 	let active = false;
+	let naming = Promise.resolve();
 	let leaf: string | null | undefined;
 	let compaction: Extract<SessionEntry, { type: "compaction" }> | undefined;
 	const resetBranch = () => { leaf = undefined; compaction = undefined; };
@@ -42,7 +43,6 @@ export default function sessionName(pi: ExtensionAPI): void {
 			description:
 				"Set or update the current Pi session's display name to a broad, durable description of its overall purpose.",
 			promptSnippet: "Set or update the current Pi session's searchable display name",
-			executionMode: "sequential",
 			promptGuidelines: [
 				"Before your first final response in an unnamed session, you must call name_session once after the overall purpose is clear; session display-name metadata reports currentName as null when unnamed. Do not skip naming just because no other tools are needed. When useful tool calls are already needed, include name_session in the same tool-call batch rather than a separate naming-only round. Do not add unrelated work just to batch naming.",
 				"Choose a broad, durable name for the session's overall purpose, usually 2-4 short terms. Do not name the current subtask, implementation detail, file, issue, phase, or temporary activity.",
@@ -60,61 +60,72 @@ export default function sessionName(pi: ExtensionAPI): void {
 				}),
 			}),
 			async execute(_toolCallId, { name }, signal, _onUpdate, ctx) {
-				if (/[\p{Cc}\p{Cf}]/u.test(name)) {
-					throw new Error(
-						"Session name cannot contain control or formatting characters",
-					);
-				}
-				const requestedName = name.trim();
-				if (!requestedName) throw new Error("Session name cannot be blank");
-
-				const previousName = pi.getSessionName();
-				const requestedSubagentIds = new Set(
-					(requestedName.match(/\bsubagent-\d+\b/gi) ?? []).map((id) =>
-						id.toLowerCase(),
-					),
-				);
-				const removesProtectedIdentity =
-					(previousName?.toLowerCase().includes("coordinator") &&
-						!requestedName.toLowerCase().includes("coordinator")) ||
-					(previousName?.match(/\bsubagent-\d+\b/gi) ?? []).some(
-						(id) => !requestedSubagentIds.has(id.toLowerCase()),
-					);
-				if (removesProtectedIdentity) {
-					if (!ctx.hasUI) {
+				// Naming calls queue here because a sequential tool serializes every sibling call in its batch.
+				const turn = Promise.withResolvers<void>();
+				const previous = naming;
+				naming = turn.promise;
+				await previous;
+				try {
+					// A call that waited behind a cancelled confirmation must not rename.
+					signal?.throwIfAborted();
+					if (/[\p{Cc}\p{Cf}]/u.test(name)) {
 						throw new Error(
-							"The current session name contains a protected role or identifier. Keep it in the name, or ask the user to rename it with /name.",
+							"Session name cannot contain control or formatting characters",
 						);
 					}
-					const confirmed = await ctx.ui.confirm(
-						"Change a protected session name?",
-						`Use the new name "${requestedName}"?`,
-						{ signal },
-					);
-					if (signal?.aborted) {
-						throw new Error("Protected name change was cancelled");
-					}
-					if (!confirmed) {
-						throw new Error(
-							"Protected name change was not confirmed by the user.",
-						);
-					}
-				}
-				if (previousName !== requestedName) pi.setSessionName(requestedName);
-				const sessionName = pi.getSessionName() ?? requestedName;
+					const requestedName = name.trim();
+					if (!requestedName) throw new Error("Session name cannot be blank");
 
-				return {
-					content: [
-						{
-							type: "text",
-							text:
-								previousName === sessionName
-									? `Session already named: ${sessionName}`
-									: `Session name set: ${sessionName}`,
-						},
-					],
-					details: { name: sessionName, previousName },
-				};
+					const previousName = pi.getSessionName();
+					const requestedSubagentIds = new Set(
+						(requestedName.match(/\bsubagent-\d+\b/gi) ?? []).map((id) =>
+							id.toLowerCase(),
+						),
+					);
+					const removesProtectedIdentity =
+						(previousName?.toLowerCase().includes("coordinator") &&
+							!requestedName.toLowerCase().includes("coordinator")) ||
+						(previousName?.match(/\bsubagent-\d+\b/gi) ?? []).some(
+							(id) => !requestedSubagentIds.has(id.toLowerCase()),
+						);
+					if (removesProtectedIdentity) {
+						if (!ctx.hasUI) {
+							throw new Error(
+								"The current session name contains a protected role or identifier. Keep it in the name, or ask the user to rename it with /name.",
+							);
+						}
+						const confirmed = await ctx.ui.confirm(
+							"Change a protected session name?",
+							`Use the new name "${requestedName}"?`,
+							{ signal },
+						);
+						if (signal?.aborted) {
+							throw new Error("Protected name change was cancelled");
+						}
+						if (!confirmed) {
+							throw new Error(
+								"Protected name change was not confirmed by the user.",
+							);
+						}
+					}
+					if (previousName !== requestedName) pi.setSessionName(requestedName);
+					const sessionName = pi.getSessionName() ?? requestedName;
+
+					return {
+						content: [
+							{
+								type: "text",
+								text:
+									previousName === sessionName
+										? `Session already named: ${sessionName}`
+										: `Session name set: ${sessionName}`,
+							},
+						],
+						details: { name: sessionName, previousName },
+					};
+				} finally {
+					turn.resolve();
+				}
 			},
 		});
 	};
