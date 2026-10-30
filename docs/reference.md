@@ -68,7 +68,7 @@ Reader state lives in native session custom entries and follows the active branc
 | `/anthropic-fast [on|off|toggle|status]` | Anthropic Opus fast mode | `anthropic-fast.json` |
 | `/xai-fast [on|off|toggle|status]` | xAI priority | `xai-fast.json` |
 
-Shared settings affect sessions sharing that directory. For OpenAI, a session override takes precedence over the shared mode. OpenAI/xAI settings apply to normal agent requests through Pi's payload hook. Built-in compaction and bare registry/nested streams bypass that hook on the verified hosts and retain their native policy; Anthropic's provider override also covers eligible internal calls. Footers follow changes made in other sessions. Changing a setting does not retier requests already in flight. The maintained 0.99.1 Fitch runtime uses request-boundary execution, not live native successor chains.
+Shared settings affect sessions sharing that directory. For OpenAI, a session override takes precedence over the shared mode. OpenAI/xAI settings apply to normal agent requests through Pi's payload hook. Built-in compaction and bare registry/nested streams bypass that hook on the verified hosts and retain their native policy; Anthropic's provider override also covers eligible internal calls. Footers follow changes made in other sessions. Changing a setting does not retier requests already in flight. The maintained Fitch runtime uses request-boundary execution, not live native successor chains.
 
 ##### OpenAI: priority and explicit Ultrafast
 
