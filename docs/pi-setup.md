@@ -226,6 +226,8 @@ The contrast is the point: the main session usually implements, while specialist
 
 ## Install and verify
 
+Before installing official Pi, check the [current security notice](../README.md#install).
+
 ```bash
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 pi
