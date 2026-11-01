@@ -111,6 +111,17 @@ test("setup content contracts reject sibling tree references and profile-gate id
   }
 });
 
+test("setup content requires host-currency provenance and an unverified fallback", () => {
+  for (const anchor of [
+    "installed host's channel and build provenance",
+    "matching version numbers do not establish identity or currency",
+    "host currency as unverified",
+  ]) {
+    rejects((input) => { input.setupPrompt = input.setupPrompt.replace(anchor, ""); },
+      "setup must require channel/build provenance before confirming host currency");
+  }
+});
+
 test("hard-review content contracts reject either missing required model family", () => {
   for (const family of ["GPT-family", "Claude-family"]) {
     rejects((input) => { input.hardReview = input.hardReview.replaceAll(family, "other-family"); },

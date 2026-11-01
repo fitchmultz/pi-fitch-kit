@@ -211,6 +211,11 @@ assert(
   "managed process content must retain the independent-review, unsatisfied, and self-review boundaries",
 );
 assert(setupPrompt.includes("selected or confirmed installed"), "setup content must scope optional ownership to selected or confirmed installed");
+assert(
+  ["installed host's channel and build provenance", "matching version numbers do not establish identity or currency", "host currency as unverified"]
+    .every((anchor) => setupPrompt.includes(anchor)),
+  "setup must require channel/build provenance before confirming host currency",
+);
 const hardReview = readFileSync(join(root, "prompts/review/hard-review.md"), "utf-8");
 assert(
   hardReview.includes("GPT-family") && hardReview.includes("Claude-family"),
