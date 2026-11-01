@@ -30,7 +30,7 @@
 ## Editing rules
 
 - Use npm and Node `>=24.15.0`; do not introduce another package manager.
-- Pi floor is official 1.4.0, whose native dialog stack keeps parallel interactive confirmations safe; do not add shims for older hosts. Use public 1.4 APIs on both hosts; do not restore dropped checkpoint, metadata/revision or usage-source APIs.
+- Support the latest stable official Pi and the current maintained Fitch build, not older releases. Pi 1.4.0 is the current technical minimum: its native dialog stack keeps parallel interactive confirmations safe. Qualify the two hosts separately; a matching version number does not identify the fork build. Use public APIs on both hosts; do not add shims for older hosts or restore dropped checkpoint, metadata/revision or usage-source APIs.
 - The lockfile must resolve only to `https://registry.npmjs.org/`; rewrite any private mirror host after installing.
 - Keep this package an opinionated composition layer. Independent extensions and skill packages must not depend on it.
 - Keep only active public resources registered in `package.json#pi` and `setup-manifest.json`.
@@ -72,7 +72,7 @@
 
 ## Dependency maintenance
 
-- Frequently review and proactively update maintained packages and all runtime, development, build, test, and tooling dependencies; routine in-scope updates are authorized. Prioritize the latest stable official Pi release and intended `fitchmultz/pi` revision, qualifying each separately without changing the supported floor.
+- Frequently review and proactively update maintained packages and all runtime, development, build, test, and tooling dependencies; routine in-scope updates are authorized. Prioritize the latest stable official Pi release and intended `fitchmultz/pi` revision, qualifying each separately. Review the technical minimum and versioned guidance when updating the official cohort; do not infer the current fork's capabilities from the official version number.
 - Review release, changelog, migration, and security notes across the upgrade range and check actual supported contracts. Use the npm/registry/lockfile rules above and compatible dependency cohorts. Adopt beneficial current APIs, conventions, patterns, and functionality instead of extending deprecated or outdated approaches.
 - Align callers, setup instructions, documentation, generated resources, and fixtures. Preserve independent package boundaries, explicit review/model requirements, opt-in behavior, and existing user state.
 - Carry updates through the applicable checks above, package smokes, exact-host compatibility, review, and CI gates. Record exact target identities, results, skips, and limits; never weaken checkers, safety, or support floors to pass an update.

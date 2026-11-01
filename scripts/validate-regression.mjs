@@ -111,6 +111,30 @@ test("setup content contracts reject sibling tree references and profile-gate id
   }
 });
 
+test("setup content does not pass an unknown running-runtime minimum", () => {
+  for (const anchor of [
+    "minimum versions against the running runtime",
+    "minimum check as unverified rather than as passing",
+  ]) {
+    rejects((input) => { input.setupPrompt = input.setupPrompt.replace(anchor, ""); },
+      "setup must assess the running-runtime minimum without treating unknown as a pass");
+  }
+});
+
+test("setup content requires host-currency provenance and an unverified fallback", () => {
+  for (const anchor of [
+    "running session's channel and build provenance",
+    "selected CLI may differ from the running session",
+    "compare it with the current maintained build or revision",
+    "matching version numbers do not establish identity or currency",
+    "host currency as unverified",
+    "current comparison target cannot be established",
+  ]) {
+    rejects((input) => { input.setupPrompt = input.setupPrompt.replace(anchor, ""); },
+      "setup must require channel/build provenance before confirming host currency");
+  }
+});
+
 test("hard-review content contracts reject either missing required model family", () => {
   for (const family of ["GPT-family", "Claude-family"]) {
     rejects((input) => { input.hardReview = input.hardReview.replaceAll(family, "other-family"); },

@@ -211,6 +211,22 @@ assert(
   "managed process content must retain the independent-review, unsatisfied, and self-review boundaries",
 );
 assert(setupPrompt.includes("selected or confirmed installed"), "setup content must scope optional ownership to selected or confirmed installed");
+assert(
+  ["minimum versions against the running runtime", "minimum check as unverified rather than as passing"]
+    .every((anchor) => setupPrompt.includes(anchor)),
+  "setup must assess the running-runtime minimum without treating unknown as a pass",
+);
+assert(
+  [
+    "running session's channel and build provenance",
+    "selected CLI may differ from the running session",
+    "compare it with the current maintained build or revision",
+    "matching version numbers do not establish identity or currency",
+    "host currency as unverified",
+    "current comparison target cannot be established",
+  ].every((anchor) => setupPrompt.includes(anchor)),
+  "setup must require channel/build provenance before confirming host currency",
+);
 const hardReview = readFileSync(join(root, "prompts/review/hard-review.md"), "utf-8");
 assert(
   hardReview.includes("GPT-family") && hardReview.includes("Claude-family"),
