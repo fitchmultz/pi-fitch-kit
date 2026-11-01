@@ -1,6 +1,6 @@
 # How I actually use Pi
 
-_Updated 30 October 2026. The kit requires Pi 1.4.0 or newer on Node.js 24.15 or newer. Official Pi 1.4 is the baseline; fork-only enhancements remain optional. Updating the kit does not activate or upgrade the runtime._
+_Updated 1 November 2026. The kit supports the latest stable official Pi and the current Fitch build on Node.js 24.15 or newer. Setup requires Pi 1.4.0 or newer; passing that minimum does not establish that a host is current. Fork-only enhancements remain optional. Updating the kit does not activate or upgrade the runtime._
 
 The useful part of this setup is not the package count. It is the division of responsibility.
 

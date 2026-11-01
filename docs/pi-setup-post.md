@@ -1,6 +1,6 @@
 # My Pi harness, and why it is structured this way
 
-_Updated 30 October 2026 for Pi 1.4.0 or newer (official or the Fitch runtime) on Node.js 24.15 or newer._
+_Updated 1 November 2026 for the latest stable official Pi and current Fitch build on Node.js 24.15 or newer. Setup requires Pi 1.4.0 or newer._
 
 A few people have asked about my terminal agent setup. The public, installable version is [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit).
 

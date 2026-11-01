@@ -6,7 +6,9 @@ Fitch Kit adds session tools and a setup prompt to [Pi](https://github.com/earen
 
 ## Install
 
-Use **Node.js 24.15+** and **Pi 1.4.0+**. The kit supports official Pi and [Fitch Pi](https://github.com/fitchmultz/pi).
+Use **Node.js 24.15+** and the latest stable official Pi or current [Fitch Pi](https://github.com/fitchmultz/pi) build. Setup requires **Pi 1.4.0+**; passing that minimum does not mean an older host release is supported.
+
+> **Official Pi security notice, checked 1 November 2026:** The latest official release, 1.4.0, bundles Undici 8.10.2, an affected version for several high-severity advisories, including [GHSA-2m5v-pch6-74hx](https://github.com/advisories/GHSA-2m5v-pch6-74hx) and [GHSA-xjj6-f33q-929c](https://github.com/advisories/GHSA-xjj6-f33q-929c). Upstream has updated its dependency, but a fixed official release was not yet available. Installing the kit does not patch the separately installed Pi CLI. Check [issue #130](https://github.com/fitchmultz/pi-fitch-kit/issues/130) for current status before installing or updating.
 
 1. Install Pi if you do not have it.
 

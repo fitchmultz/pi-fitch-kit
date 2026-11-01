@@ -280,7 +280,7 @@ This is already the working composition layer for a broader organization harness
 
 ## Install the kit
 
-The kit requires Node.js 24.15 or newer and Pi 1.4.0 or newer, official or the Fitch runtime. When using `pi-apply-edits` with `pi-subagents`, use subagents 0.39.1 or newer so completion tracking recognizes the new editing tools and partial-error receipts. Setup checks each selected package's documented requirements before installing; installing the kit does not patch or replace Pi.
+The kit supports the latest stable official Pi and the current Fitch build on Node.js 24.15 or newer. Setup requires Pi 1.4.0 or newer; passing that minimum alone does not establish that a host is current. When using `pi-apply-edits` with `pi-subagents`, use subagents 0.39.1 or newer so completion tracking recognizes the new editing tools and partial-error receipts. Setup checks each selected package's documented requirements before installing; installing the kit does not patch or replace Pi.
 
 ```bash
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
