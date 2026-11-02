@@ -64,22 +64,6 @@ Retained protection, lost detection, and established assumptions: only the two n
 Review and revisit trigger: any new offline boundary script needing the transport disable, or Pi gaining a first-class offline switch that replaces the WebSocket override.
 ```
 
-### QX-004 — Unnamed-session stub returns explicit undefined
-
-```text
-ID and title: QX-004 — unnamed-session stub returns explicit undefined.
-Rule, option, or threshold; installed tool versions: unicorn/no-useless-undefined; oxlint 1.90.0, oxlint-tsgolint 7.0.2005, typescript 7.0.2.
-Scope: files, authorized operations, origins, or bounded pattern: scripts/package-smoke.ts:326, a runtime.getSessionName stub that must model a session with no name so the smoke verifies the package surfaces an unnamed session without error.
-Directive selectors/inventory and optional duplication bounds: exactly one oxlint-disable-next-line unicorn/no-useless-undefined, tagged QX-004. No other no-useless-undefined directive exists in the repository.
-Diagnostic and required contract: oxlint flags `() => undefined` as a useless-undefined arrow body. The stubbed Pi runtime method returns `string | undefined`, and the smoke specifically exercises the undefined branch — replacing the body with `() => ""` would change the tested state from unnamed to empty-named.
-Actual compliant alternative and demonstrated quality cost: `(): undefined => undefined` still trips the rule; returning an empty string silently tests the wrong behavior. There is no compliant literal that yields undefined without tripping the rule.
-Chosen adjustment and why its scope is appropriate: a single next-line directive with the reason inline; the rule remains enforced everywhere else.
-Structural comparison or unsafe-type evidence, where applicable: none needed; the distinction between undefined (absent name) and "" (empty name) is the behavior under test.
-Verification commands, relevant tests, and results: `node_modules/.bin/oxlint --deny-warnings scripts/` exits 0; `npm run smoke` exits 0 with the unnamed-session path exercised.
-Retained protection, lost detection, and established assumptions: only this one stub line bypasses no-useless-undefined; the rule still guards every other arrow in the repository. Assumes the stub still models the unnamed state.
-Review and revisit trigger: any change to the smoke's session-name coverage or a second stub needing the undefined return.
-```
-
 ### QX-005 — Unawaited abort when closing a native dialog
 
 ```text
