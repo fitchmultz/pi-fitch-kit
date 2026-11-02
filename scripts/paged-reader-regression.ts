@@ -929,18 +929,18 @@ try {
 	// A freshly mounted overlay must retry a restart-unanswered note without
 	// first opening the note editor: the T hint is advertised, so T cannot be
 	// a silent no-op in a newly mounted overlay instance.
-	await command.handler("", ctx());
+	await readerCommand.handler("", ctx());
 	press("l");
 	press("\x1b[A");
 	press("\r");
 	press("\x1b");
 	await settle();
-	await command.handler("", ctx());
+	await readerCommand.handler("", ctx());
 	assert.ok(
 		lines().join("\n").includes("T Retry"),
 		"retry hint is advertised on the fresh overlay",
 	);
-	const freshRetryBefore = sent.length;
+	const freshRetryBefore: number = sent.length;
 	press("t");
 	assert.equal(
 		sent.length,
@@ -967,7 +967,9 @@ try {
 	press("\r");
 	assert.ok(lines().join("\n").includes("Shared section"), "cross-target document is on screen");
 	press("n");
-	for (const letter of "Retry target note.") press(letter);
+	for (const letter of "Retry target note.") {
+		press(letter);
+	}
 	press("\x1b[13;5u");
 	await event("agent_settled");
 	press("l");
@@ -985,7 +987,7 @@ try {
 		lines().join("\n").includes("T Retry"),
 		"retry hint is advertised for the on-screen document",
 	);
-	const sharedRetryBefore = sent.length;
+	const sharedRetryBefore: number = sent.length;
 	press("t");
 	assert.equal(
 		sent.length,
@@ -995,9 +997,9 @@ try {
 	const sharedRetryRequest = sent.at(-1);
 	assert.ok(sharedRetryRequest !== undefined, "cross-document retry must be recorded");
 	assert.ok(
-		feedbackText(requireRecord(sharedRetryRequest.message, "cross-document retry message")).includes(
-			"Retry target note.",
-		),
+		feedbackText(
+			requireRecord(sharedRetryRequest.message, "cross-document retry message"),
+		).includes("Retry target note."),
 		"retry carries the on-screen document's note, not the last-opened editor's note",
 	);
 	press("\x1b");
