@@ -19,7 +19,7 @@
     "regression:paged-reader": "node --experimental-strip-types scripts/paged-reader-regression.ts",
     "regression:write-prompt": "node --experimental-strip-types scripts/write-prompt-regression.ts && node scripts/write-prompt-boundary.mjs",
     "check:ambitious:live": "node scripts/ambitious-live.ts",
-    "smoke": "node scripts/package-smoke.mjs",
+    "smoke": "node scripts/package-smoke.ts",
     "smoke:lifecycle": "node scripts/setup-lifecycle-smoke.mjs",
     "lint": "oxlint --deny-warnings .",
     "lint:agent": "oxlint --deny-warnings --format=agent .",
