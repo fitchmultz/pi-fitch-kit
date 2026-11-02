@@ -91,8 +91,6 @@ A product layer would add centralized provisioning, policy distribution, scoped 
 
 ## Install it
 
-Before installing official Pi, check the [current security notice](../README.md#install).
-
 ```bash
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 pi
