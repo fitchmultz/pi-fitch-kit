@@ -305,7 +305,7 @@
         "scripts/clean-footer-regression.mjs",
         "scripts/fast-mode-regression.ts",
         "scripts/image-budget-regression.mjs",
-        "scripts/image-guard-smoke.mjs",
+        "scripts/image-guard-smoke.ts",
         "scripts/package-smoke.mjs",
         "scripts/paged-reader-regression.ts",
         "scripts/session-name-boundary.mjs",
