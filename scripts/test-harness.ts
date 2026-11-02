@@ -12,15 +12,10 @@ export type DrivenCommand = {
 	handler: (args: string, ctx: unknown) => Promise<void>;
 };
 
-/** A registered tool as the loose callable a regression drives. */
+/** A registered tool as the loose callable a regression drives; call sites
+ * pass the same (toolCallId, args, signal, onUpdate, ctx) shape Pi uses. */
 export type DrivenTool = {
-	execute: (
-		toolCallId: string,
-		args: unknown,
-		signal: undefined,
-		onUpdate: undefined,
-		ctx: unknown,
-	) => Promise<unknown>;
+	execute: (...args: unknown[]) => Promise<unknown>;
 };
 
 /** A resolved-later gate for sequencing assertions. */
@@ -43,6 +38,41 @@ export const requireRecord = (value: unknown, label: string): Record<string, unk
 	}
 	return value;
 };
+
+/** A JSON array, failing loudly with its label when the value is not one. */
+export const jsonList = (value: unknown, label: string): unknown[] => {
+	if (!Array.isArray(value)) {
+		throw new Error(`expected ${label} to be an array`);
+	}
+	return value;
+};
+
+/** A JSON string, failing loudly with its label when the value is not one. */
+export const jsonString = (value: unknown, label: string): string => {
+	if (typeof value !== "string") {
+		throw new Error(`expected ${label} to be a string`);
+	}
+	return value;
+};
+
+/** A JSON number, failing loudly with its label when the value is not one. */
+export const jsonNumber = (value: unknown, label: string): number => {
+	if (typeof value !== "number") {
+		throw new Error(`expected ${label} to be a number`);
+	}
+	return value;
+};
+
+/** A JSON array of strings, failing loudly with its label on any non-string item. */
+export const jsonStrings = (value: unknown, label: string): string[] =>
+	jsonList(value, label).map((item, index) => jsonString(item, `${label}[${index}]`));
+
+/** A JSON object field, failing loudly when the field is not an object. */
+export const jsonField = (
+	record: Record<string, unknown>,
+	key: string,
+	label: string,
+): Record<string, unknown> => requireRecord(record[key], label);
 
 /** True when the value is a plain string-keyed record. */
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -87,7 +117,7 @@ export const toolFor = (extension: Extension, name: string): DrivenTool => {
 	if (tool === undefined) {
 		throw new Error(`missing tool registration: ${name}`);
 	}
-	return { execute: tool.execute } as unknown as DrivenTool;
+	return { execute: tool.execute.bind(tool) } as unknown as DrivenTool;
 };
 
 /* oxlint-enable typescript/no-unsafe-type-assertion */

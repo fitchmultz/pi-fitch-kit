@@ -362,9 +362,7 @@ const observeTurnEnd = async (
 	]);
 	const results = [];
 	for (let i = 0; i < calls; i++) {
-		results.push(
-			await turnEnd({ entries, context: { contextMessages, pendingMessages } }, {}),
-		);
+		results.push(await turnEnd({ entries, context: { contextMessages, pendingMessages } }, {}));
 	}
 	assert.deepEqual(
 		structuredClone({ contextMessages, pendingMessages }),

@@ -1329,7 +1329,10 @@ try {
 	const nativeReply = [...nativeState.documents.values()].find(
 		(doc) => doc.replyToFeedbackId !== undefined,
 	);
-	assert.ok(nativeReply !== undefined, "native assistant final text must become a linked reader reply");
+	assert.ok(
+		nativeReply !== undefined,
+		"native assistant final text must become a linked reader reply",
+	);
 	assert.match(nativeReply.sections.at(0)?.text ?? "", /correlated answer/);
 	const nativeFirstOrder = nativeState.order.at(0);
 	assert.ok(nativeFirstOrder !== undefined, "native document order must exist");
@@ -1350,9 +1353,13 @@ try {
 				if (options?.signal?.aborted === true) {
 					resolve();
 				} else {
-					options?.signal?.addEventListener("abort", () => {
-						resolve();
-					}, { once: true });
+					options?.signal?.addEventListener(
+						"abort",
+						() => {
+							resolve();
+						},
+						{ once: true },
+					);
 				}
 			});
 			return fauxAssistantMessage("", { stopReason: "aborted" });

@@ -10,7 +10,7 @@
   "homepage": "https://github.com/fitchmultz/pi-fitch-kit#readme",
   "type": "module",
   "scripts": {
-    "check": "node scripts/run-gates.mjs",
+    "check": "node scripts/run-gates.ts",
     "check:compat": "npm run check && npm run smoke",
     "typecheck": "tsc --noEmit",
     "regression:clean-footer": "node scripts/clean-footer-regression.mjs",

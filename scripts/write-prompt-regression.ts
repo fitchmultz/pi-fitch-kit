@@ -141,8 +141,8 @@ function ctx(overrides: Record<string, unknown> = {}) {
 		},
 		modelRegistry: {
 			find: () => {
-			return;
-		},
+				return;
+			},
 			hasConfiguredAuth: () => true,
 			complete: async () => ({
 				role: "assistant",
@@ -410,8 +410,8 @@ await writerCommand("ambitious").handler(
 	ctx({
 		modelRegistry: {
 			find: () => {
-			return;
-		},
+				return;
+			},
 			hasConfiguredAuth: () => true,
 			complete: async (
 				_model: unknown,
@@ -537,8 +537,8 @@ await writerCommand("draft").handler(
 	ctx({
 		modelRegistry: {
 			find: () => {
-			return;
-		},
+				return;
+			},
 			hasConfiguredAuth: () => true,
 			complete: async (_model: unknown, context: { messages: unknown[] }) => {
 				seen.push(context.messages.length);
@@ -706,8 +706,8 @@ await writerCommand("draft").handler(
 		mode: "tui",
 		modelRegistry: {
 			find: () => {
-			return;
-		},
+				return;
+			},
 			hasConfiguredAuth: () => true,
 			complete: async () => ({
 				role: "assistant",
@@ -717,7 +717,7 @@ await writerCommand("draft").handler(
 		},
 		ui: {
 			...baseUi,
-			custom: (async (
+			custom: async (
 				factory?: (
 					tui: unknown,
 					theme: unknown,
@@ -728,22 +728,25 @@ await writerCommand("draft").handler(
 				// First custom call is the off-transcript loader; the second is the dialog.
 				customSequence += 1;
 				if (customSequence === 1) {
-				return longDraft;
-			}
+					return longDraft;
+				}
 				if (factory) {
-				dialogFactory = factory;
-			}
+					dialogFactory = factory;
+				}
 				return "Accept";
-			}),
+			},
 		},
 	}),
 );
 assert.equal(sent, longDraft, "dialog acceptance still sends the full draft");
 assert.ok(dialogFactory !== undefined, "the dialog view factory was invoked");
 const fakeTheme = { fg: (_color: string, text: string) => text };
-const smallTui = { requestRender() {
-				return;
-			}, terminal: { rows: 20 } };
+const smallTui = {
+	requestRender() {
+		return;
+	},
+	terminal: { rows: 20 },
+};
 const scrolledView = dialogFactory(smallTui, fakeTheme, {}, (value) => chosen.push(value));
 const firstPage = scrolledView.render(80);
 assert.ok(
@@ -763,8 +766,8 @@ assert.ok(
 	"clipped drafts show a position indicator with the scroll keys",
 );
 for (let i = 0; i < 10; i += 1) {
-		scrolledView.handleInput("\x1b[6~");
-	}
+	scrolledView.handleInput("\x1b[6~");
+}
 const bottom = scrolledView.render(80);
 assert.ok(
 	bottom.some((line) => /line 40 of/.test(line)),
@@ -776,8 +779,8 @@ assert.ok(
 );
 assert.ok(!bottom.join("\n").includes("below"), "no lines remain below at the end");
 for (let i = 0; i < 10; i += 1) {
-		scrolledView.handleInput("\x1b[5~");
-	}
+	scrolledView.handleInput("\x1b[5~");
+}
 const backToTop = scrolledView.render(80);
 assert.ok(
 	backToTop.some((line) => /line 1 of/.test(line)),
@@ -787,9 +790,12 @@ assert.ok(
 // footer; its budget must reserve for those dock-mates, and the indicator
 // must stay one line even at widths where its natural text would wrap.
 const narrowView = dialogFactory(
-	{ requestRender() {
-				return;
-			}, terminal: { rows: 20 } },
+	{
+		requestRender() {
+			return;
+		},
+		terminal: { rows: 20 },
+	},
 	fakeTheme,
 	{},
 	(value) => chosen.push(value),
@@ -842,8 +848,8 @@ await writerCommand("draft").handler(
 	ctx({
 		modelRegistry: {
 			find: () => {
-			return;
-		},
+				return;
+			},
 			hasConfiguredAuth: () => true,
 			complete: async () => ({
 				role: "assistant",
@@ -920,8 +926,8 @@ await writerCommand("draft").handler(
 		},
 		modelRegistry: {
 			find: () => {
-			return;
-		},
+				return;
+			},
 			hasConfiguredAuth: () => true,
 			complete: async (
 				_model: unknown,
@@ -977,8 +983,8 @@ await writerCommand("draft").handler(
 	ctx({
 		modelRegistry: {
 			find: () => {
-			return;
-		},
+				return;
+			},
 			hasConfiguredAuth: () => true,
 			complete: async (
 				_model: unknown,
@@ -1012,8 +1018,8 @@ await writerCommand("side-question").handler(
 	ctx({
 		modelRegistry: {
 			find: () => {
-			return;
-		},
+				return;
+			},
 			hasConfiguredAuth: () => true,
 			complete: async (
 				_model: unknown,
@@ -1051,8 +1057,8 @@ await writerCommand("side-question").handler(
 	ctx({
 		modelRegistry: {
 			find: () => {
-			return;
-		},
+				return;
+			},
 			hasConfiguredAuth: () => true,
 			complete: async (_model: unknown, context: { messages: unknown[] }) => {
 				asked.push(context.messages.length);
@@ -1117,8 +1123,8 @@ for (const role of ["user", "toolResult"]) {
 			},
 			modelRegistry: {
 				find: () => {
-			return;
-		},
+					return;
+				},
 				hasConfiguredAuth: () => true,
 				complete: async (
 					_model: unknown,

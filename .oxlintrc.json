@@ -312,6 +312,7 @@
         "scripts/session-name-regression.ts",
         "scripts/setup-lifecycle-smoke.mjs",
         "scripts/validate-regression.mjs",
+        "scripts/validate.ts",
         "scripts/write-prompt-boundary.mjs",
         "scripts/write-prompt-regression.ts",
         "scripts/ambitious-live.mjs"
