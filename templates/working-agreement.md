@@ -3,6 +3,7 @@
 Merge only the user-approved managed blocks into `<Pi agent dir>/AGENTS.md`, using the active directory resolved by `/fitch-setup`. Update an existing complete block in place. Never replace unrelated content. If markers are partial, duplicated, nested, or otherwise malformed, stop and ask the user how to proceed.
 
 <!-- fitch-pi-kit:baseline:start -->
+
 ## Baseline safety and evidence
 
 - Complete requested implementation and delivery under current or standing authority, including supporting setup, useful maintained dependencies, and relevant verification. Make ordinary reversible choices without preference interviews. Review, research, and planning requests remain read-only unless changes are also requested.
@@ -12,9 +13,11 @@ Merge only the user-approved managed blocks into `<Pi agent dir>/AGENTS.md`, usi
 - Refresh mutable external state immediately before consequential action or status reporting.
 - Do not claim completion until every explicit requirement and the real end state have fresh evidence.
 - Use an isolated worktree and task branch, then ship through the repository's PR workflow when current or standing policy authorizes delivery. Resolve failed checks and actionable review findings, merge once required gates pass, refresh the primary checkout and required local installation, then check for uncommitted and untracked work and remove only this task's clean, completed worktrees and obsolete branches; preserve unsaved or unrelated work. Honor explicit holds; a review request or this template alone grants no external-write authority. Do not ask again for actions already covered.
+
 <!-- fitch-pi-kit:baseline:end -->
 
 <!-- fitch-pi-kit:process:start -->
+
 ## Optional process
 
 - Use Linear where the team or task uses it. Keep status and the PR link current, and record legitimate deferred findings in the project's tracker; personal repositories do not acquire a Linear requirement from this template.
@@ -23,4 +26,5 @@ Merge only the user-approved managed blocks into `<Pi agent dir>/AGENTS.md`, usi
 - Preserve every explicit named-reviewer or model-family requirement from the user or repository, including required human reviews and repository protections. If required independent review is unavailable, report the missing capability, profile, or model family and keep the review gate unsatisfied; do not substitute self-review, silently change reviewers, or waive the requirement. Refresh affected analysis after substantive fixes and resolve actionable findings with fixes or evidence-backed rebuttals.
 - Read and respond to every pull-request comment, including review bots. Resolve a thread only after the underlying issue is fixed or answered.
 - Before merging, record changes, decisions, validation, and remaining risk. Merge after required checks and reviews pass when current or standing authority covers it; wait only for an explicit hold or genuinely missing authority.
+
 <!-- fitch-pi-kit:process:end -->

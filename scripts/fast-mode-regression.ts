@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import fs, { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import fs, {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { createRequire, syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,10 +29,13 @@ process.on("exit", () => {
 });
 
 const { fastRates } = await import("../extensions/fast-mode.ts");
-const { discoverAndLoadExtensions, SessionManager } = await import("@earendil-works/pi-coding-agent");
+const { discoverAndLoadExtensions, SessionManager } =
+	await import("@earendil-works/pi-coding-agent");
 const defaultSession = SessionManager.inMemory(agentDir);
 const loaded = await discoverAndLoadExtensions(
-	[fileURLToPath(new URL("../extensions/fast-mode.ts", import.meta.url))], agentDir, agentDir,
+	[fileURLToPath(new URL("../extensions/fast-mode.ts", import.meta.url))],
+	agentDir,
+	agentDir,
 );
 assert.deepEqual(loaded.errors, []);
 assert.equal(loaded.extensions.length, 1);
@@ -33,7 +43,8 @@ assert.equal(loaded.extensions.length, 1);
 type Handler = (event: Record<string, unknown>, ctx: Record<string, unknown>) => unknown;
 const handlers = Object.fromEntries(loaded.extensions[0].handlers) as Record<string, Handler[]>;
 const commands = Object.fromEntries(loaded.extensions[0].commands) as Record<
-	string, { handler: (args: string, ctx: unknown) => Promise<void> }
+	string,
+	{ handler: (args: string, ctx: unknown) => Promise<void> }
 >;
 const providers = new Map<string, { api: string; streamSimple: CallableFunction }>();
 for (const { name, config } of loaded.runtime.pendingProviderRegistrations) {
@@ -46,14 +57,24 @@ const flags = loaded.runtime.flagValues;
 // The mandatory beta header can only survive pi-ai's last-write-wins client
 // assembly via a fetch-time append, so Anthropic fast mode must be a scoped
 // provider override, never a before_provider_headers write.
-assert.equal(handlers.before_provider_headers, undefined, "the headers hook cannot preserve OAuth beta markers");
+assert.equal(
+	handlers.before_provider_headers,
+	undefined,
+	"the headers hook cannot preserve OAuth beta markers",
+);
 assert.deepEqual([...providers.keys()].sort(), ["anthropic", "cloudflare-ai-gateway"]);
 for (const provider of providers.values()) {
 	assert.equal(provider.api, "anthropic-messages");
 	assert.equal(typeof provider.streamSimple, "function");
 }
 assert.equal(typeof handlers.before_provider_request?.[0], "function");
-assert.deepEqual(Object.keys(commands).sort(), ["anthropic-fast", "codex-fast", "fast", "ultrafast", "xai-fast"]);
+assert.deepEqual(Object.keys(commands).sort(), [
+	"anthropic-fast",
+	"codex-fast",
+	"fast",
+	"ultrafast",
+	"xai-fast",
+]);
 assert.equal(flags.get("fast"), false, "--fast must default off");
 assert.equal(flags.get("ultrafast"), false, "--ultrafast must default off");
 
@@ -88,7 +109,9 @@ async function countToggleReads<T>(request: () => Promise<T>) {
 	const result = await request();
 	return {
 		result,
-		reads: toggleFileReads.mock.calls.slice(before).filter(({ arguments: [path] }) => path === join(agentDir, "anthropic-fast.json")).length,
+		reads: toggleFileReads.mock.calls
+			.slice(before)
+			.filter(({ arguments: [path] }) => path === join(agentDir, "anthropic-fast.json")).length,
 	};
 }
 
@@ -147,28 +170,48 @@ async function fastRequest(
 }
 
 const anthropicOpusCtx = uiCtx({ provider: "anthropic", id: "claude-opus-5" });
-const { result: offOpus, reads: defaultOffReads } = await countToggleReads(() => fastRequest("anthropic", "claude-opus-5"));
-assert.equal(defaultOffReads, 1, "an eligible request reads the missing toggle once and defaults off");
+const { result: offOpus, reads: defaultOffReads } = await countToggleReads(() =>
+	fastRequest("anthropic", "claude-opus-5"),
+);
+assert.equal(
+	defaultOffReads,
+	1,
+	"an eligible request reads the missing toggle once and defaults off",
+);
 assert.equal(offOpus.payload?.speed, undefined);
 assert.deepEqual(offOpus.beta, ["pi-existing-beta"], "no fast beta while disabled");
 
 const { anthropicProvider } = await import("@earendil-works/pi-ai/providers/anthropic");
-const nativeOpus = anthropicProvider().getModels().find((model) => model.id === "claude-opus-4-8");
+const nativeOpus = anthropicProvider()
+	.getModels()
+	.find((model) => model.id === "claude-opus-4-8");
 assert.ok(nativeOpus);
-const nativeSonnet = anthropicProvider().getModels().find((model) => model.id === "claude-sonnet-4-6");
+const nativeSonnet = anthropicProvider()
+	.getModels()
+	.find((model) => model.id === "claude-sonnet-4-6");
 assert.ok(nativeSonnet);
-const { cloudflareAIGatewayProvider } = await import("@earendil-works/pi-ai/providers/cloudflare-ai-gateway");
+const { cloudflareAIGatewayProvider } =
+	await import("@earendil-works/pi-ai/providers/cloudflare-ai-gateway");
 const gatewayProvider = cloudflareAIGatewayProvider();
-const gatewaySonnet = gatewayProvider.getModels().find((model) => ["claude-sonnet-4.6", "claude-sonnet-4-6"].includes(model.id));
+const gatewaySonnet = gatewayProvider
+	.getModels()
+	.find((model) => ["claude-sonnet-4.6", "claude-sonnet-4-6"].includes(model.id));
 assert.ok(gatewaySonnet);
 for (const enabled of [false, true]) {
 	writeFileSync(join(agentDir, "anthropic-fast.json"), JSON.stringify({ enabled }));
 	for (const model of [nativeSonnet, gatewaySonnet]) {
-		const { result, reads } = await countToggleReads(() => fastRequest(
-			model.provider, model.id, "pi-existing-beta", {},
-			{ ...model, headers: { "anthropic-beta": "pi-existing-beta" } },
-		));
-		console.log(JSON.stringify({ provider: model.provider, model: model.id, enabled, toggleReads: reads }));
+		const { result, reads } = await countToggleReads(() =>
+			fastRequest(
+				model.provider,
+				model.id,
+				"pi-existing-beta",
+				{},
+				{ ...model, headers: { "anthropic-beta": "pi-existing-beta" } },
+			),
+		);
+		console.log(
+			JSON.stringify({ provider: model.provider, model: model.id, enabled, toggleReads: reads }),
+		);
 		assert.equal(reads, 0, "ineligible native Sonnet requests must not read the toggle");
 		assert.equal(result.payload?.speed, undefined);
 		assert.deepEqual(result.beta, ["pi-existing-beta"]);
@@ -176,22 +219,42 @@ for (const enabled of [false, true]) {
 }
 rmSync(join(agentDir, "anthropic-fast.json"));
 const reasonedNoTools = await fastRequest(
-	"anthropic", nativeOpus.id, "pi-existing-beta",
-	{ reasoning: "high", toolChoice: "none" }, nativeOpus,
+	"anthropic",
+	nativeOpus.id,
+	"pi-existing-beta",
+	{ reasoning: "high", toolChoice: "none" },
+	nativeOpus,
 );
-assert.deepEqual(reasonedNoTools.payload?.thinking, { type: "adaptive", display: "summarized" }, "toolChoice must not suppress reasoning");
-assert.equal((reasonedNoTools.payload?.output_config as { effort?: string } | undefined)?.effort, "high");
+assert.deepEqual(
+	reasonedNoTools.payload?.thinking,
+	{ type: "adaptive", display: "summarized" },
+	"toolChoice must not suppress reasoning",
+);
+assert.equal(
+	(reasonedNoTools.payload?.output_config as { effort?: string } | undefined)?.effort,
+	"high",
+);
 assert.deepEqual(reasonedNoTools.payload?.tool_choice, { type: "none" });
 
 await commands["anthropic-fast"].handler("on", anthropicOpusCtx);
 assert.equal(JSON.parse(readFileSync(join(agentDir, "anthropic-fast.json"), "utf8")).enabled, true);
 assert.equal(notices.at(-1), "Anthropic fast mode ON");
 const fastReasoned = await fastRequest(
-	"anthropic", nativeOpus.id, "pi-existing-beta",
-	{ reasoning: "high", toolChoice: "none" }, nativeOpus,
+	"anthropic",
+	nativeOpus.id,
+	"pi-existing-beta",
+	{ reasoning: "high", toolChoice: "none" },
+	nativeOpus,
 );
-assert.deepEqual(fastReasoned.payload, { ...reasonedNoTools.payload, speed: "fast" }, "fast must preserve the ordinary native payload except speed");
-assert.equal((fastReasoned.payload?.output_config as { effort?: string } | undefined)?.effort, "high");
+assert.deepEqual(
+	fastReasoned.payload,
+	{ ...reasonedNoTools.payload, speed: "fast" },
+	"fast must preserve the ordinary native payload except speed",
+);
+assert.equal(
+	(fastReasoned.payload?.output_config as { effort?: string } | undefined)?.effort,
+	"high",
+);
 assert.deepEqual(fastReasoned.payload?.tool_choice, { type: "none" });
 // Direct route and gateway route get identical fast treatment.
 for (const provider of ["anthropic", "cloudflare-ai-gateway"]) {
@@ -206,12 +269,22 @@ for (const provider of ["anthropic", "cloudflare-ai-gateway"]) {
 		);
 	}
 }
-const preBeta = await fastRequest("anthropic", "claude-opus-5", "pi-existing-beta,fast-mode-2026-02-01");
+const preBeta = await fastRequest(
+	"anthropic",
+	"claude-opus-5",
+	"pi-existing-beta,fast-mode-2026-02-01",
+);
 assert.deepEqual(preBeta.beta, ["pi-existing-beta", "fast-mode-2026-02-01"], "no duplicate beta");
-const { result: unsupported, reads: unsupportedReads } = await countToggleReads(() => fastRequest("cloudflare-ai-gateway", "claude-fable-5"));
+const { result: unsupported, reads: unsupportedReads } = await countToggleReads(() =>
+	fastRequest("cloudflare-ai-gateway", "claude-fable-5"),
+);
 assert.equal(unsupportedReads, 0, "ineligible gateway requests must not read the toggle");
 assert.equal(unsupported.payload?.speed, undefined);
-assert.deepEqual(unsupported.beta, ["pi-existing-beta"], "no fast beta on models fast mode ignores");
+assert.deepEqual(
+	unsupported.beta,
+	["pi-existing-beta"],
+	"no fast beta on models fast mode ignores",
+);
 
 const fullStreamOnly = await fastRequest("anthropic", "claude-opus-5", "pi-existing-beta", {
 	toolChoice: "none",
@@ -229,35 +302,52 @@ assert.notEqual(
 
 // The selected Pi host owns this SDK; it need not be hoisted into the kit.
 const apiRequire = createRequire(import.meta.resolve("@earendil-works/pi-ai/compat"));
-const { default: Anthropic } = await import(pathToFileURL(apiRequire.resolve("@anthropic-ai/sdk")).href);
+const { default: Anthropic } = await import(
+	pathToFileURL(apiRequire.resolve("@anthropic-ai/sdk")).href
+);
 let clientPayload: Record<string, unknown> | undefined;
-const { result: prebuilt, reads: clientReads } = await countToggleReads(() => fastRequest("anthropic", "claude-opus-5", "pi-existing-beta", {
-	client: new Anthropic({
-		apiKey: "test",
-		fetch: async (_input, init) => {
-			clientPayload = JSON.parse(String(init?.body));
-			throw new Error("prebuilt client used");
-		},
+const { result: prebuilt, reads: clientReads } = await countToggleReads(() =>
+	fastRequest("anthropic", "claude-opus-5", "pi-existing-beta", {
+		client: new Anthropic({
+			apiKey: "test",
+			fetch: async (_input, init) => {
+				clientPayload = JSON.parse(String(init?.body));
+				throw new Error("prebuilt client used");
+			},
+		}),
 	}),
-}));
+);
 assert.equal(clientReads, 0, "a supplied client must not read the toggle");
 assert.equal(prebuilt.payload, undefined, "a prebuilt client bypasses the wrapped fetch");
 assert.ok(clientPayload, "the supplied client must actually receive the request");
-assert.equal(clientPayload.speed, undefined, "never request fast mode when the beta header cannot be attached");
+assert.equal(
+	clientPayload.speed,
+	undefined,
+	"never request fast mode when the beta header cannot be attached",
+);
 
 await commands["anthropic-fast"].handler("off", anthropicOpusCtx);
 assert.equal(notices.at(-1), "Anthropic fast mode OFF");
-const { result: freshOff, reads: freshOffReads } = await countToggleReads(() => fastRequest("anthropic", "claude-opus-5"));
-assert.equal(freshOffReads, 1, "the next eligible request must read current off state, not cache on");
+const { result: freshOff, reads: freshOffReads } = await countToggleReads(() =>
+	fastRequest("anthropic", "claude-opus-5"),
+);
+assert.equal(
+	freshOffReads,
+	1,
+	"the next eligible request must read current off state, not cache on",
+);
 assert.equal(freshOff.payload?.speed, undefined);
 assert.deepEqual(freshOff.beta, ["pi-existing-beta"]);
 
 // A toggle changed by the caller's payload hook only affects the next request.
 writeFileSync(join(agentDir, "anthropic-fast.json"), JSON.stringify({ enabled: true }));
-const { result: snapshot, reads: snapshotReads } = await countToggleReads(() => fastRequest(
-	"anthropic", "claude-opus-5", "pi-existing-beta",
-	{ onPayload: () => { writeFileSync(join(agentDir, "anthropic-fast.json"), JSON.stringify({ enabled: false })); } },
-));
+const { result: snapshot, reads: snapshotReads } = await countToggleReads(() =>
+	fastRequest("anthropic", "claude-opus-5", "pi-existing-beta", {
+		onPayload: () => {
+			writeFileSync(join(agentDir, "anthropic-fast.json"), JSON.stringify({ enabled: false }));
+		},
+	}),
+);
 assert.equal(snapshotReads, 1);
 assert.equal(snapshot.payload?.speed, "fast");
 assert.deepEqual(snapshot.beta, ["pi-existing-beta", "fast-mode-2026-02-01"]);
@@ -267,13 +357,20 @@ const gatewayO3 = gatewayProvider.getModels().find(({ id }) => id === "o3");
 assert.ok(gatewayO3, "the native gateway catalog must include o3");
 const supportedGatewayIds = ["o3", "o3-2025-04-16", "o4-mini", "o4-mini-2025-04-16"];
 const unsupportedGatewayIds = [
-	"o1", "o1-pro", "o3-mini", "o3-pro", "o4-mini-deep-research",
-	"o3-2025-04-16-extra", "o4-mini-2026-01-01",
-	"workers-ai/@cf/openai/gpt-oss-120b", "workers-ai/@cf/openai/o3",
+	"o1",
+	"o1-pro",
+	"o3-mini",
+	"o3-pro",
+	"o4-mini-deep-research",
+	"o3-2025-04-16-extra",
+	"o4-mini-2026-01-01",
+	"workers-ai/@cf/openai/gpt-oss-120b",
+	"workers-ai/@cf/openai/o3",
 ];
 // Aliases use the native catalog. Snapshot/negative IDs exercise custom models,
 // not invented catalog entries. No request leaves the fake fetch boundary.
-const gatewayModel = (id: string) => gatewayProvider.getModels().find((model) => model.id === id) ?? { ...gatewayO3, id };
+const gatewayModel = (id: string) =>
+	gatewayProvider.getModels().find((model) => model.id === id) ?? { ...gatewayO3, id };
 async function gatewayPriorityRequest(id: string) {
 	const model = gatewayModel(id);
 	let payload: Record<string, unknown> | undefined;
@@ -282,7 +379,9 @@ async function gatewayPriorityRequest(id: string) {
 		model,
 		{ messages: [{ role: "user", content: "test", timestamp: 0 }] },
 		{
-			apiKey: "test", maxRetries: 0, env: GATEWAY_ENV,
+			apiKey: "test",
+			maxRetries: 0,
+			env: GATEWAY_ENV,
 			onPayload: (body) => requestPayload(model, body),
 			fetch: async (input, init) => {
 				url = String(input);
@@ -291,9 +390,12 @@ async function gatewayPriorityRequest(id: string) {
 			},
 		},
 	);
-	for await (const _event of stream) { /* Drain the capture abort. */ }
+	for await (const _event of stream) {
+		/* Drain the capture abort. */
+	}
 	assert.ok(payload, `${id} must reach real provider serialization`);
-	const endpoint = model.api === "openai-completions" ? "compat/chat/completions" : "openai/responses";
+	const endpoint =
+		model.api === "openai-completions" ? "compat/chat/completions" : "openai/responses";
 	assert.equal(url, `https://gateway.ai.cloudflare.com/v1/acct-123/gw-456/${endpoint}`);
 	assert.equal(payload.model, id);
 	return payload;
@@ -301,8 +403,11 @@ async function gatewayPriorityRequest(id: string) {
 
 // OpenAI priority mode is provider-gated payload injection via the stock hook.
 const requestHook = handlers.before_provider_request[0];
-const requestPayload = async (model: unknown, payload: unknown = { model: "m" }, sessionManager = defaultSession) =>
-	requestHook({ payload }, { model, sessionManager });
+const requestPayload = async (
+	model: unknown,
+	payload: unknown = { model: "m" },
+	sessionManager = defaultSession,
+) => requestHook({ payload }, { model, sessionManager });
 const MODELS = {
 	openai: { provider: "openai", id: "gpt-5.6-sol", api: "openai-responses" },
 	codex: { provider: "openai-codex", id: "gpt-5.6-sol", api: "openai-codex-responses" },
@@ -319,14 +424,34 @@ await commands["codex-fast"].handler("on", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI priority requests ON");
 for (const model of [MODELS.openai, MODELS.codex, MODELS.gatewayGpt]) {
 	const fast = (await requestPayload(model)) as Record<string, unknown>;
-	assert.equal(fast.service_tier, "priority", `${model.provider}/${model.id} must request priority`);
+	assert.equal(
+		fast.service_tier,
+		"priority",
+		`${model.provider}/${model.id} must request priority`,
+	);
 	assert.equal(fast.model, "m", "payload fields must survive");
 }
-assert.equal(await requestPayload(MODELS.anthropicOpus), undefined, "codex toggle must not touch Anthropic requests");
-assert.equal(await requestPayload(MODELS.xai), undefined, "codex toggle must not touch xAI requests");
-assert.equal(await requestPayload(MODELS.gatewayGrok), undefined, "codex toggle must not touch gateway Grok");
 assert.equal(
-	await requestPayload({ provider: "cloudflare-ai-gateway", id: "workers-ai/@cf/openai/gpt-oss-120b", api: "openai-completions" }),
+	await requestPayload(MODELS.anthropicOpus),
+	undefined,
+	"codex toggle must not touch Anthropic requests",
+);
+assert.equal(
+	await requestPayload(MODELS.xai),
+	undefined,
+	"codex toggle must not touch xAI requests",
+);
+assert.equal(
+	await requestPayload(MODELS.gatewayGrok),
+	undefined,
+	"codex toggle must not touch gateway Grok",
+);
+assert.equal(
+	await requestPayload({
+		provider: "cloudflare-ai-gateway",
+		id: "workers-ai/@cf/openai/gpt-oss-120b",
+		api: "openai-completions",
+	}),
 	undefined,
 	"codex toggle must not touch namespaced workers-ai ids",
 );
@@ -339,7 +464,10 @@ for (const enabled of [false, true]) {
 		await handlers.model_select[0]({}, uiCtx(gatewayModel(id)));
 		assert.deepEqual(
 			{ tier: payload.service_tier, footer: status.get("codex-fast") },
-			{ tier: priority ? "priority" : undefined, footer: priority ? "accent:priority enabled" : undefined },
+			{
+				tier: priority ? "priority" : undefined,
+				footer: priority ? "accent:priority enabled" : undefined,
+			},
 			`${id}, enabled=${enabled}`,
 		);
 		assert.equal(status.get("xai-fast"), undefined);
@@ -350,19 +478,27 @@ for (const enabled of [false, true]) {
 for (const provider of ["openai", "openai-codex"]) {
 	for (const id of ["o1", "o1-pro", "o3", "o3-mini", "o3-pro", "o4-mini"]) {
 		const model = { provider, id };
-		const payload = await requestPayload(model) as Record<string, unknown>;
+		const payload = (await requestPayload(model)) as Record<string, unknown>;
 		assert.equal(payload.service_tier, "priority", `${provider}/${id} retains direct behavior`);
 		await handlers.model_select[0]({}, uiCtx(model));
 		assert.equal(status.get("codex-fast"), "accent:priority enabled");
 	}
 }
 for (const payload of [null, [], "raw"]) {
-	assert.equal(await requestPayload(MODELS.openai, payload), undefined, "non-object payloads pass through");
+	assert.equal(
+		await requestPayload(MODELS.openai, payload),
+		undefined,
+		"non-object payloads pass through",
+	);
 }
 await commands["codex-fast"].handler("off", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI priority requests OFF");
 await commands.fast.handler("", uiCtx(MODELS.openai));
-assert.equal(notices.at(-1), "OpenAI priority requests ON", "/fast with no verb must retain toggle behavior");
+assert.equal(
+	notices.at(-1),
+	"OpenAI priority requests ON",
+	"/fast with no verb must retain toggle behavior",
+);
 await commands.fast.handler("off", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI priority requests OFF");
 
@@ -373,10 +509,22 @@ assert.equal(xaiFast.service_tier, "priority", "xai must request priority");
 assert.equal(xaiFast.model, "m", "payload fields must survive");
 const gatewayGrokFast = (await requestPayload(MODELS.gatewayGrok)) as Record<string, unknown>;
 assert.equal(gatewayGrokFast.service_tier, "priority", "gateway grok must request priority");
-assert.equal(await requestPayload(MODELS.openai), undefined, "xai toggle must not touch OpenAI requests");
-assert.equal(await requestPayload(MODELS.gatewayGpt), undefined, "xai toggle must not touch gateway GPT");
+assert.equal(
+	await requestPayload(MODELS.openai),
+	undefined,
+	"xai toggle must not touch OpenAI requests",
+);
+assert.equal(
+	await requestPayload(MODELS.gatewayGpt),
+	undefined,
+	"xai toggle must not touch gateway GPT",
+);
 for (const id of supportedGatewayIds) {
-	assert.equal((await gatewayPriorityRequest(id)).service_tier, undefined, "xai toggle must not touch gateway o-series");
+	assert.equal(
+		(await gatewayPriorityRequest(id)).service_tier,
+		undefined,
+		"xai toggle must not touch gateway o-series",
+	);
 	await handlers.model_select[0]({}, uiCtx(gatewayModel(id)));
 	assert.equal(status.get("codex-fast"), undefined);
 	assert.equal(status.get("xai-fast"), undefined);
@@ -419,28 +567,50 @@ const runHandlers = async (event: string, ...args: [Record<string, unknown>, unk
 
 const { openaiProvider } = await import("@earendil-works/pi-ai/providers/openai");
 const { openaiCodexProvider } = await import("@earendil-works/pi-ai/providers/openai-codex");
-const { openAIResponsesApi, openAICodexResponsesApi, openAICompletionsApi } = await import("@earendil-works/pi-ai/compat");
-const astra = openaiProvider().getModels().find((model) => model.id === "gpt-6-astra");
-const codexAstra = openaiCodexProvider().getModels().find((model) => model.id === "gpt-6-astra");
+const { openAIResponsesApi, openAICodexResponsesApi, openAICompletionsApi } =
+	await import("@earendil-works/pi-ai/compat");
+const astra = openaiProvider()
+	.getModels()
+	.find((model) => model.id === "gpt-6-astra");
+const codexAstra = openaiCodexProvider()
+	.getModels()
+	.find((model) => model.id === "gpt-6-astra");
 assert.ok(astra);
 assert.ok(codexAstra);
 
-async function openaiWireRequest(model: Model<Api>, selectedModel = model, sessionManager = defaultSession) {
+async function openaiWireRequest(
+	model: Model<Api>,
+	selectedModel = model,
+	sessionManager = defaultSession,
+) {
 	let payload: Record<string, unknown> | undefined;
-	const api = model.api === "openai-codex-responses" ? openAICodexResponsesApi() :
-		model.api === "openai-completions" ? openAICompletionsApi() : openAIResponsesApi();
-	const stream = api.streamSimple(model, { messages: [{ role: "user", content: "test", timestamp: 0 }] }, {
-		apiKey: `synthetic.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "offline" } })).toString("base64")}.synthetic`,
-		transport: "sse", maxRetries: 0,
-		onPayload: (body) => requestPayload(selectedModel, body, sessionManager),
-		fetch: async (_input, init) => {
-			const body = new Headers(init?.headers).get("content-encoding") === "zstd"
-				? zstdDecompressSync(init?.body as Uint8Array).toString("utf8") : String(init?.body);
-			payload = JSON.parse(body);
-			throw new Error("payload captured");
+	const api =
+		model.api === "openai-codex-responses"
+			? openAICodexResponsesApi()
+			: model.api === "openai-completions"
+				? openAICompletionsApi()
+				: openAIResponsesApi();
+	const stream = api.streamSimple(
+		model,
+		{ messages: [{ role: "user", content: "test", timestamp: 0 }] },
+		{
+			apiKey: `synthetic.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "offline" } })).toString("base64")}.synthetic`,
+			transport: "sse",
+			maxRetries: 0,
+			onPayload: (body) => requestPayload(selectedModel, body, sessionManager),
+			fetch: async (_input, init) => {
+				const body =
+					new Headers(init?.headers).get("content-encoding") === "zstd"
+						? zstdDecompressSync(init?.body as Uint8Array).toString("utf8")
+						: String(init?.body);
+				payload = JSON.parse(body);
+				throw new Error("payload captured");
+			},
 		},
-	});
-	for await (const _event of stream) { /* Drain the capture abort. */ }
+	);
+	for await (const _event of stream) {
+		/* Drain the capture abort. */
+	}
 	assert.ok(payload, `${model.provider}/${model.id} must reach its native serializer`);
 	return payload;
 }
@@ -461,31 +631,51 @@ writeFileSync(statePath, JSON.stringify({ enabled: true }));
 assert.equal((await openaiWireRequest(astra)).service_tier, "priority");
 const legacyState = readFileSync(statePath, "utf8");
 await commands["codex-fast"].handler("ultrafast", uiCtx(MODELS.openai));
-assert.equal(readFileSync(statePath, "utf8"), legacyState, "unsupported activation must preserve the selected mode");
+assert.equal(
+	readFileSync(statePath, "utf8"),
+	legacyState,
+	"unsupported activation must preserve the selected mode",
+);
 assert.match(notices.at(-1) ?? "", /No mode was changed/);
 await commands["codex-fast"].handler("ultrafast", uiCtx(astra));
 assert.deepEqual(JSON.parse(readFileSync(statePath, "utf8")), { enabled: true, tier: "ultrafast" });
 assert.match(notices.at(-1) ?? "", /6x API\/credit price; 8x Codex included usage/);
 const selectedUltraState = readFileSync(statePath, "utf8");
 await commands["codex-fast"].handler("", uiCtx(astra));
-assert.equal(readFileSync(statePath, "utf8"), selectedUltraState, "blank /codex-fast remains a status query");
+assert.equal(
+	readFileSync(statePath, "utf8"),
+	selectedUltraState,
+	"blank /codex-fast remains a status query",
+);
 for (const model of [astra, codexAstra, { ...astra, baseUrl: "https://us.api.openai.com/v1/" }]) {
 	assert.equal((await openaiWireRequest(model)).service_tier, "ultrafast");
 	await runHandlers("model_select", {}, uiCtx(model));
 	assert.equal(status.get("codex-fast"), "accent:ultrafast requested");
 }
 for (const model of [
-	{ ...astra, id: "gpt-5.6-sol" }, { ...astra, id: "gpt-6.1-sol" },
-	{ ...astra, id: "gpt-6-astra-extra" }, { ...astra, api: "openai-completions" as const },
-	{ ...astra, provider: "cloudflare-ai-gateway" }, { ...astra, provider: "opencode" },
+	{ ...astra, id: "gpt-5.6-sol" },
+	{ ...astra, id: "gpt-6.1-sol" },
+	{ ...astra, id: "gpt-6-astra-extra" },
+	{ ...astra, api: "openai-completions" as const },
+	{ ...astra, provider: "cloudflare-ai-gateway" },
+	{ ...astra, provider: "opencode" },
 	{ ...astra, provider: "chatgpt-rotate" },
-	{ ...astra, baseUrl: "https://eu.api.openai.com/v1" }, { ...astra, baseUrl: "https://proxy.invalid/v1" },
+	{ ...astra, baseUrl: "https://eu.api.openai.com/v1" },
+	{ ...astra, baseUrl: "https://proxy.invalid/v1" },
 ]) {
-	assert.equal((await openaiWireRequest(model)).service_tier, undefined, "unsupported routes must not fall back to priority");
+	assert.equal(
+		(await openaiWireRequest(model)).service_tier,
+		undefined,
+		"unsupported routes must not fall back to priority",
+	);
 	await runHandlers("model_select", {}, uiCtx(model));
 	assert.equal(status.get("codex-fast"), "warning:ultrafast unavailable");
 }
-assert.equal((await openaiWireRequest({ ...astra, id: "gpt-5.6-sol" }, astra)).service_tier, undefined, "serialized model must match, even when the selected model is Astra");
+assert.equal(
+	(await openaiWireRequest({ ...astra, id: "gpt-5.6-sol" }, astra)).service_tier,
+	undefined,
+	"serialized model must match, even when the selected model is Astra",
+);
 for (const payload of [null, [], "raw", { model: "gpt-6-astra-extra" }]) {
 	assert.equal(await requestPayload(astra, payload), undefined);
 }
@@ -493,10 +683,18 @@ await commands.fast.handler("", uiCtx(astra));
 assert.equal(notices.at(-1), "OpenAI ultrafast requests OFF");
 assert.equal((await openaiWireRequest(astra)).service_tier, undefined);
 await commands.fast.handler("", uiCtx(astra));
-assert.equal((await openaiWireRequest(astra)).service_tier, "priority", "/fast must never implicitly enable Ultrafast");
+assert.equal(
+	(await openaiWireRequest(astra)).service_tier,
+	"priority",
+	"/fast must never implicitly enable Ultrafast",
+);
 await commands["codex-fast"].handler("ultrafast", uiCtx(astra));
 await commands["codex-fast"].handler("on", uiCtx(astra));
-assert.equal((await openaiWireRequest(astra)).service_tier, "priority", "on explicitly returns to priority");
+assert.equal(
+	(await openaiWireRequest(astra)).service_tier,
+	"priority",
+	"on explicitly returns to priority",
+);
 for (const content of ['{"enabled":true,"tier":"unknown"}', "null", "{broken"]) {
 	writeFileSync(statePath, content);
 	assert.equal((await openaiWireRequest(astra)).service_tier, undefined);
@@ -509,68 +707,140 @@ for (const content of ['{"enabled":true,"tier":"unknown"}', "null", "{broken"]) 
 // disk flush until it has an assistant message.
 const sessionA = SessionManager.create(agentDir, join(agentDir, "sessions"));
 sessionA.appendMessage({
-	role: "assistant", content: [{ type: "text", text: "offline fixture" }], api: astra.api,
-	provider: astra.provider, model: astra.id,
-	usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-	stopReason: "stop", timestamp: 0,
+	role: "assistant",
+	content: [{ type: "text", text: "offline fixture" }],
+	api: astra.api,
+	provider: astra.provider,
+	model: astra.id,
+	usage: {
+		input: 0,
+		output: 0,
+		cacheRead: 0,
+		cacheWrite: 0,
+		totalTokens: 0,
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+	},
+	stopReason: "stop",
+	timestamp: 0,
 });
 const sessionB = SessionManager.inMemory(agentDir);
 const localCommand = async (args: string, sessionManager = sessionA, model: unknown = astra) => {
 	// Same native append binding used by AgentSession, not a fake persistence store.
-	loaded.runtime.appendEntry = (type, data) => { sessionManager.appendCustomEntry(type, data); };
+	loaded.runtime.appendEntry = (type, data) => {
+		sessionManager.appendCustomEntry(type, data);
+	};
 	await commands.ultrafast.handler(args, uiCtx(model, sessionManager));
 };
 await commands["codex-fast"].handler("on", uiCtx(astra));
 const sharedPriority = readFileSync(statePath, "utf8");
 await localCommand("on --session");
-assert.equal(readFileSync(statePath, "utf8"), sharedPriority, "session activation must not write shared state");
+assert.equal(
+	readFileSync(statePath, "utf8"),
+	sharedPriority,
+	"session activation must not write shared state",
+);
 assert.equal((await openaiWireRequest(astra, astra, sessionA)).service_tier, "ultrafast");
-assert.equal((await openaiWireRequest(astra, astra, sessionB)).service_tier, "priority", "another session keeps the shared tier");
+assert.equal(
+	(await openaiWireRequest(astra, astra, sessionB)).service_tier,
+	"priority",
+	"another session keeps the shared tier",
+);
 assert.equal(status.get("codex-fast"), "accent:session ultrafast requested");
 assert.match(notices.at(-1) ?? "", /shared: priority; session: ultrafast; effective: ultrafast/);
 const sessionFile = sessionA.getSessionFile();
 assert.ok(sessionFile);
 const resumed = SessionManager.open(sessionFile);
-assert.equal((await openaiWireRequest(codexAstra, codexAstra, resumed)).service_tier, "ultrafast", "same-ID resume restores the override");
+assert.equal(
+	(await openaiWireRequest(codexAstra, codexAstra, resumed)).service_tier,
+	"ultrafast",
+	"same-ID resume restores the override",
+);
 const reloaded = await discoverAndLoadExtensions(
-	[fileURLToPath(new URL("../extensions/fast-mode.ts", import.meta.url))], agentDir, agentDir,
+	[fileURLToPath(new URL("../extensions/fast-mode.ts", import.meta.url))],
+	agentDir,
+	agentDir,
 );
 assert.deepEqual(reloaded.errors, []);
 const reloadedHook = reloaded.extensions[0].handlers.get("before_provider_request")?.[0];
 assert.ok(reloadedHook);
-assert.equal((await reloadedHook(
-	{ type: "before_provider_request", payload: { model: astra.id } },
-	uiCtx(astra, resumed) as never,
-) as Record<string, unknown>).service_tier, "ultrafast", "a fresh factory reads persisted metadata");
+assert.equal(
+	(
+		(await reloadedHook(
+			{ type: "before_provider_request", payload: { model: astra.id } },
+			uiCtx(astra, resumed) as never,
+		)) as Record<string, unknown>
+	).service_tier,
+	"ultrafast",
+	"a fresh factory reads persisted metadata",
+);
 const forked = SessionManager.forkFrom(sessionFile, agentDir, join(agentDir, "sessions"));
 assert.notEqual(forked.getSessionId(), sessionA.getSessionId());
-assert.equal((await openaiWireRequest(astra, astra, forked)).service_tier, "priority", "copied fork entries do not copy the override");
-assert.equal(sessionA.buildSessionContext().messages.length, 1, "policy metadata stays out of model context");
+assert.equal(
+	(await openaiWireRequest(astra, astra, forked)).service_tier,
+	"priority",
+	"copied fork entries do not copy the override",
+);
+assert.equal(
+	sessionA.buildSessionContext().messages.length,
+	1,
+	"policy metadata stays out of model context",
+);
 const firstEntry = sessionA.getEntries()[0];
 sessionA.branch(firstEntry.id);
-assert.equal((await openaiWireRequest(astra, astra, sessionA)).service_tier, "ultrafast", "/tree cannot silently retier the same session");
+assert.equal(
+	(await openaiWireRequest(astra, astra, sessionA)).service_tier,
+	"ultrafast",
+	"/tree cannot silently retier the same session",
+);
 await commands.fast.handler("off", uiCtx(astra, sessionA));
-assert.equal((await openaiWireRequest(astra, astra, sessionA)).service_tier, "ultrafast", "global off preserves explicit session on");
+assert.equal(
+	(await openaiWireRequest(astra, astra, sessionA)).service_tier,
+	"ultrafast",
+	"global off preserves explicit session on",
+);
 assert.equal((await openaiWireRequest(astra, astra, sessionB)).service_tier, undefined);
 assert.match(notices.at(-1) ?? "", /shared: off; session: ultrafast; effective: ultrafast/);
 await localCommand("off --session");
 assert.equal(status.get("codex-fast"), "muted:session OpenAI tiers off");
 for (const model of [MODELS.anthropicOpus, MODELS.xai]) {
 	await runHandlers("model_select", {}, uiCtx(model, sessionA));
-	assert.equal(status.get("codex-fast"), undefined, "local OpenAI off must not label other providers as off");
+	assert.equal(
+		status.get("codex-fast"),
+		undefined,
+		"local OpenAI off must not label other providers as off",
+	);
 }
 await commands.ultrafast.handler("", uiCtx(astra));
-assert.equal((await openaiWireRequest(astra, astra, sessionA)).service_tier, undefined, "session off wins over shared Ultrafast");
-assert.equal((await openaiWireRequest(astra, astra, sessionB)).service_tier, "ultrafast", "blank /ultrafast changes shared mode");
+assert.equal(
+	(await openaiWireRequest(astra, astra, sessionA)).service_tier,
+	undefined,
+	"session off wins over shared Ultrafast",
+);
+assert.equal(
+	(await openaiWireRequest(astra, astra, sessionB)).service_tier,
+	"ultrafast",
+	"blank /ultrafast changes shared mode",
+);
 await localCommand("status --session");
 assert.match(notices.at(-1) ?? "", /shared: ultrafast; session: off; effective: off/);
 await localCommand("reset --session", sessionA, MODELS.openai);
-assert.equal((await openaiWireRequest(astra, astra, sessionA)).service_tier, "ultrafast", "reset resumes the current shared tier even from an unsupported route");
+assert.equal(
+	(await openaiWireRequest(astra, astra, sessionA)).service_tier,
+	"ultrafast",
+	"reset resumes the current shared tier even from an unsupported route",
+);
 await localCommand("--session");
-assert.equal((await openaiWireRequest(astra, astra, sessionA)).service_tier, undefined, "session toggle disables inherited Ultrafast");
+assert.equal(
+	(await openaiWireRequest(astra, astra, sessionA)).service_tier,
+	undefined,
+	"session toggle disables inherited Ultrafast",
+);
 await commands["codex-fast"].handler("on", uiCtx(astra));
-assert.equal((await openaiWireRequest(astra, astra, sessionA)).service_tier, undefined, "session off also suppresses kit priority");
+assert.equal(
+	(await openaiWireRequest(astra, astra, sessionA)).service_tier,
+	undefined,
+	"session off also suppresses kit priority",
+);
 await localCommand("toggle --session");
 assert.equal((await openaiWireRequest(astra, astra, sessionA)).service_tier, "ultrafast");
 await runHandlers("model_select", {}, uiCtx(MODELS.openai, sessionA));
@@ -583,11 +853,19 @@ for (const args of ["reset", "on off", "on --session --session", "on --unknown"]
 }
 await localCommand("on --session", sessionA, MODELS.openai);
 assert.match(notices.at(-1) ?? "", /No mode was changed/);
-assert.equal(readFileSync(sessionFile, "utf8"), beforeInvalid, "invalid activation cannot persist an override");
+assert.equal(
+	readFileSync(sessionFile, "utf8"),
+	beforeInvalid,
+	"invalid activation cannot persist an override",
+);
 assert.equal(readFileSync(statePath, "utf8"), beforeInvalidShared);
 await localCommand("reset --session");
 await commands.ultrafast.handler("toggle", uiCtx(astra));
-assert.equal((await openaiWireRequest(astra)).service_tier, "ultrafast", "global toggle from priority selects Ultrafast");
+assert.equal(
+	(await openaiWireRequest(astra)).service_tier,
+	"ultrafast",
+	"global toggle from priority selects Ultrafast",
+);
 await commands.ultrafast.handler("toggle", uiCtx(astra));
 assert.equal((await openaiWireRequest(astra)).service_tier, undefined);
 
@@ -600,23 +878,41 @@ flags.set("ultrafast", true);
 await runHandlers("session_start", { reason: "startup" }, uiCtx(astra));
 assert.equal(readFileSync(statePath, "utf8"), ultraState);
 assert.deepEqual(await handlers.input[0]({}, uiCtx(astra)), { action: "handled" });
-assert.equal(await handlers.input[0]({ source: "extension" }, uiCtx(astra)), undefined, "startup recovery must not swallow intercom or extension-delivered input");
+assert.equal(
+	await handlers.input[0]({ source: "extension" }, uiCtx(astra)),
+	undefined,
+	"startup recovery must not swallow intercom or extension-delivered input",
+);
 const recreatedInputs: Handler[] = [];
 for (const reason of ["reload", "new", "resume", "fork"] as const) {
 	const fresh = await discoverAndLoadExtensions(
-		[fileURLToPath(new URL("../extensions/fast-mode.ts", import.meta.url))], agentDir, agentDir,
+		[fileURLToPath(new URL("../extensions/fast-mode.ts", import.meta.url))],
+		agentDir,
+		agentDir,
 	);
 	assert.deepEqual(fresh.errors, []);
 	for (const [name, value] of flags) fresh.runtime.flagValues.set(name, value);
-	const freshHandlers = Object.fromEntries(fresh.extensions[0].handlers) as Record<string, Handler[]>;
+	const freshHandlers = Object.fromEntries(fresh.extensions[0].handlers) as Record<
+		string,
+		Handler[]
+	>;
 	await freshHandlers.session_start[0]({ reason }, uiCtx(astra));
-	assert.deepEqual(await freshHandlers.input[0]({ source: "interactive" }, uiCtx(astra)), { action: "handled" }, `${reason} must not bypass unresolved startup validation`);
+	assert.deepEqual(
+		await freshHandlers.input[0]({ source: "interactive" }, uiCtx(astra)),
+		{ action: "handled" },
+		`${reason} must not bypass unresolved startup validation`,
+	);
 	recreatedInputs.push(freshHandlers.input[0]);
 	await freshHandlers.session_shutdown[0]({}, uiCtx(astra));
 }
 await commands["codex-fast"].handler("off", uiCtx(astra));
 assert.equal(await handlers.input[0]({}, uiCtx(astra)), undefined);
-for (const input of recreatedInputs) assert.equal(await input({ source: "interactive" }, uiCtx(astra)), undefined, "an explicit mode command resolves the process-wide startup error");
+for (const input of recreatedInputs)
+	assert.equal(
+		await input({ source: "interactive" }, uiCtx(astra)),
+		undefined,
+		"an explicit mode command resolves the process-wide startup error",
+	);
 flags.set("fast", false);
 const offState = readFileSync(statePath, "utf8");
 await runHandlers("session_start", { reason: "startup" }, uiCtx(MODELS.openai));
@@ -624,34 +920,73 @@ assert.equal(readFileSync(statePath, "utf8"), offState);
 assert.deepEqual(await handlers.input[0]({}, uiCtx(MODELS.openai)), { action: "handled" });
 await commands["codex-fast"].handler("off", uiCtx(MODELS.openai));
 await runHandlers("session_start", { reason: "startup" }, uiCtx(astra));
-assert.equal((await openaiWireRequest(astra)).service_tier, "ultrafast", "--ultrafast must select the explicit shared tier");
-assert.match(notices.at(-1) ?? "", /6x API\/credit price; 8x Codex included usage/, "startup activation must show billing and entitlement");
+assert.equal(
+	(await openaiWireRequest(astra)).service_tier,
+	"ultrafast",
+	"--ultrafast must select the explicit shared tier",
+);
+assert.match(
+	notices.at(-1) ?? "",
+	/6x API\/credit price; 8x Codex included usage/,
+	"startup activation must show billing and entitlement",
+);
 for (const reason of ["reload", "resume"]) {
 	await runHandlers("session_start", { reason }, uiCtx(astra));
-	assert.match(notices.at(-1) ?? "", /6x API\/credit price; 8x Codex included usage/, `${reason} must announce restored Ultrafast policy`);
+	assert.match(
+		notices.at(-1) ?? "",
+		/6x API\/credit price; 8x Codex included usage/,
+		`${reason} must announce restored Ultrafast policy`,
+	);
 }
 await localCommand("off --session");
 const noticeCount = notices.length;
 await runHandlers("session_start", { reason: "startup" }, uiCtx(astra, sessionA));
-assert.equal(notices.length, noticeCount + 1, "shared startup activation must warn even when this session is off");
-assert.match(notices.at(-1) ?? "", /shared: ultrafast; session: off; effective: off.*6x API\/credit price/);
+assert.equal(
+	notices.length,
+	noticeCount + 1,
+	"shared startup activation must warn even when this session is off",
+);
+assert.match(
+	notices.at(-1) ?? "",
+	/shared: ultrafast; session: off; effective: off.*6x API\/credit price/,
+);
 await localCommand("reset --session");
 await commands["codex-fast"].handler("off", uiCtx(astra));
 for (const reason of ["reload", "new", "resume", "fork"]) {
 	await runHandlers("session_start", { reason }, uiCtx(astra));
-	assert.equal((await openaiWireRequest(astra)).service_tier, undefined, `${reason} must not reapply --ultrafast`);
+	assert.equal(
+		(await openaiWireRequest(astra)).service_tier,
+		undefined,
+		`${reason} must not reapply --ultrafast`,
+	);
 }
 flags.set("ultrafast", false);
 
-const gatewayOpus = { provider: "cloudflare-ai-gateway", id: "claude-opus-5", api: "anthropic-messages" };
+const gatewayOpus = {
+	provider: "cloudflare-ai-gateway",
+	id: "claude-opus-5",
+	api: "anthropic-messages",
+};
 flags.set("fast", true);
 await runHandlers("session_start", { reason: "startup" }, uiCtx(gatewayOpus));
-assert.equal(JSON.parse(readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8")).enabled, true, "--fast must enable shared OpenAI fast state");
+assert.equal(
+	JSON.parse(readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8")).enabled,
+	true,
+	"--fast must enable shared OpenAI fast state",
+);
 await commands["codex-fast"].handler("off", uiCtx(gatewayOpus));
 for (const reason of ["reload", "new", "resume", "fork"]) {
 	await runHandlers("session_start", { reason }, uiCtx(MODELS.openai));
-	assert.equal(JSON.parse(readFileSync(statePath, "utf8")).enabled, false, `${reason} must preserve explicit fast off despite --fast`);
-	assert.equal(await requestPayload(MODELS.openai), undefined, `${reason} must not restore priority requests`);
+	assert.equal(
+		JSON.parse(readFileSync(statePath, "utf8")).enabled,
+		false,
+		`${reason} must preserve explicit fast off despite --fast`,
+	);
+	assert.equal(
+		await requestPayload(MODELS.openai),
+		undefined,
+		`${reason} must not restore priority requests`,
+	);
 	assert.equal(status.get("codex-fast"), undefined, `${reason} must leave the fast footer off`);
 }
 flags.set("fast", false);
@@ -660,7 +995,11 @@ assert.equal(status.get("codex-fast"), undefined);
 await commands["anthropic-fast"].handler("on", uiCtx(gatewayOpus));
 assert.equal(status.get("anthropic-fast"), "accent:fast");
 await runHandlers("model_select", {}, uiCtx(MODELS.copilotOpus));
-assert.equal(status.get("anthropic-fast"), undefined, "no footer on Opus routes the override does not cover");
+assert.equal(
+	status.get("anthropic-fast"),
+	undefined,
+	"no footer on Opus routes the override does not cover",
+);
 await runHandlers("model_select", {}, uiCtx(MODELS.openai));
 assert.equal(status.get("anthropic-fast"), undefined);
 assert.equal(status.get("codex-fast"), undefined);
@@ -684,9 +1023,20 @@ for (const count of [781, 43_000]) {
 	assert.equal(entries.mock.callCount(), 0, "Requests/status retain known-absent session policy");
 	const before = readFileSync(statePath, "utf8");
 	writeFileSync(statePath, JSON.stringify({ enabled: true, tier: "ultrafast" }));
-	assert.equal((await requestPayload(astra, { model: astra.id }, manager) as Record<string, unknown>).service_tier, "ultrafast", "Shared billing policy is still read on the next request");
+	assert.equal(
+		((await requestPayload(astra, { model: astra.id }, manager)) as Record<string, unknown>)
+			.service_tier,
+		"ultrafast",
+		"Shared billing policy is still read on the next request",
+	);
 	writeFileSync(statePath, before);
-	console.log(JSON.stringify({ historyEntries: count, bootstrapReads: 1, unchangedRequestAndStatusReads: entries.mock.callCount() }));
+	console.log(
+		JSON.stringify({
+			historyEntries: count,
+			bootstrapReads: 1,
+			unchangedRequestAndStatusReads: entries.mock.callCount(),
+		}),
+	);
 	entries.mock.restore();
 }
 
@@ -701,8 +1051,10 @@ console.log(
 		anthropicFast: "wire-verified on direct+gateway opus",
 		betaHeader: "fetch-time append preserves existing markers",
 		prebuiltClient: "stays standard speed",
-		openaiFast: "native registered hook + gateway Responses wire: supported o3/o4-mini aliases/snapshots only",
-		openaiUltrafast: "native Astra Responses/Codex wire; shared and session overrides; resume/reload/tree/fork isolation; explicit startup policy",
+		openaiFast:
+			"native registered hook + gateway Responses wire: supported o3/o4-mini aliases/snapshots only",
+		openaiUltrafast:
+			"native Astra Responses/Codex wire; shared and session overrides; resume/reload/tree/fork isolation; explicit startup policy",
 		xaiFast: "provider-gated priority",
 		footer: "eligibility-scoped incl. proxy exclusion",
 		watchers: "released",

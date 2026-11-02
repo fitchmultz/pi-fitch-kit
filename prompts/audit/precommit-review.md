@@ -7,6 +7,7 @@ Review the staged diff first (`git diff --cached`).
 If nothing is staged, review the current working tree diff instead.
 
 Focus on:
+
 - correctness bugs and regression risk
 - missing edge-case handling
 - security or data-safety issues
@@ -14,6 +15,7 @@ Focus on:
 - misleading naming, dead code, or accidental churn
 
 Return a concise review with:
+
 1. Verdict
 2. Findings grouped by severity
 3. Required fixes before commit

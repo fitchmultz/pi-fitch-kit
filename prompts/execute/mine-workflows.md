@@ -64,23 +64,26 @@ Mine recent agent chats for durable workflow improvements that should become one
 </loop>
 
 <privacy_rules>
+
 - Do not paste transcript paths.
 - Do not paste raw private chat bodies.
 - Cite parent conversation IDs only.
 - Do not encode secrets, credentials, account-specific data, PII, or incidental private project facts into durable global artifacts.
 - Do not quote the user unless the quote is necessary, non-sensitive, and the user explicitly requested quote-level evidence.
-</privacy_rules>
+  </privacy_rules>
 
 <artifact_rules>
+
 - Prompt templates belong in the active prompt source of truth, such as `pi-fitch-kit/prompts/` for package-backed global prompts.
 - Global reusable skills belong in `~/.agents/skills/` unless the user names another global source of truth.
 - Project-specific skills belong in the project's `.agents/skills/` or `.pi/skills/` and must stay there unless promotion is explicitly requested.
 - Existing artifacts win over new artifacts when their trigger surface overlaps.
 - Do not create a new global rule for a single weak signal.
-</artifact_rules>
+  </artifact_rules>
 
 <final_handoff>
 Return only:
+
 1. Window, focus, and mode
 2. Evidence corpus using parent conversation IDs only
 3. Adopted changes, if apply mode was used
@@ -89,4 +92,4 @@ Return only:
 6. Files changed
 7. Validation evidence
 8. Open questions, only if blocking
-</final_handoff>
+   </final_handoff>

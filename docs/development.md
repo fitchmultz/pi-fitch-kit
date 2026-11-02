@@ -40,11 +40,11 @@ The article was read and re-read as advice to evaluate, not executable requireme
 
 Historical `/ambitious` measurements on Node 24.22.0 with its final production instruction (not `/unreasonable` evidence):
 
-| Scenario | GPT-6.1 Sol, six samples | Claude Opus 5.5, one sample |
-|---|---:|---:|
-| New session | 896–1,025 characters | 1,617 characters |
-| In progress | 1,278–1,492 characters | 1,563 characters |
-| Recurring outcome | 1,380–1,581 characters | 1,651 characters |
+| Scenario          | GPT-6.1 Sol, six samples | Claude Opus 5.5, one sample |
+| ----------------- | -----------------------: | --------------------------: |
+| New session       |     896–1,025 characters |            1,617 characters |
+| In progress       |   1,278–1,492 characters |            1,563 characters |
+| Recurring outcome |   1,380–1,581 characters |            1,651 characters |
 
 The original instruction produced 2,390–2,668 characters (322–372 words) in four samples. Shorter pilot rewrites and the final constraint-preserving examples support the 1,800-character ceiling, rather than budgeting for the original speculative checklists. Final outputs were 124–248 words. GPT used one writer call per prompt; two of the three Claude prompts needed the bounded shortening retry. Sizes are **accepted output after any retry**, not natural first-attempt lengths; this small synthetic sample is not a model-wide reliability guarantee.
 

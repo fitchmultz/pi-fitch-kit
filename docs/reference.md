@@ -12,33 +12,33 @@ These are the extensions loaded in my current setup. Every external extension li
 
 ### Orchestration and connected work
 
-| Extension | What I use it for |
-|---|---|
-| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) | Fresh specialists, parallel work, chains, isolated worktrees, async review, durable artifacts, and coordination between local sessions |
-| [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter) | One searchable gateway over configured MCP servers and their tools |
-| [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) | Live documentation, browser automation, screenshots, product QA, and authenticated web flows |
+| Extension                                                                          | What I use it for                                                                                                                      |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents)                       | Fresh specialists, parallel work, chains, isolated worktrees, async review, durable artifacts, and coordination between local sessions |
+| [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter)                   | One searchable gateway over configured MCP servers and their tools                                                                     |
+| [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) | Live documentation, browser automation, screenshots, product QA, and authenticated web flows                                           |
 
 ### Coding and task control
 
-| Extension | What I use it for |
-|---|---|
-| [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) | `apply_patch`, `replace_text`, `write_files`, and read-only `preview_patch`; contracts live in the owning package |
-| [`pi-ask-question`](https://github.com/fitchmultz/pi-ask-question) | Structured user decisions when ambiguity changes scope or safety |
-| [`pi-todo-list`](https://github.com/fitchmultz/pi-todo-list) | Persistent nested task state that survives long sessions and compaction |
-| [`pi-change-working-dir`](https://github.com/fitchmultz/pi-change-working-dir) | Safe mid-session movement into worktrees and monorepo subprojects |
-| [`pi-calculator`](https://github.com/fitchmultz/pi-calculator) | Deterministic high-precision arithmetic instead of model estimation |
+| Extension                                                                      | What I use it for                                                                                                 |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits)               | `apply_patch`, `replace_text`, `write_files`, and read-only `preview_patch`; contracts live in the owning package |
+| [`pi-ask-question`](https://github.com/fitchmultz/pi-ask-question)             | Structured user decisions when ambiguity changes scope or safety                                                  |
+| [`pi-todo-list`](https://github.com/fitchmultz/pi-todo-list)                   | Persistent nested task state that survives long sessions and compaction                                           |
+| [`pi-change-working-dir`](https://github.com/fitchmultz/pi-change-working-dir) | Safe mid-session movement into worktrees and monorepo subprojects                                                 |
+| [`pi-calculator`](https://github.com/fitchmultz/pi-calculator)                 | Deterministic high-precision arithmetic instead of model estimation                                               |
 
 ### Session quality and small friction reducers
 
-| Extension | What I use it for |
-|---|---|
-| [`pi-ctx-info`](https://github.com/fitchmultz/pi-ctx-info) | `/ctx` breakdown of reported context usage, estimated composition, loaded resources, and the largest session entries |
-| [`pi-verbosity-control`](https://github.com/fitchmultz/pi-verbosity-control) | Per-model OpenAI verbosity and its native footer status |
-| [`pi-tool-duration`](https://github.com/fitchmultz/pi-tool-duration) | Model-visible timing on slow tool calls |
-| [`pi-edit-session-in-place`](https://github.com/fitchmultz/pi-edit-session-in-place) | Re-edit or remove an earlier user turn in the current branch |
-| [`pi-stash`](https://github.com/fitchmultz/pi-stash) | Park and restore a draft message while handling another thought |
-| [`pi-copy-message`](https://github.com/fitchmultz/pi-copy-message) | Copy raw session messages without terminal formatting |
-| [`ponytail`](https://github.com/fitchmultz/ponytail) | Persistent pressure toward reuse, deletion, native features, and the smallest root-cause fix |
+| Extension                                                                            | What I use it for                                                                                                    |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| [`pi-ctx-info`](https://github.com/fitchmultz/pi-ctx-info)                           | `/ctx` breakdown of reported context usage, estimated composition, loaded resources, and the largest session entries |
+| [`pi-verbosity-control`](https://github.com/fitchmultz/pi-verbosity-control)         | Per-model OpenAI verbosity and its native footer status                                                              |
+| [`pi-tool-duration`](https://github.com/fitchmultz/pi-tool-duration)                 | Model-visible timing on slow tool calls                                                                              |
+| [`pi-edit-session-in-place`](https://github.com/fitchmultz/pi-edit-session-in-place) | Re-edit or remove an earlier user turn in the current branch                                                         |
+| [`pi-stash`](https://github.com/fitchmultz/pi-stash)                                 | Park and restore a draft message while handling another thought                                                      |
+| [`pi-copy-message`](https://github.com/fitchmultz/pi-copy-message)                   | Copy raw session messages without terminal formatting                                                                |
+| [`ponytail`](https://github.com/fitchmultz/ponytail)                                 | Persistent pressure toward reuse, deletion, native features, and the smallest root-cause fix                         |
 
 ### Extensions bundled by this kit
 
@@ -60,13 +60,13 @@ Reader state lives in native session custom entries and follows the active branc
 
 [`fast-mode`](../extensions/fast-mode.ts) owns shared per-user settings for three providers, plus an optional OpenAI override for one session. Installing or updating the kit never opts you into Ultrafast or changes the default model routes.
 
-| Command | Request policy | State file in the Pi agent directory |
-|---|---|---|
-| `/codex-fast [on|off|toggle|status|ultrafast]` | Shared OpenAI off, priority, or Ultrafast; only one at a time | `openai-codex-fast.json` |
-| `/ultrafast [on|off|toggle|status] [--session]` | Ultrafast toggle, shared by default; `--session` overrides only this session | Shared file above, or native session metadata |
-| `/ultrafast reset --session` | Clear this session's override and follow the shared mode | Native session metadata |
-| `/anthropic-fast [on|off|toggle|status]` | Anthropic Opus fast mode | `anthropic-fast.json` |
-| `/xai-fast [on|off|toggle|status]` | xAI priority | `xai-fast.json` |
+| Command                      | Request policy                                           | State file in the Pi agent directory |
+| ---------------------------- | -------------------------------------------------------- | ------------------------------------ |
+| `/codex-fast [on             | off                                                      | toggle                               | status               | ultrafast]`                                                                  | Shared OpenAI off, priority, or Ultrafast; only one at a time | `openai-codex-fast.json` |
+| `/ultrafast [on              | off                                                      | toggle                               | status] [--session]` | Ultrafast toggle, shared by default; `--session` overrides only this session | Shared file above, or native session metadata                 |
+| `/ultrafast reset --session` | Clear this session's override and follow the shared mode | Native session metadata              |
+| `/anthropic-fast [on         | off                                                      | toggle                               | status]`             | Anthropic Opus fast mode                                                     | `anthropic-fast.json`                                         |
+| `/xai-fast [on               | off                                                      | toggle                               | status]`             | xAI priority                                                                 | `xai-fast.json`                                               |
 
 Shared settings affect sessions sharing that directory. For OpenAI, a session override takes precedence over the shared mode. OpenAI/xAI settings apply to normal agent requests through Pi's payload hook. Built-in compaction and bare registry/nested streams bypass that hook on the verified hosts and retain their native policy; Anthropic's provider override also covers eligible internal calls. Footers follow changes made in other sessions. Changing a setting does not retier requests already in flight. The maintained Fitch runtime uses request-boundary execution, not live native successor chains.
 
@@ -136,9 +136,9 @@ Optional overrides live in `~/.pi/agent/write-prompt.json` (or `write-prompt.jso
 
 ```json
 {
-  "provider": "openai-codex",
-  "model": "gpt-6-astra",
-  "thinkingLevel": "high"
+	"provider": "openai-codex",
+	"model": "gpt-6-astra",
+	"thinkingLevel": "high"
 }
 ```
 
@@ -178,9 +178,9 @@ Pi defaults `images.autoResize` to `true`, which protects provider limits by shr
 
 ```json
 {
-  "images": {
-    "autoResize": false
-  }
+	"images": {
+		"autoResize": false
+	}
 }
 ```
 
@@ -190,13 +190,13 @@ That exposed stricter Anthropic image limits. The bundled guard fixes the bounda
 
 [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) is an optional composition component that owns delegation, coordination, and its packaged profile defaults. The kit is not an orchestration runtime and works without it. Native Pi does not supply delegation tools or specialist profiles. Use the installed owner's current docs and effective executable inventory, not a fixed roster of sibling-only names.
 
-| Job | Selection requirement |
-|---|---|
-| Map, research, diagnose, or plan | A suitable available profile with a bounded, normally read-only brief |
-| Implement or remediate | A suitable available profile, explicit scope, and isolated writes where needed |
-| Challenge the result | Fresh independent review with the required correctness, security, maintainability, or UI coverage |
-| Cross-family review | Effective routing and actual review evidence meeting each required model family |
-| Human-facing output | A suitable available profile with the requested audience and deliverable |
+| Job                              | Selection requirement                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Map, research, diagnose, or plan | A suitable available profile with a bounded, normally read-only brief                             |
+| Implement or remediate           | A suitable available profile, explicit scope, and isolated writes where needed                    |
+| Challenge the result             | Fresh independent review with the required correctness, security, maintainability, or UI coverage |
+| Cross-family review              | Effective routing and actual review evidence meeting each required model family                   |
+| Human-facing output              | A suitable available profile with the requested audience and deliverable                          |
 
 The parent session remains responsible for the task. Specialists return evidence; they do not become an autonomous hierarchy.
 
@@ -208,28 +208,28 @@ The optional working-agreement process block requires fresh independent review f
 
 Skills load task-specific operating instructions only when the work matches. [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries the active reusable workflow set:
 
-| Skill | What it adds |
-|---|---|
-| [`ask-clarifying-questions`](https://github.com/fitchmultz/pi-agent-skills) | Stop only for ambiguity that materially changes scope, safety, or reversibility |
-| [`deslop`](https://github.com/fitchmultz/pi-agent-skills) | Remove AI-generated diff noise and ceremonial test tables without dropping real boundary coverage |
-| [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills) | Create editable SVG or D2 architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with rendered SVG/PNG review artifacts |
-| [`dogfood`](https://github.com/fitchmultz/pi-agent-skills) | Exploratory QA through real browser and terminal/TUI flows |
-| [`handoff`](https://github.com/fitchmultz/pi-agent-skills) | Paste-ready continuation or bounded delegation prompts for a new session |
-| [`pi-extension-development`](https://github.com/fitchmultz/pi-agent-skills) | Build, debug, validate, package, and release Pi extensions against current runtime contracts |
-| [`propose-then-ship-pi`](https://github.com/fitchmultz/pi-agent-skills) | Rank one repository improvement, stop for direction, then implement, review, and ship it |
-| [`test-audit`](https://github.com/fitchmultz/pi-agent-skills) | Gate new tests and audit low-value, implementation-coupled, or duplicative ones |
-| [`thermo-nuclear-code-quality-review`](https://github.com/fitchmultz/pi-agent-skills) | Strict maintainability review for large or structurally risky diffs |
-| [`ux-review`](https://github.com/fitchmultz/pi-agent-skills) | Review user-visible workflows for completion, recovery, progress, and truthful outcomes |
-| [`verification-before-completion`](https://github.com/fitchmultz/pi-agent-skills) | Require current evidence before completion, commit, PR, or passing-check claims |
+| Skill                                                                                 | What it adds                                                                                                                                         |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`ask-clarifying-questions`](https://github.com/fitchmultz/pi-agent-skills)           | Stop only for ambiguity that materially changes scope, safety, or reversibility                                                                      |
+| [`deslop`](https://github.com/fitchmultz/pi-agent-skills)                             | Remove AI-generated diff noise and ceremonial test tables without dropping real boundary coverage                                                    |
+| [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills)                   | Create editable SVG or D2 architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with rendered SVG/PNG review artifacts |
+| [`dogfood`](https://github.com/fitchmultz/pi-agent-skills)                            | Exploratory QA through real browser and terminal/TUI flows                                                                                           |
+| [`handoff`](https://github.com/fitchmultz/pi-agent-skills)                            | Paste-ready continuation or bounded delegation prompts for a new session                                                                             |
+| [`pi-extension-development`](https://github.com/fitchmultz/pi-agent-skills)           | Build, debug, validate, package, and release Pi extensions against current runtime contracts                                                         |
+| [`propose-then-ship-pi`](https://github.com/fitchmultz/pi-agent-skills)               | Rank one repository improvement, stop for direction, then implement, review, and ship it                                                             |
+| [`test-audit`](https://github.com/fitchmultz/pi-agent-skills)                         | Gate new tests and audit low-value, implementation-coupled, or duplicative ones                                                                      |
+| [`thermo-nuclear-code-quality-review`](https://github.com/fitchmultz/pi-agent-skills) | Strict maintainability review for large or structurally risky diffs                                                                                  |
+| [`ux-review`](https://github.com/fitchmultz/pi-agent-skills)                          | Review user-visible workflows for completion, recovery, progress, and truthful outcomes                                                              |
+| [`verification-before-completion`](https://github.com/fitchmultz/pi-agent-skills)     | Require current evidence before completion, commit, PR, or passing-check claims                                                                      |
 
 Companion skills ship beside their extensions:
 
-| Source | Skills |
-|---|---|
-| [`pi-pstack`](https://github.com/fitchmultz/pi-pstack) | `poteto-mode` playbooks, 24 `principle-*` skills, `tdd`, `bro`, `how`, `why`, `architect`, `arena`, `swarm`, `interrogate`, `unslop`, `no-comments`, `ketchup`, `recall`, and `poteto-agent` / `comment-sicko` subagent profiles |
-| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) | `pi-subagents` orchestration and `pi-intercom` coordination guidance |
-| [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter) | `mcp-scripting` for discovering and composing MCP calls |
-| [`ponytail`](https://github.com/fitchmultz/ponytail) | `ponytail`, `ponytail-audit`, `ponytail-review` (my runtime filters the debt, gain, and help variants) |
+| Source                                                           | Skills                                                                                                                                                                                                                           |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`pi-pstack`](https://github.com/fitchmultz/pi-pstack)           | `poteto-mode` playbooks, 24 `principle-*` skills, `tdd`, `bro`, `how`, `why`, `architect`, `arena`, `swarm`, `interrogate`, `unslop`, `no-comments`, `ketchup`, `recall`, and `poteto-agent` / `comment-sicko` subagent profiles |
+| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents)     | `pi-subagents` orchestration and `pi-intercom` coordination guidance                                                                                                                                                             |
+| [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter) | `mcp-scripting` for discovering and composing MCP calls                                                                                                                                                                          |
+| [`ponytail`](https://github.com/fitchmultz/ponytail)             | `ponytail`, `ponytail-audit`, `ponytail-review` (my runtime filters the debt, gain, and help variants)                                                                                                                           |
 
 Most `pi-pstack` leaf skills (including `bro`) are user-invoked or routed through `poteto-mode`, while `poteto-mode`, `tdd`, and the `pi-agent-skills` workflows are selected by task fit rather than loaded into every prompt.
 
@@ -239,18 +239,18 @@ MCP is the context and action bus around the coding loop. Authentication is per-
 
 The current setup has authenticated, read-only-discovery-verified connections for:
 
-| Connection | Capability |
-|---|---|
-| `horizon` | Internal integration gateway, authenticated identity, integration API calls, and nested tool catalogs |
-| GitHub | Repositories, issues, pull requests, checks, reviews, releases, and code search |
-| Linear | Issues, projects, teams, and planning context |
-| Slack, primary and development workspaces | Public and approved private conversation context, threads, users, and canvases |
-| Cloudflare | Documentation plus typed account API access |
-| Sentry | Issues, events, traces, releases, and project context |
-| Datadog | Dashboards, monitors, metrics, logs, traces, and operational context |
-| Plain | Support threads, customers, workspace data, and Sidekick sessions |
-| Notion | Workspace search, pages, databases, comments, and meeting notes |
-| Granola | Meeting notes, summaries, folders, and transcripts |
+| Connection                                | Capability                                                                                            |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `horizon`                                 | Internal integration gateway, authenticated identity, integration API calls, and nested tool catalogs |
+| GitHub                                    | Repositories, issues, pull requests, checks, reviews, releases, and code search                       |
+| Linear                                    | Issues, projects, teams, and planning context                                                         |
+| Slack, primary and development workspaces | Public and approved private conversation context, threads, users, and canvases                        |
+| Cloudflare                                | Documentation plus typed account API access                                                           |
+| Sentry                                    | Issues, events, traces, releases, and project context                                                 |
+| Datadog                                   | Dashboards, monitors, metrics, logs, traces, and operational context                                  |
+| Plain                                     | Support threads, customers, workspace data, and Sidekick sessions                                     |
+| Notion                                    | Workspace search, pages, databases, comments, and meeting notes                                       |
+| Granola                                   | Meeting notes, summaries, folders, and transcripts                                                    |
 
 The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](../setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session. The optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary. The setup configures only integrations listed in the manifest and uses canonical package names for local stdio servers.
 

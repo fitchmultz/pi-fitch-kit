@@ -27,6 +27,11 @@
 - Install/update package in Pi from this checkout: `pi install "$PWD"`
 - After changing extension code or dependencies, start a fresh Pi process before runtime verification. `/reload` refreshes settings and non-code resources; a new conversation in the old process is insufficient.
 
+## Engineering standard
+
+- Follow `docs/engineering-standard.md` (Strict Oxlint and Oxfmt Engineering Standard, v5.1.2). `npm run check` is the normal acceptance command.
+- Relaxing any applicable rule, option, or threshold requires a quality exception recorded in `docs/engineering-records.md` with the evidence the standard's Section 2 requires.
+
 ## Editing rules
 
 - Use npm and Node `>=24.15.0`; do not introduce another package manager.
