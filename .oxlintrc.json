@@ -1,6 +1,13 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "promise"],
+  "plugins": [
+    "eslint",
+    "typescript",
+    "unicorn",
+    "oxc",
+    "import",
+    "promise"
+  ],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -99,7 +106,10 @@
         "considerDefaultExhaustiveForUnions": false
       }
     ],
-    "eqeqeq": ["error", "always"],
+    "eqeqeq": [
+      "error",
+      "always"
+    ],
     "no-implicit-coercion": "error",
     "typescript/restrict-plus-operands": [
       "error",
@@ -142,7 +152,10 @@
     ],
     "typescript/no-misused-promises": "error",
     "typescript/await-thenable": "error",
-    "typescript/return-await": ["error", "error-handling-correctness-only"],
+    "typescript/return-await": [
+      "error",
+      "error-handling-correctness-only"
+    ],
     "typescript/strict-void-return": "off",
     "typescript/no-confusing-void-expression": [
       "error",
@@ -191,7 +204,10 @@
     ],
     "typescript/prefer-readonly": "error",
     "typescript/explicit-module-boundary-types": "error",
-    "typescript/method-signature-style": ["error", "property"],
+    "typescript/method-signature-style": [
+      "error",
+      "property"
+    ],
     "typescript/consistent-type-imports": [
       "error",
       {
@@ -260,11 +276,17 @@
         "skipComments": true
       }
     ],
-    "curly": ["error", "all"],
+    "curly": [
+      "error",
+      "all"
+    ],
     "no-var": "error",
     "prefer-const": "error",
     "no-nested-ternary": "error",
-    "no-return-assign": ["error", "always"],
+    "no-return-assign": [
+      "error",
+      "always"
+    ],
     "no-sequences": "error",
     "no-multi-assign": "error",
     "no-else-return": "error",
@@ -313,7 +335,7 @@
         "scripts/setup-lifecycle-smoke.ts",
         "scripts/validate-regression.ts",
         "scripts/validate.ts",
-        "scripts/write-prompt-boundary.mjs",
+        "scripts/write-prompt-boundary.ts",
         "scripts/write-prompt-regression.ts",
         "scripts/ambitious-live.ts"
       ],
@@ -343,7 +365,11 @@
       }
     },
     {
-      "files": ["**/*.d.ts", "**/*.d.mts", "**/*.d.cts"],
+      "files": [
+        "**/*.d.ts",
+        "**/*.d.mts",
+        "**/*.d.cts"
+      ],
       "rules": {
         "complexity": "off",
         "max-depth": "off",
@@ -354,7 +380,9 @@
       }
     },
     {
-      "files": ["**/*.test-d.{ts,mts,cts}"],
+      "files": [
+        "**/*.test-d.{ts,mts,cts}"
+      ],
       "rules": {
         "typescript/ban-ts-comment": [
           "error",

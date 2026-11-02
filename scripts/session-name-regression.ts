@@ -524,6 +524,6 @@ for (const count of [781, 43_000]) {
 console.log(`kit session-name checks passed (${VERSION})`);
 execFileSync(
 	process.execPath,
-	[join(process.cwd(), "scripts/session-name-boundary.mjs"), getPackageDir()],
+	[join(process.cwd(), "scripts/session-name-boundary.ts"), getPackageDir()],
 	{ stdio: "inherit" },
 );

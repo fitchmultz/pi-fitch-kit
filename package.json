@@ -17,7 +17,7 @@
     "regression:fast-mode": "node --experimental-strip-types scripts/fast-mode-regression.ts",
     "regression:session-name": "node --experimental-strip-types scripts/session-name-regression.ts",
     "regression:paged-reader": "node --experimental-strip-types scripts/paged-reader-regression.ts",
-    "regression:write-prompt": "node --experimental-strip-types scripts/write-prompt-regression.ts && node scripts/write-prompt-boundary.mjs",
+    "regression:write-prompt": "node --experimental-strip-types scripts/write-prompt-regression.ts && node scripts/write-prompt-boundary.ts",
     "check:ambitious:live": "node scripts/ambitious-live.ts",
     "smoke": "node scripts/package-smoke.ts",
     "smoke:lifecycle": "node scripts/setup-lifecycle-smoke.ts",
