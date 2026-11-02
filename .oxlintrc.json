@@ -302,7 +302,7 @@
   "overrides": [
     {
       "files": [
-        "scripts/clean-footer-regression.mjs",
+        "scripts/clean-footer-regression.ts",
         "scripts/fast-mode-regression.ts",
         "scripts/image-budget-regression.ts",
         "scripts/image-guard-smoke.ts",

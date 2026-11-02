@@ -13,7 +13,7 @@
     "check": "node scripts/run-gates.ts",
     "check:compat": "npm run check && npm run smoke",
     "typecheck": "tsc --noEmit",
-    "regression:clean-footer": "node scripts/clean-footer-regression.mjs",
+    "regression:clean-footer": "node scripts/clean-footer-regression.ts",
     "regression:fast-mode": "node --experimental-strip-types scripts/fast-mode-regression.ts",
     "regression:session-name": "node --experimental-strip-types scripts/session-name-regression.ts",
     "regression:paged-reader": "node --experimental-strip-types scripts/paged-reader-regression.ts",
