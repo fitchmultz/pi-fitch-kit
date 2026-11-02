@@ -38,7 +38,9 @@ for (const gate of gates) {
 		stdio: "inherit",
 		shell: process.platform === "win32",
 	});
-	if (result.status !== 0) failures.push(gate.name);
+	if (result.status !== 0) {
+		failures.push(gate.name);
+	}
 }
 
 console.log("\n=== summary ===");
