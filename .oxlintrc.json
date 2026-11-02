@@ -315,7 +315,7 @@
         "scripts/validate.ts",
         "scripts/write-prompt-boundary.mjs",
         "scripts/write-prompt-regression.ts",
-        "scripts/ambitious-live.mjs"
+        "scripts/ambitious-live.ts"
       ],
       "rules": {
         "complexity": [

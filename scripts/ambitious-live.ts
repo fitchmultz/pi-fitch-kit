@@ -5,11 +5,53 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { requireRecord } from "./test-harness.ts";
+import type {
+	createAgentSession as CreateAgentSessionFn,
+	DefaultResourceLoader,
+	getAgentDir as GetAgentDirFn,
+	ModelRuntime,
+	SessionManager,
+	SettingsManager,
+} from "@earendil-works/pi-coding-agent";
 
-const host = process.argv[2]
-	? resolve(process.argv[2])
-	: dirname(dirname(fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))));
-const modelRef = process.argv[3] ?? `${process.env.PI_PROVIDER}/${process.env.PI_MODEL}`;
+/** The host-selected Pi SDK surface this live check drives. */
+type HostSdk = {
+	DefaultResourceLoader: typeof DefaultResourceLoader;
+	ModelRuntime: typeof ModelRuntime;
+	SessionManager: typeof SessionManager;
+	SettingsManager: typeof SettingsManager;
+	createAgentSession: typeof CreateAgentSessionFn;
+	getAgentDir: typeof GetAgentDirFn;
+};
+const isHostSdk = (module: unknown): module is HostSdk =>
+	typeof module === "object" &&
+	module !== null &&
+	"DefaultResourceLoader" in module &&
+	"ModelRuntime" in module &&
+	"SessionManager" in module &&
+	"SettingsManager" in module &&
+	"createAgentSession" in module &&
+	"getAgentDir" in module;
+
+/** One live writer-contract case. */
+type WriterCase = {
+	name: string;
+	source: string;
+	history: Array<["user" | "assistant", string]>;
+	required: RegExp[];
+	forbidden: RegExp[];
+	method?: RegExp;
+	evidence?: RegExp;
+	acceptance?: RegExp;
+};
+
+const host =
+	process.argv[2] !== undefined
+		? resolve(process.argv[2])
+		: dirname(dirname(fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))));
+const modelRef =
+	process.argv[3] ?? `${process.env.PI_PROVIDER ?? ""}/${process.env.PI_MODEL ?? ""}`;
 const repeats = Number(process.argv[4] ?? 1);
 const command = process.argv[5] ?? "ambitious";
 assert.ok(Number.isInteger(repeats) && repeats > 0 && repeats <= 5, "repeats must be 1–5");
@@ -17,14 +59,18 @@ assert.ok(
 	["ambitious", "unreasonable"].includes(command),
 	"command must be ambitious or unreasonable (fourth argument; default ambitious)",
 );
+const sdkModule: unknown = await import(pathToFileURL(join(host, "dist/index.js")).href);
+if (!isHostSdk(sdkModule)) {
+	throw new Error("host Pi SDK did not expose the expected session surface");
+}
 const {
-	DefaultResourceLoader,
-	ModelRuntime,
-	SessionManager,
-	SettingsManager,
+	DefaultResourceLoader: HostLoader,
+	ModelRuntime: HostModelRuntime,
+	SessionManager: HostSessionManager,
+	SettingsManager: HostSettingsManager,
 	createAgentSession,
 	getAgentDir,
-} = await import(pathToFileURL(join(host, "dist/index.js")));
+} = sdkModule;
 const authDir = getAgentDir();
 const temp = mkdtempSync(join(tmpdir(), `pi-${command}-live-`));
 const agentDir = join(temp, "agent");
@@ -40,7 +86,7 @@ const noDelivery = [
 	/(?:no|do not|don't|neither)\b[^.!?\n]*\bcommit/i,
 	/(?:no|do not|don't|nor)\b[^.!?\n]*\bdeploy/i,
 ];
-const ambitiousCases = [
+const ambitiousCases: WriterCase[] = [
 	{
 		name: "new-session",
 		source:
@@ -108,7 +154,7 @@ const ambitiousCases = [
 // Real generations own semantic quality here; offline HTTP fixtures own writer
 // transport/lifecycle. These independent, task-specific heuristics catch dropped
 // constraints or one-size-fits-all escalation, not every possible bad rewrite.
-const unreasonableCases = [
+const unreasonableCases: WriterCase[] = [
 	{
 		name: "bounded-fix",
 		source:
@@ -186,7 +232,7 @@ try {
 	delete process.env.PI_CACHE_TRACE_DIR;
 	process.env.PI_CODING_AGENT_DIR = agentDir;
 	process.env.PI_PACKAGE_DIR = host;
-	const runtime = await ModelRuntime.create({
+	const runtime = await HostModelRuntime.create({
 		authPath: join(authDir, "auth.json"),
 		modelsPath: join(authDir, "models.json"),
 		modelsStorePath: join(temp, "models-cache.json"),
@@ -213,11 +259,11 @@ The export regression command is npm run test:exports.
 Preserve tenant isolation. Do not introduce new dependencies.
 `,
 	);
-	const settingsManager = SettingsManager.inMemory({
+	const settingsManager = HostSettingsManager.inMemory({
 		compaction: { enabled: false },
 		retry: { enabled: false },
 	});
-	const loader = new DefaultResourceLoader({
+	const loader = new HostLoader({
 		cwd,
 		agentDir,
 		settingsManager,
@@ -231,154 +277,211 @@ Preserve tenant isolation. Do not introduce new dependencies.
 	});
 	await loader.reload({ resolveProjectTrust: async () => true });
 	assert.deepEqual(loader.getExtensions().errors, []);
-	let failures = 0;
-	for (let repeat = 1; repeat <= repeats; repeat++)
-		for (const fixture of cases) {
-			const manager = SessionManager.inMemory(cwd);
-			for (const [role, text] of fixture.history)
-				manager.appendMessage(
-					role === "user"
-						? { role, content: text, timestamp: Date.now() }
-						: {
-								role,
-								content: [{ type: "text", text }],
-								api: model.api,
-								provider: model.provider,
-								model: model.id,
-								usage: {
-									input: 0,
-									output: 0,
-									cacheRead: 0,
-									cacheWrite: 0,
-									totalTokens: 0,
-									cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-								},
-								stopReason: "stop",
-								timestamp: Date.now(),
-							},
-				);
-			const { session } = await createAgentSession({
-				cwd,
-				agentDir,
-				modelRuntime: runtime,
-				model,
-				thinkingLevel: "high",
-				resourceLoader: loader,
-				settingsManager,
-				sessionManager: manager,
-				tools: [],
-			});
-			let draft;
-			const notices = [];
-			const start = writerCalls;
-			try {
-				assert.match(
-					session.systemPrompt,
-					/Ledgerline/,
-					"native project context must be available even without history",
-				);
-				await session.bindExtensions({
-					mode: "rpc",
-					uiContext: {
-						...session.extensionRunner.createContext().ui,
-						select: async (text) => {
-							draft = text;
-							return "Deny";
-						},
-						notify: (text, level) => {
-							if (level === "error") notices.push(text);
-						},
-					},
-					onError: (error) => {
-						throw new Error(error.error);
-					},
-				});
-				const before = structuredClone(manager.getEntries());
-				await session.prompt(`/${command} ${fixture.source}`);
-				assert.deepEqual(manager.getEntries(), before, "rewrite must stay off transcript");
-				assert.ok(draft, `No draft: ${notices.join("; ")}`);
-				const errors = [];
-				if (command === "ambitious" && [...draft].length > 1800)
-					errors.push("exceeds 1800-character maximum");
-				if (
-					/^(?:Here is|Here's|Sure[,!]|I've rewritten)|as (?:discussed|agreed)|earlier turns/i.test(
-						draft,
-					)
-				)
-					errors.push("not a standalone prompt");
-				if (
-					/\b\d+(?:[,.]\d+)?\s*(?:ms|seconds|minutes|seeded cases|generated cases)\b|\b(?!100\s*%|0\s*%)\d+(?:[,.]\d+)?\s*%/i.test(
-						draft,
-					)
-				)
-					errors.push("unsupported quantitative target");
-				if (/\b100\s*%\s*(?:test\s*)?(?:code\s*)?coverage/i.test(draft))
-					errors.push("unsupported coverage target");
-				if (
-					/\bat least one\b.{0,120}(?:finding|previously|unreported|unestablished)|(?:identify|produce|deliver)\b.{0,80}(?:previously unreported|new finding|not already)/is.test(
-						draft,
-					)
-				)
-					errors.push("mandatory unsupported novelty");
-				if (
-					!(
-						fixture.method ??
-						/\b(?:trace|reproduc\w*|inspect|investigat\w*|reconcil\w*|compare|review|examine|audit|read)\b/i
-					).test(draft) ||
-					!(
-						fixture.evidence ??
-						/\b(?:raw|actual|implementation|code|diff|source|contract|data model|logs?|fixtures?)\b/i
-					).test(draft)
-				)
-					errors.push("missing task-appropriate method on primary evidence");
-				if (
-					!(
-						fixture.acceptance ??
-						/\b(?:regressions?|fixtures?|tests?|checks?|reconciliation|assertions?)\b(?!:).*?(?:fail|expos|reproduc|expected|exact|distinct|tenant|input.order|identit|missing)/is
-					).test(draft)
-				)
-					errors.push("missing concrete task-appropriate acceptance evidence");
-				for (const sentence of draft.split(/(?<=[.!?])\s+/u)) {
-					if (
-						/(?:first|last)[ -]wins|(?:keep|retain|choose|use) (?:only )?(?:the )?(?:first|last) (?:occurrence|copy|record|row)/i.test(
-							sentence,
-						) &&
-						!/\b(?:if|unless|contract|establish|determine|confirm|verify)\b/i.test(sentence)
-					)
-						errors.push("invented duplicate-conflict policy");
-					if (
-						/\b(?:tests?|checks?) (?:already )?(?:have )?passed|already verified/i.test(sentence) &&
-						!/\b(?:if|unless|until|only|do not|don't|never|before|must|cannot)\b/i.test(sentence)
-					)
-						errors.push("invented completed verification");
-				}
-				for (const rule of fixture.required) if (!rule.test(draft)) errors.push(`missing ${rule}`);
-				for (const rule of fixture.forbidden)
-					if (rule.test(draft)) errors.push(`unsupported ${rule}`);
-				failures += errors.length;
-				console.log(
-					JSON.stringify({
-						command,
-						case: fixture.name,
-						repeat,
-						source: fixture.source,
-						characters: [...draft].length,
-						words: draft.split(/\s+/u).length,
-						writerCalls: writerCalls - start,
-						errors,
-						draft,
-					}),
-				);
-			} finally {
-				await session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
-				session.dispose();
+	/** Runs one writer-contract case and records its failure count. */
+	/** Collects the writer-contract errors for one generated draft. */
+	const draftQualityErrors = (draft: string, writerCommand: string): string[] => {
+		const errors: string[] = [];
+		if (writerCommand === "ambitious" && Array.from(draft).length > 1800) {
+			errors.push("exceeds 1800-character maximum");
+		}
+		if (
+			/^(?:Here is|Here's|Sure[,!]|I've rewritten)|as (?:discussed|agreed)|earlier turns/i.test(
+				draft,
+			)
+		) {
+			errors.push("not a standalone prompt");
+		}
+		if (
+			/\b\d+(?:[,.]\d+)?\s*(?:ms|seconds|minutes|seeded cases|generated cases)\b|\b(?!100\s*%|0\s*%)\d+(?:[,.]\d+)?\s*%/i.test(
+				draft,
+			)
+		) {
+			errors.push("unsupported quantitative target");
+		}
+		if (/\b100\s*%\s*(?:test\s*)?(?:code\s*)?coverage/i.test(draft)) {
+			errors.push("unsupported coverage target");
+		}
+		if (
+			/\bat least one\b.{0,120}(?:finding|previously|unreported|unestablished)|(?:identify|produce|deliver)\b.{0,80}(?:previously unreported|new finding|not already)/is.test(
+				draft,
+			)
+		) {
+			errors.push("mandatory unsupported novelty");
+		}
+		return errors;
+	};
+
+	const methodEvidenceErrors = (draft: string, fixture: WriterCase): string[] => {
+		const errors: string[] = [];
+		if (
+			!(
+				fixture.method ??
+				/\b(?:trace|reproduc\w*|inspect|investigat\w*|reconcil\w*|compare|review|examine|audit|read)\b/i
+			).test(draft) ||
+			!(
+				fixture.evidence ??
+				/\b(?:raw|actual|implementation|code|diff|source|contract|data model|logs?|fixtures?)\b/i
+			).test(draft)
+		) {
+			errors.push("missing task-appropriate method on primary evidence");
+		}
+		if (
+			!(
+				fixture.acceptance ??
+				/\b(?:regressions?|fixtures?|tests?|checks?|reconciliation|assertions?)\b(?!:).*?(?:fail|expos|reproduc|expected|exact|distinct|tenant|input.order|identit|missing)/is
+			).test(draft)
+		) {
+			errors.push("missing concrete task-appropriate acceptance evidence");
+		}
+		return errors;
+	};
+
+	const sentenceErrors = (draft: string): string[] => {
+		const errors: string[] = [];
+		for (const sentence of draft.split(/(?<=[.!?])\s+/u)) {
+			if (
+				/(?:first|last)[ -]wins|(?:keep|retain|choose|use) (?:only )?(?:the )?(?:first|last) (?:occurrence|copy|record|row)/i.test(
+					sentence,
+				) &&
+				!/\b(?:if|unless|contract|establish|determine|confirm|verify)\b/i.test(sentence)
+			) {
+				errors.push("invented duplicate-conflict policy");
+			}
+			if (
+				/\b(?:tests?|checks?) (?:already )?(?:have )?passed|already verified/i.test(sentence) &&
+				!/\b(?:if|unless|until|only|do not|don't|never|before|must|cannot)\b/i.test(sentence)
+			) {
+				errors.push("invented completed verification");
 			}
 		}
+		return errors;
+	};
+
+	const ruleErrors = (draft: string, fixture: WriterCase): string[] => {
+		const errors: string[] = [];
+		for (const rule of fixture.required) {
+			if (!rule.test(draft)) {
+				errors.push(`missing ${rule.source}`);
+			}
+		}
+		for (const rule of fixture.forbidden) {
+			if (rule.test(draft)) {
+				errors.push(`unsupported ${rule.source}`);
+			}
+		}
+		return errors;
+	};
+
+	/** Collects the writer-contract errors for one generated draft. */
+	const collectErrors = (draft: string, fixture: WriterCase, writerCommand: string): string[] => [
+		...draftQualityErrors(draft, writerCommand),
+		...methodEvidenceErrors(draft, fixture),
+		...sentenceErrors(draft),
+		...ruleErrors(draft, fixture),
+	];
+
+	const runCase = async (fixture: WriterCase, repeat: number): Promise<void> => {
+		const manager = HostSessionManager.inMemory(cwd);
+		for (const [role, text] of fixture.history) {
+			manager.appendMessage(
+				role === "user"
+					? { role, content: text, timestamp: Date.now() }
+					: {
+							role,
+							content: [{ type: "text", text }],
+							api: model.api,
+							provider: model.provider,
+							model: model.id,
+							usage: {
+								input: 0,
+								output: 0,
+								cacheRead: 0,
+								cacheWrite: 0,
+								totalTokens: 0,
+								cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+							},
+							stopReason: "stop",
+							timestamp: Date.now(),
+						},
+			);
+		}
+		const { session } = await createAgentSession({
+			cwd,
+			agentDir,
+			modelRuntime: runtime,
+			model,
+			thinkingLevel: "high",
+			resourceLoader: loader,
+			settingsManager,
+			sessionManager: manager,
+			tools: [],
+		});
+		let draft: string | undefined;
+		const notices: string[] = [];
+		const start = writerCalls;
+		try {
+			assert.match(
+				session.systemPrompt,
+				/Ledgerline/,
+				"native project context must be available even without history",
+			);
+			await session.bindExtensions({
+				mode: "rpc",
+				uiContext: {
+					...session.extensionRunner.createContext().ui,
+					select: async (text) => {
+						draft = text;
+						return "Deny";
+					},
+					notify: (text: string, level?: "error" | "info" | "warning") => {
+						if (level === "error") {
+							notices.push(text);
+						}
+					},
+				},
+				onError: (error) => {
+					throw new Error(error.error);
+				},
+			});
+			const before = structuredClone(manager.getEntries());
+			await session.prompt(`/${command} ${fixture.source}`);
+			assert.deepEqual(manager.getEntries(), before, "rewrite must stay off transcript");
+			assert.ok(draft !== undefined, `No draft: ${notices.join("; ")}`);
+			const errors = collectErrors(draft, fixture, command);
+			failures += errors.length;
+			console.log(
+				JSON.stringify({
+					command,
+					case: fixture.name,
+					repeat,
+					source: fixture.source,
+					characters: Array.from(draft).length,
+					words: draft.split(/\s+/u).length,
+					writerCalls: writerCalls - start,
+					errors,
+					draft,
+				}),
+			);
+		} finally {
+			await session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
+			session.dispose();
+		}
+	};
+
+	let failures = 0;
+	for (let repeat = 1; repeat <= repeats; repeat++) {
+		for (const fixture of cases) {
+			await runCase(fixture, repeat);
+		}
+	}
 	console.log(
 		JSON.stringify({
 			command,
 			host,
-			version: JSON.parse(readFileSync(join(host, "package.json"))).version,
+			version: requireRecord(
+				JSON.parse(readFileSync(join(host, "package.json"), "utf-8")),
+				"host package.json",
+			).version,
 			model: modelRef,
 			repeats,
 			failures,
