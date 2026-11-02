@@ -91,7 +91,7 @@ for (const [route, value] of Object.entries(modelContextWindows)) {
 }
 const runtime = jsonField(manifest, "runtime", "manifest runtime");
 const piFloor = /^>=(\d+\.\d+\.\d+)$/.exec(jsonString(runtime.pi, "runtime.pi"))?.[1];
-assert(piFloor === "1.4.0", "the kit requires Pi 1.4.0 or newer");
+assert(piFloor === "1.5.0", "the kit requires Pi 1.5.0 or newer");
 const engines = jsonField(packageJson, "engines", "package engines");
 assert(engines.node === runtime.node, "package and manifest Node floors must match");
 assert(

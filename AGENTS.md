@@ -35,7 +35,7 @@
 ## Editing rules
 
 - Use npm and Node `>=24.15.0`; do not introduce another package manager.
-- Support the latest stable official Pi and the current maintained Fitch build, not older releases. Pi 1.4.0 is the current technical minimum: its native dialog stack keeps parallel interactive confirmations safe. Qualify the two hosts separately; a matching version number does not identify the fork build. Use public APIs on both hosts; do not add shims for older hosts or restore dropped checkpoint, metadata/revision or usage-source APIs.
+- Support the latest stable official Pi and the current maintained Fitch build, not older releases. Pi 1.5.0 is the current technical minimum: the kit is built and qualified against its extension contracts, and its native dialog stack keeps parallel interactive confirmations safe. Qualify the two hosts separately; a matching version number does not identify the fork build. Use public APIs on both hosts; do not add shims for older hosts or restore dropped checkpoint, metadata/revision or usage-source APIs.
 - The lockfile must resolve only to `https://registry.npmjs.org/`; rewrite any private mirror host after installing.
 - Keep this package an opinionated composition layer. Independent extensions and skill packages must not depend on it.
 - Keep only active public resources registered in `package.json#pi` and `setup-manifest.json`.
