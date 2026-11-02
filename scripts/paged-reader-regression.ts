@@ -926,6 +926,13 @@ try {
 		sentBeforeAmbiguous + 2,
 		"restart never auto-resends ambiguous or unanswered feedback",
 	);
+	const restartedUnlinked = docs().at(1);
+	assert.ok(restartedUnlinked !== undefined, "restarted unlinked reply must be stored");
+	assert.ok(
+		restartedUnlinked.unlinkedFeedbackIds !== undefined,
+		"restarted unlinked ids must be recorded",
+	);
+	assert.equal(restartedUnlinked.unlinkedFeedbackIds.length, 2);
 	// A freshly mounted overlay must retry a restart-unanswered note without
 	// first opening the note editor: the T hint is advertised, so T cannot be
 	// a silent no-op in a newly mounted overlay instance.
