@@ -74,7 +74,7 @@ process.env.PI_OFFLINE = "1";
 const originalFetch = globalThis.fetch;
 const originalWebSocket = globalThis.WebSocket;
 // The fixture disables WebSocket so no transport can leave offline mode.
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- deliberate offline-fixture disable
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- QX-003: offline fixture disables the WebSocket transport
 globalThis.WebSocket = undefined as unknown as typeof WebSocket;
 const requests: Array<Record<string, unknown>> = [];
 let requestedName: string | undefined;
@@ -733,7 +733,7 @@ try {
 				const closed = new Promise<boolean>((settle) => {
 					signal.addEventListener("abort", () => settle(false), { once: true });
 				});
-				// oxlint-disable-next-line typescript/no-floating-promises -- awaiting abort would deadlock the dialog it is meant to close
+				// oxlint-disable-next-line typescript/no-floating-promises -- QX-005: awaiting abort would deadlock the dialog it is meant to close
 				current.abort();
 				return closed;
 			},

@@ -323,8 +323,7 @@ try {
 			}),
 		);
 	extensions.runtime.getActiveTools = () => ["name_session"];
-	// oxlint-disable-next-line unicorn/no-useless-undefined -- the stub must report an unnamed session
-	extensions.runtime.getSessionName = () => undefined;
+	extensions.runtime.getSessionName = (): undefined => undefined;
 	const fastModeStart = fastMode.handlers.get("session_start")?.[0];
 	if (!fastModeStart) {
 		throw new Error("Fast-mode session_start handler missing");
