@@ -148,7 +148,7 @@ const originalFetch = globalThis.fetch;
 const originalWebSocket = globalThis.WebSocket;
 // Keep the writer's raw request options unchanged. Native auto transport falls
 // back to our fake HTTP endpoint when WebSockets are unavailable.
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- deliberate offline-fixture disable
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- QX-003: offline fixture disables the WebSocket transport
 globalThis.WebSocket = undefined as unknown as typeof WebSocket;
 const png =
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1kAAAAASUVORK5CYII=";

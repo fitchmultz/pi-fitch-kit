@@ -23,6 +23,7 @@ type Gate = { name: string; command: readonly string[] };
 
 const gates: readonly Gate[] = [
 	{ name: "typecheck", command: ["tsc", "--noEmit"] },
+	{ name: "lint", command: ["oxlint", "--deny-warnings", "."] },
 	{ name: "format", command: ["oxfmt", "--check", "."] },
 	{ name: "tests", command: ["node", "--test", ...testFiles] },
 ];

@@ -323,7 +323,7 @@ try {
 			}),
 		);
 	extensions.runtime.getActiveTools = () => ["name_session"];
-	// oxlint-disable-next-line unicorn/no-useless-undefined -- the stub must report an unnamed session
+	// oxlint-disable-next-line unicorn/no-useless-undefined -- QX-004: the stub must report an unnamed session
 	extensions.runtime.getSessionName = () => undefined;
 	const fastModeStart = fastMode.handlers.get("session_start")?.[0];
 	if (!fastModeStart) {
