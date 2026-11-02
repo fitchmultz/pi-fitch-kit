@@ -271,7 +271,7 @@ const contextSegment = (frame: FooterFrame, usage: ContextUsage | undefined): st
 const renderRightSegment = (frame: FooterFrame): string => {
 	const model = frame.ctx.model?.id.split("/").pop() ?? "no-model";
 	const thinking =
-		frame.ctx.model?.reasoning !== undefined ? ` • ${frame.ctx.thinkingLevel ?? "off"}` : "";
+		frame.ctx.model?.reasoning === true ? ` • ${frame.ctx.thinkingLevel ?? "off"}` : "";
 	const provider =
 		frame.footerData.getAvailableProviderCount() > 1 && frame.ctx.model !== undefined
 			? `(${frame.ctx.model.provider}) `

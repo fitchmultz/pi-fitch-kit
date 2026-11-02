@@ -84,6 +84,7 @@ export class ReaderOverlay implements Component, Focusable {
 			controller: options.controller,
 			isAgentIdle: options.isAgentIdle,
 			isFocused: () => this.focused,
+			currentKey: () => this.key,
 			currentSectionId: () => this.section()?.id,
 			setStatus: (line) => {
 				this.status = line;

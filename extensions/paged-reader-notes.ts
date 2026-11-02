@@ -10,6 +10,7 @@ export type NoteHost = {
 	controller: ReaderController;
 	isAgentIdle: () => boolean;
 	isFocused: () => boolean;
+	currentKey: () => string | undefined;
 	currentSectionId: () => string | undefined;
 	setStatus: (line: string) => void;
 	requestRender: () => void;
@@ -120,14 +121,15 @@ export class NoteSession {
 		return { key: this.key, sectionId: this.sectionId, text: this.editor.getText() };
 	}
 
-	/** The latest note for the reading cursor's section, for a retry. */
+	/** The latest note for the reading cursor's document and section, for a retry. */
 	private retryNote(): { key: string; sectionId: string; text: string } | undefined {
+		const key = this.host.currentKey();
 		const sectionId = this.host.currentSectionId();
-		if (this.key === undefined || sectionId === undefined) {
+		if (key === undefined || sectionId === undefined) {
 			return undefined;
 		}
-		const text = this.host.controller.state().latestFeedback(this.key, sectionId)?.note ?? "";
-		return { key: this.key, sectionId, text };
+		const text = this.host.controller.state().latestFeedback(key, sectionId)?.note ?? "";
+		return { key, sectionId, text };
 	}
 
 	/** Handles a keypress while the editor is focused. */

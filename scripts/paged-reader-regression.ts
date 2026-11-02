@@ -518,6 +518,16 @@ try {
 	assert.ok(lines().join("\n").includes("Revised explanation"));
 	clickText("Revised explanation");
 	assert.ok(lines().join("\n").includes("Revised section"), "native pointer opens a library row");
+	// The note editor was last opened on stable@1. Retry must follow the
+	// document on screen: stable@2 has no note on this section, so T cannot
+	// dispatch stable@1's note against the reader's current document.
+	const crossDocBefore = sent.length;
+	press("t");
+	assert.equal(
+		sent.length,
+		crossDocBefore,
+		"Retry follows the document on screen, not the last-opened note editor",
+	);
 	clickText("L List");
 	clickText("Immutable explanation");
 	assert.ok(lines().join("\n").includes("Original section"));
@@ -710,6 +720,81 @@ try {
 		"restart never auto-resends ambiguous or unanswered feedback",
 	);
 	assert.equal(docs()[1].unlinkedFeedbackIds.length, 2);
+	// A freshly mounted overlay must retry a restart-unanswered note without
+	// first opening the note editor: the T hint is advertised, so T cannot be
+	// a silent no-op in a newly mounted overlay instance.
+	await command.handler("", ctx());
+	press("l");
+	press("\x1b[A");
+	press("\r");
+	press("\x1b");
+	await settle();
+	await command.handler("", ctx());
+	// A freshly mounted overlay must retry a restart-unanswered note without
+	// first opening the note editor: the T hint is advertised, so T cannot be
+	// a silent no-op in a newly mounted overlay instance.
+	assert.ok(
+		lines().join("\n").includes("T Retry"),
+		"retry hint is advertised on the fresh overlay",
+	);
+	const freshRetryBefore = sent.length;
+	press("t");
+	assert.equal(
+		sent.length,
+		freshRetryBefore + 1,
+		"fresh overlay retries the restart-unanswered note without opening the editor",
+	);
+	await event("agent_settled");
+	// Cross-document retry: the note editor must not pin Retry to the document
+	// where it was last opened. Both documents share the section id, and both
+	// notes are retryable, so T must carry the on-screen document's note.
+	await execute({
+		title: "Cross target",
+		sections: [
+			{
+				id: "second",
+				heading: "Shared section",
+				text: "Same section id as the original question.",
+			},
+		],
+	});
+	press("l");
+	press("\x1b[B");
+	press("\x1b[B");
+	press("\r");
+	assert.ok(lines().join("\n").includes("Shared section"), "cross-target document is on screen");
+	press("n");
+	for (const letter of "Retry target note.") press(letter);
+	press("\x1b[13;5u");
+	await event("agent_settled");
+	press("l");
+	press("\x1b[A");
+	press("\x1b[A");
+	press("\r");
+	press("n");
+	press("\x1b");
+	press("l");
+	press("\x1b[B");
+	press("\x1b[B");
+	press("\r");
+	assert.ok(lines().join("\n").includes("Shared section"), "cross-target document is on screen");
+	assert.ok(
+		lines().join("\n").includes("T Retry"),
+		"retry hint is advertised for the on-screen document",
+	);
+	const sharedRetryBefore = sent.length;
+	press("t");
+	assert.equal(
+		sent.length,
+		sharedRetryBefore + 1,
+		"T dispatches the on-screen document's retryable note",
+	);
+	assert.ok(
+		sent.at(-1).message.content.includes("Retry target note."),
+		"retry carries the on-screen document's note, not the last-opened editor's note",
+	);
+	press("\x1b");
+	await settle();
 
 	currentSession = SessionManager.create(
 		join(root, "steered-tool"),
