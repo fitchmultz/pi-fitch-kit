@@ -304,7 +304,7 @@
       "files": [
         "scripts/clean-footer-regression.mjs",
         "scripts/fast-mode-regression.ts",
-        "scripts/image-budget-regression.mjs",
+        "scripts/image-budget-regression.ts",
         "scripts/image-guard-smoke.ts",
         "scripts/package-smoke.ts",
         "scripts/paged-reader-regression.ts",
