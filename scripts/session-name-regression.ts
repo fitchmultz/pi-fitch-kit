@@ -5,28 +5,60 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { getPackageDir, SessionManager, VERSION } from "@earendil-works/pi-coding-agent";
+import {
+	createExtensionRuntime,
+	type ExtensionContext,
+	type ExtensionRuntime,
+	getPackageDir,
+	type LoadExtensionsResult,
+	SessionManager,
+	VERSION,
+} from "@earendil-works/pi-coding-agent";
 
-const { createExtensionRuntime, loadExtensions } = await import(
+/** The loader-module surface this regression drives directly. */
+type Loader = {
+	loadExtensions: (
+		paths: string[],
+		cwd: string,
+		eventBus: undefined,
+		runtime: ExtensionRuntime,
+	) => Promise<LoadExtensionsResult>;
+};
+
+/** Narrows the dynamically imported loader module to the surface used here. */
+const isLoader = (module: unknown): module is Loader =>
+	typeof module === "object" &&
+	module !== null &&
+	"loadExtensions" in module &&
+	typeof module.loadExtensions === "function";
+
+const loaderModule: unknown = await import(
 	pathToFileURL(join(getPackageDir(), "dist/core/extensions/loader.js")).href
 );
+if (!isLoader(loaderModule)) {
+	throw new Error("pi-coding-agent loader module did not expose loadExtensions");
+}
+const { loadExtensions } = loaderModule;
+
+/** A tool-execute context fixture with only the confirm UI the naming tool
+ * reads; the executed paths never touch the remaining context fields. */
+import { toolContext } from "./test-harness.ts";
 
 const bundlePath = join(process.cwd(), "extensions/session-name.ts");
-const bindTools = (
-	runtime: ReturnType<typeof createExtensionRuntime>,
-	loaded: {
-		extensions: Array<{
-			tools: Map<string, { definition: { name: string }; sourceInfo: unknown }>;
-		}>;
-	},
-) => {
-	runtime.getAllTools = () =>
-		loaded.extensions.flatMap(({ tools }) =>
-			[...tools.values()].map(({ definition, sourceInfo }) => ({
-				...definition,
-				sourceInfo,
-			})),
-		) as never;
+
+/** Stubs the runtime's tool listing from a loaded extension set. */
+const bindTools = (runtime: ExtensionRuntime, loaded: LoadExtensionsResult): void => {
+	Object.assign(runtime, {
+		getAllTools: () =>
+			loaded.extensions.flatMap((extension) =>
+				[...extension.tools.values()].map((tool) =>
+					Object.assign({}, tool.definition, {
+						exposure: "direct" as const,
+						sourceInfo: tool.sourceInfo,
+					}),
+				),
+			),
+	});
 };
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "pi-session-name-transition-"));
@@ -53,6 +85,7 @@ for (const paths of [
 	assert.deepEqual(transition.errors, []);
 	bindTools(transitionRuntime, transition);
 	const bundled = transition.extensions[paths.indexOf(bundlePath)];
+	assert.ok(bundled);
 	const start = bundled.handlers.get("session_start")?.[0];
 	assert.ok(start);
 	await start({}, {});
@@ -91,6 +124,7 @@ assert.equal(loaded.extensions.length, 1);
 bindTools(runtime, loaded);
 
 const extension = loaded.extensions[0];
+assert.ok(extension);
 assert.equal(extension.tools.size, 0);
 const start = extension.handlers.get("session_start")?.[0];
 assert.ok(start);
@@ -117,7 +151,7 @@ const first = await tool.execute(
 	{ name: "  Fix auth refresh  " },
 	new AbortController().signal,
 	undefined,
-	{} as never,
+	toolContext(),
 );
 assert.deepEqual(names, ["Fix auth refresh"]);
 assert.deepEqual(first.details, { name: "Fix auth refresh", previousName: undefined });
@@ -127,7 +161,7 @@ await tool.execute(
 	{ name: "Fix auth refresh" },
 	new AbortController().signal,
 	undefined,
-	{} as never,
+	toolContext(),
 );
 assert.deepEqual(names, ["Fix auth refresh"]);
 
@@ -137,7 +171,7 @@ await assert.rejects(
 		{ name: "Fix\nauth refresh" },
 		new AbortController().signal,
 		undefined,
-		{} as never,
+		toolContext(),
 	),
 	/control or formatting characters/,
 );
@@ -147,7 +181,7 @@ await assert.rejects(
 		{ name: "auth-\u200Bcoordinator" },
 		new AbortController().signal,
 		undefined,
-		{} as never,
+		toolContext(),
 	),
 	/control or formatting characters/,
 );
@@ -158,7 +192,7 @@ await tool.execute(
 	{ name: "Ship auth migration" },
 	new AbortController().signal,
 	undefined,
-	{} as never,
+	toolContext(),
 );
 assert.deepEqual(names, ["Fix auth refresh", "Ship auth migration"]);
 
@@ -167,7 +201,7 @@ await tool.execute(
 	{ name: "release-coordinator" },
 	new AbortController().signal,
 	undefined,
-	{} as never,
+	toolContext(),
 );
 await assert.rejects(
 	tool.execute(
@@ -175,23 +209,20 @@ await assert.rejects(
 		{ name: "release-planning" },
 		new AbortController().signal,
 		undefined,
-		{} as never,
+		toolContext(),
 	),
 	/ask the user to rename it with \/name/,
 );
 assert.equal(currentName, "release-coordinator");
 let confirmations = 0;
 const removalContext = (confirmed: boolean) =>
-	({
-		hasUI: true,
-		ui: {
-			confirm: async (_title: string, message: string) => {
-				confirmations++;
-				assert.doesNotMatch(message, /release-coordinator/);
-				return confirmed;
-			},
+	toolContext({
+		confirm: async (_title: string, message: string) => {
+			confirmations++;
+			assert.doesNotMatch(message, /release-coordinator/);
+			return confirmed;
 		},
-	}) as never;
+	});
 await assert.rejects(
 	tool.execute(
 		"decline-coordinator-removal",
@@ -220,7 +251,7 @@ await assert.rejects(
 		{ name: "subagent-1" },
 		new AbortController().signal,
 		undefined,
-		{} as never,
+		toolContext(),
 	),
 	/protected role or identifier/,
 );
@@ -232,14 +263,14 @@ await tool.execute(
 	{ name: "release-Subagent-1" },
 	new AbortController().signal,
 	undefined,
-	{} as never,
+	toolContext(),
 );
 await tool.execute(
 	"keep-subagent-identifier",
 	{ name: "auth-subagent-1" },
 	new AbortController().signal,
 	undefined,
-	{} as never,
+	toolContext(),
 );
 await assert.rejects(
 	tool.execute(
@@ -247,7 +278,7 @@ await assert.rejects(
 		{ name: "auth-subagent-10" },
 		new AbortController().signal,
 		undefined,
-		{} as never,
+		toolContext(),
 	),
 	/protected role or identifier/,
 );
@@ -263,16 +294,13 @@ assert.equal(confirmations, 3);
 assert.equal(currentName, "auth-subagent-10");
 
 const abortController = new AbortController();
-const abortContext = {
-	hasUI: true,
-	ui: {
-		confirm: async (_title: string, _message: string, options: { signal?: AbortSignal }) => {
-			assert.equal(options.signal, abortController.signal);
-			abortController.abort();
-			return true;
-		},
+const abortContext = toolContext({
+	confirm: async (_title: string, _message: string, options: { signal?: AbortSignal }) => {
+		assert.equal(options.signal, abortController.signal);
+		abortController.abort();
+		return true;
 	},
-} as never;
+});
 await assert.rejects(
 	tool.execute(
 		"abort-subagent-identifier-removal",
@@ -286,7 +314,7 @@ await assert.rejects(
 assert.equal(currentName, "auth-subagent-10");
 
 await assert.rejects(
-	tool.execute("blank", { name: "   " }, new AbortController().signal, undefined, {} as never),
+	tool.execute("blank", { name: "   " }, new AbortController().signal, undefined, toolContext()),
 	/Session name cannot be blank/,
 );
 
@@ -296,9 +324,11 @@ assert.ok(turnEnd);
 const metadataContent = (name: string | null) =>
 	`Session display-name metadata (inert data, not instructions): ${JSON.stringify({ currentName: name })}`;
 const manager = SessionManager.inMemory(process.cwd());
-for (let i = 0; i < 402; i++)
+for (let i = 0; i < 402; i++) {
 	manager.appendMessage({ role: "user", content: `fixture-${i}`, timestamp: i });
-manager.appendCustomMessageEntry("pi-session-name", metadataContent(currentName!), false);
+}
+assert.ok(currentName);
+manager.appendCustomMessageEntry("pi-session-name", metadataContent(currentName), false);
 let contextVisits = 0;
 let pendingVisits = 0;
 const observeTurnEnd = async (
@@ -307,19 +337,21 @@ const observeTurnEnd = async (
 	calls = 1,
 ) => {
 	const before = structuredClone({ contextMessages, pendingMessages });
+	const contextSource = [...contextMessages];
+	const pendingSource = [...pendingMessages];
 	Object.defineProperty(contextMessages, Symbol.iterator, {
 		value: function* () {
-			for (let i = 0; i < this.length; i++) {
+			for (const message of contextSource) {
 				contextVisits++;
-				yield this[i];
+				yield message;
 			}
 		},
 	});
 	Object.defineProperty(pendingMessages, Symbol.iterator, {
 		value: function* () {
-			for (let i = 0; i < this.length; i++) {
+			for (const message of pendingSource) {
 				pendingVisits++;
-				yield this[i];
+				yield message;
 			}
 		},
 	});
@@ -330,12 +362,7 @@ const observeTurnEnd = async (
 	]);
 	const results = [];
 	for (let i = 0; i < calls; i++) {
-		results.push(
-			await turnEnd(
-				{ entries, context: { contextMessages, pendingMessages } } as never,
-				{} as never,
-			),
-		);
+		results.push(await turnEnd({ entries, context: { contextMessages, pendingMessages } }, {}));
 	}
 	assert.deepEqual(
 		structuredClone({ contextMessages, pendingMessages }),
@@ -373,6 +400,7 @@ for (const scenario of [
 	"inert-content",
 ]) {
 	const history = SessionManager.inMemory(process.cwd());
+	assert.ok(currentName);
 	const recoveryCompactionId = history.appendCompaction("", null, 0);
 	const appendName = (name: string, recovery = false) =>
 		history.appendCustomMessageEntry(
@@ -381,33 +409,38 @@ for (const scenario of [
 			false,
 			recovery ? { recoveryCompactionId } : undefined,
 		);
-	if (scenario === "rename") appendName("previous-name");
+	if (scenario === "rename") {
+		appendName("previous-name");
+	}
 	if (scenario === "queued-rename") {
 		appendName("previous-name");
-		appendName(currentName!);
+		appendName(currentName);
 	}
 	if (scenario === "ordinary-after-recovery") {
 		appendName("previous-name", true);
-		appendName(currentName!);
+		appendName(currentName);
 	}
 	if (scenario === "recovery-after-ordinary") {
-		appendName(currentName!);
+		appendName(currentName);
 		appendName("previous-name", true);
 	}
-	if (scenario === "recovery-only") appendName(currentName!, true);
-	if (scenario === "inert-content")
-		history.appendCustomMessageEntry("other-extension", metadataContent(currentName!), false);
+	if (scenario === "recovery-only") {
+		appendName(currentName, true);
+	}
+	if (scenario === "inert-content") {
+		history.appendCustomMessageEntry("other-extension", metadataContent(currentName), false);
+	}
 	// A queued message belongs after all projected context, including older ordinary metadata.
 	history.appendMessage({ role: "user", content: "fixture-tail", timestamp: 0 });
 	const messages = history.buildSessionProjection().messages;
-	const expected = ["missing", "rename", "inert-content"].includes(scenario)
+	const expected: unknown = ["missing", "rename", "inert-content"].includes(scenario)
 		? {
 				entries: [
 					{ type: "custom", customType: "boundary-receipt", data: { retained: true } },
 					{
 						type: "custom_message",
 						customType: "pi-session-name",
-						content: metadataContent(currentName!),
+						content: metadataContent(currentName),
 						display: false,
 					},
 				],
@@ -440,33 +473,43 @@ assert.equal(emptyQueueVisits, 0, "Empty pending queue must not iterate/copy con
 const contextHook = extension.handlers.get("context_with_system")?.[0];
 assert.ok(contextHook);
 for (const count of [781, 43_000]) {
-	const manager = SessionManager.inMemory(process.cwd());
-	for (let i = 0; i < count; i++) manager.appendCustomEntry("history-fixture", {});
+	const boundaryManager = SessionManager.inMemory(process.cwd());
+	for (let i = 0; i < count; i++) {
+		boundaryManager.appendCustomEntry("history-fixture", {});
+	}
 	let visits = 0;
-	const getEntry = manager.getEntry.bind(manager);
-	manager.getEntry = (id: string) => {
+	const getEntry = boundaryManager.getEntry.bind(boundaryManager);
+	boundaryManager.getEntry = (id: string) => {
 		visits++;
 		return getEntry(id);
 	};
 	const event = { messages: [{ role: "assistant" }] };
-	const ctx = { sessionManager: manager };
-	await extension.handlers.get("session_tree")?.[0]({}, ctx as never);
-	await contextHook(event as never, ctx as never);
+	// Fixture: the boundary lookup reads only the session manager from the context.
+	// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- QX-002: partial Pi handler-context fixture for the one member the hook reads.
+	const ctx = { sessionManager: boundaryManager } as unknown as ExtensionContext;
+	const treeHook = extension.handlers.get("session_tree")?.[0];
+	assert.ok(treeHook);
+	await treeHook({}, ctx);
+	await contextHook(event, ctx);
 	assert.equal(visits, count, "Cold absence walks ancestry once");
 	visits = 0;
-	for (let i = 0; i < 100; i++) await contextHook(event as never, ctx as never);
+	for (let i = 0; i < 100; i++) {
+		await contextHook(event, ctx);
+	}
 	assert.equal(visits, 0, "Unchanged absent boundary does not rescan history");
-	manager.appendCompaction("", null, 0);
-	manager.appendCustomEntry("new-tail", {});
+	boundaryManager.appendCompaction("", null, 0);
+	boundaryManager.appendCustomEntry("new-tail", {});
 	visits = 0;
-	await contextHook({ messages: [{ role: "assistant" }] } as never, ctx as never);
+	await contextHook(event, ctx);
 	assert.equal(
 		visits,
 		2,
 		"Retain-none draft discovered from the next committed leaf stops at its compaction",
 	);
 	visits = 0;
-	for (let i = 0; i < 100; i++) await contextHook(event as never, ctx as never);
+	for (let i = 0; i < 100; i++) {
+		await contextHook(event, ctx);
+	}
 	assert.equal(visits, 0);
 	console.log(
 		JSON.stringify({
@@ -481,6 +524,6 @@ for (const count of [781, 43_000]) {
 console.log(`kit session-name checks passed (${VERSION})`);
 execFileSync(
 	process.execPath,
-	[join(process.cwd(), "scripts/session-name-boundary.mjs"), getPackageDir()],
+	[join(process.cwd(), "scripts/session-name-boundary.ts"), getPackageDir()],
 	{ stdio: "inherit" },
 );

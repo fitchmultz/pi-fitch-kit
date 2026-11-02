@@ -68,7 +68,7 @@
 
 - Run `npm run check` after edits to `package.json`, `setup-manifest.json`, `extensions/`, `scripts/`, or registered prompts; add `npm run smoke` when package resources changed.
 - Run `npm run regression:fast-mode` after changing fast-mode toggles, eligibility, payload or header injection, or state handling.
-- Run `node --test scripts/validate-regression.mjs` after changing context-policy validation or its inputs.
+- Run `node --test scripts/validate-regression.ts` after changing context-policy validation or its inputs.
 - Run `npm run regression:session-name` after changing naming guidance, metadata injection, protected identities, or its migration gate.
 - Run `npm run regression:paged-reader` after changing reader pagination, drafts, feedback delivery, reply linkage, or native controls.
 - Run `npm run regression:write-prompt` after changing writer commands, config parsing, history, cancellation, or accept/copy/tweak/deny behavior.

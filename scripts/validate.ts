@@ -2,23 +2,49 @@
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	isRecord,
+	jsonField,
+	jsonList,
+	jsonNumber,
+	jsonString,
+	jsonStrings,
+	requireRecord,
+} from "./test-harness.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const manifest = JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf-8"));
-const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
-const packageLock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf-8"));
-const settingsExample = JSON.parse(readFileSync(join(root, "examples", "settings.json"), "utf-8"));
+/** A parsed JSON document, kept unknown until a check establishes its shape. */
+const jsonDocument = (path: string): unknown => JSON.parse(readFileSync(join(root, path), "utf-8"));
+const manifest: Record<string, unknown> = requireRecord(
+	jsonDocument("setup-manifest.json"),
+	"setup-manifest.json",
+);
+const packageJson: Record<string, unknown> = requireRecord(
+	jsonDocument("package.json"),
+	"package.json",
+);
+const packageLock: Record<string, unknown> = requireRecord(
+	jsonDocument("package-lock.json"),
+	"package-lock.json",
+);
+const settingsExample: Record<string, unknown> = requireRecord(
+	jsonDocument(join("examples", "settings.json")),
+	"examples/settings.json",
+);
 
-const assert = (condition, message) => {
-	if (!condition) throw new Error(message);
+const assert: (condition: boolean, message: string) => asserts condition = (condition, message) => {
+	if (!condition) {
+		throw new Error(message);
+	}
 };
 
 assert(
 	manifest.schemaVersion === 8,
 	"setup manifest schema must match the ordered required-alternatives shape",
 );
+const requiredModelsRaw = jsonList(manifest.requiredModels, "manifest requiredModels");
 assert(
-	manifest.requiredModels.every(
+	requiredModelsRaw.every(
 		(routes) =>
 			Array.isArray(routes) &&
 			routes.length > 0 &&
@@ -26,46 +52,63 @@ assert(
 	),
 	"each requiredModels entry must be a non-empty ordered list of provider/model routes",
 );
-const manifestModelRoutes = new Set([
-	...manifest.requiredModels.flat(),
-	...manifest.optionalModels,
+const requiredModels: string[][] = requiredModelsRaw.map((routes, index) =>
+	jsonStrings(routes, `requiredModels[${index}]`),
+);
+const manifestModelRoutes = new Set<string>([
+	...requiredModels.flat(),
+	...jsonStrings(manifest.optionalModels, "optionalModels"),
 ]);
-const compaction = settingsExample.compaction;
+const compaction: Record<string, unknown> = isRecord(settingsExample.compaction)
+	? settingsExample.compaction
+	: {};
 for (const key of ["reserveTokens", "keepRecentTokens"]) {
+	const value = compaction[key];
 	assert(
-		Number.isSafeInteger(compaction?.[key]) && compaction[key] > 0,
+		typeof value === "number" && Number.isSafeInteger(value) && value > 0,
 		`compaction.${key} must be a positive safe integer`,
 	);
 }
-assert(
-	manifest.modelContextWindows && Object.keys(manifest.modelContextWindows).length > 0,
-	"manifest must carry modelContextWindows",
+const reserveTokens = jsonNumber(compaction["reserveTokens"], "compaction.reserveTokens");
+const keepRecentTokens = jsonNumber(compaction["keepRecentTokens"], "compaction.keepRecentTokens");
+const modelContextWindows = jsonField(
+	manifest,
+	"modelContextWindows",
+	"manifest modelContextWindows",
 );
-for (const [route, value] of Object.entries(manifest.modelContextWindows)) {
+assert(Object.keys(modelContextWindows).length > 0, "manifest must carry modelContextWindows");
+for (const [route, value] of Object.entries(modelContextWindows)) {
 	assert(
 		manifestModelRoutes.has(route),
 		`modelContextWindows route ${route} must be a manifest-managed model route`,
 	);
 	assert(
-		Number.isSafeInteger(value) && value > compaction.reserveTokens + compaction.keepRecentTokens,
+		typeof value === "number" &&
+			Number.isSafeInteger(value) &&
+			value > reserveTokens + keepRecentTokens,
 		`modelContextWindows value for ${route} must be a safe integer exceeding the compaction reserve plus recent tokens`,
 	);
 }
-const piFloor = /^>=(\d+\.\d+\.\d+)$/.exec(manifest.runtime.pi)?.[1];
+const runtime = jsonField(manifest, "runtime", "manifest runtime");
+const piFloor = /^>=(\d+\.\d+\.\d+)$/.exec(jsonString(runtime.pi, "runtime.pi"))?.[1];
 assert(piFloor === "1.4.0", "the kit requires Pi 1.4.0 or newer");
+const engines = jsonField(packageJson, "engines", "package engines");
+assert(engines.node === runtime.node, "package and manifest Node floors must match");
 assert(
-	packageJson.engines.node === manifest.runtime.node,
-	"package and manifest Node floors must match",
+	typeof packageJson.version === "string" && /^\d+\.\d+\.\d+$/.test(packageJson.version),
+	"package version must be a release version",
 );
-assert(/^\d+\.\d+\.\d+$/.test(packageJson.version), "package version must be a release version");
+const lockPackages = jsonField(packageLock, "packages", "lockfile packages");
+const lockRoot = requireRecord(lockPackages[""], "lockfile root package");
 assert(
-	packageLock.version === packageJson.version &&
-		packageLock.packages[""].version === packageJson.version,
+	packageLock.version === packageJson.version && lockRoot.version === packageJson.version,
 	"lockfile version must match package.json",
 );
-const resolvedOrigins = Object.values(packageLock.packages)
-	.map((entry) => entry.resolved)
-	.filter(Boolean)
+const resolvedOrigins = Object.values(lockPackages)
+	.flatMap((entry) => {
+		const resolved = requireRecord(entry, "lockfile entry").resolved;
+		return typeof resolved === "string" ? [resolved] : [];
+	})
 	.map((resolved) => new URL(resolved).origin);
 assert(resolvedOrigins.length > 0, "the lockfile must contain resolved package origins");
 assert(
@@ -77,7 +120,9 @@ assert(
 	"Pi core patch artifacts are retired; the kit must stay patch-free",
 );
 assert(
-	!Object.keys(packageJson.scripts).some((script) => script.includes("pi-core")),
+	!Object.keys(jsonField(packageJson, "scripts", "package scripts")).some((script) =>
+		script.includes("pi-core"),
+	),
 	"guarded Pi core scripts are retired with the patch stack",
 );
 for (const dependency of [
@@ -85,44 +130,51 @@ for (const dependency of [
 	"@earendil-works/pi-coding-agent",
 	"@earendil-works/pi-tui",
 ]) {
+	const devDependencies = jsonField(packageJson, "devDependencies", "package devDependencies");
+	const devVersion = devDependencies[dependency];
 	assert(
-		/^\d+\.\d+\.\d+$/.test(packageJson.devDependencies[dependency]),
+		typeof devVersion === "string" && /^\d+\.\d+\.\d+$/.test(devVersion),
 		`${dependency} must pin an exact Pi development baseline`,
 	);
 	assert(
-		packageJson.devDependencies[dependency] ===
-			packageJson.devDependencies["@earendil-works/pi-coding-agent"],
+		devVersion === devDependencies["@earendil-works/pi-coding-agent"],
 		`${dependency} must use the coherent Pi development cohort`,
 	);
-	assert(
-		packageJson.peerDependencies[dependency] === "*",
-		`${dependency} must remain an unversioned Pi peer`,
+	const peerDependencies = jsonField(packageJson, "peerDependencies", "package peerDependencies");
+	assert(peerDependencies[dependency] === "*", `${dependency} must remain an unversioned Pi peer`);
+	const peerDependenciesMeta = jsonField(
+		packageJson,
+		"peerDependenciesMeta",
+		"package peerDependenciesMeta",
 	);
 	assert(
-		packageJson.peerDependenciesMeta[dependency]?.optional === true,
+		isRecord(peerDependenciesMeta[dependency]) &&
+			peerDependenciesMeta[dependency].optional === true,
 		`${dependency} must remain an optional Pi peer`,
 	);
 }
+const piField = jsonField(packageJson, "pi", "package pi field");
+const kitResources = jsonField(manifest, "kitResources", "manifest kitResources");
+const kitExtensions = jsonStrings(kitResources.extensions, "kitResources.extensions");
+const kitPrompts = jsonStrings(kitResources.prompts, "kitResources.prompts");
+const kitThemes = jsonStrings(kitResources.themes, "kitResources.themes");
 assert(
-	JSON.stringify(packageJson.pi.extensions) ===
-		JSON.stringify(manifest.kitResources.extensions.map((path) => `./${path}`)),
+	JSON.stringify(piField.extensions) === JSON.stringify(kitExtensions.map((path) => `./${path}`)),
 	"package.json pi.extensions must match manifest kitResources.extensions",
 );
 assert(
-	JSON.stringify(packageJson.pi.prompts) ===
-		JSON.stringify(manifest.kitResources.prompts.map((path) => `./${path}`)),
+	JSON.stringify(piField.prompts) === JSON.stringify(kitPrompts.map((path) => `./${path}`)),
 	"package.json pi.prompts must match manifest kitResources.prompts",
 );
 assert(
-	JSON.stringify(packageJson.pi.themes) ===
-		JSON.stringify(manifest.kitResources.themes.map((path) => `./${path}`)),
+	JSON.stringify(piField.themes) === JSON.stringify(kitThemes.map((path) => `./${path}`)),
 	"package.json pi.themes must match manifest kitResources.themes",
 );
 for (const resource of [
-	...manifest.kitResources.extensions,
-	...manifest.kitResources.prompts,
-	manifest.kitResources.workingAgreementTemplate,
-	manifest.kitResources.settingsExample,
+	...kitExtensions,
+	...kitPrompts,
+	jsonString(kitResources.workingAgreementTemplate, "kitResources.workingAgreementTemplate"),
+	jsonString(kitResources.settingsExample, "kitResources.settingsExample"),
 ]) {
 	assert(lstatSync(join(root, resource)).isFile(), `manifest resource missing: ${resource}`);
 }
@@ -137,7 +189,7 @@ assert(
 	"codex-context is retired; fast-mode owns the fast toggles",
 );
 assert(
-	JSON.stringify(manifest.kitResources.extensions) ===
+	JSON.stringify(kitExtensions) ===
 		JSON.stringify([
 			"extensions/anthropic-image-guard.ts",
 			"extensions/clean-footer.ts",
@@ -154,75 +206,79 @@ assert(
 	"the fork's native /restart replaces the retired kit helper",
 );
 
-for (const pkg of manifest.corePackages) {
+const corePackages = jsonList(manifest.corePackages, "corePackages").map((pkg, index) =>
+	requireRecord(pkg, `corePackages[${index}]`),
+);
+const retiredPackageSources = jsonStrings(manifest.retiredPackageSources, "retiredPackageSources");
+for (const pkg of corePackages) {
+	const id = jsonString(pkg.id, "core package id");
+	const source = pkg.source;
 	assert(
-		/^npm:(?:@[\w.-]+\/)?[\w.-]+$/.test(pkg.source) ||
-			/^git:github\.com\/[\w-]+\/[\w-]+$/.test(pkg.source),
-		`corePackages ${pkg.id} must use an unpinned npm or Git source: ${pkg.source}`,
+		typeof source === "string" &&
+			(/^npm:(?:@[\w.-]+\/)?[\w.-]+$/.test(source) ||
+				/^git:github\.com\/[\w-]+\/[\w-]+$/.test(source)),
+		`corePackages ${id} must use an unpinned npm or Git source: ${typeof source === "string" ? source : JSON.stringify(source)}`,
 	);
-	assert(
-		!manifest.retiredPackageSources.includes(pkg.source),
-		`corePackages ${pkg.id} cannot also be retired`,
-	);
+	assert(!retiredPackageSources.includes(source), `corePackages ${id} cannot also be retired`);
 }
-const subagents = manifest.corePackages.find(({ id }) => id === "subagents");
+const subagents = corePackages.find((pkg) => pkg.id === "subagents");
 assert(
 	subagents?.source === "npm:@fitchmultz/pi-subagents",
 	"subagents must use the consolidated owned scoped npm source",
 );
 assert(
-	!manifest.corePackages.some(({ id }) => id === "intercom"),
+	!corePackages.some((pkg) => pkg.id === "intercom"),
 	"standalone intercom is retired into pi-subagents",
 );
 assert(
-	manifest.optionalIntegrations.includes("GitHub"),
+	jsonStrings(manifest.optionalIntegrations, "optionalIntegrations").includes("GitHub"),
 	"active GitHub MCP integration must be selectable",
 );
 
-const mcp = manifest.corePackages.find(({ id }) => id === "mcp");
+const mcp = corePackages.find((pkg) => pkg.id === "mcp");
 assert(
 	mcp?.source === "git:github.com/fitchmultz/pi-mcp-adapter",
 	"MCP adapter must use its public source",
 );
 
-const agentSkills = manifest.corePackages.find(({ id }) => id === "agent-skills");
+const agentSkills = corePackages.find((pkg) => pkg.id === "agent-skills");
 assert(
 	agentSkills?.source === "git:github.com/fitchmultz/pi-agent-skills",
 	"agent-skills must use its public source",
 );
 
-const pstack = manifest.corePackages.find(({ id }) => id === "pstack");
+const pstack = corePackages.find((pkg) => pkg.id === "pstack");
 assert(
 	pstack?.source === "git:github.com/fitchmultz/pi-pstack",
 	"pstack must use its public source",
 );
 
-const ctxInfo = manifest.corePackages.find(({ id }) => id === "ctx-info");
+const ctxInfo = corePackages.find((pkg) => pkg.id === "ctx-info");
 assert(
 	ctxInfo?.source === "git:github.com/fitchmultz/pi-ctx-info",
 	"ctx-info must follow its public source",
 );
 
 assert(
-	!manifest.corePackages.some(({ id }) => id === "codex-context"),
+	!corePackages.some((pkg) => pkg.id === "codex-context"),
 	"codex-context is retired, not a core package",
 );
 assert(
-	!manifest.corePackages.some(({ id }) => id === "session-name"),
+	!corePackages.some((pkg) => pkg.id === "session-name"),
 	"session-name now belongs to the kit",
 );
-const askQuestion = manifest.corePackages.find(({ id }) => id === "ask-question");
+const askQuestion = corePackages.find((pkg) => pkg.id === "ask-question");
 assert(
 	askQuestion?.source === "npm:@fitchmultz/pi-ask-question",
 	"ask-question must use the owned scoped npm source for the structured question tool",
 );
-const ponytail = manifest.corePackages.find(({ id }) => id === "ponytail");
+const ponytail = corePackages.find((pkg) => pkg.id === "ponytail");
 assert(
 	ponytail?.source === "git:github.com/fitchmultz/ponytail",
 	"ponytail must use its public source",
 );
 assert(
-	!manifest.corePackages.some(({ id }) => id === "fff"),
+	!corePackages.some((pkg) => pkg.id === "fff"),
 	"fff is retired in favor of native repository search",
 );
 for (const source of [
@@ -233,12 +289,15 @@ for (const source of [
 	"git:github.com/DietrichGebert/ponytail",
 ]) {
 	assert(
-		manifest.retiredPackageSources.includes(source),
+		retiredPackageSources.includes(source),
 		`upgrades must remove the retired standalone package: ${source}`,
 	);
 }
+const retiredExtensionLinks = jsonList(manifest.retiredExtensionLinks, "retiredExtensionLinks").map(
+	(link, index) => requireRecord(link, `retiredExtensionLinks[${index}]`),
+);
 assert(
-	JSON.stringify(manifest.retiredExtensionLinks) ===
+	JSON.stringify(retiredExtensionLinks) ===
 		JSON.stringify([
 			{
 				path: "extensions/fold-responsive-footer.ts",
@@ -251,13 +310,14 @@ assert(
 		]),
 	"upgrades must retire the approved Fold footer and standalone fast-mode links",
 );
-assert(
-	Array.isArray(manifest.consentBehaviors),
-	"consentBehaviors must stay a declared list, even when empty",
-);
-for (const behavior of manifest.consentBehaviors) {
-	assert(behavior?.consent?.required === true, "consent behaviors must require explicit consent");
-	assert(behavior?.consent?.default === "disabled", "consent behaviors must default off");
+const consentBehaviors = jsonList(manifest.consentBehaviors, "consentBehaviors");
+for (const behavior of consentBehaviors) {
+	const consent = requireRecord(
+		requireRecord(behavior, "consent behavior").consent,
+		"consent behavior consent",
+	);
+	assert(consent.required === true, "consent behaviors must require explicit consent");
+	assert(consent.default === "disabled", "consent behaviors must default off");
 }
 assert(
 	manifest.piCorePatch === undefined,
@@ -265,33 +325,35 @@ assert(
 );
 
 assert(
-	manifest.kit.packageName === "@fitch/pi-kit",
+	jsonField(manifest, "kit", "manifest kit").packageName === "@fitch/pi-kit",
 	"setup must identify duplicate kit package entries",
 );
 
-const verbosity = manifest.corePackages.find(({ id }) => id === "verbosity");
+const verbosity = corePackages.find((pkg) => pkg.id === "verbosity");
 assert(
 	verbosity?.source === "npm:@fitchmultz/pi-verbosity-control",
 	"verbosity must use the owned scoped npm native-status controller",
 );
 
-const calculator = manifest.corePackages.find(({ id }) => id === "calculator");
+const calculator = corePackages.find((pkg) => pkg.id === "calculator");
 assert(
 	calculator?.source === "npm:@fitchmultz/pi-calculator",
 	"calculator must use the owned scoped npm source",
 );
 
-const editSession = manifest.corePackages.find(({ id }) => id === "edit-session");
+const editSession = corePackages.find((pkg) => pkg.id === "edit-session");
 assert(
 	editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place",
 	"edit-session must follow its public Git source",
 );
 
-const browser = manifest.corePackages.find(
-	({ id }) => id === "agent-browser",
-)?.externalPrerequisite;
+const browser = requireRecord(
+	corePackages.find((pkg) => pkg.id === "agent-browser")?.externalPrerequisite,
+	"agent-browser externalPrerequisite",
+);
+const browserMinimumVersion = browser.minimumVersion;
 assert(
-	/^\d+\.\d+\.\d+$/.test(browser?.minimumVersion),
+	typeof browserMinimumVersion === "string" && /^\d+\.\d+\.\d+$/.test(browserMinimumVersion),
 	"Agent Browser prerequisite must declare its minimum version",
 );
 assert(
@@ -299,13 +361,17 @@ assert(
 	"Agent Browser install must use the canonical package name without a version",
 );
 
-const setupPromptPath = manifest.kitResources.prompts.find((path) =>
-	path.endsWith("/fitch-setup.md"),
-);
-assert(setupPromptPath, "manifest must include prompts/fitch-setup.md");
+const setupPromptPath = kitPrompts.find((path) => path.endsWith("/fitch-setup.md"));
+assert(setupPromptPath !== undefined, "manifest must include prompts/fitch-setup.md");
 const setupPrompt = readFileSync(join(root, setupPromptPath), "utf-8");
 // Content contracts only; native resource smokes separately verify delivery, not model obedience.
-const agreement = readFileSync(join(root, manifest.kitResources.workingAgreementTemplate), "utf-8");
+const agreement = readFileSync(
+	join(
+		root,
+		jsonString(kitResources.workingAgreementTemplate, "kitResources.workingAgreementTemplate"),
+	),
+	"utf-8",
+);
 const processBlock =
 	agreement.match(
 		/<!-- fitch-pi-kit:process:start -->([\s\S]*?)<!-- fitch-pi-kit:process:end -->/,
@@ -377,18 +443,19 @@ assert(
 	setupPrompt.includes("long-context tier"),
 	"setup prompt must disclose the OpenAI pricing consequence",
 );
-const defaultRoute = `${settingsExample.defaultProvider}/${settingsExample.defaultModel}`;
+const defaultRoute = `${jsonString(settingsExample.defaultProvider, "settings defaultProvider")}/${jsonString(
+	settingsExample.defaultModel,
+	"settings defaultModel",
+)}`;
 assert(
-	manifest.requiredModels.some(([preferred]) => preferred === defaultRoute),
+	requiredModels.some(([preferred]) => preferred === defaultRoute),
 	"settings default model must be the preferred route of a required entry",
 );
-assert(
-	settingsExample.enabledModels.includes(defaultRoute),
-	"settings default model must be enabled",
-);
+const enabledModels = jsonStrings(settingsExample.enabledModels, "settings enabledModels");
+assert(enabledModels.includes(defaultRoute), "settings default model must be enabled");
 assert(
 	["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(
-		settingsExample.defaultThinkingLevel,
+		jsonString(settingsExample.defaultThinkingLevel, "settings defaultThinkingLevel"),
 	),
 	"settings thinking level must be valid",
 );
@@ -401,22 +468,25 @@ assert(
 	"setup must explain how to restore the normal view",
 );
 assert(
-	new Set(settingsExample.enabledModels).size === settingsExample.enabledModels.length,
+	new Set(enabledModels).size === enabledModels.length,
 	"settings enabledModels must be unique",
 );
-for (const route of settingsExample.enabledModels) {
+for (const route of enabledModels) {
 	assert(
 		manifestModelRoutes.has(route),
 		`settings enabled model ${route} must be a manifest-managed route`,
 	);
 }
+const retry = requireRecord(settingsExample.retry, "settings retry");
+const maxRetries = retry.maxRetries;
 assert(
-	Number.isSafeInteger(settingsExample.retry?.maxRetries) && settingsExample.retry.maxRetries > 0,
+	typeof maxRetries === "number" && Number.isSafeInteger(maxRetries) && maxRetries > 0,
 	"settings example must carry a retry budget",
 );
+const retryProvider = requireRecord(retry.provider, "settings retry provider");
+const timeoutMs = retryProvider.timeoutMs;
 assert(
-	Number.isSafeInteger(settingsExample.retry?.provider?.timeoutMs) &&
-		settingsExample.retry.provider.timeoutMs > 0,
+	typeof timeoutMs === "number" && Number.isSafeInteger(timeoutMs) && timeoutMs > 0,
 	"settings example must carry a provider timeout",
 );
 

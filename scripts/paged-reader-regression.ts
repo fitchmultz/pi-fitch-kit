@@ -14,6 +14,7 @@ import {
 	ModelRuntime,
 	SessionManager,
 	SettingsManager,
+	type ExtensionUIContext,
 } from "@earendil-works/pi-coding-agent";
 import * as tuiApi from "@earendil-works/pi-tui";
 import {
@@ -24,74 +25,165 @@ import {
 	TuiAltScreen,
 	TuiMainScreen,
 	visibleWidth,
+	type OverlayHandle,
+	type ProgramStatus,
+	type Terminal as TerminalInterface,
 } from "@earendil-works/pi-tui";
+import {
+	commandFor,
+	drivenCommands,
+	drivenHandlers,
+	gate,
+	isRecord,
+	requireRecord,
+	soleExtension,
+	toolContextFrom,
+	toolFor,
+} from "./test-harness.ts";
 import { paginateDocument, restoreReaderState } from "../extensions/paged-reader.ts";
 
 const root = mkdtempSync(join(tmpdir(), "pi-reader-regression-"));
 process.on("exit", () => rmSync(root, { recursive: true, force: true }));
 initTheme("dark");
 const nativeMouse = typeof tuiApi.MouseRegion === "function";
-const hostTui = await import(
+/** The host-selected pi-tui surface this regression drives. */
+type HostTui = Pick<
+	typeof tuiApi,
+	"getCapabilities" | "setCapabilities" | "Container" | "Image" | "TuiAltScreen"
+>;
+const isHostTui = (module: unknown): module is HostTui =>
+	typeof module === "object" &&
+	module !== null &&
+	"getCapabilities" in module &&
+	"setCapabilities" in module &&
+	"Container" in module &&
+	"Image" in module &&
+	"TuiAltScreen" in module;
+const hostTuiModule: unknown = await import(
 	pathToFileURL(
 		createRequire(import.meta.resolve("@earendil-works/pi-coding-agent")).resolve(
 			"@earendil-works/pi-tui",
 		),
 	).href
 );
+if (!isHostTui(hostTuiModule)) {
+	throw new Error("host pi-tui did not expose the expected surface");
+}
+const hostTui = hostTuiModule;
 
-class Terminal {
+class Terminal implements TerminalInterface {
 	columns = 100;
 	rows = 28;
 	kittyProtocolActive = false;
-	inputHandler;
-	writes = [];
-	start(onInput) {
+	inputHandler: ((data: string) => void) | undefined;
+	writes: string[] = [];
+	start(onInput: (data: string) => void, _onResize: () => void) {
 		this.inputHandler = onInput;
 	}
 	stop() {
 		this.inputHandler = undefined;
 	}
-	write(data) {
+	restoreOnExit(_before: string, _after: string) {
+		return;
+	}
+	async drainInput(_maxMs?: number, _idleMs?: number) {
+		return;
+	}
+	write(data: string) {
 		this.writes.push(data);
 	}
-	hideCursor() {}
-	showCursor() {}
-	clearLine() {}
-	clearFromCursor() {}
-	clearScreen() {}
-	moveBy() {}
-	setTitle() {}
-	setProgress() {}
-	input(data) {
-		assert.ok(this.inputHandler, "native TUI input route is active");
+	hideCursor() {
+		return;
+	}
+	showCursor() {
+		return;
+	}
+	clearLine() {
+		return;
+	}
+	clearFromCursor() {
+		return;
+	}
+	clearScreen() {
+		return;
+	}
+	moveBy(_lines: number) {
+		return;
+	}
+	setTitle(_title: string) {
+		return;
+	}
+	setProgress(_active: boolean) {
+		return;
+	}
+	setProgramStatus(_status: ProgramStatus) {
+		return;
+	}
+	input(data: string) {
+		assert.ok(this.inputHandler !== undefined, "native TUI input route is active");
 		this.inputHandler(data);
 	}
-	mouseClick(x, y) {
+	mouseClick(x: number, y: number) {
 		this.input(`\x1b[<0;${x + 1};${y + 1}M`);
 		this.input(`\x1b[<0;${x + 1};${y + 1}m`);
 	}
 }
 const terminal = new Terminal();
-let tui = new TuiAltScreen(terminal);
+let tui: TuiAltScreen | TuiMainScreen = new TuiAltScreen(terminal);
 tui.start();
 const theme = {
-	fg: (_color, text) => text,
-	bg: (_color, text) => text,
-	bold: (text) => text,
+	fg: (_color: string, text: string) => text,
+	bg: (_color: string, text: string) => text,
+	bold: (text: string) => text,
 };
-let overlay;
-let handle;
+
+/** A reader overlay component as this regression drives it. */
+type ReaderComponent = {
+	render: (width: number) => string[];
+	handleInput?: (data: string) => void;
+	invalidate: () => void;
+	dispose?: () => void;
+	focused?: boolean;
+	close?: (interactive: boolean) => void;
+};
+
+/** The widget factory the reader hands to ui.custom, typed at the fixture boundary. */
+type ReaderFactory = (
+	tui: unknown,
+	theme: unknown,
+	keybindings: unknown,
+	onDone: () => void,
+) => ReaderComponent;
+
+/** The custom-dialog options the reader passes along. */
+type ReaderCustomOptions = {
+	overlayOptions?: Parameters<TuiAltScreen["showOverlay"]>[1];
+	onHandle?: (handle: OverlayHandle) => void;
+};
+
+let overlay: ReaderComponent | undefined;
+/** The latest overlay a custom callback created, if any, read across a call boundary. */
+const latestOverlay = (): ReaderComponent | undefined => overlay;
+let handle: OverlayHandle | undefined;
 const ui = {
-	notify() {},
-	custom(factory, options) {
-		let finish;
-		const promise = new Promise((resolve) => {
-			finish = resolve;
+	notify() {
+		return;
+	},
+	custom(factory: ReaderFactory, options: ReaderCustomOptions) {
+		let finish: () => void = () => {
+			throw new Error("custom dialog finished before construction");
+		};
+		const promise = new Promise<void>((resolve) => {
+			finish = () => {
+				resolve();
+			};
 		});
 		const component = factory(tui, theme, getKeybindings(), () => {
 			handle?.hide();
 			component.dispose?.();
-			if (overlay === component) overlay = undefined;
+			if (overlay === component) {
+				overlay = undefined;
+			}
 			finish();
 		});
 		handle = tui.showOverlay(component, options.overlayOptions);
@@ -104,9 +196,12 @@ const ui = {
 const session = SessionManager.create(root, join(root, "sessions"));
 session.appendMessage(fauxAssistantMessage("Reader test baseline"));
 const sessionFile = session.getSessionFile();
-assert.ok(sessionFile, "file-backed session must exist before reader publication on official Pi");
+assert.ok(
+	sessionFile !== undefined && sessionFile !== "",
+	"file-backed session must exist before reader publication on official Pi",
+);
 let currentSession = session;
-let mockIdle = true;
+const mockIdle = true;
 const ctx = () => ({
 	mode: "tui",
 	hasUI: true,
@@ -114,7 +209,7 @@ const ctx = () => ({
 	sessionManager: currentSession,
 	isIdle: () => mockIdle,
 });
-const sent = [];
+const sent: Array<{ message: unknown; options: unknown }> = [];
 const loaded = await discoverAndLoadExtensions(
 	[fileURLToPath(new URL("../extensions/paged-reader.ts", import.meta.url))],
 	root,
@@ -122,27 +217,39 @@ const loaded = await discoverAndLoadExtensions(
 );
 assert.deepEqual(loaded.errors, []);
 assert.equal(loaded.extensions.length, 1);
-const extension = loaded.extensions[0];
-const tool = [...extension.tools.values()].find(
-	({ definition }) => definition.name === "reader_present",
-)?.definition;
-const command = extension.commands.get("reader");
-assert.ok(tool && command);
-loaded.runtime.appendEntry = (kind, data) => currentSession.appendCustomEntry(kind, data);
-loaded.runtime.sendMessage = (message, options) => sent.push({ message, options });
-const event = async (name, data = {}) => {
-	for (const handler of extension.handlers.get(name) ?? []) await handler(data, ctx());
+const extension = soleExtension(loaded);
+const readerTool = toolFor(extension, "reader_present");
+const readerCommand = commandFor(drivenCommands(extension), "reader");
+const handlers = drivenHandlers(extension);
+type AppendEntrySignature = typeof loaded.runtime.appendEntry;
+type SendMessageSignature = typeof loaded.runtime.sendMessage;
+loaded.runtime.appendEntry = (
+	kind: Parameters<AppendEntrySignature>[0],
+	data: Parameters<AppendEntrySignature>[1],
+) => currentSession.appendCustomEntry(kind, data);
+loaded.runtime.sendMessage = (
+	message: Parameters<SendMessageSignature>[0],
+	options: Parameters<SendMessageSignature>[1],
+) => {
+	sent.push({ message, options });
 };
-const execute = (args) => tool.execute("reader-test", args, undefined, undefined, ctx());
+const event = async (name: string, data: Record<string, unknown> = {}) => {
+	for (const handler of handlers[name] ?? []) {
+		await handler(data, ctx());
+	}
+};
+const execute = (args: unknown) =>
+	readerTool.execute("reader-test", args, undefined, undefined, toolContextFrom(ctx()));
 const lines = () => {
-	assert.ok(overlay, "reader overlay is mounted");
-	return overlay.render(terminal.columns).map(stripTerminalSequences);
+	const current = latestOverlay();
+	assert.ok(current !== undefined, "reader overlay is mounted");
+	return current.render(terminal.columns).map(stripTerminalSequences);
 };
-const press = (input) => {
+const press = (input: string) => {
 	terminal.input(input);
 	tui.renderNow();
 };
-const clickText = (text) => {
+const clickText = (text: string) => {
 	const screen = lines();
 	const y = screen.findIndex((line) => line.includes(text));
 	assert.ok(y >= 0, `visible action ${text} must be rendered`);
@@ -150,8 +257,9 @@ const clickText = (text) => {
 		if (text === "Revised explanation" || text === "Immutable explanation") {
 			const selected = screen.findIndex((line) => line.includes("› "));
 			assert.ok(selected >= 0, "library selection must be visible");
-			for (let row = selected; row !== y; row += Math.sign(y - selected))
+			for (let row = selected; row !== y; row += Math.sign(y - selected)) {
 				press(y > selected ? "\x1b[B" : "\x1b[A");
+			}
 			press("\r");
 			return;
 		}
@@ -170,25 +278,76 @@ const clickText = (text) => {
 			"T Retry": ["t"],
 		}[text];
 		assert.ok(keys, `keyboard fallback for ${text}`);
-		for (const key of keys) press(key);
+		for (const key of keys) {
+			press(key);
+		}
 		return;
 	}
-	const x = screen[y].indexOf(text) + Math.floor(text.length / 2);
+	const target = screen.at(y);
+	assert.ok(target !== undefined, `visible action ${text} must be on a rendered line`);
+	const x = target.indexOf(text) + Math.floor(text.length / 2);
 	terminal.mouseClick(x, y);
 	tui.renderNow();
 };
 const state = () => restoreReaderState(currentSession.getBranch());
 const docs = () => [...state().documents.values()];
-const lastCursor = () =>
-	[...currentSession.getBranch()]
+const lastCursor = (): Record<string, unknown> | undefined => {
+	const entry = [...currentSession.getBranch()]
 		.reverse()
 		.find(
-			(entry) =>
-				entry.type === "custom" &&
-				entry.customType === "fitch-paged-reader" &&
-				entry.data?.kind === "cursor",
-		)?.data;
-const settle = () => new Promise((resolve) => setImmediate(resolve));
+			(candidate) =>
+				candidate.type === "custom" &&
+				candidate.customType === "fitch-paged-reader" &&
+				isRecord(candidate.data) &&
+				candidate.data.kind === "cursor",
+		);
+	const data = entry?.type === "custom" ? entry.data : undefined;
+	return isRecord(data) ? data : undefined;
+};
+
+/** The first text line of a reader tool result, failing loudly when absent. */
+const resultText = (result: unknown): string => {
+	const record = requireRecord(result, "reader tool result");
+	const content = record.content;
+	if (!Array.isArray(content) || content.length === 0) {
+		throw new Error("expected array content in the reader tool result");
+	}
+	const line = requireRecord(content[0], "first result content item");
+	if (typeof line.text !== "string") {
+		throw new Error("expected text content in the reader tool result");
+	}
+	return line.text;
+};
+
+/** The text content of a sent reader feedback message, failing loudly when absent. */
+const feedbackText = (message: Record<string, unknown>): string => {
+	const content = message.content;
+	if (typeof content !== "string") {
+		throw new Error("expected string content in the feedback message");
+	}
+	return content;
+};
+
+/** The last reader cursor entry, failing loudly when absent. */
+const requireCursor = (): Record<string, unknown> => {
+	const cursor = lastCursor();
+	if (cursor === undefined) {
+		throw new Error("expected a reader cursor entry");
+	}
+	return cursor;
+};
+
+/* oxlint-disable typescript/no-unsafe-type-assertion -- QX-002: TuiAltScreen keeps its rendered
+ * screen buffer private; this regression inspects it white-box to verify image masking. */
+/** The last rendered screen buffer of a TUI, read white-box for image verification. */
+const renderedScreen = (screen: TuiAltScreen): string[] =>
+	(screen as unknown as { previousScreen: string[] }).previousScreen;
+/* oxlint-enable typescript/no-unsafe-type-assertion */
+
+const settle = (): Promise<void> =>
+	new Promise<void>((resolve) => {
+		setImmediate(resolve);
+	});
 
 try {
 	await event("session_start");
@@ -245,25 +404,26 @@ try {
 		title: sample.title,
 		sections: sample.sections,
 	});
-	assert.ok(result.content[0].text.includes("stable revision 1"));
+	assert.ok(resultText(result).includes("stable revision 1"));
 	assert.ok(
-		!result.content[0].text.includes(body.slice(0, 30)),
+		!resultText(result).includes(body.slice(0, 30)),
 		"tool result must not echo explanation body",
 	);
 	assert.equal(docs().length, 1);
-	assert.equal(overlay?.focused, true, "native overlay should own keyboard focus");
-	if (nativeMouse)
+	assert.equal(latestOverlay()?.focused, true, "native overlay should own keyboard focus");
+	if (nativeMouse) {
 		assert.deepEqual(handle?.getBounds(), {
 			row: 0,
 			col: 0,
 			width: terminal.columns,
 			height: terminal.rows,
 		});
-	let screen = lines();
+	}
+	const screen = lines();
 	assert.equal(screen.length, terminal.rows);
 	assert.ok(screen.every((line) => visibleWidth(line) <= terminal.columns));
 	assert.equal(
-		screen[0].trim(),
+		screen.at(0)?.trim(),
 		"",
 		"the full-viewport overlay must blank the transcript behind the panel",
 	);
@@ -272,32 +432,39 @@ try {
 
 	if (nativeMouse) {
 		const footer = screen.findIndex((line) => line.includes("→ Next"));
-		terminal.mouseClick(screen[footer].indexOf("→ Next") - 1, footer);
+		const footerLine = screen.at(footer);
+		assert.ok(footerLine !== undefined, "pagination footer must be rendered");
+		terminal.mouseClick(footerLine.indexOf("→ Next") - 1, footer);
 		tui.renderNow();
 		assert.deepEqual(
-			lastCursor().anchor,
+			requireCursor().anchor,
 			{ sectionId: "scope", line: 0, column: 0 },
 			"separator cells cannot activate a hidden action",
 		);
 	}
 	clickText("→ Next");
-	const firstMove = lastCursor();
-	assert.ok(firstMove.anchor.line > 0 || firstMove.anchor.column > 0);
+	const firstMove = requireCursor();
+	const firstAnchor = requireRecord(firstMove.anchor, "cursor anchor");
+	assert.ok(
+		typeof firstAnchor.line === "number" && typeof firstAnchor.column === "number",
+		"cursor anchor must be numeric",
+	);
+	assert.ok(firstAnchor.line > 0 || firstAnchor.column > 0);
 	press("\x1b[D");
 	assert.deepEqual(
-		lastCursor().anchor,
+		requireCursor().anchor,
 		{ sectionId: "scope", line: 0, column: 0 },
 		"left returns to prior page",
 	);
 	press(" ");
 	assert.deepEqual(
-		lastCursor().anchor,
+		requireCursor().anchor,
 		firstMove.anchor,
 		"Space and clickable Next share navigation",
 	);
 	assert.equal(sent.length, 0);
 
-	let anchorBeforeResize = lastCursor();
+	let anchorBeforeResize = requireCursor();
 	terminal.columns = 44;
 	tui.renderNow();
 	assert.deepEqual(lastCursor(), anchorBeforeResize, "resize must not mutate saved reading anchor");
@@ -314,11 +481,11 @@ try {
 	assert.ok(lines().join("\n").includes("Esc"), "compact action row retains a visible exit");
 	clickText("→");
 	assert.notDeepEqual(
-		lastCursor().anchor,
-		anchorBeforeResize.anchor,
+		requireCursor().anchor,
+		requireRecord(anchorBeforeResize.anchor, "saved anchor"),
 		"compact clickable Next navigates rather than clipping a hidden action",
 	);
-	anchorBeforeResize = lastCursor();
+	anchorBeforeResize = requireCursor();
 	terminal.columns = 100;
 	terminal.rows = 28;
 	tui.renderNow();
@@ -354,11 +521,15 @@ try {
 	terminal.columns = 100;
 	tui.renderNow();
 	assert.ok(lines().join("\n").includes("Original section"), "note editor keeps section header");
+	const focusedOverlay = latestOverlay();
+	assert.ok(focusedOverlay !== undefined, "note editor overlay must be mounted");
 	assert.ok(
-		overlay.render(terminal.columns).some((line) => line.includes(CURSOR_MARKER)),
+		focusedOverlay.render(terminal.columns).some((line) => line.includes(CURSOR_MARKER)),
 		"native Editor cursor marker reaches the focused overlay for IME",
 	);
-	for (const letter of "Please clarify the implication.") press(letter);
+	for (const letter of "Please clarify the implication.") {
+		press(letter);
+	}
 	assert.equal(sent.length, 0, "typing a note does not enter model context");
 	assert.equal(state().drafts.get("stable@1/scope"), "Please clarify the implication.");
 	assert.ok(
@@ -373,7 +544,7 @@ try {
 		"height-8 editor retains a visible content row",
 	);
 	assert.ok(
-		overlay.render(terminal.columns).some((line) => line.includes(CURSOR_MARKER)),
+		focusedOverlay.render(terminal.columns).some((line) => line.includes(CURSOR_MARKER)),
 		"height-8 editor retains the IME cursor",
 	);
 	terminal.rows = 28;
@@ -390,14 +561,19 @@ try {
 	assert.ok(lines().join("\n").includes("Please clarify the implication."));
 	press("\x1b[13;5u"); // Ctrl+Enter explicitly requests a main-agent response.
 	assert.equal(sent.length, 1);
-	const request = sent[0];
-	assert.deepEqual(request.options, { triggerTurn: true });
-	const feedbackId = request.message.details.feedbackId;
-	assert.ok(request.message.content.includes(`Reader feedback ID: ${feedbackId}`));
-	assert.ok(request.message.content.includes("stable · immutable revision: 1"));
-	assert.ok(request.message.content.includes("Section ID: scope · heading: Original section"));
+	const request = sent.at(0);
+	assert.ok(request !== undefined, "feedback send must be recorded");
+	const feedbackMessage = requireRecord(request.message, "feedback message");
+	assert.deepEqual(requireRecord(request.options, "feedback options"), { triggerTurn: true });
+	const feedbackId = requireRecord(feedbackMessage.details, "feedback details").feedbackId;
+	assert.ok(typeof feedbackId === "string", "feedback id must be a string");
+	assert.ok(feedbackText(feedbackMessage).includes(`Reader feedback ID: ${feedbackId}`));
+	assert.ok(feedbackText(feedbackMessage).includes("stable · immutable revision: 1"));
 	assert.ok(
-		request.message.content.includes(
+		feedbackText(feedbackMessage).includes("Section ID: scope · heading: Original section"),
+	);
+	assert.ok(
+		feedbackText(feedbackMessage).includes(
 			JSON.stringify({ originalSectionText: body, note: "Please clarify the implication." }),
 		),
 	);
@@ -424,7 +600,7 @@ try {
 		message: {
 			role: "custom",
 			customType: "fitch-paged-reader-feedback",
-			details: request.message.details,
+			details: feedbackMessage.details,
 		},
 	});
 	assert.ok(lines().join("\n").includes("Sent to agent"));
@@ -437,7 +613,9 @@ try {
 	});
 	assert.equal(sent.length, 1);
 	assert.equal(docs().length, 2, "ordinary final text becomes a stored reader reply");
-	assert.equal(docs()[1].replyToFeedbackId, feedbackId);
+	const replyDoc = docs().at(1);
+	assert.ok(replyDoc !== undefined, "reply document must be stored");
+	assert.equal(replyDoc.replyToFeedbackId, feedbackId);
 	assert.deepEqual(lastCursor(), anchorBeforeResize, "incoming reply cannot replace current page");
 	assert.ok(lines().join("\n").includes("Reply ready"));
 	assert.equal(
@@ -449,8 +627,8 @@ try {
 	assert.ok(lines().join("\n").includes("The implication is narrower"));
 	press("b");
 	assert.deepEqual(
-		lastCursor().anchor,
-		anchorBeforeResize.anchor,
+		requireCursor().anchor,
+		requireRecord(anchorBeforeResize.anchor, "saved anchor"),
 		"Back restores original document and cursor",
 	);
 	assert.ok(lines().join("\n").includes("Original section"));
@@ -465,7 +643,11 @@ try {
 		],
 	});
 	assert.equal(docs().length, 3);
-	assert.equal(docs()[0].sections[0].text, body, "new revision cannot overwrite the original text");
+	const originalDoc = docs().at(0);
+	assert.ok(originalDoc !== undefined, "original document must be stored");
+	const originalSection = originalDoc.sections.at(0);
+	assert.ok(originalSection !== undefined, "original section must be stored");
+	assert.equal(originalSection.text, body, "new revision cannot overwrite the original text");
 	assert.equal(
 		state().drafts.get("stable@1/scope"),
 		oldDraft,
@@ -494,16 +676,16 @@ try {
 		/Unknown reader feedback ID/,
 	);
 
-	const saved = lastCursor();
+	const saved = requireCursor();
 	press("\x1b");
 	await settle();
-	assert.equal(overlay, undefined);
+	assert.equal(latestOverlay(), undefined);
 	currentSession = SessionManager.open(sessionFile);
 	await event("session_start");
 	assert.equal(sent.length, 1, "restart must not auto-resend feedback");
-	await command.handler("", ctx());
+	await readerCommand.handler("", ctx());
 	assert.deepEqual(
-		lastCursor().anchor,
+		requireCursor().anchor,
 		saved.anchor,
 		"/reader reopens at persisted cursor after file-backed restart",
 	);
@@ -534,14 +716,16 @@ try {
 	press("\x1b");
 	await settle();
 
-	const beforeDemo = sent.length;
-	await command.handler("demo", ctx());
+	const beforeDemo: number = sent.length;
+	await readerCommand.handler("demo", ctx());
 	assert.equal(sent.length, beforeDemo, "built-in demo is entirely local");
 	assert.ok(lines().join("\n").includes("A quiet reading example"));
 	assert.ok(docs().length >= 4);
 
 	clickText("N Note");
-	for (const letter of "A second note.") press(letter);
+	for (const letter of "A second note.") {
+		press(letter);
+	}
 	clickText("CtrlS Save");
 	assert.equal(sent.length, beforeDemo, "clicking Save remains local");
 	clickText("Esc Read");
@@ -553,24 +737,36 @@ try {
 	assert.equal(sent.length, beforeDemo + 1, "repeat click cannot resubmit unchanged note");
 	press("\x1b");
 	clickText("N Note");
-	for (const letter of " More detail.") press(letter);
+	for (const letter of " More detail.") {
+		press(letter);
+	}
 	press("\x1b[13;5u");
 	assert.equal(sent.length, beforeDemo + 2, "an edited note can explicitly request a new response");
 	await event("agent_settled");
 	assert.ok(lines().join("\n").includes("No saved reply"));
 	clickText("N Note");
-	for (const letter of " UNSENT") press(letter);
+	for (const letter of " UNSENT") {
+		press(letter);
+	}
 	press("\x1b");
-	const unsentDraft = state().drafts.get(`${lastCursor().key}/${lastCursor().anchor.sectionId}`);
-	assert.ok(unsentDraft?.endsWith(" UNSENT"));
+	const unsentCursor = requireCursor();
+	const unsentKeyRaw = unsentCursor.key;
+	const unsentSectionRaw = requireRecord(unsentCursor.anchor, "cursor anchor").sectionId;
+	const unsentKey = typeof unsentKeyRaw === "string" ? unsentKeyRaw : "";
+	const unsentSectionId = typeof unsentSectionRaw === "string" ? unsentSectionRaw : "";
+	const unsentDraft = state().drafts.get(`${unsentKey}/${unsentSectionId}`);
+	assert.ok(unsentDraft !== undefined, "unsent draft must be stored");
+	assert.ok(unsentDraft.endsWith(" UNSENT"));
 	clickText("T Retry");
 	assert.equal(
 		sent.length,
 		beforeDemo + 3,
 		"an explicit Retry may request again after an unanswered turn",
 	);
+	const retryRequest = sent.at(-1);
+	assert.ok(retryRequest !== undefined, "retry request must be recorded");
 	assert.ok(
-		!sent.at(-1).message.content.includes("UNSENT"),
+		!feedbackText(requireRecord(retryRequest.message, "retry message")).includes("UNSENT"),
 		"Retry sends only the prior submitted note, never a newer local draft",
 	);
 	press("t");
@@ -579,8 +775,11 @@ try {
 		beforeDemo + 3,
 		"repeated Retry does not duplicate an outstanding request",
 	);
-	const secondFeedbackId = sent.at(-1).message.details.feedbackId;
-	const demoCursor = lastCursor();
+	const secondFeedbackId = requireRecord(
+		requireRecord(retryRequest.message, "retry message").details,
+		"retry details",
+	).feedbackId;
+	const demoCursor = requireCursor();
 	await execute({
 		title: "Answer to the example",
 		sections: [
@@ -593,7 +792,7 @@ try {
 	press("r");
 	assert.ok(lines().join("\n").includes("The local note was explicitly delivered."));
 	press("b");
-	assert.deepEqual(lastCursor().anchor, demoCursor.anchor);
+	assert.deepEqual(requireCursor().anchor, demoCursor.anchor);
 
 	press("\x1b");
 	await settle();
@@ -601,11 +800,11 @@ try {
 	tui = new TuiMainScreen(terminal);
 	tui.start();
 	assert.equal(tui.mode, "regular");
-	await command.handler("", ctx());
-	const regularStart = lastCursor();
+	await readerCommand.handler("", ctx());
+	const regularStart = requireCursor();
 	press("\x1b[C");
 	assert.notDeepEqual(
-		lastCursor().anchor,
+		requireCursor().anchor,
 		regularStart.anchor,
 		"regular-mode keyboard still advances a page",
 	);
@@ -613,15 +812,14 @@ try {
 	press("\x1b");
 	await settle();
 
-	const firstDocumentEntry = currentSession
-		.getBranch()
-		.find(
-			(entry) =>
-				entry.type === "custom" &&
-				entry.data?.kind === "document" &&
-				entry.data.document.id === "stable",
-		);
-	assert.ok(firstDocumentEntry);
+	const firstDocumentEntry = currentSession.getBranch().find((entry) => {
+		if (entry.type !== "custom" || !isRecord(entry.data)) {
+			return false;
+		}
+		const data = entry.data;
+		return data.kind === "document" && isRecord(data.document) && data.document.id === "stable";
+	});
+	assert.ok(firstDocumentEntry !== undefined);
 	currentSession.branch(firstDocumentEntry.id);
 	await event("session_tree");
 	assert.deepEqual(
@@ -629,7 +827,7 @@ try {
 		["stable@1"],
 	);
 	assert.equal(
-		lastCursor().key,
+		requireCursor().key,
 		"stable@1",
 		"tree navigation persists a cursor on the selected branch",
 	);
@@ -646,10 +844,14 @@ try {
 	const printCtx = {
 		mode: "print",
 		hasUI: false,
-		ui: { notify() {} },
+		ui: {
+			notify() {
+				return;
+			},
+		},
 		sessionManager: currentSession,
 	};
-	await tool.execute(
+	await readerTool.execute(
 		"print-publish",
 		{
 			title: "Print-mode explanation",
@@ -674,7 +876,7 @@ try {
 			{ id: "second", heading: "Second section", text: "Second original." },
 		],
 	});
-	const sentBeforeAmbiguous = sent.length;
+	const sentBeforeAmbiguous: number = sent.length;
 	press("n");
 	press("A");
 	press("\x1b[13;5u");
@@ -683,12 +885,13 @@ try {
 	press("B");
 	press("\x1b[13;5u");
 	assert.equal(sent.length, sentBeforeAmbiguous + 2);
-	for (const request of sent.slice(-2)) {
+	for (const delivery of sent.slice(-2)) {
+		const requestMessage = requireRecord(delivery.message, "request message");
 		await event("message_start", {
 			message: {
 				role: "custom",
 				customType: "fitch-paged-reader-feedback",
-				details: request.message.details,
+				details: requestMessage.details,
 			},
 		});
 	}
@@ -698,8 +901,11 @@ try {
 		message: fauxAssistantMessage("A combined answer that cannot safely be assigned to one note."),
 	});
 	assert.equal(docs().length, 2);
-	assert.equal(docs()[1].replyToFeedbackId, undefined);
-	assert.equal(docs()[1].unlinkedFeedbackIds.length, 2);
+	const unlinkedDoc = docs().at(1);
+	assert.ok(unlinkedDoc !== undefined, "unlinked reply must be stored");
+	assert.ok(unlinkedDoc.unlinkedFeedbackIds !== undefined, "unlinked ids must be recorded");
+	assert.equal(unlinkedDoc.replyToFeedbackId, undefined);
+	assert.equal(unlinkedDoc.unlinkedFeedbackIds.length, 2);
 	assert.ok(lines().join("\n").includes("Unlinked response in L List"));
 	press("l");
 	press("\x1b[B");
@@ -712,6 +918,7 @@ try {
 	await settle();
 	await event("agent_settled");
 	const ambiguousFile = currentSession.getSessionFile();
+	assert.ok(ambiguousFile !== undefined, "ambiguous session file must exist");
 	currentSession = SessionManager.open(ambiguousFile);
 	await event("session_start");
 	assert.equal(
@@ -719,25 +926,28 @@ try {
 		sentBeforeAmbiguous + 2,
 		"restart never auto-resends ambiguous or unanswered feedback",
 	);
-	assert.equal(docs()[1].unlinkedFeedbackIds.length, 2);
+	const restartedUnlinked = docs().at(1);
+	assert.ok(restartedUnlinked !== undefined, "restarted unlinked reply must be stored");
+	assert.ok(
+		restartedUnlinked.unlinkedFeedbackIds !== undefined,
+		"restarted unlinked ids must be recorded",
+	);
+	assert.equal(restartedUnlinked.unlinkedFeedbackIds.length, 2);
 	// A freshly mounted overlay must retry a restart-unanswered note without
 	// first opening the note editor: the T hint is advertised, so T cannot be
 	// a silent no-op in a newly mounted overlay instance.
-	await command.handler("", ctx());
+	await readerCommand.handler("", ctx());
 	press("l");
 	press("\x1b[A");
 	press("\r");
 	press("\x1b");
 	await settle();
-	await command.handler("", ctx());
-	// A freshly mounted overlay must retry a restart-unanswered note without
-	// first opening the note editor: the T hint is advertised, so T cannot be
-	// a silent no-op in a newly mounted overlay instance.
+	await readerCommand.handler("", ctx());
 	assert.ok(
 		lines().join("\n").includes("T Retry"),
 		"retry hint is advertised on the fresh overlay",
 	);
-	const freshRetryBefore = sent.length;
+	const freshRetryBefore: number = sent.length;
 	press("t");
 	assert.equal(
 		sent.length,
@@ -764,7 +974,9 @@ try {
 	press("\r");
 	assert.ok(lines().join("\n").includes("Shared section"), "cross-target document is on screen");
 	press("n");
-	for (const letter of "Retry target note.") press(letter);
+	for (const letter of "Retry target note.") {
+		press(letter);
+	}
 	press("\x1b[13;5u");
 	await event("agent_settled");
 	press("l");
@@ -782,15 +994,19 @@ try {
 		lines().join("\n").includes("T Retry"),
 		"retry hint is advertised for the on-screen document",
 	);
-	const sharedRetryBefore = sent.length;
+	const sharedRetryBefore: number = sent.length;
 	press("t");
 	assert.equal(
 		sent.length,
 		sharedRetryBefore + 1,
 		"T dispatches the on-screen document's retryable note",
 	);
+	const sharedRetryRequest = sent.at(-1);
+	assert.ok(sharedRetryRequest !== undefined, "cross-document retry must be recorded");
 	assert.ok(
-		sent.at(-1).message.content.includes("Retry target note."),
+		feedbackText(
+			requireRecord(sharedRetryRequest.message, "cross-document retry message"),
+		).includes("Retry target note."),
 		"retry carries the on-screen document's note, not the last-opened editor's note",
 	);
 	press("\x1b");
@@ -806,7 +1022,12 @@ try {
 	press("n");
 	press("S");
 	press("\x1b[13;5u");
-	const steeredId = sent.at(-1).message.details.feedbackId;
+	const steeredRequest = sent.at(-1);
+	assert.ok(steeredRequest !== undefined, "steered request must be recorded");
+	const steeredId = requireRecord(
+		requireRecord(steeredRequest.message, "steered message").details,
+		"steered details",
+	).feedbackId;
 	press("\x1b");
 	await settle();
 	await event("message_start", {
@@ -822,6 +1043,7 @@ try {
 		sections: [{ heading: "Response", text: "Answers the note and the steer." }],
 	});
 	const mixed = docs().find((doc) => doc.title === "Mixed answer");
+	assert.ok(mixed !== undefined, "mixed reply must be stored");
 	assert.equal(mixed.replyToFeedbackId, undefined);
 	assert.deepEqual(
 		mixed.unlinkedFeedbackIds,
@@ -842,7 +1064,13 @@ try {
 	press("n");
 	press("Q");
 	press("\x1b[13;5u");
-	const partialId = sent.at(-1).message.details.feedbackId;
+	const partialRequest = sent.at(-1);
+	assert.ok(partialRequest !== undefined, "partial request must be recorded");
+	const partialId = requireRecord(
+		requireRecord(partialRequest.message, "partial message").details,
+		"partial details",
+	).feedbackId;
+	assert.ok(typeof partialId === "string", "partial feedback id must be a string");
 	await event("message_start", {
 		message: {
 			role: "custom",
@@ -855,12 +1083,15 @@ try {
 		toolResults: [],
 		message: fauxAssistantMessage("TRUNCATED BEFORE END", { stopReason: "length" }),
 	});
-	assert.equal(docs()[1].incomplete, true);
+	const partialDoc = docs().at(1);
+	assert.ok(partialDoc !== undefined, "partial reply must be stored");
+	assert.equal(partialDoc.incomplete, true);
 	assert.equal(
-		docs()[1].replyToFeedbackId,
+		partialDoc.replyToFeedbackId,
 		undefined,
 		"a length-stopped answer must never be linked as a complete reply",
 	);
+	assert.ok(typeof partialId === "string", "partial feedback id must be a string");
 	assert.equal(state().replies(partialId).length, 0);
 	assert.ok(lines().join("\n").includes("Incomplete response in L List"));
 	assert.ok(!lines().join("\n").includes("Reply ready"));
@@ -890,13 +1121,13 @@ try {
 		"paged-reader regression: bounded native pages, fullscreen clicks and regular keys, durable drafts/cursors, explicit feedback, linked and unlinked replies, revisions, tree and file-backed resume passed",
 	);
 } finally {
-	if (overlay) overlay.close(false);
+	latestOverlay()?.close?.(false);
 	tui.stop();
 }
 
 const originalCapabilities = hostTui.getCapabilities();
 const imageTerminal = new Terminal();
-let imageTui;
+let imageTui: TuiAltScreen | undefined;
 try {
 	hostTui.setCapabilities({ ...originalCapabilities, images: "kitty" });
 	imageTui = new hostTui.TuiAltScreen(imageTerminal);
@@ -906,7 +1137,7 @@ try {
 		new hostTui.Image(
 			"AA==",
 			"image/png",
-			{ fallbackColor: (text) => text },
+			{ fallbackColor: (text: string) => text },
 			{ maxWidthCells: 10, maxHeightCells: 2 },
 			{ widthPx: 2, heightPx: 2 },
 		),
@@ -914,11 +1145,11 @@ try {
 	imageTui.addChild(transcript);
 	imageTui.renderNow();
 	assert.ok(
-		imageTui.previousScreen.some((line) => line.includes("\x1b_G")),
+		renderedScreen(imageTui).some((line: string) => line.includes("\x1b_G")),
 		"native transcript contains an inline image before opening reader",
 	);
 	tui = imageTui;
-	await command.handler("", ctx());
+	await readerCommand.handler("", ctx());
 	imageTui.renderNow();
 	assert.equal(
 		hostTui.getCapabilities().images,
@@ -926,14 +1157,16 @@ try {
 		"fullscreen reader temporarily suppresses native image rendering",
 	);
 	assert.ok(
-		imageTui.previousScreen.every((line) => !line.includes("\x1b_G")),
+		renderedScreen(imageTui).every((line: string) => !line.includes("\x1b_G")),
 		"the reader masks image rows as well as text",
 	);
 	assert.ok(
 		imageTerminal.writes.some((part) => part.includes("a=d,d=a") || part.includes("a=d,d=A")),
 		"native fullscreen repaint clears Kitty placements",
 	);
-	overlay.handleInput("\x1b");
+	const imageOverlay = latestOverlay();
+	assert.ok(imageOverlay !== undefined, "image-mode reader overlay must be mounted");
+	imageOverlay.handleInput?.("\x1b");
 	await settle();
 	imageTui.renderNow();
 	assert.equal(
@@ -942,14 +1175,14 @@ try {
 		"closing restores the exact image protocol",
 	);
 	assert.ok(
-		imageTui.previousScreen.some((line) => line.includes("\x1b_G")),
+		renderedScreen(imageTui).some((line: string) => line.includes("\x1b_G")),
 		"native image rows render again after closing",
 	);
 	console.log(
 		"paged-reader native image overlay: Kitty rows masked, placements cleared, capabilities restored",
 	);
 } finally {
-	if (overlay) overlay.close(false);
+	latestOverlay()?.close?.(false);
 	imageTui?.stop();
 	hostTui.setCapabilities(originalCapabilities);
 }
@@ -963,13 +1196,19 @@ mkdirSync(sdkAgentDir);
 const sdkTerminal = new Terminal();
 const sdkTui = new TuiAltScreen(sdkTerminal);
 sdkTui.start();
-let sdkOverlay;
-let sdkHandle;
-let finishOverlay;
+let sdkOverlay: ReaderComponent | undefined;
+/** The latest sdk overlay a custom callback created, if any, read across a call boundary. */
+const latestSdkOverlay = (): ReaderComponent | undefined => sdkOverlay;
+let sdkHandle: OverlayHandle | undefined;
+let finishOverlay: () => void = () => {
+	throw new Error("overlay finished before construction");
+};
 const nativeUi = {
-	custom(factory, options) {
-		const promise = new Promise((resolve) => {
-			finishOverlay = resolve;
+	custom(factory: ReaderFactory, options: ReaderCustomOptions) {
+		const promise = new Promise<void>((resolve) => {
+			finishOverlay = () => {
+				resolve();
+			};
 		});
 		const component = factory(sdkTui, theme, getKeybindings(), () => {
 			sdkHandle?.hide();
@@ -998,7 +1237,7 @@ runtime.registerProvider(model.provider, {
 	baseUrl: model.baseUrl,
 	apiKey: "test-only",
 	models: faux.models,
-	streamSimple: faux.provider.streamSimple,
+	streamSimple: faux.provider.streamSimple.bind(faux.provider),
 });
 const sdkManager = SessionManager.create(sdkCwd, join(root, "sdk-sessions"));
 sdkManager.appendMessage({
@@ -1038,26 +1277,31 @@ const { session: sdkSession } = await createAgentSession({
 });
 try {
 	const baseUi = sdkSession.extensionRunner.createContext().ui;
+	/* oxlint-disable typescript/no-unsafe-type-assertion -- QX-002: the native ui fixture's
+	 * custom signature is intentionally narrower than ExtensionUIContext.custom. */
 	await sdkSession.bindExtensions({
 		mode: "tui",
-		uiContext: { ...baseUi, ...nativeUi },
+		uiContext: { ...baseUi, ...nativeUi } as unknown as ExtensionUIContext,
 		onError(error) {
 			throw new Error(`${error.event}: ${error.error}`);
 		},
 	});
+	/* oxlint-enable typescript/no-unsafe-type-assertion */
 	await sdkSession.prompt("/reader demo");
-	assert.ok(sdkOverlay, "real command dispatch opens a reader overlay");
-	let releaseUnrelated;
-	let startedUnrelated;
-	const started = new Promise((resolve) => {
-		startedUnrelated = resolve;
-	});
-	let nativeFeedback;
+	const demoOverlay = latestSdkOverlay();
+	assert.ok(demoOverlay !== undefined, "real command dispatch opens a reader overlay");
+	let releaseUnrelated: () => void = () => {
+		throw new Error("unrelated release before the response started");
+	};
+	const unrelatedGate = gate();
+	let nativeFeedback: string | undefined;
 	faux.setResponses([
 		async () => {
-			startedUnrelated();
-			await new Promise((resolve) => {
-				releaseUnrelated = resolve;
+			unrelatedGate.open();
+			await new Promise<void>((resolve) => {
+				releaseUnrelated = () => {
+					resolve();
+				};
 			});
 			return fauxAssistantMessage("Unrelated task finished first.");
 		},
@@ -1067,10 +1311,12 @@ try {
 		},
 	]);
 	const unrelated = sdkSession.prompt("An unrelated task is already running");
-	await started;
-	sdkOverlay.handleInput("n");
-	for (const key of "Native note") sdkOverlay.handleInput(key);
-	sdkOverlay.handleInput("\x1b[13;5u");
+	await unrelatedGate.promise;
+	demoOverlay.handleInput?.("n");
+	for (const key of "Native note") {
+		demoOverlay.handleInput?.(key);
+	}
+	demoOverlay.handleInput?.("\x1b[13;5u");
 	assert.equal(
 		faux.state.callCount,
 		1,
@@ -1084,47 +1330,64 @@ try {
 		2,
 		"the main agent, not a nested client, handles explicit feedback",
 	);
+	assert.ok(nativeFeedback !== undefined, "native feedback must reach the model context");
 	assert.ok(nativeFeedback.includes("Native note"));
 	assert.ok(nativeFeedback.includes("Document ID:"));
 	assert.ok(nativeFeedback.includes("One idea at a time"));
 	const nativeState = restoreReaderState(sdkManager.getBranch());
-	const nativeReply = [...nativeState.documents.values()].find((doc) => doc.replyToFeedbackId);
-	assert.ok(nativeReply, "native assistant final text must become a linked reader reply");
-	assert.match(nativeReply.sections[0].text, /correlated answer/);
-	assert.equal(nativeState.cursors.get(nativeState.order[0]).sectionId, "section-1");
+	const nativeReply = [...nativeState.documents.values()].find(
+		(doc) => doc.replyToFeedbackId !== undefined,
+	);
 	assert.ok(
-		sdkOverlay
+		nativeReply !== undefined,
+		"native assistant final text must become a linked reader reply",
+	);
+	assert.match(nativeReply.sections.at(0)?.text ?? "", /correlated answer/);
+	const nativeFirstOrder = nativeState.order.at(0);
+	assert.ok(nativeFirstOrder !== undefined, "native document order must exist");
+	assert.equal(nativeState.cursors.get(nativeFirstOrder)?.sectionId, "section-1");
+	assert.ok(
+		demoOverlay
 			.render(sdkTerminal.columns)
 			.map(stripTerminalSequences)
 			.join("\n")
 			.includes("Reply ready"),
 	);
 
-	let startedAbort;
-	const abortStarted = new Promise((resolve) => {
-		startedAbort = resolve;
-	});
+	const abortGate = gate();
 	faux.setResponses([
 		async (_context, options) => {
-			startedAbort();
-			await new Promise((resolve) => {
-				if (options?.signal?.aborted) resolve();
-				else options?.signal?.addEventListener("abort", resolve, { once: true });
+			abortGate.open();
+			await new Promise<void>((resolve) => {
+				if (options?.signal?.aborted === true) {
+					resolve();
+				} else {
+					options?.signal?.addEventListener(
+						"abort",
+						() => {
+							resolve();
+						},
+						{ once: true },
+					);
+				}
 			});
 			return fauxAssistantMessage("", { stopReason: "aborted" });
 		},
 	]);
 	const interruptedWork = sdkSession.prompt("A different busy task that will be canceled");
-	await abortStarted;
-	sdkOverlay.handleInput("n");
-	for (const key of " Private note") sdkOverlay.handleInput(key);
-	sdkOverlay.handleInput("\x1b[13;5u");
+	await abortGate.promise;
+	demoOverlay.handleInput?.("n");
+	for (const key of " Private note") {
+		demoOverlay.handleInput?.(key);
+	}
+	demoOverlay.handleInput?.("\x1b[13;5u");
 	const pendingPrivate = restoreReaderState(sdkManager.getBranch()).latestFeedback(
-		nativeState.order[0],
+		nativeFirstOrder,
 		"section-1",
 	);
-	assert.ok(pendingPrivate?.note.endsWith("Private note"));
-	const callsAtAbort = faux.state.callCount;
+	assert.ok(pendingPrivate !== undefined, "pending private note must be recorded");
+	assert.ok(pendingPrivate.note.endsWith("Private note"));
+	const callsAtAbort: number = faux.state.callCount;
 	await sdkSession.abort();
 	await Promise.allSettled([interruptedWork]);
 	await sdkSession.waitForIdle();
@@ -1137,13 +1400,13 @@ try {
 	assert.equal(afterAbort.statuses.get(pendingPrivate.id), "interrupted");
 	assert.equal(afterAbort.replies(pendingPrivate.id).length, 0);
 	assert.ok(
-		sdkOverlay
+		demoOverlay
 			.render(sdkTerminal.columns)
 			.map(stripTerminalSequences)
 			.join("\n")
 			.includes("Queued request canceled"),
 	);
-	let nextRequestContext;
+	let nextRequestContext: string | undefined;
 	faux.setResponses([
 		async (context) => {
 			nextRequestContext = JSON.stringify(context.messages);
@@ -1157,18 +1420,19 @@ try {
 		callsAtAbort + 1,
 		"canceled reader work cannot drain on a later prompt",
 	);
+	assert.ok(nextRequestContext !== undefined, "next request context must be captured");
 	assert.ok(
 		!nextRequestContext.includes("Private note"),
 		"an unsent draft stays outside model context after cancellation",
 	);
 	assert.equal(restoreReaderState(sdkManager.getBranch()).replies(pendingPrivate.id).length, 0);
-	sdkOverlay.handleInput("\x1b");
-	await new Promise((resolve) => setImmediate(resolve));
+	demoOverlay.handleInput?.("\x1b");
+	await settle();
 	console.log(
 		"paged-reader native SDK: busy feedback, abort/no-ghost delivery, exact section context and final-text correlation passed without a paid model",
 	);
 } finally {
-	if (sdkOverlay) sdkOverlay.close(false);
+	latestSdkOverlay()?.close?.(false);
 	await sdkSession.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
 	sdkSession.dispose();
 	sdkTui.stop();

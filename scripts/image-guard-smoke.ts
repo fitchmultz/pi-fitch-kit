@@ -5,11 +5,53 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import {
+	commandFor,
+	drivenCommands,
+	jsonList,
+	requireRecord,
+	type DrivenHandler,
+} from "./test-harness.ts";
+import type {
+	DefaultResourceLoader,
+	SessionManager,
+	SettingsManager,
+} from "@earendil-works/pi-coding-agent";
+
+/** The host-selected Pi SDK surface this smoke drives. */
+type HostSdk = {
+	DefaultResourceLoader: typeof DefaultResourceLoader;
+	SessionManager: typeof SessionManager;
+	SettingsManager: typeof SettingsManager;
+};
+const isHostSdk = (module: unknown): module is HostSdk =>
+	typeof module === "object" &&
+	module !== null &&
+	"DefaultResourceLoader" in module &&
+	"SessionManager" in module &&
+	"SettingsManager" in module;
+
+/** The host photon image surface the guard's native resizes use. */
+type HostPhotonImage = {
+	get_bytes: () => Uint8Array;
+	free: () => void;
+};
+type HostPhoton = {
+	loadPhoton: () => Promise<{
+		PhotonImage: new (pixels: Uint8Array, width: number, height: number) => HostPhotonImage;
+	}>;
+};
+const isHostPhoton = (module: unknown): module is HostPhoton =>
+	typeof module === "object" &&
+	module !== null &&
+	"loadPhoton" in module &&
+	typeof module.loadPhoton === "function";
 
 // Optional host root and extension path support read-only native host/RED probes.
-const sdkPath = process.argv[2]
-	? pathToFileURL(join(process.argv[2], "dist/index.js")).href
-	: import.meta.resolve("@earendil-works/pi-coding-agent");
+const sdkPath =
+	process.argv[2] !== undefined
+		? pathToFileURL(join(process.argv[2], "dist/index.js")).href
+		: import.meta.resolve("@earendil-works/pi-coding-agent");
 const temp = mkdtempSync(join(tmpdir(), "pi-image-guard-"));
 const cwd = join(temp, "project");
 const agentDir = join(temp, "agent");
@@ -18,14 +60,22 @@ mkdirSync(agentDir);
 process.env.PI_CODING_AGENT_DIR = agentDir;
 process.env.PI_OFFLINE = "1";
 process.on("exit", () => rmSync(temp, { recursive: true, force: true }));
-const { DefaultResourceLoader, SessionManager, SettingsManager } = await import(sdkPath);
+const sdkModule: unknown = await import(sdkPath);
+if (!isHostSdk(sdkModule)) {
+	throw new Error("host Pi SDK did not expose the expected loader surface");
+}
+const {
+	DefaultResourceLoader: HostLoader,
+	SessionManager: HostSessionManager,
+	SettingsManager: HostSettingsManager,
+} = sdkModule;
 const guardPath =
 	process.argv[3] ??
 	fileURLToPath(new URL("../extensions/anthropic-image-guard.ts", import.meta.url));
-const loader = new DefaultResourceLoader({
+const loader = new HostLoader({
 	cwd,
 	agentDir,
-	settingsManager: SettingsManager.inMemory({}),
+	settingsManager: HostSettingsManager.inMemory({}),
 	additionalExtensionPaths: [guardPath, join(dirname(guardPath), "write-prompt.ts")],
 	noExtensions: true,
 	noSkills: true,
@@ -37,14 +87,24 @@ await loader.reload();
 const loaded = loader.getExtensions();
 assert.deepEqual(loaded.errors, []);
 assert.equal(loaded.extensions.length, 2);
-const [{ handlers }, writer] = loaded.extensions;
-const { loadPhoton } = await import(new URL("./utils/photon.js", sdkPath));
+const guardExtension = loaded.extensions[0];
+const writer = loaded.extensions[1];
+if (guardExtension === undefined || writer === undefined) {
+	throw new Error("expected the guard and writer extensions to load");
+}
+const { handlers } = guardExtension;
+const photonModule: unknown = await import(new URL("./utils/photon.js", sdkPath).href);
+if (!isHostPhoton(photonModule)) {
+	throw new Error("host photon module did not expose the expected surface");
+}
+const { loadPhoton } = photonModule;
 const photon = await loadPhoton();
-assert.ok(photon);
 let workers = 0;
 const workerHook = createHook({
-	init(_id, type) {
-		if (type === "WORKER") workers++;
+	init(_id: number, type: string) {
+		if (type === "WORKER") {
+			workers += 1;
+		}
 	},
 });
 workerHook.enable();
@@ -58,14 +118,34 @@ const SMALL_BMP =
 
 const anthropicModel = { provider: "anthropic", api: "anthropic-messages", id: "claude-opus-5" };
 
-const runHandlers = async (event, ...args) => {
-	for (const handler of handlers.get(event) ?? []) await handler(...args);
+const runHandlers = async (event: string, ...args: unknown[]): Promise<void> => {
+	for (const handler of handlers.get(event) ?? []) {
+		await handler(...args);
+	}
 };
 
-const context = handlers.get("context")[0];
-assert.equal(typeof context, "function");
-assert.equal(typeof handlers.get("session_start")[0], "function");
-assert.equal(typeof handlers.get("session_compact")[0], "function");
+const context: DrivenHandler | undefined = handlers.get("context")?.[0];
+if (context === undefined) {
+	throw new Error("expected a context handler registration");
+}
+assert.equal(typeof handlers.get("session_start")?.[0], "function");
+assert.equal(typeof handlers.get("session_compact")?.[0], "function");
+
+/** The rewritten messages of a guard pass result. */
+const contextResult = (result: unknown): Array<Record<string, unknown>> =>
+	jsonList(requireRecord(result, "context result").messages, "context result messages").map(
+		(message, index) => requireRecord(message, `context result messages[${index}]`),
+	);
+
+/** The content items of one rewritten message. */
+const messageContent = (message: Record<string, unknown>): Array<Record<string, unknown>> =>
+	jsonList(message.content, "message content").map((item, index) =>
+		requireRecord(item, `message content[${index}]`),
+	);
+
+/** The text of one content item, empty when absent. */
+const contentText = (item: Record<string, unknown>): string =>
+	typeof item.text === "string" ? item.text : "";
 
 // Distinct valid captures reproduce the old cyclic LRU miss, including when a
 // request exceeds the byte ceiling: retained results must still get reused.
@@ -93,7 +173,11 @@ for (const count of [16, 40]) {
 		timestamp,
 		content: [{ type: "image", data, mimeType: "image/png" }],
 	}));
-	const sourceChars = originals.reduce((sum, message) => sum + message.content[0].data.length, 0);
+	const sourceChars = originals.reduce((sum, message) => {
+		const first = message.content.at(0);
+		assert.ok(first !== undefined, "each capture must carry an image");
+		return sum + first.data.length;
+	}, 0);
 	assert.ok(
 		sourceChars < 64 * 1024 * 1024,
 		"all captures must fit the existing source admission budget",
@@ -112,13 +196,16 @@ for (const count of [16, 40]) {
 		const delta = workers - before;
 		deltas.push(delta);
 		assert.deepEqual(outgoing, originals, "in-limit captures and chronology stay intact");
-		if (pass === 0) assert.equal(delta, count, "cold control must use the real native workers");
-		else if (count === 16) assert.equal(delta, 0, "admitted16 must reuse every real resize result");
-		else
+		if (pass === 0) {
+			assert.equal(delta, count, "cold control must use the real native workers");
+		} else if (count === 16) {
+			assert.equal(delta, 0, "admitted16 must reuse every real resize result");
+		} else {
 			assert.ok(
 				delta > 0 && delta < count,
 				"byte eviction must bound sources AND results without cyclic all-miss thrash",
 			);
+		}
 	}
 	cacheReceipts.push({ count, sourceChars, workers: deltas });
 	if (count === 16) {
@@ -135,7 +222,7 @@ console.log(JSON.stringify({ nativeCache: cacheReceipts, sdkPath }));
 // Pi gives each extension its own module instance; the writer must still reuse
 // the guard's results instead of decoding the session's captures again.
 await runHandlers("session_start");
-const writerSession = SessionManager.inMemory(cwd);
+const writerSession = HostSessionManager.inMemory(cwd);
 for (const [timestamp, data] of captures.slice(0, 4).entries()) {
 	writerSession.appendMessage({
 		role: "user",
@@ -149,9 +236,9 @@ await context(
 	{ model: anthropicModel },
 );
 assert.equal(workers - beforeGuard, 4, "the guard decodes each capture once");
-let writerRequest;
+let writerRequest: unknown;
 const beforeWriter = workers;
-await writer.commands.get("draft").handler("reuse guard results", {
+await commandFor(drivenCommands(writer), "draft").handler("reuse guard results", {
 	hasUI: true,
 	mode: "rpc",
 	isIdle: () => true,
@@ -160,7 +247,7 @@ await writer.commands.get("draft").handler("reuse guard results", {
 	getSystemPrompt: () => "",
 	sessionManager: writerSession,
 	modelRegistry: {
-		streamSimple: (_model, request) => {
+		streamSimple: (_model: unknown, request: unknown) => {
 			writerRequest = request;
 			return {
 				result: async () => ({
@@ -171,14 +258,21 @@ await writer.commands.get("draft").handler("reuse guard results", {
 			};
 		},
 	},
-	ui: { notify() {}, select: async () => "Deny" },
+	ui: {
+		notify() {
+			return;
+		},
+		select: async () => "Deny",
+	},
 });
 assert.equal(workers - beforeWriter, 0, "the writer reuses the guard's native results");
 assert.deepEqual(
-	writerRequest.messages
-		.flatMap(({ content }) => content)
-		.filter(({ type }) => type === "image")
-		.map(({ data }) => data),
+	jsonList(requireRecord(writerRequest, "writer request").messages, "writer request messages")
+		.flatMap((message) =>
+			jsonList(requireRecord(message, "writer message").content, "message content"),
+		)
+		.filter((item) => requireRecord(item, "content item").type === "image")
+		.map((item) => requireRecord(item, "content item").data),
 	captures.slice(0, 4),
 );
 
@@ -193,14 +287,18 @@ assert.equal(
 	),
 	undefined,
 );
-assert.equal(nonAnthropic[0].content[0].type, "image");
+const nonAnthropicFirst = nonAnthropic.at(0);
+assert.ok(nonAnthropicFirst !== undefined, "the non-anthropic fixture must carry a message");
+assert.equal(messageContent(nonAnthropicFirst).at(0)?.type, "image");
 assert.equal(workers, beforeNonClaude);
 
 const unchanged = [
 	{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/png" }] },
 ];
 assert.equal(await context({ messages: unchanged }, { model: anthropicModel }), undefined);
-assert.equal(unchanged[0].content[0].data, SMALL_PNG);
+const unchangedFirst = unchanged.at(0);
+assert.ok(unchangedFirst !== undefined, "the unchanged fixture must carry a message");
+assert.equal(messageContent(unchangedFirst).at(0)?.data, SMALL_PNG);
 
 await runHandlers("session_start", {}, {});
 const mislabeled = [
@@ -211,15 +309,23 @@ const correctlyLabeled = [
 	{ role: "user", content: [{ type: "image", data: SMALL_PNG, mimeType: "image/png" }] },
 ];
 assert.equal(await context({ messages: correctlyLabeled }, { model: anthropicModel }), undefined);
-assert.equal(correctlyLabeled[0].content[0].mimeType, "image/png");
+const labeledFirst = correctlyLabeled.at(0);
+assert.ok(labeledFirst !== undefined, "the labeled fixture must carry a message");
+assert.equal(messageContent(labeledFirst).at(0)?.mimeType, "image/png");
 
 const wide = [
 	{ role: "user", content: [{ type: "image", data: WIDE_PNG, mimeType: "image/png" }] },
 ];
-const wideResult = await context({ messages: wide }, { model: anthropicModel });
-assert.match(wideResult.messages[0].content[0].text, /original 2001x1, displayed at 2000x1/);
-assert.equal(wideResult.messages[0].content[1].type, "image");
-assert.notEqual(wideResult.messages[0].content[1].data, WIDE_PNG);
+const wideMessages = contextResult(await context({ messages: wide }, { model: anthropicModel }));
+const wideFirst = wideMessages.at(0);
+assert.ok(wideFirst !== undefined, "the wide rewrite must carry a message");
+const wideContent = messageContent(wideFirst);
+assert.match(
+	contentText(requireRecord(wideContent.at(0), "first content item")),
+	/original 2001x1, displayed at 2000x1/,
+);
+assert.equal(wideContent.at(1)?.type, "image");
+assert.notEqual(wideContent.at(1)?.data, WIDE_PNG);
 
 const custom = [
 	{
@@ -231,9 +337,17 @@ const custom = [
 	},
 ];
 const beforeCustom = workers;
-const customResult = await context({ messages: custom }, { model: anthropicModel });
-assert.match(customResult.messages[0].content[0].text, /original 2001x1, displayed at 2000x1/);
-assert.equal(customResult.messages[0].content[1].type, "image");
+const customMessages = contextResult(
+	await context({ messages: custom }, { model: anthropicModel }),
+);
+const customFirst = customMessages.at(0);
+assert.ok(customFirst !== undefined, "the custom rewrite must carry a message");
+const customContent = messageContent(customFirst);
+assert.match(
+	contentText(requireRecord(customContent.at(0), "first content item")),
+	/original 2001x1, displayed at 2000x1/,
+);
+assert.equal(customContent.at(1)?.type, "image");
 assert.equal(
 	workers,
 	beforeCustom,
@@ -249,25 +363,46 @@ const customBmp = [
 		timestamp: 0,
 	},
 ];
-const customBmpResult = await context({ messages: customBmp }, { model: anthropicModel });
-assert.match(customBmpResult.messages[0].content[0].text, /does not support this image type/);
+const customBmpMessages = contextResult(
+	await context({ messages: customBmp }, { model: anthropicModel }),
+);
+const customBmpFirst = customBmpMessages.at(0);
+assert.ok(customBmpFirst !== undefined, "the BMP rewrite must carry a message");
+const customBmpContent = messageContent(customBmpFirst);
+assert.match(
+	contentText(requireRecord(customBmpContent.at(0), "first content item")),
+	/does not support this image type/,
+);
 assert.equal(
-	customBmpResult.messages[0].content.some(({ type }) => type === "image"),
+	customBmpContent.some((item) => item.type === "image"),
 	false,
 );
 
 const anthropic = [
 	{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] },
 ];
-const result = await context({ messages: anthropic }, { model: anthropicModel });
-assert.equal(result.messages[0].content[0].type, "text");
-assert.match(result.messages[0].content[0].text, /Image omitted/);
+const invalidMessages = contextResult(
+	await context({ messages: anthropic }, { model: anthropicModel }),
+);
+const invalidFirst = invalidMessages.at(0);
+assert.ok(invalidFirst !== undefined, "the invalid-image rewrite must carry a message");
+const invalidContent = messageContent(invalidFirst);
+assert.equal(requireRecord(invalidContent.at(0), "first content item").type, "text");
+assert.match(
+	contentText(requireRecord(invalidContent.at(0), "first content item")),
+	/Image omitted/,
+);
 const beforeRetry = workers;
 const retry = [
 	{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] },
 ];
-const retryResult = await context({ messages: retry }, { model: anthropicModel });
-assert.match(retryResult.messages[0].content[0].text, /Image omitted/);
+const retryMessages = contextResult(await context({ messages: retry }, { model: anthropicModel }));
+const retryFirst = retryMessages.at(0);
+assert.ok(retryFirst !== undefined, "the retry rewrite must carry a message");
+assert.match(
+	contentText(requireRecord(messageContent(retryFirst).at(0), "first content item")),
+	/Image omitted/,
+);
 assert.equal(
 	workers - beforeRetry,
 	1,
@@ -283,9 +418,17 @@ const oversized = [
 		],
 	},
 ];
-const oversizedResult = await context({ messages: oversized }, { model: anthropicModel });
-assert.match(oversizedResult.messages[0].content[0].text, /resize safety limit/);
-assert.equal(oversizedResult.messages[0].content[1].type, "image");
+const oversizedMessages = contextResult(
+	await context({ messages: oversized }, { model: anthropicModel }),
+);
+const oversizedFirst = oversizedMessages.at(0);
+assert.ok(oversizedFirst !== undefined, "the oversized rewrite must carry a message");
+const oversizedContent = messageContent(oversizedFirst);
+assert.match(
+	contentText(requireRecord(oversizedContent.at(0), "first content item")),
+	/resize safety limit/,
+);
+assert.equal(oversizedContent.at(1)?.type, "image");
 
 // The guard requires a Claude model on the anthropic-messages API: Claude
 // behind a gateway or proxy hits the same Anthropic image limits, while
@@ -294,26 +437,43 @@ assert.equal(oversizedResult.messages[0].content[1].type, "image");
 const gatewayWide = [
 	{ role: "user", content: [{ type: "image", data: WIDE_PNG, mimeType: "image/png" }] },
 ];
-const gatewayResult = await context(
-	{ messages: gatewayWide },
-	{ model: { provider: "cloudflare-ai-gateway", api: "anthropic-messages", id: "claude-fable-5" } },
+const gatewayMessages = contextResult(
+	await context(
+		{ messages: gatewayWide },
+		{
+			model: { provider: "cloudflare-ai-gateway", api: "anthropic-messages", id: "claude-fable-5" },
+		},
+	),
 );
-assert.match(gatewayResult.messages[0].content[0].text, /original 2001x1, displayed at 2000x1/);
-assert.equal(gatewayResult.messages[0].content[1].type, "image");
+const gatewayFirst = gatewayMessages.at(0);
+assert.ok(gatewayFirst !== undefined, "the gateway rewrite must carry a message");
+const gatewayContent = messageContent(gatewayFirst);
+assert.match(
+	contentText(requireRecord(gatewayContent.at(0), "first content item")),
+	/original 2001x1, displayed at 2000x1/,
+);
+assert.equal(gatewayContent.at(1)?.type, "image");
 const namespacedClaude = [
 	{ role: "user", content: [{ type: "image", data: SMALL_BMP, mimeType: "image/bmp" }] },
 ];
-const namespacedResult = await context(
-	{ messages: namespacedClaude },
-	{
-		model: {
-			provider: "vercel-ai-gateway",
-			api: "anthropic-messages",
-			id: "anthropic/claude-opus-5",
+const namespacedMessages = contextResult(
+	await context(
+		{ messages: namespacedClaude },
+		{
+			model: {
+				provider: "vercel-ai-gateway",
+				api: "anthropic-messages",
+				id: "anthropic/claude-opus-5",
+			},
 		},
-	},
+	),
 );
-assert.match(namespacedResult.messages[0].content[0].text, /does not support this image type/);
+const namespacedFirst = namespacedMessages.at(0);
+assert.ok(namespacedFirst !== undefined, "the namespaced rewrite must carry a message");
+assert.match(
+	contentText(requireRecord(messageContent(namespacedFirst).at(0), "first content item")),
+	/does not support this image type/,
+);
 const vercelNonClaude = [
 	{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] },
 ];
@@ -345,11 +505,15 @@ const afterCompaction = [
 	{ role: "bashExecution", command: "pwd", output: "/tmp" },
 	{ role: "user", content: [{ type: "image", data: "invalid", mimeType: "image/png" }] },
 ];
-const afterCompactionResult = await context(
-	{ messages: afterCompaction },
-	{ model: anthropicModel },
+const compactionMessages = contextResult(
+	await context({ messages: afterCompaction }, { model: anthropicModel }),
 );
-assert.equal(afterCompactionResult.messages[3].content[0].type, "text");
+const compactionUser = compactionMessages.at(3);
+assert.ok(compactionUser !== undefined, "the post-compaction rewrite must carry the user message");
+assert.equal(
+	requireRecord(messageContent(compactionUser).at(0), "first content item").type,
+	"text",
+);
 workerHook.disable();
 
 console.log(

@@ -302,19 +302,20 @@
   "overrides": [
     {
       "files": [
-        "scripts/clean-footer-regression.mjs",
+        "scripts/clean-footer-regression.ts",
         "scripts/fast-mode-regression.ts",
-        "scripts/image-budget-regression.mjs",
-        "scripts/image-guard-smoke.mjs",
-        "scripts/package-smoke.mjs",
+        "scripts/image-budget-regression.ts",
+        "scripts/image-guard-smoke.ts",
+        "scripts/package-smoke.ts",
         "scripts/paged-reader-regression.ts",
-        "scripts/session-name-boundary.mjs",
+        "scripts/session-name-boundary.ts",
         "scripts/session-name-regression.ts",
-        "scripts/setup-lifecycle-smoke.mjs",
-        "scripts/validate-regression.mjs",
-        "scripts/write-prompt-boundary.mjs",
+        "scripts/setup-lifecycle-smoke.ts",
+        "scripts/validate-regression.ts",
+        "scripts/validate.ts",
+        "scripts/write-prompt-boundary.ts",
         "scripts/write-prompt-regression.ts",
-        "scripts/ambitious-live.mjs"
+        "scripts/ambitious-live.ts"
       ],
       "rules": {
         "complexity": [

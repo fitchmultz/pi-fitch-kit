@@ -7,28 +7,68 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { anthropicMessagesApi } from "@earendil-works/pi-ai/compat";
+import type { Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
+import {
+	handlerFor,
+	drivenHandlers,
+	requireRecord,
+	jsonField,
+	jsonList,
+	jsonString,
+} from "./test-harness.ts";
+
+/** One framed image part for the tight-budget fixtures. */
+type WireImage = { type: "image"; source: { type: string; media_type: string; data: string } };
+/** One framed wire part for the tight-budget fixtures. */
+type WirePart = WireImage | { type: "text"; text: string };
+
+/** The wire stream the native Anthropic API and the fast-mode override share. */
+type AnthropicStreamSimple = ReturnType<typeof anthropicMessagesApi>["streamSimple"];
+
+/** The host photon image surface the guard's native resizes use. */
+type HostPhotonImage = {
+	get_bytes: () => Uint8Array;
+	free: () => void;
+};
+type HostPhoton = {
+	loadPhoton: () => Promise<{
+		PhotonImage: new (pixels: Uint8Array, width: number, height: number) => HostPhotonImage;
+	}>;
+};
+const isHostPhoton = (module: unknown): module is HostPhoton =>
+	typeof module === "object" &&
+	module !== null &&
+	"loadPhoton" in module &&
+	typeof module.loadPhoton === "function";
+
 const agentDir = mkdtempSync(join(tmpdir(), "pi-image-budget-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
 process.on("exit", () => rmSync(agentDir, { recursive: true, force: true }));
 const { prepareClaudeImages, fitClaudeRequest, sharedImageCache } =
 	await import("../extensions/anthropic-image-guard.ts");
 const { default: fastMode } = await import("../extensions/fast-mode.ts");
-const { anthropicMessagesApi } = await import("@earendil-works/pi-ai/compat");
 const ai = await import("@earendil-works/pi-ai");
-const { loadPhoton } = await import(
-	new URL("./utils/photon.js", import.meta.resolve("@earendil-works/pi-coding-agent"))
+const photonModule: unknown = await import(
+	new URL("./utils/photon.js", import.meta.resolve("@earendil-works/pi-coding-agent")).href
 );
+if (!isHostPhoton(photonModule)) {
+	throw new Error("host photon module did not expose the expected surface");
+}
+const { loadPhoton } = photonModule;
 const photon = await loadPhoton();
-assert.ok(photon);
 let workers = 0;
 createHook({
-	init(_id, type) {
-		if (type === "WORKER") workers++;
+	init(_id: number, type: string) {
+		if (type === "WORKER") {
+			workers += 1;
+		}
 	},
 }).enable();
-const model = {
+const model: Model<"anthropic-messages"> = {
 	api: "anthropic-messages",
 	id: "claude-opus-5",
+	name: "claude-opus-5",
 	provider: "anthropic",
 	baseUrl: "https://offline.invalid",
 	reasoning: false,
@@ -37,7 +77,7 @@ const model = {
 	contextWindow: 320000,
 	maxTokens: 4096,
 };
-function png(width, height) {
+function png(width: number, height: number): string {
 	const pixels = new Uint8Array(width * height * 4);
 	let seed = 123456789;
 	for (let i = 0; i < pixels.length; i += 4) {
@@ -56,7 +96,16 @@ function png(width, height) {
 		image.free();
 	}
 }
-const messages = (data, count) =>
+/** A synthetic user turn carrying one full-resolution screenshot. */
+type ScreenshotTurn = {
+	role: "user";
+	timestamp: number;
+	content: Array<
+		{ type: "text"; text: string } | { type: "image"; mimeType: string; data: string }
+	>;
+};
+
+const messages = (data: string, count: number): ScreenshotTurn[] =>
 	Array.from({ length: count }, (_, index) => ({
 		role: "user",
 		timestamp: index + 1,
@@ -66,7 +115,7 @@ const messages = (data, count) =>
 		],
 	}));
 const selected = process.argv[2];
-if (!selected || selected === "source") {
+if (selected === undefined || selected === "source") {
 	const { DefaultResourceLoader, SettingsManager } =
 		await import("@earendil-works/pi-coding-agent");
 	const loader = new DefaultResourceLoader({
@@ -84,8 +133,12 @@ if (!selected || selected === "source") {
 	});
 	await loader.reload();
 	assert.deepEqual(loader.getExtensions().errors, []);
-	const context = loader.getExtensions().extensions[0].handlers.get("context")[0];
-	const prepare = (messages) => context({ messages }, { model });
+	const guard = loader.getExtensions().extensions.at(0);
+	if (guard === undefined) {
+		throw new Error("image-guard extension missing");
+	}
+	const contextHandler = handlerFor(drivenHandlers(guard), "context");
+	const prepare = (turns: unknown) => contextHandler({ messages: turns }, { model });
 	const data = png(2400, 1400);
 	const originals = messages(data, 7);
 	for (const count of [6, 7]) {
@@ -103,35 +156,75 @@ if (!selected || selected === "source") {
 			"source safety budget must admit newest screenshots",
 		);
 		assert.ok(
-			outgoing.every((message) => message.content[0].text === `Screenshot ${message.timestamp}`),
+			outgoing.every((message) => {
+				const first = message.content.at(0);
+				return (
+					first !== undefined &&
+					first.type === "text" &&
+					first.text === `Screenshot ${message.timestamp}`
+				);
+			}),
 		);
 	}
 	assert.ok(
-		originals.every((message) => message.content[1].data === data),
+		originals.every((message) => {
+			const image = message.content.at(1);
+			return image !== undefined && image.type === "image" && image.data === data;
+		}),
 		"saved sources stay full resolution",
 	);
 	// Several captures in one tool result must retain their original content ordering too.
 	const tool = [{ role: "toolResult", content: originals.flatMap((message) => message.content) }];
 	await prepare(tool);
+	const toolTurn = tool.at(0);
+	if (toolTurn === undefined) {
+		throw new Error("tool fixture missing");
+	}
 	assert.deepEqual(
-		tool[0].content
+		toolTurn.content
 			.filter((part) => part.type === "text" && part.text.startsWith("Screenshot"))
-			.map((part) => part.text),
-		originals.map((message) => message.content[0].text),
+			.map((part) => {
+				if (part.type !== "text") {
+					throw new Error("expected a text part");
+				}
+				return part.text;
+			}),
+		originals.map((message) => {
+			const first = message.content.at(0);
+			if (first === undefined || first.type !== "text") {
+				throw new Error("fixture message lost its text part");
+			}
+			return first.text;
+		}),
 	);
-	assert.equal(tool[0].content.filter((part) => part.type === "image").length, 3);
+	assert.equal(toolTurn.content.filter((part) => part.type === "image").length, 3);
 	console.log(
 		"source budget: newest three admitted on repeated requests; chronology and original sources preserved",
 	);
 }
-if (!selected || selected === "wire") {
-	const providers = new Map();
+if (selected === undefined || selected === "wire") {
+	const providers = new Map<string, { api: unknown; streamSimple: AnthropicStreamSimple }>();
+	/* oxlint-disable typescript/no-unsafe-type-assertion -- QX-002: the fast-mode entry
+	 * demands the complete ExtensionAPI. This regression drives it with partial recorders;
+	 * the cast lives only at this boundary, matching the harness allowance. */
 	fastMode({
-		registerProvider: (name, config) => providers.set(name, config),
-		registerFlag() {},
-		registerCommand() {},
-		on() {},
-	});
+		registerProvider: (
+			name: string,
+			config: { api: unknown; streamSimple: AnthropicStreamSimple },
+		) => {
+			providers.set(name, config);
+		},
+		registerFlag: (_name: string, _config: unknown) => {
+			return;
+		},
+		registerCommand: (_name: string, _config: unknown) => {
+			return;
+		},
+		on: (_event: string, _handler: unknown) => {
+			return;
+		},
+	} as unknown as Parameters<typeof fastMode>[0]);
+	/* oxlint-enable typescript/no-unsafe-type-assertion */
 	const data = png(900, 900);
 	const originals = messages(data, 9);
 	const outgoing = structuredClone(originals);
@@ -147,55 +240,82 @@ if (!selected || selected === "wire") {
 			},
 		],
 	});
-	async function capture(stream, options = {}) {
-		let body;
+	const capture = async (
+		stream: AnthropicStreamSimple,
+		options: SimpleStreamOptions = {},
+	): Promise<{ bytes: number; body: Record<string, unknown> }> => {
+		let body: BodyInit | null | undefined;
 		const response = await stream(model, structuredClone(context), {
 			apiKey: "synthetic",
 			maxRetries: 0,
 			...options,
-			fetch: async (_url, init) => {
+			fetch: async (
+				_url: Parameters<typeof fetch>[0],
+				init: Parameters<typeof fetch>[1],
+			): Promise<Response> => {
+				if (init === undefined) {
+					throw new Error("offline capture received no request init");
+				}
 				body = init.body;
 				throw new Error("offline capture complete");
 			},
 		}).result();
 		assert.equal(response.stopReason, "error");
-		assert.equal(typeof body, "string", response.errorMessage);
-		return { bytes: Buffer.byteLength(body), body: JSON.parse(body) };
-	}
+		if (typeof body !== "string") {
+			throw new Error(response.errorMessage ?? "offline capture lost its body");
+		}
+		return {
+			bytes: Buffer.byteLength(body),
+			body: requireRecord(JSON.parse(body), "captured request body"),
+		};
+	};
 	const native = anthropicMessagesApi();
-	const baseline = await capture(native.streamSimple);
+	const nativeStreamSimple = native.streamSimple.bind(native);
+	const baseline = await capture(nativeStreamSimple);
 	assert.ok(baseline.bytes > 32_000_000, "fixture must reproduce native aggregate overflow");
-	assert.ok(baseline.body.system.length > 0);
-	assert.equal(baseline.body.tools.length, 1);
+	assert.ok(jsonList(baseline.body.system, "body system").length > 0);
+	assert.equal(jsonList(baseline.body.tools, "body tools").length, 1);
 	for (const fast of [false, true]) {
 		writeFileSync(join(agentDir, "anthropic-fast.json"), JSON.stringify({ enabled: fast }));
-		const result = await capture(providers.get("anthropic").streamSimple, {
+		const anthropicFast = providers.get("anthropic");
+		if (anthropicFast === undefined) {
+			throw new Error("fast-mode did not register an anthropic provider");
+		}
+		const result = await capture(anthropicFast.streamSimple, {
 			// A replacement hook and fast-mode speed are both included in final accounting.
-			onPayload: (payload) => ({ ...payload, metadata: { user_id: "x".repeat(50000) } }),
+			onPayload: (payload) => ({
+				...requireRecord(payload, "onPayload payload"),
+				metadata: { user_id: "x".repeat(50000) },
+			}),
 		});
 		assert.ok(result.bytes <= 32_000_000, `final request is ${result.bytes} bytes`);
 		assert.equal(
-			result.body.messages
-				.flatMap((message) => message.content)
-				.filter((part) => part.type === "image").length,
+			jsonList(result.body.messages, "body messages")
+				.flatMap((message) => requireRecord(message, "body message").content)
+				.filter((part) => requireRecord(part, "body part").type === "image").length,
 			9,
 			"resize instead of dropping usable screenshots",
 		);
 		assert.equal(result.body.speed, fast ? "fast" : undefined);
 		assert.deepEqual(result.body.system, baseline.body.system);
 		assert.deepEqual(result.body.tools, baseline.body.tools);
-		assert.equal(result.body.metadata.user_id.length, 50000);
+		assert.equal(
+			jsonString(jsonField(result.body, "metadata", "body metadata").user_id, "user_id").length,
+			50000,
+		);
 	}
 	// The writer's native callback also works without the fast-mode provider override.
-	const writer = await capture(native.streamSimple, {
+	const writer = await capture(nativeStreamSimple, {
 		onPayload: (payload) => fitClaudeRequest(model, payload),
 	});
 	assert.ok(writer.bytes <= 32_000_000);
 	// Every over-limit turn resends the same captures; the shared cache must spare them native work.
-	const repeated = { onPayload: (payload) => fitClaudeRequest(model, payload, sharedImageCache()) };
-	const first = await capture(native.streamSimple, repeated);
+	const repeated: SimpleStreamOptions = {
+		onPayload: (payload) => fitClaudeRequest(model, payload, sharedImageCache()),
+	};
+	const first = await capture(nativeStreamSimple, repeated);
 	const beforeRepeat = workers;
-	const repeat = await capture(native.streamSimple, repeated);
+	const repeat = await capture(nativeStreamSimple, repeated);
 	assert.equal(
 		workers - beforeRepeat,
 		0,
@@ -227,8 +347,18 @@ if (!selected || selected === "wire") {
 	};
 	await fitClaudeRequest(model, toolPayload);
 	assert.ok(Buffer.byteLength(JSON.stringify(toolPayload)) <= 32_000_000);
+	const toolMessage = toolPayload.messages.at(0);
+	if (toolMessage === undefined) {
+		throw new Error("tool payload lost its message");
+	}
+	const toolPart = toolMessage.content.at(0);
+	if (toolPart === undefined) {
+		throw new Error("tool payload lost its tool_result part");
+	}
 	assert.equal(
-		toolPayload.messages[0].content[0].content.filter((part) => part.type === "image").length,
+		jsonList(toolPart.content, "tool_result content").filter(
+			(part) => requireRecord(part, "tool_result part").type === "image",
+		).length,
 		9,
 	);
 	const textOnly = { messages: [{ role: "user", content: "x".repeat(32_000_001) }] };
@@ -245,8 +375,13 @@ if (!selected || selected === "wire") {
 		messages: [...textOnly.messages, { role: "user", content: [unfixableImage] }],
 	};
 	await fitClaudeRequest(model, unfixable);
+	const unfixableTurn = unfixable.messages.at(-1);
+	if (unfixableTurn === undefined) {
+		throw new Error("unfixable payload lost its image turn");
+	}
+	const unfixablePart = unfixableTurn.content.at(0);
 	assert.equal(
-		unfixable.messages.at(-1).content[0],
+		unfixablePart,
 		unfixableImage,
 		"do not discard images when text alone exceeds the cap",
 	);
@@ -258,7 +393,12 @@ if (!selected || selected === "wire") {
 		baseline.body,
 		"non-Claude requests retain even oversized image payloads",
 	);
-	assert.ok(originals.every((message) => message.content[1].data === data));
+	assert.ok(
+		originals.every((message) => {
+			const image = message.content.at(1);
+			return image !== undefined && image.type === "image" && image.data === data;
+		}),
+	);
 	console.log(
 		`wire budget: native ${baseline.bytes} bytes; guarded main fast on/off and writer under 32 MB, all nine images retained`,
 	);
@@ -266,14 +406,14 @@ if (!selected || selected === "wire") {
 	// Tight framing/coordinate-note budgets used to drop the largest (newest)
 	// image during fallback even when both images could fit after further resizing.
 	for (const allowance of [775, 500]) {
-		const image = (data) => ({
+		const image = (imageData: string): WireImage => ({
 			type: "image",
-			source: { type: "base64", media_type: "image/png", data },
+			source: { type: "base64", media_type: "image/png", data: imageData },
 		});
 		const old = image(png(10, 10));
 		const newest = image(png(20, 20));
-		const text = { type: "text", text: "" };
-		const content = [text, old, newest];
+		const text: WirePart = { type: "text", text: "" };
+		const content: WirePart[] = [text, old, newest];
 		const payload = { messages: [{ role: "user", content }] };
 		const overhead =
 			Buffer.byteLength(JSON.stringify({ ...payload, stream: true })) -
@@ -288,9 +428,13 @@ if (!selected || selected === "wire") {
 			allowance === 775,
 			"further resizing preserves both when feasible; otherwise omit oldest",
 		);
-		assert.equal(content[0], text);
+		assert.equal(content.at(0), text);
+		const lastPart = content.at(-1);
+		if (lastPart === undefined || lastPart.type !== "text") {
+			throw new Error("coordinate note missing after tight-budget fit");
+		}
 		assert.match(
-			content.at(-1).text,
+			lastPart.text,
 			/original 20x20/,
 			"repeated resizing retains the original coordinate mapping",
 		);
