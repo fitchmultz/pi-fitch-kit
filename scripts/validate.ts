@@ -42,20 +42,26 @@ assert(
 	manifest.schemaVersion === 8,
 	"setup manifest schema must match the ordered required-alternatives shape",
 );
-const requiredModels: string[][] = jsonList(manifest.requiredModels, "requiredModels").map(
-	(routes, index) => jsonStrings(routes, `requiredModels[${index}]`),
-);
+const requiredModelsRaw = jsonList(manifest.requiredModels, "manifest requiredModels");
 assert(
-	requiredModels.every(
-		(routes) => routes.length > 0 && routes.every((route) => route.includes("/")),
+	requiredModelsRaw.every(
+		(routes) =>
+			Array.isArray(routes) &&
+			routes.length > 0 &&
+			routes.every((route) => typeof route === "string" && route.includes("/")),
 	),
 	"each requiredModels entry must be a non-empty ordered list of provider/model routes",
+);
+const requiredModels: string[][] = requiredModelsRaw.map((routes, index) =>
+	jsonStrings(routes, `requiredModels[${index}]`),
 );
 const manifestModelRoutes = new Set<string>([
 	...requiredModels.flat(),
 	...jsonStrings(manifest.optionalModels, "optionalModels"),
 ]);
-const compaction = jsonField(settingsExample, "compaction", "settings compaction");
+const compaction: Record<string, unknown> = isRecord(settingsExample.compaction)
+	? settingsExample.compaction
+	: {};
 for (const key of ["reserveTokens", "keepRecentTokens"]) {
 	const value = compaction[key];
 	assert(
@@ -205,17 +211,15 @@ const corePackages = jsonList(manifest.corePackages, "corePackages").map((pkg, i
 );
 const retiredPackageSources = jsonStrings(manifest.retiredPackageSources, "retiredPackageSources");
 for (const pkg of corePackages) {
+	const id = jsonString(pkg.id, "core package id");
 	const source = pkg.source;
 	assert(
 		typeof source === "string" &&
 			(/^npm:(?:@[\w.-]+\/)?[\w.-]+$/.test(source) ||
 				/^git:github\.com\/[\w-]+\/[\w-]+$/.test(source)),
-		`corePackages ${JSON.stringify(pkg.id)} must use an unpinned npm or Git source: ${JSON.stringify(source)}`,
+		`corePackages ${id} must use an unpinned npm or Git source: ${typeof source === "string" ? source : JSON.stringify(source)}`,
 	);
-	assert(
-		!retiredPackageSources.includes(source),
-		`corePackages ${JSON.stringify(pkg.id)} cannot also be retired`,
-	);
+	assert(!retiredPackageSources.includes(source), `corePackages ${id} cannot also be retired`);
 }
 const subagents = corePackages.find((pkg) => pkg.id === "subagents");
 assert(
