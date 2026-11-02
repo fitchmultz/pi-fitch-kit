@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { RegisteredCommand } from "@earendil-works/pi-coding-agent";
+import { gate, type DrivenCommand } from "./test-harness.ts";
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-write-prompt-"));
 process.on("exit", () => rmSync(agentDir, { recursive: true, force: true }));
@@ -69,28 +71,46 @@ for (const isError of [false, true]) {
 	assert.deepEqual(imageResult, before, "flattening must not mutate source history");
 }
 
-const commands: Record<string, { handler: (args: string, ctx: never) => Promise<void> }> = {};
+const commands: Record<string, { handler: RegisteredCommand["handler"] }> = {};
 let sent: string | undefined;
 let sendOptions: { deliverAs?: string } | undefined;
 let sendFailure: Error | undefined;
-const savedDrafts: Array<{
+type SavedDraft = {
 	type: "custom";
 	customType: string;
 	data: { source: string; draft: string };
-}> = [];
+};
+const savedDrafts: Array<SavedDraft> = [];
+
+/* oxlint-disable typescript/no-unsafe-type-assertion -- QX-002: the write-prompt entry
+ * demands the complete ExtensionAPI and its handlers demand the complete
+ * ExtensionCommandContext. This regression drives both with partial recorders; the
+ * narrowing casts live only at these two boundaries, matching the harness allowance. */
 writePrompt({
-	registerCommand(name: string, config: { handler: (args: string, ctx: never) => Promise<void> }) {
+	registerCommand: (name: string, config: { handler: RegisteredCommand["handler"] }) => {
 		commands[name] = config;
 	},
-	sendUserMessage(content: string, options?: { deliverAs?: string }) {
-		if (sendFailure) throw sendFailure;
+	sendUserMessage: (content: string, options?: { deliverAs?: string }) => {
+		if (sendFailure !== undefined) {
+			throw sendFailure;
+		}
 		sent = content;
 		sendOptions = options;
 	},
-	appendEntry(customType: string, data: { source: string; draft: string }) {
+	appendEntry: (customType: string, data: { source: string; draft: string }) => {
 		savedDrafts.push({ type: "custom", customType, data: structuredClone(data) });
 	},
-} as never);
+} as unknown as Parameters<typeof writePrompt>[0]);
+
+/** The command under one name as the loose callable this regression drives. */
+const writerCommand = (name: string): DrivenCommand => {
+	const registered = commands[name];
+	if (registered === undefined) {
+		throw new Error(`missing command registration: ${name}`);
+	}
+	return { handler: registered.handler as unknown as DrivenCommand["handler"] };
+};
+/* oxlint-enable typescript/no-unsafe-type-assertion */
 
 const notices: string[] = [];
 const baseUi = {
@@ -98,7 +118,9 @@ const baseUi = {
 		notices.push(message);
 	},
 	editor: async (_title: string, prefill?: string) => prefill,
-	select: async () => undefined,
+	select: async () => {
+		return;
+	},
 	custom: async () => {
 		throw new Error("custom should not run in rpc");
 	},
@@ -115,10 +137,12 @@ function ctx(overrides: Record<string, unknown> = {}) {
 		sessionManager: {
 			getEntries: () => [],
 			getLeafId: () => null,
-			getBranch: () => [],
+			getBranch: (): SavedDraft[] => [],
 		},
 		modelRegistry: {
-			find: () => undefined,
+			find: () => {
+			return;
+		},
 			hasConfiguredAuth: () => true,
 			complete: async () => ({
 				role: "assistant",
@@ -140,8 +164,8 @@ function ctx(overrides: Record<string, unknown> = {}) {
 		},
 		modelRegistry: {
 			...registry,
-			streamSimple: (...args: unknown[]) => ({
-				result: () => Reflect.apply(registry.complete, registry, args),
+			streamSimple: (...args: unknown[]): { result: () => unknown } => ({
+				result: (): unknown => Reflect.apply(registry.complete, registry, args) as unknown,
 			}),
 		},
 	};
@@ -164,8 +188,11 @@ for (const [config, expected] of [
 	[{ thinkingLevel: "max" }, ["xai", "grok-4.6", "high"]],
 ] as const) {
 	const path = join(agentDir, WRITE_PROMPT_FILE);
-	if (config === undefined) rmSync(path, { force: true });
-	else writeFileSync(path, JSON.stringify(config));
+	if (config === undefined) {
+		rmSync(path, { force: true });
+	} else {
+		writeFileSync(path, JSON.stringify(config));
+	}
 	const calls: unknown[][] = [];
 	const context = ctx({
 		modelRegistry: {
@@ -187,7 +214,7 @@ for (const [config, expected] of [
 		ui: { ...baseUi, select: async () => "Deny" },
 	});
 	const originalModel = context.model;
-	await commands.draft.handler("configuration test", context as never);
+	await writerCommand("draft").handler("configuration test", context);
 	assert.deepEqual(calls, [expected], JSON.stringify(config));
 	assert.equal(context.model, originalModel, "writer selection must not change the active model");
 	assert.equal(context.thinkingLevel, "high", "writer selection must not change session thinking");
@@ -211,7 +238,7 @@ for (const [raw, diagnostic] of [
 	writeFileSync(join(agentDir, WRITE_PROMPT_FILE), raw);
 	notices.length = 0;
 	let called = false;
-	await commands.draft.handler(
+	await writerCommand("draft").handler(
 		"invalid configuration",
 		ctx({
 			modelRegistry: {
@@ -223,74 +250,76 @@ for (const [raw, diagnostic] of [
 					throw new Error("must not call a model");
 				},
 			},
-		}) as never,
+		}),
 	);
 	assert.equal(called, false, raw);
-	assert.match(notices[0], /^write-prompt\.json: /);
-	assert.match(notices[0], diagnostic, raw);
+	assert.match(notices[0] ?? "", /^write-prompt\.json: /);
+	assert.match(notices[0] ?? "", diagnostic, raw);
 }
 rmSync(join(agentDir, WRITE_PROMPT_FILE));
 
 notices.length = 0;
-await commands["draft"].handler("", ctx() as never);
+await writerCommand("draft").handler("", ctx());
 assert.equal(notices[0], "Usage: /draft <text>");
 assert.equal(sent, undefined);
 
 notices.length = 0;
-await commands["draft"].handler("do the thing", ctx({ hasUI: false }) as never);
-assert.match(notices[0] ?? "", /interactive UI/);
+await writerCommand("draft").handler("do the thing", ctx({ hasUI: false }));
+const interactiveNotice = notices.at(0);
+assert.ok(interactiveNotice !== undefined, "expected an interactive-UI notice");
+assert.match(interactiveNotice, /interactive UI/);
 
 sent = undefined;
-await commands["draft"].handler(
+await writerCommand("draft").handler(
 	"do the thing",
 	ctx({
 		ui: {
 			...baseUi,
 			select: async () => "Accept",
 		},
-	}) as never,
+	}),
 );
 assert.equal(sent, "better prompt");
 assert.equal(sendOptions, undefined, "idle acceptance keeps normal delivery");
 
 sent = undefined;
-await commands["draft"].handler(
+await writerCommand("draft").handler(
 	"do the thing",
 	ctx({
 		ui: {
 			...baseUi,
 			select: async () => "Deny",
 		},
-	}) as never,
+	}),
 );
 assert.equal(sent, undefined);
 
 sent = undefined;
-let idle = true;
-await commands.draft.handler(
+let idleNow = true;
+await writerCommand("draft").handler(
 	"busy acceptance",
 	ctx({
-		isIdle: () => idle,
+		isIdle: () => idleNow,
 		ui: {
 			...baseUi,
 			select: async () => {
-				idle = false;
+				idleNow = false;
 				return "Accept";
 			},
 		},
-	}) as never,
+	}),
 );
 assert.equal(sent, "better prompt", "Accept must not discard a draft when the agent becomes busy");
 assert.deepEqual(sendOptions, { deliverAs: "steer" });
 
 // Busy from the start is valid too, including recovery after a failed send.
 sent = undefined;
-await commands.draft.handler(
+await writerCommand("draft").handler(
 	"already busy",
 	ctx({
 		isIdle: () => false,
 		ui: { ...baseUi, select: async () => "Accept" },
-	}) as never,
+	}),
 );
 assert.equal(sent, "better prompt");
 assert.deepEqual(sendOptions, { deliverAs: "steer" });
@@ -301,7 +330,7 @@ sent = undefined;
 sendFailure = new Error("send unavailable");
 let attempts = 0;
 const original = "original input\nwith a second line  ";
-await commands.draft.handler(
+await writerCommand("draft").handler(
 	original,
 	ctx({
 		ui: {
@@ -318,7 +347,7 @@ await commands.draft.handler(
 				return "Accept";
 			},
 		},
-	}) as never,
+	}),
 );
 assert.equal(attempts, 2);
 assert.equal(sent, "better prompt");
@@ -342,15 +371,15 @@ const recovery = ctx({
 		},
 	},
 });
-recovery.sessionManager.getBranch = () => savedDrafts as never;
-await commands.draft.handler("", recovery as never);
+recovery.sessionManager.getBranch = () => savedDrafts;
+await writerCommand("draft").handler("", recovery);
 assert.equal(restored, `/draft ${original}`);
 assert.equal(notices.at(-1), "Original restored to editor");
 
 // A broken writer override must not prevent recovering already-written input.
 writeFileSync(join(agentDir, WRITE_PROMPT_FILE), "invalid json");
 restored = undefined;
-await commands.draft.handler("", recovery as never);
+await writerCommand("draft").handler("", recovery);
 assert.equal(
 	restored,
 	`/draft ${original}`,
@@ -363,22 +392,26 @@ rmSync(join(agentDir, WRITE_PROMPT_FILE));
 for (const command of ["ambitious", "unreasonable"]) {
 	notices.length = 0;
 	sent = undefined;
-	await commands[command].handler("", ctx() as never);
+	await writerCommand(command).handler("", ctx());
 	assert.equal(notices[0], `Usage: /${command} <text>`);
 	assert.equal(sent, undefined, "an empty rewrite must not send");
 
 	notices.length = 0;
-	await commands[command].handler("no UI", ctx({ hasUI: false }) as never);
-	assert.match(notices[0] ?? "", /interactive UI/);
+	await writerCommand(command).handler("no UI", ctx({ hasUI: false }));
+	const noUiNotice = notices.at(0);
+	assert.ok(noUiNotice !== undefined, "expected an interactive-UI notice");
+	assert.match(noUiNotice, /interactive UI/);
 }
 
 sent = undefined;
 let ambitiousTask: string | undefined;
-await commands["ambitious"].handler(
+await writerCommand("ambitious").handler(
 	"raise the thing",
 	ctx({
 		modelRegistry: {
-			find: () => undefined,
+			find: () => {
+			return;
+		},
 			hasConfiguredAuth: () => true,
 			complete: async (
 				_model: unknown,
@@ -398,7 +431,7 @@ await commands["ambitious"].handler(
 			...baseUi,
 			select: async () => "Accept",
 		},
-	}) as never,
+	}),
 );
 assert.match(ambitiousTask ?? "", /more ambitious coding-agent prompt/);
 assert.match(ambitiousTask ?? "", /<<<\nraise the thing\n>>>/);
@@ -411,7 +444,7 @@ assert.equal(sendOptions, undefined, "idle acceptance keeps normal delivery");
 
 sent = undefined;
 let ambitiousIdle = true;
-await commands["ambitious"].handler(
+await writerCommand("ambitious").handler(
 	"busy raise",
 	ctx({
 		isIdle: () => ambitiousIdle,
@@ -422,7 +455,7 @@ await commands["ambitious"].handler(
 				return "Accept";
 			},
 		},
-	}) as never,
+	}),
 );
 assert.equal(
 	sent,
@@ -458,8 +491,8 @@ const ambitiousRecovery = ctx({
 		},
 	},
 });
-ambitiousRecovery.sessionManager.getBranch = () => savedDrafts as never;
-await commands["ambitious"].handler("", ambitiousRecovery as never);
+ambitiousRecovery.sessionManager.getBranch = () => savedDrafts;
+await writerCommand("ambitious").handler("", ambitiousRecovery);
 assert.equal(ambitiousRestored, `/ambitious ${ambitiousOriginal}`);
 assert.equal(notices.at(-1), "Original restored to editor");
 
@@ -480,9 +513,11 @@ const draftIsolation = ctx({
 		},
 	},
 });
-draftIsolation.sessionManager.getBranch = () =>
-	[savedDrafts.findLast((entry) => entry.customType === "fitch-kit.ambitious")] as never;
-await commands.draft.handler("", draftIsolation as never);
+draftIsolation.sessionManager.getBranch = () => {
+	const entry = savedDrafts.findLast((draft) => draft.customType === "fitch-kit.ambitious");
+	return entry === undefined ? [] : [entry];
+};
+await writerCommand("draft").handler("", draftIsolation);
 assert.equal(
 	notices[0],
 	"Usage: /draft <text>",
@@ -491,17 +526,19 @@ assert.equal(
 assert.equal(draftSawAmbitious, undefined);
 
 notices.length = 0;
-await commands["side-question"].handler("busy question", ctx({ isIdle: () => false }) as never);
+await writerCommand("side-question").handler("busy question", ctx({ isIdle: () => false }));
 assert.equal(notices[0], "Agent is busy", "side-question behavior is unchanged");
 
 const seen: number[] = [];
 let step = 0;
 sent = undefined;
-await commands["draft"].handler(
+await writerCommand("draft").handler(
 	"first draft",
 	ctx({
 		modelRegistry: {
-			find: () => undefined,
+			find: () => {
+			return;
+		},
 			hasConfiguredAuth: () => true,
 			complete: async (_model: unknown, context: { messages: unknown[] }) => {
 				seen.push(context.messages.length);
@@ -515,15 +552,17 @@ await commands["draft"].handler(
 		ui: {
 			...baseUi,
 			editor: async (title: string) => {
-				if (title === "Tweak notes") return "shorter";
-				return undefined;
+				if (title === "Tweak notes") {
+					return "shorter";
+				}
+				return;
 			},
 			select: async () => {
 				step += 1;
 				return step === 1 ? "Tweak" : "Accept";
 			},
 		},
-	}) as never,
+	}),
 );
 assert.deepEqual(seen, [1, 3]);
 assert.equal(sent, "v2");
@@ -534,7 +573,7 @@ notices.length = 0;
 sent = undefined;
 let revisionCalls = 0;
 let reviewCalls = 0;
-await commands.unreasonable.handler(
+await writerCommand("unreasonable").handler(
 	"review only; do not edit",
 	ctx({
 		modelRegistry: {
@@ -560,7 +599,7 @@ await commands.unreasonable.handler(
 				return ++reviewCalls === 1 ? "Tweak" : "Deny";
 			},
 		},
-	}) as never,
+	}),
 );
 assert.equal(revisionCalls, 2);
 assert.equal(reviewCalls, 2);
@@ -570,7 +609,7 @@ assert.equal(sent, undefined);
 sent = undefined;
 let usedSelect = false;
 let customCalls = 0;
-await commands["draft"].handler(
+await writerCommand("draft").handler(
 	"show me",
 	ctx({
 		mode: "tui",
@@ -585,7 +624,7 @@ await commands["draft"].handler(
 				return "Accept";
 			},
 		},
-	}) as never,
+	}),
 );
 assert.equal(usedSelect, false);
 assert.equal(customCalls, 2);
@@ -594,7 +633,7 @@ assert.equal(sent, "better prompt");
 sent = undefined;
 const painted: string[][] = [];
 let colorCalls = 0;
-await commands["draft"].handler(
+await writerCommand("draft").handler(
 	"show me",
 	ctx({
 		mode: "tui",
@@ -609,10 +648,16 @@ await commands["draft"].handler(
 				) => unknown,
 			) => {
 				colorCalls += 1;
-				if (colorCalls === 1 || !factory) return colorCalls === 1 ? "better prompt" : "Accept";
+				if (colorCalls === 1 || !factory) {
+					return colorCalls === 1 ? "better prompt" : "Accept";
+				}
 				try {
 					factory(
-						{ requestRender() {} },
+						{
+							requestRender() {
+								return;
+							},
+						},
 						{
 							fg(color: string, text: string) {
 								painted.push([color, text]);
@@ -620,7 +665,9 @@ await commands["draft"].handler(
 							},
 						},
 						{},
-						() => {},
+						() => {
+							return;
+						},
 					);
 				} catch {
 					// keyHint uses the live TUI theme; the draft color is painted first
@@ -628,7 +675,7 @@ await commands["draft"].handler(
 				return "Accept";
 			},
 		},
-	}) as never,
+	}),
 );
 assert.ok(painted.some(([color, text]) => color === "text" && text === "better prompt"));
 assert.equal(sent, "better prompt");
@@ -640,9 +687,8 @@ const longDraft = Array.from(
 	(_, i) => `line ${i + 1} of the rewritten prompt`,
 ).join("\n");
 const themeKey = Symbol.for("@earendil-works/pi-coding-agent:theme");
-const globalRecord = globalThis as unknown as Record<symbol, unknown>;
-const priorGlobalTheme = globalRecord[themeKey];
-globalRecord[themeKey] = { fg: (_color: string, text: string) => text };
+const priorGlobalTheme: unknown = Reflect.get(globalThis, themeKey);
+Reflect.set(globalThis, themeKey, { fg: (_color: string, text: string) => text });
 type DialogView = {
 	render: (width: number) => string[];
 	invalidate: () => void;
@@ -654,12 +700,14 @@ let dialogFactory:
 const chosen: string[] = [];
 let customSequence = 0;
 sent = undefined;
-await commands.draft.handler(
+await writerCommand("draft").handler(
 	"tall draft",
 	ctx({
 		mode: "tui",
 		modelRegistry: {
-			find: () => undefined,
+			find: () => {
+			return;
+		},
 			hasConfiguredAuth: () => true,
 			complete: async () => ({
 				role: "assistant",
@@ -679,18 +727,24 @@ await commands.draft.handler(
 			) => {
 				// First custom call is the off-transcript loader; the second is the dialog.
 				customSequence += 1;
-				if (customSequence === 1) return longDraft;
-				if (factory) dialogFactory = factory;
+				if (customSequence === 1) {
+				return longDraft;
+			}
+				if (factory) {
+				dialogFactory = factory;
+			}
 				return "Accept";
-			}) as never,
+			}),
 		},
-	}) as never,
+	}),
 );
 assert.equal(sent, longDraft, "dialog acceptance still sends the full draft");
-assert.ok(dialogFactory, "the dialog view factory was invoked");
+assert.ok(dialogFactory !== undefined, "the dialog view factory was invoked");
 const fakeTheme = { fg: (_color: string, text: string) => text };
-const smallTui = { requestRender() {}, terminal: { rows: 20 } };
-const scrolledView = dialogFactory!(smallTui, fakeTheme, {}, (value) => chosen.push(value));
+const smallTui = { requestRender() {
+				return;
+			}, terminal: { rows: 20 } };
+const scrolledView = dialogFactory(smallTui, fakeTheme, {}, (value) => chosen.push(value));
 const firstPage = scrolledView.render(80);
 assert.ok(
 	firstPage.length <= 15,
@@ -708,7 +762,9 @@ assert.ok(
 	firstPage.some((line) => /below/.test(line) && /scroll/.test(line)),
 	"clipped drafts show a position indicator with the scroll keys",
 );
-for (let i = 0; i < 10; i += 1) scrolledView.handleInput("\x1b[6~");
+for (let i = 0; i < 10; i += 1) {
+		scrolledView.handleInput("\x1b[6~");
+	}
 const bottom = scrolledView.render(80);
 assert.ok(
 	bottom.some((line) => /line 40 of/.test(line)),
@@ -719,7 +775,9 @@ assert.ok(
 	"bottom page reports lines above",
 );
 assert.ok(!bottom.join("\n").includes("below"), "no lines remain below at the end");
-for (let i = 0; i < 10; i += 1) scrolledView.handleInput("\x1b[5~");
+for (let i = 0; i < 10; i += 1) {
+		scrolledView.handleInput("\x1b[5~");
+	}
 const backToTop = scrolledView.render(80);
 assert.ok(
 	backToTop.some((line) => /line 1 of/.test(line)),
@@ -728,8 +786,10 @@ assert.ok(
 // The dialog renders in the editor dock slot under the chat tail and the
 // footer; its budget must reserve for those dock-mates, and the indicator
 // must stay one line even at widths where its natural text would wrap.
-const narrowView = dialogFactory!(
-	{ requestRender() {}, terminal: { rows: 20 } },
+const narrowView = dialogFactory(
+	{ requestRender() {
+				return;
+			}, terminal: { rows: 20 } },
 	fakeTheme,
 	{},
 	(value) => chosen.push(value),
@@ -750,8 +810,13 @@ assert.ok(
 	`wide clipped dialog must fit rows minus the dock reserve, got ${firstPageAgain.length}`,
 );
 
-const tallView = dialogFactory!(
-	{ requestRender() {}, terminal: { rows: 200 } },
+const tallView = dialogFactory(
+	{
+		requestRender() {
+			return;
+		},
+		terminal: { rows: 200 },
+	},
 	fakeTheme,
 	{},
 	(value) => chosen.push(value),
@@ -768,15 +833,17 @@ assert.deepEqual(
 	["Accept"],
 	"Enter still confirms the action through the scrollable scrolledView",
 );
-globalRecord[themeKey] = priorGlobalTheme;
+Reflect.set(globalThis, themeKey, priorGlobalTheme);
 
 notices.length = 0;
 sent = undefined;
-await commands["draft"].handler(
+await writerCommand("draft").handler(
 	"fail please",
 	ctx({
 		modelRegistry: {
-			find: () => undefined,
+			find: () => {
+			return;
+		},
 			hasConfiguredAuth: () => true,
 			complete: async () => ({
 				role: "assistant",
@@ -785,7 +852,7 @@ await commands["draft"].handler(
 				errorMessage: "boom",
 			}),
 		},
-	}) as never,
+	}),
 );
 assert.equal(sent, undefined);
 assert.equal(notices.at(-1), "boom");
@@ -797,7 +864,7 @@ writeFileSync(
 let found: { provider: string; id: string } | undefined;
 sent = undefined;
 notices.length = 0;
-await commands["draft"].handler(
+await writerCommand("draft").handler(
 	"override me",
 	ctx({
 		modelRegistry: {
@@ -816,7 +883,7 @@ await commands["draft"].handler(
 			...baseUi,
 			select: async () => "Accept",
 		},
-	}) as never,
+	}),
 );
 assert.deepEqual(found, { provider: "anthropic", id: "claude-opus-5" });
 assert.equal(notices[0], "Using anthropic/claude-opus-5 (high thinking)");
@@ -824,12 +891,12 @@ assert.equal(sent, "claude-opus-5");
 rmSync(join(agentDir, WRITE_PROMPT_FILE));
 
 const captured: Array<{
-	systemPrompt?: string;
+	systemPrompt: string | undefined;
 	messages: Array<{ role?: string; content?: unknown }>;
-	cacheRetention?: string;
+	cacheRetention: string | undefined;
 }> = [];
 sent = undefined;
-await commands["draft"].handler(
+await writerCommand("draft").handler(
 	"do the thing",
 	ctx({
 		sessionManager: {
@@ -852,7 +919,9 @@ await commands["draft"].handler(
 			getLeafId: () => "a1",
 		},
 		modelRegistry: {
-			find: () => undefined,
+			find: () => {
+			return;
+		},
 			hasConfiguredAuth: () => true,
 			complete: async (
 				_model: unknown,
@@ -875,35 +944,41 @@ await commands["draft"].handler(
 			...baseUi,
 			select: async () => "Accept",
 		},
-	}) as never,
+	}),
 );
 assert.equal(captured.length, 1);
-assert.equal(captured[0]?.systemPrompt, "session system");
-assert.equal(captured[0]?.cacheRetention, "short");
-assert.equal(captured[0]?.messages.length, 3);
-assert.equal((captured[0]?.messages[0] as { role: string }).role, "user");
-assert.equal((captured[0]?.messages[1] as { role: string }).role, "assistant");
-assert.match(JSON.stringify(captured[0]?.messages[2]), /do the thing/);
-assert.match(JSON.stringify(captured[0]?.messages[2]), /Do not answer the text/);
+const firstCapture = captured[0];
+if (firstCapture === undefined) {
+	assert.fail("expected one captured completion request");
+}
+assert.equal(firstCapture.systemPrompt, "session system");
+assert.equal(firstCapture.cacheRetention, "short");
+assert.equal(firstCapture.messages.length, 3);
+assert.equal(firstCapture.messages[0]?.role, "user");
+assert.equal(firstCapture.messages[1]?.role, "assistant");
+assert.match(JSON.stringify(firstCapture.messages[2]), /do the thing/);
+assert.match(JSON.stringify(firstCapture.messages[2]), /Do not answer the text/);
 assert.match(
-	JSON.stringify(captured[0]?.messages[2]),
+	JSON.stringify(firstCapture.messages[2]),
 	/Preserve intent and every explicit constraint/,
 );
 assert.match(
-	JSON.stringify(captured[0]?.messages[2]),
+	JSON.stringify(firstCapture.messages[2]),
 	/without adding unrequested scope or presenting assumptions as requirements/,
 );
-assert.match(JSON.stringify(captured[0]?.messages[2]), /phrase it as conditional/);
-assert.match(JSON.stringify(captured[0]?.messages[2]), /<<<\\ndo the thing\\n>>>/);
+assert.match(JSON.stringify(firstCapture.messages[2]), /phrase it as conditional/);
+assert.match(JSON.stringify(firstCapture.messages[2]), /<<<\\ndo the thing\\n>>>/);
 assert.equal(sent, "better prompt");
 
 const questionCapture: string[] = [];
 sent = undefined;
-await commands["draft"].handler(
+await writerCommand("draft").handler(
 	"did you cut a new GH release",
 	ctx({
 		modelRegistry: {
-			find: () => undefined,
+			find: () => {
+			return;
+		},
 			hasConfiguredAuth: () => true,
 			complete: async (
 				_model: unknown,
@@ -921,7 +996,7 @@ await commands["draft"].handler(
 			...baseUi,
 			select: async () => "Accept",
 		},
-	}) as never,
+	}),
 );
 assert.match(questionCapture[0] ?? "", /Do not answer the text/);
 assert.match(questionCapture[0] ?? "", /not the session agent/);
@@ -932,11 +1007,13 @@ assert.equal(sent, "better prompt");
 const sideCapture: string[] = [];
 sent = undefined;
 notices.length = 0;
-await commands["side-question"].handler(
+await writerCommand("side-question").handler(
 	"is that the best fix?",
 	ctx({
 		modelRegistry: {
-			find: () => undefined,
+			find: () => {
+			return;
+		},
 			hasConfiguredAuth: () => true,
 			complete: async (
 				_model: unknown,
@@ -954,7 +1031,7 @@ await commands["side-question"].handler(
 			...baseUi,
 			select: async () => "Dismiss",
 		},
-	}) as never,
+	}),
 );
 assert.equal(sent, undefined);
 assert.match(sideCapture[0] ?? "", /Answer the boxed question/);
@@ -963,17 +1040,19 @@ assert.equal(sideCapture[0]?.includes("Do not rewrite it into a prompt"), true);
 assert.equal(notices.at(-1), "Dismissed");
 
 notices.length = 0;
-await commands["side-question"].handler("", ctx() as never);
+await writerCommand("side-question").handler("", ctx());
 assert.equal(notices[0], "Usage: /side-question <text>");
 
 const asked: number[] = [];
 let askStep = 0;
 sent = undefined;
-await commands["side-question"].handler(
+await writerCommand("side-question").handler(
 	"first question",
 	ctx({
 		modelRegistry: {
-			find: () => undefined,
+			find: () => {
+			return;
+		},
 			hasConfiguredAuth: () => true,
 			complete: async (_model: unknown, context: { messages: unknown[] }) => {
 				asked.push(context.messages.length);
@@ -987,15 +1066,17 @@ await commands["side-question"].handler(
 		ui: {
 			...baseUi,
 			editor: async (title: string) => {
-				if (title === "Ask again") return "and why";
-				return undefined;
+				if (title === "Ask again") {
+					return "and why";
+				}
+				return;
 			},
 			select: async () => {
 				askStep += 1;
 				return askStep === 1 ? "Ask again" : "Dismiss";
 			},
 		},
-	}) as never,
+	}),
 );
 assert.deepEqual(asked, [1, 3]);
 assert.equal(sent, undefined);
@@ -1026,7 +1107,7 @@ for (const role of ["user", "toolResult"]) {
 	];
 	const saved = structuredClone(history);
 	sent = undefined;
-	await commands["draft"].handler(
+	await writerCommand("draft").handler(
 		"after image",
 		ctx({
 			model: { id: "claude-opus-5", provider: "anthropic", api: "anthropic-messages" },
@@ -1035,7 +1116,9 @@ for (const role of ["user", "toolResult"]) {
 				getLeafId: () => "u1",
 			},
 			modelRegistry: {
-				find: () => undefined,
+				find: () => {
+			return;
+		},
 				hasConfiguredAuth: () => true,
 				complete: async (
 					_model: unknown,
@@ -1055,7 +1138,11 @@ for (const role of ["user", "toolResult"]) {
 					const payload = {
 						messages: [{ role: "user", content: [{ type: "text", text: "unchanged" }] }],
 					};
-					assert.equal(await options.onPayload!(payload), payload);
+					const onPayload = options.onPayload;
+					if (onPayload === undefined) {
+						assert.fail("expected an onPayload hook");
+					}
+					assert.equal(await onPayload(payload), payload);
 					return {
 						role: "assistant",
 						content: [{ type: "text", text: "better prompt" }],
@@ -1067,7 +1154,7 @@ for (const role of ["user", "toolResult"]) {
 				...baseUi,
 				select: async () => "Accept",
 			},
-		}) as never,
+		}),
 	);
 	assert.equal(
 		imageCapture.some((part) => part.type === "image"),
@@ -1080,31 +1167,46 @@ for (const role of ["user", "toolResult"]) {
 	assert.deepEqual(history, saved, "writer image preparation must not rewrite saved history");
 }
 
+/** The TUI widget handle surface this regression drives through ui.custom. */
+type WidgetHandle = {
+	handleInput: (data: string) => void;
+	dispose: () => void;
+	render: (width: number) => string[];
+};
+
+/** The widget factory Pi hands to ui.custom, typed at the fixture boundary. */
+type WidgetFactory = (
+	terminal: { requestRender: () => void; terminal?: { rows: number } },
+	theme: { fg: (color: string, text: string) => string },
+	props: Record<string, unknown>,
+	onDone: (value: unknown) => void,
+) => WidgetHandle;
+
 // Cancelling a TUI loader aborts its pending API call, and the late result is harmless.
 const { initTheme } = await import("@earendil-works/pi-coding-agent");
 initTheme("dark");
-let releaseCompletion!: (value: unknown) => void;
-let markStarted!: () => void;
-let markSettled!: () => void;
-let view: { handleInput(data: string): void; dispose(): void };
+let releaseCompletion: (value: unknown) => void = () => {
+	throw new Error("completion release before the provider call started");
+};
+let view: WidgetHandle | undefined;
+/** The latest widget a custom callback created, if any, read across a call boundary. */
+const latestView = (): WidgetHandle | undefined => view;
 let apiSignal: AbortSignal | undefined;
-const started = new Promise<void>((resolve) => {
-	markStarted = resolve;
-});
-const settled = new Promise<void>((resolve) => {
-	markSettled = resolve;
-});
+const started = gate();
+const settled = gate();
 let doneCount = 0;
-const cancelledWriter = commands.draft.handler(
+const cancelledWriter = writerCommand("draft").handler(
 	"cancel pending API",
 	ctx({
 		mode: "tui",
 		modelRegistry: {
-			find: () => undefined,
+			find: () => {
+				return;
+			},
 			hasConfiguredAuth: () => true,
 			complete: (_model: unknown, _context: unknown, options: { signal?: AbortSignal }) => {
 				apiSignal = options.signal;
-				markStarted();
+				started.open();
 				return new Promise((resolve) => {
 					releaseCompletion = resolve;
 				});
@@ -1112,28 +1214,38 @@ const cancelledWriter = commands.draft.handler(
 		},
 		ui: {
 			...baseUi,
-			custom: (factory: Function) =>
+			custom: (factory: WidgetFactory) =>
 				new Promise((resolve) => {
-					view = factory(
-						{ requestRender() {} },
+					const widget = factory(
+						{
+							requestRender() {
+								return;
+							},
+						},
 						{ fg: (_color: string, value: string) => value },
 						{},
 						(value: unknown) => {
-							view.dispose();
+							widget.dispose();
 							resolve(value);
-							if (++doneCount === 2) markSettled();
+							if (++doneCount === 2) {
+								settled.open();
+							}
 						},
 					);
+					view = widget;
 				}),
 		},
-	}) as never,
+	}),
 );
-await started;
-view!.handleInput("\x1b");
+await started.promise;
+if (view === undefined) {
+	assert.fail("expected the loader widget to be created");
+}
+view.handleInput("\x1b");
 await cancelledWriter;
 assert.equal(apiSignal?.aborted, true);
 releaseCompletion({ role: "assistant", content: [], stopReason: "aborted" });
-await settled;
+await settled.promise;
 
 // Cancelled work must not touch a context retired by /reload or /new.
 for (const command of ["draft", "unreasonable", "side-question"]) {
@@ -1141,9 +1253,11 @@ for (const command of ["draft", "unreasonable", "side-question"]) {
 		let retired = false;
 		let staleReads = 0;
 		let calls = 0;
-		let rejectCompletion!: (error: Error) => void;
-		const started = Promise.withResolvers<void>();
-		const finished = Promise.withResolvers<void>();
+		let rejectCompletion: (error: Error) => void = () => {
+			throw new Error("rejection before the provider call started");
+		};
+		const providerStarted = gate();
+		const finished = gate();
 		let doneCalls = 0;
 		const context = ctx({
 			mode: "tui",
@@ -1173,8 +1287,8 @@ for (const command of ["draft", "unreasonable", "side-question"]) {
 			},
 			modelRegistry: {
 				complete: () => {
-					calls++;
-					started.resolve();
+					calls += 1;
+					providerStarted.open();
 					return new Promise((_resolve, reject) => {
 						rejectCompletion = reject;
 					});
@@ -1182,19 +1296,26 @@ for (const command of ["draft", "unreasonable", "side-question"]) {
 			},
 			ui: {
 				...baseUi,
-				custom: (factory: Function) =>
+				custom: (factory: WidgetFactory) =>
 					new Promise((resolve) => {
-						view = factory(
-							{ requestRender() {} },
+						const widget = factory(
+							{
+								requestRender() {
+									return;
+								},
+							},
 							{ fg: (_color: string, value: string) => value },
 							{},
 							(value: unknown) => {
-								view.dispose();
+								widget.dispose();
 								resolve(value);
 								// The abort closes the loader first; the completion's own return is the second call.
-								if (++doneCalls === 2) finished.resolve();
+								if (++doneCalls === 2) {
+									finished.open();
+								}
 							},
 						);
+						view = widget;
 					}),
 			},
 		});
@@ -1211,14 +1332,23 @@ for (const command of ["draft", "unreasonable", "side-question"]) {
 			});
 		}
 		notices.length = 0;
-		const pending = commands[command].handler("cancel before replacement", context as never);
-		if (phase === "provider rejection") await started.promise;
-		view!.handleInput("\x1b");
+		const pending = writerCommand(command).handler("cancel before replacement", context);
+		if (phase === "provider rejection") {
+			await providerStarted.promise;
+		}
+		const currentView = latestView();
+		assert.ok(currentView !== undefined, "expected the loader widget to be created");
+		currentView.handleInput("\x1b");
 		await pending;
 		retired = true;
-		if (phase === "provider rejection") rejectCompletion(new Error("late provider failure"));
-		else await finished.promise;
-		await new Promise((resolve) => setImmediate(resolve));
+		if (phase === "provider rejection") {
+			rejectCompletion(new Error("late provider failure"));
+		} else {
+			await finished.promise;
+		}
+		await new Promise<void>((resolve) => {
+			setImmediate(resolve);
+		});
 		assert.equal(staleReads, 0, `${command}: cancelled ${phase} must not read retired context`);
 		assert.equal(calls, phase === "provider rejection" ? 1 : 0);
 		assert.deepEqual(notices, [], "cancelled work must not report late errors");
@@ -1229,23 +1359,30 @@ for (const command of ["draft", "unreasonable", "side-question"]) {
 for (const action of ["Accept", "Restore original"] as const) {
 	let calls = 0;
 	let editorText = "";
-	let idle = true;
+	let menuIdle = true;
 	sent = undefined;
-	await commands.draft.handler(
+	await writerCommand("draft").handler(
 		"original TUI input",
 		ctx({
 			mode: "tui",
-			isIdle: () => idle,
+			isIdle: () => menuIdle,
 			ui: {
 				...baseUi,
 				setEditorText: (text: string) => {
 					editorText = text;
 				},
-				custom: async (factory: Function) => {
-					if (++calls === 1) return "better prompt";
+				custom: async (factory: WidgetFactory) => {
+					if (++calls === 1) {
+						return "better prompt";
+					}
 					return new Promise((resolve) => {
 						const menu = factory(
-							{ requestRender() {}, terminal: { rows: 40 } },
+							{
+								requestRender() {
+									return;
+								},
+								terminal: { rows: 40 },
+							},
 							{ fg: (_color: string, text: string) => text },
 							{},
 							resolve,
@@ -1253,13 +1390,15 @@ for (const action of ["Accept", "Restore original"] as const) {
 						const screen = menu.render(80).join("\n");
 						assert.match(screen, /better prompt/);
 						assert.match(screen, /Restore original/);
-						for (let i = 0; i < (action === "Accept" ? 0 : 3); i++) menu.handleInput("\x1b[B");
-						idle = false;
+						for (let i = 0; i < (action === "Accept" ? 0 : 3); i++) {
+							menu.handleInput("\x1b[B");
+						}
+						menuIdle = false;
 						menu.handleInput("\r");
 					});
 				},
 			},
-		}) as never,
+		}),
 	);
 	if (action === "Accept") {
 		assert.equal(sent, "better prompt");

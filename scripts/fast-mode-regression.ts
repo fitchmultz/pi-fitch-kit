@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { zstdDecompressSync } from "node:zlib";
 import { mock } from "node:test";
-import type { Api, Model } from "@earendil-works/pi-ai";
+import { normalizeContext, type Api, type Model } from "@earendil-works/pi-ai";
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-fast-mode-"));
 process.on("exit", () => rmSync(agentDir, { recursive: true, force: true }));
@@ -29,8 +29,18 @@ process.on("exit", () => {
 });
 
 const { fastRates } = await import("../extensions/fast-mode.ts");
+import {
+	commandFor,
+	drivenCommands,
+	drivenHandlers,
+	handlerFor,
+	requireRecord,
+	soleExtension,
+	type DrivenHandler,
+} from "./test-harness.ts";
 const { discoverAndLoadExtensions, SessionManager } =
 	await import("@earendil-works/pi-coding-agent");
+import type { ProviderConfig } from "@earendil-works/pi-coding-agent";
 const defaultSession = SessionManager.inMemory(agentDir);
 const loaded = await discoverAndLoadExtensions(
 	[fileURLToPath(new URL("../extensions/fast-mode.ts", import.meta.url))],
@@ -40,16 +50,19 @@ const loaded = await discoverAndLoadExtensions(
 assert.deepEqual(loaded.errors, []);
 assert.equal(loaded.extensions.length, 1);
 
-type Handler = (event: Record<string, unknown>, ctx: Record<string, unknown>) => unknown;
-const handlers = Object.fromEntries(loaded.extensions[0].handlers) as Record<string, Handler[]>;
-const commands = Object.fromEntries(loaded.extensions[0].commands) as Record<
-	string,
-	{ handler: (args: string, ctx: unknown) => Promise<void> }
->;
-const providers = new Map<string, { api: string; streamSimple: CallableFunction }>();
+const extension = soleExtension(loaded);
+const handlers = drivenHandlers(extension);
+const commands = drivenCommands(extension);
+/** The provider stream entry the wire capture drives. */
+type StreamEntry = {
+	api: string;
+	streamSimple: NonNullable<ProviderConfig["streamSimple"]>;
+};
+const providers = new Map<string, StreamEntry>();
 for (const { name, config } of loaded.runtime.pendingProviderRegistrations) {
-	assert.ok(config.api);
-	assert.ok(config.streamSimple);
+	if (typeof config.api !== "string" || typeof config.streamSimple !== "function") {
+		throw new Error(`incomplete provider registration: ${name}`);
+	}
 	providers.set(name, { api: config.api, streamSimple: config.streamSimple });
 }
 const flags = loaded.runtime.flagValues;
@@ -67,7 +80,7 @@ for (const provider of providers.values()) {
 	assert.equal(provider.api, "anthropic-messages");
 	assert.equal(typeof provider.streamSimple, "function");
 }
-assert.equal(typeof handlers.before_provider_request?.[0], "function");
+assert.equal(typeof handlerFor(handlers, "before_provider_request"), "function");
 assert.deepEqual(Object.keys(commands).sort(), [
 	"anthropic-fast",
 	"codex-fast",
@@ -104,7 +117,9 @@ const uiCtx = (model: unknown, sessionManager = defaultSession) => ({
 const GATEWAY_PLACEHOLDER_URL =
 	"https://gateway.ai.cloudflare.com/v1/{CLOUDFLARE_ACCOUNT_ID}/{CLOUDFLARE_GATEWAY_ID}/anthropic";
 const GATEWAY_ENV = { CLOUDFLARE_ACCOUNT_ID: "acct-123", CLOUDFLARE_GATEWAY_ID: "gw-456" };
-async function countToggleReads<T>(request: () => Promise<T>) {
+async function countToggleReads(
+	request: () => Promise<FastRequestResult>,
+): Promise<{ result: FastRequestResult; reads: number }> {
 	const before = toggleFileReads.mock.callCount();
 	const result = await request();
 	return {
@@ -115,20 +130,27 @@ async function countToggleReads<T>(request: () => Promise<T>) {
 	};
 }
 
+type FastRequestResult = { payload: Record<string, unknown> | undefined; beta: string[] };
+
 async function fastRequest(
 	provider: string,
 	id: string,
 	beta = "pi-existing-beta",
 	extraOptions: Record<string, unknown> = {},
 	modelOverride?: Model<Api>,
-) {
+): Promise<FastRequestResult> {
 	let payload: Record<string, unknown> | undefined;
 	let headers = new Headers();
 	let url: string | undefined;
 	const gateway = provider === "cloudflare-ai-gateway";
-	const stream = providers.get(provider)?.streamSimple(
+	const provider_ = providers.get(provider);
+	if (provider_ === undefined) {
+		throw new Error(`no registered provider: ${provider}`);
+	}
+	const stream = provider_.streamSimple(
 		modelOverride ?? {
 			id,
+			name: id,
 			api: "anthropic-messages",
 			provider,
 			baseUrl: gateway ? GATEWAY_PLACEHOLDER_URL : "https://example.invalid",
@@ -139,7 +161,7 @@ async function fastRequest(
 			contextWindow: 300_000,
 			maxTokens: 4096,
 		},
-		{ messages: [{ role: "user", content: "test", timestamp: 0 }] },
+		normalizeContext({ messages: [{ role: "user", content: "test", timestamp: 0 }] }),
 		{
 			apiKey: "test",
 			maxRetries: 0,
@@ -148,7 +170,11 @@ async function fastRequest(
 			fetch: async (input: unknown, init: { headers?: HeadersInit; body?: unknown } = {}) => {
 				url = String(input);
 				headers = new Headers(init.headers);
-				payload = JSON.parse(String(init.body));
+				const raw = init.body;
+				if (typeof raw === "string") {
+					const parsed: unknown = JSON.parse(raw);
+					payload = requireRecord(parsed, "captured payload");
+				}
 				throw new Error("payload captured");
 			},
 		},
@@ -157,11 +183,16 @@ async function fastRequest(
 		// Drain the capture abort.
 	}
 	// A prebuilt client never reaches the wrapped fetch, which is the point of that case.
-	if (!extraOptions.client) {
-		assert.ok(payload, "an Anthropic request must be issued");
+	if (extraOptions.client === undefined) {
+		if (payload === undefined) {
+			throw new Error("an Anthropic request must be issued");
+		}
 		if (gateway) {
+			if (url === undefined) {
+				assert.fail("gateway endpoint placeholders must resolve for every request");
+			}
 			assert.ok(
-				url?.startsWith("https://gateway.ai.cloudflare.com/v1/acct-123/gw-456/anthropic"),
+				url.startsWith("https://gateway.ai.cloudflare.com/v1/acct-123/gw-456/anthropic"),
 				`gateway endpoint placeholders must resolve for every request, got ${url}`,
 			);
 		}
@@ -230,14 +261,23 @@ assert.deepEqual(
 	{ type: "adaptive", display: "summarized" },
 	"toolChoice must not suppress reasoning",
 );
+const ordinaryConfig = reasonedNoTools.payload.output_config;
 assert.equal(
-	(reasonedNoTools.payload?.output_config as { effort?: string } | undefined)?.effort,
+	typeof ordinaryConfig === "object" && ordinaryConfig !== null && "effort" in ordinaryConfig
+		? ordinaryConfig.effort
+		: undefined,
 	"high",
 );
-assert.deepEqual(reasonedNoTools.payload?.tool_choice, { type: "none" });
+assert.deepEqual(reasonedNoTools.payload.tool_choice, { type: "none" });
 
-await commands["anthropic-fast"].handler("on", anthropicOpusCtx);
-assert.equal(JSON.parse(readFileSync(join(agentDir, "anthropic-fast.json"), "utf8")).enabled, true);
+await commandFor(commands, "anthropic-fast").handler("on", anthropicOpusCtx);
+assert.equal(
+	requireRecord(
+		JSON.parse(readFileSync(join(agentDir, "anthropic-fast.json"), "utf8")),
+		"anthropic-fast state",
+	).enabled,
+	true,
+);
 assert.equal(notices.at(-1), "Anthropic fast mode ON");
 const fastReasoned = await fastRequest(
 	"anthropic",
@@ -246,16 +286,20 @@ const fastReasoned = await fastRequest(
 	{ reasoning: "high", toolChoice: "none" },
 	nativeOpus,
 );
+const ordinaryReasoned = reasonedNoTools.payload;
 assert.deepEqual(
 	fastReasoned.payload,
-	{ ...reasonedNoTools.payload, speed: "fast" },
+	Object.assign({}, ordinaryReasoned, { speed: "fast" }),
 	"fast must preserve the ordinary native payload except speed",
 );
+const fastConfig = fastReasoned.payload.output_config;
 assert.equal(
-	(fastReasoned.payload?.output_config as { effort?: string } | undefined)?.effort,
+	typeof fastConfig === "object" && fastConfig !== null && "effort" in fastConfig
+		? fastConfig.effort
+		: undefined,
 	"high",
 );
-assert.deepEqual(fastReasoned.payload?.tool_choice, { type: "none" });
+assert.deepEqual(fastReasoned.payload.tool_choice, { type: "none" });
 // Direct route and gateway route get identical fast treatment.
 for (const provider of ["anthropic", "cloudflare-ai-gateway"]) {
 	for (const id of ["claude-opus-5-5", "claude-opus-5", "claude-opus-4-8"]) {
@@ -289,29 +333,53 @@ assert.deepEqual(
 const fullStreamOnly = await fastRequest("anthropic", "claude-opus-5", "pi-existing-beta", {
 	toolChoice: "none",
 });
+const fullChoice = fullStreamOnly.payload?.tool_choice;
 assert.equal(
-	(fullStreamOnly.payload?.tool_choice as { type?: string } | undefined)?.type,
+	typeof fullChoice === "object" && fullChoice !== null && "type" in fullChoice
+		? fullChoice.type
+		: undefined,
 	"none",
 	"full-only options must survive",
 );
+const fullThinking = fullStreamOnly.payload?.thinking;
 assert.notEqual(
-	(fullStreamOnly.payload?.thinking as { type?: string } | undefined)?.type,
+	typeof fullThinking === "object" && fullThinking !== null && "type" in fullThinking
+		? fullThinking.type
+		: undefined,
 	"disabled",
 	"a full call without thinkingEnabled must not be recomputed by the simple path",
 );
 
 // The selected Pi host owns this SDK; it need not be hoisted into the kit.
 const apiRequire = createRequire(import.meta.resolve("@earendil-works/pi-ai/compat"));
-const { default: Anthropic } = await import(
+/** The host-selected Anthropic SDK constructor surface this regression uses. */
+type AnthropicCtor = new (options: {
+	apiKey: string;
+	fetch: (input: unknown, init: { body?: unknown } | undefined) => Promise<never>;
+}) => unknown;
+const isAnthropicCtor = (module: unknown): module is { default: AnthropicCtor } =>
+	typeof module === "object" &&
+	module !== null &&
+	"default" in module &&
+	typeof module.default === "function";
+const anthropicModule: unknown = await import(
 	pathToFileURL(apiRequire.resolve("@anthropic-ai/sdk")).href
 );
+if (!isAnthropicCtor(anthropicModule)) {
+	throw new Error("host Anthropic SDK did not expose a constructor");
+}
+const { default: Anthropic } = anthropicModule;
 let clientPayload: Record<string, unknown> | undefined;
 const { result: prebuilt, reads: clientReads } = await countToggleReads(() =>
 	fastRequest("anthropic", "claude-opus-5", "pi-existing-beta", {
 		client: new Anthropic({
 			apiKey: "test",
-			fetch: async (_input, init) => {
-				clientPayload = JSON.parse(String(init?.body));
+			fetch: async (_input: unknown, init: { body?: unknown } | undefined) => {
+				const raw = init?.body;
+				if (typeof raw === "string") {
+					const parsed: unknown = JSON.parse(raw);
+					clientPayload = requireRecord(parsed, "client payload");
+				}
 				throw new Error("prebuilt client used");
 			},
 		}),
@@ -326,7 +394,7 @@ assert.equal(
 	"never request fast mode when the beta header cannot be attached",
 );
 
-await commands["anthropic-fast"].handler("off", anthropicOpusCtx);
+await commandFor(commands, "anthropic-fast").handler("off", anthropicOpusCtx);
 assert.equal(notices.at(-1), "Anthropic fast mode OFF");
 const { result: freshOff, reads: freshOffReads } = await countToggleReads(() =>
 	fastRequest("anthropic", "claude-opus-5"),
@@ -377,15 +445,23 @@ async function gatewayPriorityRequest(id: string) {
 	let url = "";
 	const stream = gatewayProvider.streamSimple(
 		model,
-		{ messages: [{ role: "user", content: "test", timestamp: 0 }] },
+		normalizeContext({ messages: [{ role: "user", content: "test", timestamp: 0 }] }),
 		{
 			apiKey: "test",
 			maxRetries: 0,
 			env: GATEWAY_ENV,
 			onPayload: (body) => requestPayload(model, body),
 			fetch: async (input, init) => {
-				url = String(input);
-				payload = JSON.parse(String(init?.body));
+				if (typeof input === "string") {
+					url = input;
+				} else if (input instanceof URL) {
+					url = input.href;
+				}
+				const raw = init?.body;
+				if (typeof raw === "string") {
+					const parsed: unknown = JSON.parse(raw);
+					payload = requireRecord(parsed, "captured payload");
+				}
 				throw new Error("payload captured");
 			},
 		},
@@ -402,7 +478,7 @@ async function gatewayPriorityRequest(id: string) {
 }
 
 // OpenAI priority mode is provider-gated payload injection via the stock hook.
-const requestHook = handlers.before_provider_request[0];
+const requestHook = handlerFor(handlers, "before_provider_request");
 const requestPayload = async (
 	model: unknown,
 	payload: unknown = { model: "m" },
@@ -420,10 +496,10 @@ const MODELS = {
 for (const model of Object.values(MODELS)) {
 	assert.equal(await requestPayload(model), undefined, "all payloads pass through while off");
 }
-await commands["codex-fast"].handler("on", uiCtx(MODELS.openai));
+await commandFor(commands, "codex-fast").handler("on", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI priority requests ON");
 for (const model of [MODELS.openai, MODELS.codex, MODELS.gatewayGpt]) {
-	const fast = (await requestPayload(model)) as Record<string, unknown>;
+	const fast = requireRecord(await requestPayload(model), "captured payload");
 	assert.equal(
 		fast.service_tier,
 		"priority",
@@ -457,11 +533,11 @@ assert.equal(
 );
 // The loaded hook, real gateway/Responses serializer, and footer must agree.
 for (const enabled of [false, true]) {
-	await commands["codex-fast"].handler(enabled ? "on" : "off", uiCtx(MODELS.openai));
+	await commandFor(commands, "codex-fast").handler(enabled ? "on" : "off", uiCtx(MODELS.openai));
 	for (const id of [...supportedGatewayIds, ...unsupportedGatewayIds]) {
 		const priority = enabled && supportedGatewayIds.includes(id);
 		const payload = await gatewayPriorityRequest(id);
-		await handlers.model_select[0]({}, uiCtx(gatewayModel(id)));
+		await handlerFor(handlers, "model_select")({}, uiCtx(gatewayModel(id)));
 		assert.deepEqual(
 			{ tier: payload.service_tier, footer: status.get("codex-fast") },
 			{
@@ -478,9 +554,9 @@ for (const enabled of [false, true]) {
 for (const provider of ["openai", "openai-codex"]) {
 	for (const id of ["o1", "o1-pro", "o3", "o3-mini", "o3-pro", "o4-mini"]) {
 		const model = { provider, id };
-		const payload = (await requestPayload(model)) as Record<string, unknown>;
+		const payload = requireRecord(await requestPayload(model), "captured payload");
 		assert.equal(payload.service_tier, "priority", `${provider}/${id} retains direct behavior`);
-		await handlers.model_select[0]({}, uiCtx(model));
+		await handlerFor(handlers, "model_select")({}, uiCtx(model));
 		assert.equal(status.get("codex-fast"), "accent:priority enabled");
 	}
 }
@@ -491,23 +567,23 @@ for (const payload of [null, [], "raw"]) {
 		"non-object payloads pass through",
 	);
 }
-await commands["codex-fast"].handler("off", uiCtx(MODELS.openai));
+await commandFor(commands, "codex-fast").handler("off", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI priority requests OFF");
-await commands.fast.handler("", uiCtx(MODELS.openai));
+await commandFor(commands, "fast").handler("", uiCtx(MODELS.openai));
 assert.equal(
 	notices.at(-1),
 	"OpenAI priority requests ON",
 	"/fast with no verb must retain toggle behavior",
 );
-await commands.fast.handler("off", uiCtx(MODELS.openai));
+await commandFor(commands, "fast").handler("off", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI priority requests OFF");
 
-await commands["xai-fast"].handler("on", uiCtx(MODELS.xai));
+await commandFor(commands, "xai-fast").handler("on", uiCtx(MODELS.xai));
 assert.equal(notices.at(-1), "xAI fast mode ON");
-const xaiFast = (await requestPayload(MODELS.xai)) as Record<string, unknown>;
+const xaiFast = requireRecord(await requestPayload(MODELS.xai), "captured payload");
 assert.equal(xaiFast.service_tier, "priority", "xai must request priority");
 assert.equal(xaiFast.model, "m", "payload fields must survive");
-const gatewayGrokFast = (await requestPayload(MODELS.gatewayGrok)) as Record<string, unknown>;
+const gatewayGrokFast = requireRecord(await requestPayload(MODELS.gatewayGrok), "captured payload");
 assert.equal(gatewayGrokFast.service_tier, "priority", "gateway grok must request priority");
 assert.equal(
 	await requestPayload(MODELS.openai),
@@ -525,21 +601,21 @@ for (const id of supportedGatewayIds) {
 		undefined,
 		"xai toggle must not touch gateway o-series",
 	);
-	await handlers.model_select[0]({}, uiCtx(gatewayModel(id)));
+	await handlerFor(handlers, "model_select")({}, uiCtx(gatewayModel(id)));
 	assert.equal(status.get("codex-fast"), undefined);
 	assert.equal(status.get("xai-fast"), undefined);
 }
-await commands["xai-fast"].handler("off", uiCtx(MODELS.xai));
+await commandFor(commands, "xai-fast").handler("off", uiCtx(MODELS.xai));
 
 // Command verbs: toggle flips, status reports, invalid warns without a write.
-await commands["codex-fast"].handler("toggle", uiCtx(MODELS.openai));
+await commandFor(commands, "codex-fast").handler("toggle", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI priority requests ON");
-await commands["codex-fast"].handler("toggle", uiCtx(MODELS.openai));
+await commandFor(commands, "codex-fast").handler("toggle", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI priority requests OFF");
-await commands["codex-fast"].handler("status", uiCtx(MODELS.openai));
+await commandFor(commands, "codex-fast").handler("status", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "OpenAI shared: off; session: inherit; effective: off.");
 const codexState = readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8");
-await commands["codex-fast"].handler("bogus", uiCtx(MODELS.openai));
+await commandFor(commands, "codex-fast").handler("bogus", uiCtx(MODELS.openai));
 assert.equal(notices.at(-1), "Usage: /codex-fast [on|off|toggle|status|ultrafast]");
 assert.equal(readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8"), codexState);
 
@@ -549,7 +625,10 @@ const statePath = join(agentDir, "openai-codex-fast.json");
 renameSync(statePath, `${statePath}.saved`);
 mkdirSync(statePath);
 try {
-	await assert.rejects(commands["codex-fast"].handler("on", uiCtx(MODELS.openai)), /EISDIR/);
+	await assert.rejects(
+		commandFor(commands, "codex-fast").handler("on", uiCtx(MODELS.openai)),
+		/EISDIR/,
+	);
 	assert.equal(await requestPayload(MODELS.openai), undefined);
 } finally {
 	rmSync(statePath, { recursive: true });
@@ -561,8 +640,10 @@ try {
 const statWatchers = () =>
 	process.getActiveResourcesInfo().filter((resource) => resource === "StatWatcher").length;
 const watcherBaseline = statWatchers();
-const runHandlers = async (event: string, ...args: [Record<string, unknown>, unknown]) => {
-	for (const handler of handlers[event] ?? []) await handler(...(args as [never, never]));
+const runHandlers = async (event: string, ...args: unknown[]): Promise<void> => {
+	for (const handler of handlers[event] ?? []) {
+		await handler(...args);
+	}
 };
 
 const { openaiProvider } = await import("@earendil-works/pi-ai/providers/openai");
@@ -584,26 +665,37 @@ async function openaiWireRequest(
 	sessionManager = defaultSession,
 ) {
 	let payload: Record<string, unknown> | undefined;
-	const api =
-		model.api === "openai-codex-responses"
-			? openAICodexResponsesApi()
-			: model.api === "openai-completions"
-				? openAICompletionsApi()
-				: openAIResponsesApi();
+	let api: ReturnType<typeof openAIResponsesApi>;
+	if (model.api === "openai-codex-responses") {
+		api = openAICodexResponsesApi();
+	} else if (model.api === "openai-completions") {
+		api = openAICompletionsApi();
+	} else {
+		api = openAIResponsesApi();
+	}
 	const stream = api.streamSimple(
 		model,
-		{ messages: [{ role: "user", content: "test", timestamp: 0 }] },
+		normalizeContext({ messages: [{ role: "user", content: "test", timestamp: 0 }] }),
 		{
 			apiKey: `synthetic.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "offline" } })).toString("base64")}.synthetic`,
 			transport: "sse",
 			maxRetries: 0,
 			onPayload: (body) => requestPayload(selectedModel, body, sessionManager),
 			fetch: async (_input, init) => {
-				const body =
-					new Headers(init?.headers).get("content-encoding") === "zstd"
-						? zstdDecompressSync(init?.body as Uint8Array).toString("utf8")
-						: String(init?.body);
-				payload = JSON.parse(body);
+				const raw = init?.body;
+				let body: string | undefined;
+				if (
+					new Headers(init?.headers).get("content-encoding") === "zstd" &&
+					raw instanceof Uint8Array
+				) {
+					body = zstdDecompressSync(raw).toString("utf8");
+				} else if (typeof raw === "string") {
+					body = raw;
+				}
+				if (body !== undefined) {
+					const parsed: unknown = JSON.parse(body);
+					payload = requireRecord(parsed, "captured payload");
+				}
 				throw new Error("payload captured");
 			},
 		},
@@ -617,7 +709,7 @@ async function openaiWireRequest(
 
 const rotatingSol = { ...astra, provider: "chatgpt-rotate", id: "gpt-6.1-sol" };
 for (const enabled of [false, true]) {
-	await commands["codex-fast"].handler(enabled ? "on" : "off", uiCtx(rotatingSol));
+	await commandFor(commands, "codex-fast").handler(enabled ? "on" : "off", uiCtx(rotatingSol));
 	// The rotation provider delegates to native OpenAI while the session keeps its own provider ID.
 	const payload = await openaiWireRequest({ ...rotatingSol, provider: "openai" }, rotatingSol);
 	assert.equal(payload.service_tier, enabled ? "priority" : undefined);
@@ -630,18 +722,18 @@ for (const enabled of [false, true]) {
 writeFileSync(statePath, JSON.stringify({ enabled: true }));
 assert.equal((await openaiWireRequest(astra)).service_tier, "priority");
 const legacyState = readFileSync(statePath, "utf8");
-await commands["codex-fast"].handler("ultrafast", uiCtx(MODELS.openai));
+await commandFor(commands, "codex-fast").handler("ultrafast", uiCtx(MODELS.openai));
 assert.equal(
 	readFileSync(statePath, "utf8"),
 	legacyState,
 	"unsupported activation must preserve the selected mode",
 );
 assert.match(notices.at(-1) ?? "", /No mode was changed/);
-await commands["codex-fast"].handler("ultrafast", uiCtx(astra));
+await commandFor(commands, "codex-fast").handler("ultrafast", uiCtx(astra));
 assert.deepEqual(JSON.parse(readFileSync(statePath, "utf8")), { enabled: true, tier: "ultrafast" });
 assert.match(notices.at(-1) ?? "", /6x API\/credit price; 8x Codex included usage/);
 const selectedUltraState = readFileSync(statePath, "utf8");
-await commands["codex-fast"].handler("", uiCtx(astra));
+await commandFor(commands, "codex-fast").handler("", uiCtx(astra));
 assert.equal(
 	readFileSync(statePath, "utf8"),
 	selectedUltraState,
@@ -679,17 +771,17 @@ assert.equal(
 for (const payload of [null, [], "raw", { model: "gpt-6-astra-extra" }]) {
 	assert.equal(await requestPayload(astra, payload), undefined);
 }
-await commands.fast.handler("", uiCtx(astra));
+await commandFor(commands, "fast").handler("", uiCtx(astra));
 assert.equal(notices.at(-1), "OpenAI ultrafast requests OFF");
 assert.equal((await openaiWireRequest(astra)).service_tier, undefined);
-await commands.fast.handler("", uiCtx(astra));
+await commandFor(commands, "fast").handler("", uiCtx(astra));
 assert.equal(
 	(await openaiWireRequest(astra)).service_tier,
 	"priority",
 	"/fast must never implicitly enable Ultrafast",
 );
-await commands["codex-fast"].handler("ultrafast", uiCtx(astra));
-await commands["codex-fast"].handler("on", uiCtx(astra));
+await commandFor(commands, "codex-fast").handler("ultrafast", uiCtx(astra));
+await commandFor(commands, "codex-fast").handler("on", uiCtx(astra));
 assert.equal(
 	(await openaiWireRequest(astra)).service_tier,
 	"priority",
@@ -698,7 +790,7 @@ assert.equal(
 for (const content of ['{"enabled":true,"tier":"unknown"}', "null", "{broken"]) {
 	writeFileSync(statePath, content);
 	assert.equal((await openaiWireRequest(astra)).service_tier, undefined);
-	await commands["codex-fast"].handler("status", uiCtx(astra));
+	await commandFor(commands, "codex-fast").handler("status", uiCtx(astra));
 	assert.equal(notices.at(-1), "OpenAI shared: off; session: inherit; effective: off.");
 }
 
@@ -729,9 +821,9 @@ const localCommand = async (args: string, sessionManager = sessionA, model: unkn
 	loaded.runtime.appendEntry = (type, data) => {
 		sessionManager.appendCustomEntry(type, data);
 	};
-	await commands.ultrafast.handler(args, uiCtx(model, sessionManager));
+	await commandFor(commands, "ultrafast").handler(args, uiCtx(model, sessionManager));
 };
-await commands["codex-fast"].handler("on", uiCtx(astra));
+await commandFor(commands, "codex-fast").handler("on", uiCtx(astra));
 const sharedPriority = readFileSync(statePath, "utf8");
 await localCommand("on --session");
 assert.equal(
@@ -746,9 +838,11 @@ assert.equal(
 	"another session keeps the shared tier",
 );
 assert.equal(status.get("codex-fast"), "accent:session ultrafast requested");
-assert.match(notices.at(-1) ?? "", /shared: priority; session: ultrafast; effective: ultrafast/);
+const tierNotice = notices.at(-1);
+assert.ok(tierNotice !== undefined, "expected a tier status notice");
+assert.match(tierNotice, /shared: priority; session: ultrafast; effective: ultrafast/);
 const sessionFile = sessionA.getSessionFile();
-assert.ok(sessionFile);
+assert.ok(sessionFile !== undefined && sessionFile !== "", "expected a session file");
 const resumed = SessionManager.open(sessionFile);
 assert.equal(
 	(await openaiWireRequest(codexAstra, codexAstra, resumed)).service_tier,
@@ -761,14 +855,14 @@ const reloaded = await discoverAndLoadExtensions(
 	agentDir,
 );
 assert.deepEqual(reloaded.errors, []);
-const reloadedHook = reloaded.extensions[0].handlers.get("before_provider_request")?.[0];
-assert.ok(reloadedHook);
+const reloadedHook = handlerFor(drivenHandlers(soleExtension(reloaded)), "before_provider_request");
 assert.equal(
-	(
-		(await reloadedHook(
+	requireRecord(
+		await reloadedHook(
 			{ type: "before_provider_request", payload: { model: astra.id } },
-			uiCtx(astra, resumed) as never,
-		)) as Record<string, unknown>
+			uiCtx(astra, resumed),
+		),
+		"tier payload",
 	).service_tier,
 	"ultrafast",
 	"a fresh factory reads persisted metadata",
@@ -786,13 +880,14 @@ assert.equal(
 	"policy metadata stays out of model context",
 );
 const firstEntry = sessionA.getEntries()[0];
+assert.ok(firstEntry);
 sessionA.branch(firstEntry.id);
 assert.equal(
 	(await openaiWireRequest(astra, astra, sessionA)).service_tier,
 	"ultrafast",
 	"/tree cannot silently retier the same session",
 );
-await commands.fast.handler("off", uiCtx(astra, sessionA));
+await commandFor(commands, "fast").handler("off", uiCtx(astra, sessionA));
 assert.equal(
 	(await openaiWireRequest(astra, astra, sessionA)).service_tier,
 	"ultrafast",
@@ -810,7 +905,7 @@ for (const model of [MODELS.anthropicOpus, MODELS.xai]) {
 		"local OpenAI off must not label other providers as off",
 	);
 }
-await commands.ultrafast.handler("", uiCtx(astra));
+await commandFor(commands, "ultrafast").handler("", uiCtx(astra));
 assert.equal(
 	(await openaiWireRequest(astra, astra, sessionA)).service_tier,
 	undefined,
@@ -835,7 +930,7 @@ assert.equal(
 	undefined,
 	"session toggle disables inherited Ultrafast",
 );
-await commands["codex-fast"].handler("on", uiCtx(astra));
+await commandFor(commands, "codex-fast").handler("on", uiCtx(astra));
 assert.equal(
 	(await openaiWireRequest(astra, astra, sessionA)).service_tier,
 	undefined,
@@ -860,30 +955,30 @@ assert.equal(
 );
 assert.equal(readFileSync(statePath, "utf8"), beforeInvalidShared);
 await localCommand("reset --session");
-await commands.ultrafast.handler("toggle", uiCtx(astra));
+await commandFor(commands, "ultrafast").handler("toggle", uiCtx(astra));
 assert.equal(
 	(await openaiWireRequest(astra)).service_tier,
 	"ultrafast",
 	"global toggle from priority selects Ultrafast",
 );
-await commands.ultrafast.handler("toggle", uiCtx(astra));
+await commandFor(commands, "ultrafast").handler("toggle", uiCtx(astra));
 assert.equal((await openaiWireRequest(astra)).service_tier, undefined);
 
 // Startup validation refuses ambiguous or unsupported activation and blocks
 // prompts until an explicit mode command recovers, without changing shared state.
-await commands["codex-fast"].handler("ultrafast", uiCtx(astra));
+await commandFor(commands, "codex-fast").handler("ultrafast", uiCtx(astra));
 const ultraState = readFileSync(statePath, "utf8");
 flags.set("fast", true);
 flags.set("ultrafast", true);
 await runHandlers("session_start", { reason: "startup" }, uiCtx(astra));
 assert.equal(readFileSync(statePath, "utf8"), ultraState);
-assert.deepEqual(await handlers.input[0]({}, uiCtx(astra)), { action: "handled" });
+assert.deepEqual(await handlerFor(handlers, "input")({}, uiCtx(astra)), { action: "handled" });
 assert.equal(
-	await handlers.input[0]({ source: "extension" }, uiCtx(astra)),
+	await handlerFor(handlers, "input")({ source: "extension" }, uiCtx(astra)),
 	undefined,
 	"startup recovery must not swallow intercom or extension-delivered input",
 );
-const recreatedInputs: Handler[] = [];
+const recreatedInputs: DrivenHandler[] = [];
 for (const reason of ["reload", "new", "resume", "fork"] as const) {
 	const fresh = await discoverAndLoadExtensions(
 		[fileURLToPath(new URL("../extensions/fast-mode.ts", import.meta.url))],
@@ -891,34 +986,36 @@ for (const reason of ["reload", "new", "resume", "fork"] as const) {
 		agentDir,
 	);
 	assert.deepEqual(fresh.errors, []);
-	for (const [name, value] of flags) fresh.runtime.flagValues.set(name, value);
-	const freshHandlers = Object.fromEntries(fresh.extensions[0].handlers) as Record<
-		string,
-		Handler[]
-	>;
-	await freshHandlers.session_start[0]({ reason }, uiCtx(astra));
+	for (const [name, value] of flags) {
+		fresh.runtime.flagValues.set(name, value);
+	}
+	const freshHandlers = drivenHandlers(soleExtension(fresh));
+	await handlerFor(freshHandlers, "session_start")({ reason }, uiCtx(astra));
 	assert.deepEqual(
-		await freshHandlers.input[0]({ source: "interactive" }, uiCtx(astra)),
+		await handlerFor(freshHandlers, "input")({ source: "interactive" }, uiCtx(astra)),
 		{ action: "handled" },
 		`${reason} must not bypass unresolved startup validation`,
 	);
-	recreatedInputs.push(freshHandlers.input[0]);
-	await freshHandlers.session_shutdown[0]({}, uiCtx(astra));
+	recreatedInputs.push(handlerFor(freshHandlers, "input"));
+	await handlerFor(freshHandlers, "session_shutdown")({}, uiCtx(astra));
 }
-await commands["codex-fast"].handler("off", uiCtx(astra));
-assert.equal(await handlers.input[0]({}, uiCtx(astra)), undefined);
-for (const input of recreatedInputs)
+await commandFor(commands, "codex-fast").handler("off", uiCtx(astra));
+assert.equal(await handlerFor(handlers, "input")({}, uiCtx(astra)), undefined);
+for (const input of recreatedInputs) {
 	assert.equal(
 		await input({ source: "interactive" }, uiCtx(astra)),
 		undefined,
 		"an explicit mode command resolves the process-wide startup error",
 	);
+}
 flags.set("fast", false);
 const offState = readFileSync(statePath, "utf8");
 await runHandlers("session_start", { reason: "startup" }, uiCtx(MODELS.openai));
 assert.equal(readFileSync(statePath, "utf8"), offState);
-assert.deepEqual(await handlers.input[0]({}, uiCtx(MODELS.openai)), { action: "handled" });
-await commands["codex-fast"].handler("off", uiCtx(MODELS.openai));
+assert.deepEqual(await handlerFor(handlers, "input")({}, uiCtx(MODELS.openai)), {
+	action: "handled",
+});
+await commandFor(commands, "codex-fast").handler("off", uiCtx(MODELS.openai));
 await runHandlers("session_start", { reason: "startup" }, uiCtx(astra));
 assert.equal(
 	(await openaiWireRequest(astra)).service_tier,
@@ -951,7 +1048,7 @@ assert.match(
 	/shared: ultrafast; session: off; effective: off.*6x API\/credit price/,
 );
 await localCommand("reset --session");
-await commands["codex-fast"].handler("off", uiCtx(astra));
+await commandFor(commands, "codex-fast").handler("off", uiCtx(astra));
 for (const reason of ["reload", "new", "resume", "fork"]) {
 	await runHandlers("session_start", { reason }, uiCtx(astra));
 	assert.equal(
@@ -970,15 +1067,18 @@ const gatewayOpus = {
 flags.set("fast", true);
 await runHandlers("session_start", { reason: "startup" }, uiCtx(gatewayOpus));
 assert.equal(
-	JSON.parse(readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8")).enabled,
+	requireRecord(
+		JSON.parse(readFileSync(join(agentDir, "openai-codex-fast.json"), "utf8")),
+		"codex-fast state",
+	).enabled,
 	true,
 	"--fast must enable shared OpenAI fast state",
 );
-await commands["codex-fast"].handler("off", uiCtx(gatewayOpus));
+await commandFor(commands, "codex-fast").handler("off", uiCtx(gatewayOpus));
 for (const reason of ["reload", "new", "resume", "fork"]) {
 	await runHandlers("session_start", { reason }, uiCtx(MODELS.openai));
 	assert.equal(
-		JSON.parse(readFileSync(statePath, "utf8")).enabled,
+		requireRecord(JSON.parse(readFileSync(statePath, "utf8")), "fast state").enabled,
 		false,
 		`${reason} must preserve explicit fast off despite --fast`,
 	);
@@ -992,7 +1092,7 @@ for (const reason of ["reload", "new", "resume", "fork"]) {
 flags.set("fast", false);
 assert.equal(status.get("anthropic-fast"), undefined, "no footer while off");
 assert.equal(status.get("codex-fast"), undefined);
-await commands["anthropic-fast"].handler("on", uiCtx(gatewayOpus));
+await commandFor(commands, "anthropic-fast").handler("on", uiCtx(gatewayOpus));
 assert.equal(status.get("anthropic-fast"), "accent:fast");
 await runHandlers("model_select", {}, uiCtx(MODELS.copilotOpus));
 assert.equal(
@@ -1011,7 +1111,9 @@ assert.equal(status.get("xai-fast"), undefined);
 // History size must not multiply repeated request/status work, including a missing override.
 for (const count of [781, 43_000]) {
 	const manager = SessionManager.inMemory(agentDir);
-	for (let i = 0; i < count; i++) manager.appendCustomEntry("history-fixture", {});
+	for (let i = 0; i < count; i++) {
+		manager.appendCustomEntry("history-fixture", {});
+	}
 	const entries = mock.method(manager, "getEntries");
 	await runHandlers("session_start", { reason: "resume" }, uiCtx(astra, manager));
 	assert.equal(entries.mock.callCount(), 1, "Session policy bootstraps once");
@@ -1024,7 +1126,7 @@ for (const count of [781, 43_000]) {
 	const before = readFileSync(statePath, "utf8");
 	writeFileSync(statePath, JSON.stringify({ enabled: true, tier: "ultrafast" }));
 	assert.equal(
-		((await requestPayload(astra, { model: astra.id }, manager)) as Record<string, unknown>)
+		requireRecord(await requestPayload(astra, { model: astra.id }, manager), "captured payload")
 			.service_tier,
 		"ultrafast",
 		"Shared billing policy is still read on the next request",

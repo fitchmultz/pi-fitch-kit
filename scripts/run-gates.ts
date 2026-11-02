@@ -4,30 +4,37 @@
 import { spawnSync } from "node:child_process";
 
 const testFiles = [
-	"scripts/image-guard-smoke.mjs",
-	"scripts/image-budget-regression.mjs",
-	"scripts/clean-footer-regression.mjs",
+	"scripts/image-guard-smoke.ts",
+	"scripts/image-budget-regression.ts",
+	"scripts/clean-footer-regression.ts",
 	"scripts/fast-mode-regression.ts",
 	"scripts/session-name-regression.ts",
-	"scripts/session-name-boundary.mjs",
+	"scripts/session-name-boundary.ts",
 	"scripts/write-prompt-regression.ts",
-	"scripts/write-prompt-boundary.mjs",
+	"scripts/write-prompt-boundary.ts",
 	"scripts/paged-reader-regression.ts",
-	"scripts/setup-lifecycle-smoke.mjs",
-	"scripts/validate.mjs",
-	"scripts/validate-regression.mjs",
-];
+	"scripts/setup-lifecycle-smoke.ts",
+	"scripts/validate.ts",
+	"scripts/validate-regression.ts",
+] as const;
 
-const gates = [
+/** One acceptance gate and the command that runs it. */
+type Gate = { name: string; command: readonly string[] };
+
+const gates: readonly Gate[] = [
 	{ name: "typecheck", command: ["tsc", "--noEmit"] },
 	{ name: "format", command: ["oxfmt", "--check", "."] },
 	{ name: "tests", command: ["node", "--test", ...testFiles] },
 ];
 
-const failures = [];
+const failures: string[] = [];
 for (const gate of gates) {
 	console.log(`\n=== ${gate.name} ===`);
-	const result = spawnSync(gate.command[0], gate.command.slice(1), {
+	const [command, ...args] = gate.command;
+	if (command === undefined) {
+		continue;
+	}
+	const result = spawnSync(command, args, {
 		stdio: "inherit",
 		shell: process.platform === "win32",
 	});
