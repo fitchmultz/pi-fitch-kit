@@ -14,10 +14,7 @@ const manifest: Record<string, unknown> = requireRecord(
 	JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf8")),
 	"setup-manifest.json",
 );
-const runtimePi = jsonString(
-	jsonField(manifest, "runtime", "manifest runtime").pi,
-	"runtime.pi",
-);
+const runtimePi = jsonString(jsonField(manifest, "runtime", "manifest runtime").pi, "runtime.pi");
 const minimumPi = runtimePi.replace(/^>=/, "");
 const versionAtLeast = (actual: string, minimum: string): boolean => {
 	const left = actual.split(".").map(Number);

@@ -272,7 +272,7 @@ try {
 				settingsManager,
 				sessionManager: manager,
 				// "builtin" matches the original truthy flag: no default tools, no allowlist.
-			noTools: "builtin",
+				noTools: "builtin",
 			})
 		).session;
 		session = created;
