@@ -12,6 +12,7 @@ export default function setupModels(pi: ExtensionAPI): void {
 				Type.String({ description: "Provider/model routes from setup-manifest.json" }),
 			),
 		}),
+		// oxlint-disable-next-line eslint/max-params -- QX-001: Pi's documented five-parameter tool execute callback.
 		async execute(_toolCallId, { routes }, _signal, _onUpdate, ctx) {
 			const known = new Set(
 				ctx.modelRegistry.getAll().map((model) => `${model.provider}/${model.id}`),
