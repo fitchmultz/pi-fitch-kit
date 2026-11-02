@@ -20,7 +20,7 @@
     "regression:write-prompt": "node --experimental-strip-types scripts/write-prompt-regression.ts && node scripts/write-prompt-boundary.mjs",
     "check:ambitious:live": "node scripts/ambitious-live.ts",
     "smoke": "node scripts/package-smoke.ts",
-    "smoke:lifecycle": "node scripts/setup-lifecycle-smoke.mjs",
+    "smoke:lifecycle": "node scripts/setup-lifecycle-smoke.ts",
     "lint": "oxlint --deny-warnings .",
     "lint:agent": "oxlint --deny-warnings --format=agent .",
     "lint:fix": "oxlint --fix .",

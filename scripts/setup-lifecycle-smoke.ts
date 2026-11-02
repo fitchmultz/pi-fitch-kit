@@ -7,15 +7,25 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { jsonField, jsonList, jsonString, requireRecord } from "./test-harness.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const manifest = JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf8"));
-const minimumPi = manifest.runtime.pi.replace(/^>=/, "");
-const versionAtLeast = (actual, minimum) => {
+const manifest: Record<string, unknown> = requireRecord(
+	JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf8")),
+	"setup-manifest.json",
+);
+const runtimePi = jsonString(
+	jsonField(manifest, "runtime", "manifest runtime").pi,
+	"runtime.pi",
+);
+const minimumPi = runtimePi.replace(/^>=/, "");
+const versionAtLeast = (actual: string, minimum: string): boolean => {
 	const left = actual.split(".").map(Number);
 	const right = minimum.split(".").map(Number);
 	for (let index = 0; index < Math.max(left.length, right.length); index++) {
-		if ((left[index] ?? 0) !== (right[index] ?? 0)) return (left[index] ?? 0) > (right[index] ?? 0);
+		if ((left[index] ?? 0) !== (right[index] ?? 0)) {
+			return (left[index] ?? 0) > (right[index] ?? 0);
+		}
 	}
 	return true;
 };
@@ -37,23 +47,32 @@ const env = {
 const packageDir = fileURLToPath(
 	new URL("..", import.meta.resolve("@earendil-works/pi-coding-agent")),
 );
-const hostPackage = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
-const installedCli = resolve(packageDir, hostPackage.bin.pi);
+const hostPackage: Record<string, unknown> = requireRecord(
+	JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8")),
+	"host package.json",
+);
+const installedCli = resolve(
+	packageDir,
+	jsonString(jsonField(hostPackage, "bin", "host bin").pi, "host bin.pi"),
+);
 const cli = process.env.PI_HOST_CLI ?? installedCli;
 assert.equal(
 	realpathSync(cli),
 	realpathSync(installedCli),
 	"Child CLI must match the installed SDK/types graph",
 );
-if (process.env.PI_COMPAT_EXPECTED_PACKAGE_DIR)
+if (process.env.PI_COMPAT_EXPECTED_PACKAGE_DIR !== undefined) {
 	assert.equal(realpathSync(packageDir), realpathSync(process.env.PI_COMPAT_EXPECTED_PACKAGE_DIR));
-if (process.env.PI_HOST_INDEX)
+}
+if (process.env.PI_HOST_INDEX !== undefined) {
 	assert.equal(
 		realpathSync(process.env.PI_HOST_INDEX),
 		realpathSync(join(packageDir, "dist/index.js")),
 	);
-if (process.env.PI_COMPAT_EXPECTED_VERSION)
+}
+if (process.env.PI_COMPAT_EXPECTED_VERSION !== undefined) {
 	assert.equal(hostPackage.version, process.env.PI_COMPAT_EXPECTED_VERSION);
+}
 console.log(
 	JSON.stringify({
 		host: process.env.PI_COMPAT_HOST ?? "local",
@@ -62,7 +81,7 @@ console.log(
 		cli,
 	}),
 );
-const pi = (...args) =>
+const pi = (...args: string[]) =>
 	execFileSync(process.execPath, [cli, ...args, "--no-approve"], {
 		cwd,
 		encoding: "utf8",
@@ -72,23 +91,23 @@ const pi = (...args) =>
 
 try {
 	const piVersion = pi("--version").trim();
-	assert.ok(
-		versionAtLeast(piVersion, minimumPi),
-		`Pi ${piVersion} must satisfy ${manifest.runtime.pi}`,
-	);
+	assert.ok(versionAtLeast(piVersion, minimumPi), `Pi ${piVersion} must satisfy ${runtimePi}`);
 	pi("install", root);
 	assert.ok(
 		pi("list").includes(root),
 		"installed package list must include the resolved checkout path",
 	);
 
-	const filtered = JSON.parse(readFileSync(settingsPath, "utf8"));
+	const filtered: Record<string, unknown> = requireRecord(
+		JSON.parse(readFileSync(settingsPath, "utf8")),
+		"settings.json",
+	);
 	assert.equal(filtered.compactView, undefined, "installing the kit must not enable compact view");
 	filtered.compactView = false;
 	filtered.packages = [{ source: root, prompts: [] }];
 	writeFileSync(settingsPath, `${JSON.stringify(filtered, null, 2)}\n`);
 
-	const settingsManager = await SettingsManager.create(cwd, agentDir, {
+	const settingsManager = SettingsManager.create(cwd, agentDir, {
 		projectTrusted: false,
 	});
 	const loader = new DefaultResourceLoader({
@@ -106,7 +125,7 @@ try {
 	writeFileSync(settingsPath, `${JSON.stringify(filtered, null, 2)}\n`);
 	pi("remove", canonicalSource);
 	assert.deepEqual(
-		JSON.parse(readFileSync(settingsPath, "utf8")).packages,
+		requireRecord(JSON.parse(readFileSync(settingsPath, "utf8")), "settings.json").packages,
 		[],
 		"one identity-aware remove must clear filtered canonical and pinned duplicates",
 	);
@@ -114,19 +133,21 @@ try {
 	await settingsManager.reload();
 	await loader.reload();
 
-	const normalized = JSON.parse(readFileSync(settingsPath, "utf8"));
+	const normalized: Record<string, unknown> = requireRecord(
+		JSON.parse(readFileSync(settingsPath, "utf8")),
+		"settings.json",
+	);
 	assert.equal(
 		normalized.compactView,
 		false,
 		"kit reinstall and reload must preserve an explicit compact-view opt-out",
 	);
-	assert.equal(normalized.packages.length, 1);
-	assert.equal(
-		typeof normalized.packages[0],
-		"string",
-		"reinstall must remove stale package filters",
-	);
-	assert.equal(resolve(dirname(settingsPath), normalized.packages[0]), root);
+	assert.equal(jsonList(normalized.packages, "settings packages").length, 1);
+	const packageSource = jsonList(normalized.packages, "settings packages").at(0);
+	if (typeof packageSource !== "string") {
+		throw new Error("reinstall must remove stale package filters");
+	}
+	assert.equal(resolve(dirname(settingsPath), packageSource), root);
 	assert.deepEqual(
 		loader
 			.getPrompts()

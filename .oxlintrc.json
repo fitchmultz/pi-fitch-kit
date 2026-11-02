@@ -310,7 +310,7 @@
         "scripts/paged-reader-regression.ts",
         "scripts/session-name-boundary.mjs",
         "scripts/session-name-regression.ts",
-        "scripts/setup-lifecycle-smoke.mjs",
+        "scripts/setup-lifecycle-smoke.ts",
         "scripts/validate-regression.ts",
         "scripts/validate.ts",
         "scripts/write-prompt-boundary.mjs",
