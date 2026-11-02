@@ -46,17 +46,17 @@ Setup keeps the kit's opinionated model baseline: `gpt-6-astra` through OpenAI/C
 
 The package loads seven extensions, two prompts, and the `calm` theme. Setup installs the external components you select.
 
-| Command | Use |
-|---|---|
-| `/draft <text>` | Rewrite a request in a separate dialog. Review the result before you accept it. |
-| `/ambitious <text>` | A concise, context-aware, more ambitious request: outcome, expert methods, justified targets, and runnable verification. Maximum 1,800 characters; same dialog as `/draft`. |
-| `/unreasonable <text>` | Turn a tentative request into a forceful, outcome-driven mandate: stronger task-specific methods and proof, not extra scope or permissions. Same review dialog as `/draft`; no kit-specific length cap. |
-| `/side-question <text>` | Ask a question with session context. The answer stays outside the main conversation. |
-| `/reader demo` | Open a sample document without a model call. Press Right/Space for the next page. Press Left for the previous page. Press Escape to close. |
-| `/reader` or `/reader list` | Show the saved page or document list. Press `N` to write a section note. Use Ctrl+Enter to request a response. |
-| `/clean-footer` | Switch between the compact and built-in footers. |
-| `/codex-fast status`, `/anthropic-fast status`, `/xai-fast status` | Check the shared fast-mode settings. |
-| `/github-open-issues-prs` | Start the prompt for an audit of open GitHub issues and pull requests. |
+| Command                                                            | Use                                                                                                                                                                                                     |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/draft <text>`                                                    | Rewrite a request in a separate dialog. Review the result before you accept it.                                                                                                                         |
+| `/ambitious <text>`                                                | A concise, context-aware, more ambitious request: outcome, expert methods, justified targets, and runnable verification. Maximum 1,800 characters; same dialog as `/draft`.                             |
+| `/unreasonable <text>`                                             | Turn a tentative request into a forceful, outcome-driven mandate: stronger task-specific methods and proof, not extra scope or permissions. Same review dialog as `/draft`; no kit-specific length cap. |
+| `/side-question <text>`                                            | Ask a question with session context. The answer stays outside the main conversation.                                                                                                                    |
+| `/reader demo`                                                     | Open a sample document without a model call. Press Right/Space for the next page. Press Left for the previous page. Press Escape to close.                                                              |
+| `/reader` or `/reader list`                                        | Show the saved page or document list. Press `N` to write a section note. Use Ctrl+Enter to request a response.                                                                                          |
+| `/clean-footer`                                                    | Switch between the compact and built-in footers.                                                                                                                                                        |
+| `/codex-fast status`, `/anthropic-fast status`, `/xai-fast status` | Check the shared fast-mode settings.                                                                                                                                                                    |
+| `/github-open-issues-prs`                                          | Start the prompt for an audit of open GitHub issues and pull requests.                                                                                                                                  |
 
 Session names help you find saved sessions. The Claude image guard adapts Claude images to provider limits. The setup model tool reads the current model registry without a provider call.
 
@@ -66,11 +66,11 @@ Session names help you find saved sessions. The Claude image guard adapts Claude
 
 Setup offers the [settings example](examples/settings.json) and model context windows as separate choices. Setup preserves existing values unless you select a change.
 
-| Setting | Choice |
-|---|---|
-| `images.autoResize` | Set `false` to preserve source image detail. The Claude image guard still applies. |
-| `compactView` | Optional. Requires a Pi runtime that supports compact view. |
-| `compaction` | The example reserves 64,000 tokens and retains 40,000 recent tokens. |
+| Setting               | Choice                                                                                          |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| `images.autoResize`   | Set `false` to preserve source image detail. The Claude image guard still applies.              |
+| `compactView`         | Optional. Requires a Pi runtime that supports compact view.                                     |
+| `compaction`          | The example reserves 64,000 tokens and retains 40,000 recent tokens.                            |
 | `modelContextWindows` | The manifest offers 300,000 tokens per route. Check route pricing before you increase a window. |
 
 Use `/reload` after changes to settings or other non-code resources. See the [configuration reference](docs/reference.md) for exact limits and options.

@@ -9,7 +9,11 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { fauxAssistantMessage } from "@earendil-works/pi-ai";
-import { DefaultResourceLoader, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
+import {
+	DefaultResourceLoader,
+	SessionManager,
+	SettingsManager,
+} from "@earendil-works/pi-coding-agent";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const temp = mkdtempSync(join(tmpdir(), "pi-fitch-kit-package-"));
@@ -23,7 +27,10 @@ try {
 	mkdirSync(agentDir, { recursive: true });
 	mkdirSync(home, { recursive: true });
 	mkdirSync(cwd, { recursive: true });
-	writeFileSync(join(agentDir, "settings.json"), `${JSON.stringify({ packages: [root] }, null, 2)}\n`);
+	writeFileSync(
+		join(agentDir, "settings.json"),
+		`${JSON.stringify({ packages: [root] }, null, 2)}\n`,
+	);
 	writeFileSync(
 		join(agentDir, "verbosity.json"),
 		`${JSON.stringify({ showIndicator: true, models: { "openai-codex/gpt-6-astra": "low" } }, null, 2)}\n`,
@@ -46,21 +53,28 @@ try {
 	const extensions = loader.getExtensions();
 	const themeNames = themes.themes.map(({ name }) => name).sort();
 	if (JSON.stringify(themeNames) !== JSON.stringify(["calm"]) || themes.diagnostics.length > 0) {
-		throw new Error(`Theme load failed: ${JSON.stringify({ themes: themeNames, diagnostics: themes.diagnostics })}`);
+		throw new Error(
+			`Theme load failed: ${JSON.stringify({ themes: themeNames, diagnostics: themes.diagnostics })}`,
+		);
 	}
 	// SDK-only loaders resolve colors but do not install Pi's full theme schema validator.
 	// The native CLI does; observe its selected theme because invalid themes silently fall back.
-	const hostDir = fileURLToPath(new URL("..", import.meta.resolve("@earendil-works/pi-coding-agent")));
+	const hostDir = fileURLToPath(
+		new URL("..", import.meta.resolve("@earendil-works/pi-coding-agent")),
+	);
 	const hostPackage = JSON.parse(readFileSync(join(hostDir, "package.json"), "utf8"));
 	const cliAgentDir = join(temp, "cli-agent");
 	mkdirSync(join(cliAgentDir, "themes"), { recursive: true });
 	writeFileSync(join(cliAgentDir, "settings.json"), JSON.stringify({ theme: "calm" }));
 	const themeProbe = join(temp, "theme-probe.ts");
-	writeFileSync(themeProbe, `export default function (pi) {
+	writeFileSync(
+		themeProbe,
+		`export default function (pi) {
 		pi.on("session_start", (_event, ctx) => {
 			pi.appendEntry("kit-theme-smoke", { name: ctx.ui.theme.name });
 		});
-	}\n`);
+	}\n`,
+	);
 	const shippedTheme = JSON.parse(readFileSync(join(root, "themes", "calm.json"), "utf8"));
 	const missingRequiredColor = structuredClone(shippedTheme);
 	delete missingRequiredColor.colors.mdHeading;
@@ -69,28 +83,57 @@ try {
 		["missing required mdHeading", missingRequiredColor, false],
 	]) {
 		writeFileSync(join(cliAgentDir, "themes", "calm.json"), JSON.stringify(document));
-		const result = spawnSync(process.execPath, [
-			resolve(hostDir, hostPackage.bin.pi), "--mode", "rpc", "--offline", "--no-session",
-			"--no-extensions", "-e", themeProbe, "--no-skills", "--no-prompt-templates",
-			"--no-context-files", "--no-tools", "--no-approve",
-			"--provider", "openai", "--model", "gpt-6-astra", "--api-key", "fixture-only",
-		], {
-			cwd,
-			env: {
-				PATH: process.env.PATH, HOME: home, PI_CODING_AGENT_DIR: cliAgentDir,
-				PI_TELEMETRY: "0", PI_SKIP_VERSION_CHECK: "1",
+		const result = spawnSync(
+			process.execPath,
+			[
+				resolve(hostDir, hostPackage.bin.pi),
+				"--mode",
+				"rpc",
+				"--offline",
+				"--no-session",
+				"--no-extensions",
+				"-e",
+				themeProbe,
+				"--no-skills",
+				"--no-prompt-templates",
+				"--no-context-files",
+				"--no-tools",
+				"--no-approve",
+				"--provider",
+				"openai",
+				"--model",
+				"gpt-6-astra",
+				"--api-key",
+				"fixture-only",
+			],
+			{
+				cwd,
+				env: {
+					PATH: process.env.PATH,
+					HOME: home,
+					PI_CODING_AGENT_DIR: cliAgentDir,
+					PI_TELEMETRY: "0",
+					PI_SKIP_VERSION_CHECK: "1",
+				},
+				input: '{"id":"theme","type":"get_entries"}\n',
+				encoding: "utf8",
+				timeout: 30_000,
 			},
-			input: '{"id":"theme","type":"get_entries"}\n',
-			encoding: "utf8",
-			timeout: 30_000,
-		});
+		);
 		if (result.error) throw result.error;
 		if (result.status !== 0) throw new Error(`Native theme probe failed: ${result.stderr}`);
-		const response = result.stdout.split("\n").filter(Boolean).map((line) => JSON.parse(line))
+		const response = result.stdout
+			.split("\n")
+			.filter(Boolean)
+			.map((line) => JSON.parse(line))
 			.find(({ id, type }) => id === "theme" && type === "response");
-		if (!response?.success) throw new Error(`Native theme probe had no successful response: ${result.stdout}`);
-		const observed = response.data.entries.find(({ customType }) => customType === "kit-theme-smoke")?.data?.name;
-		if (typeof observed !== "string") throw new Error("Native theme probe did not observe the active theme");
+		if (!response?.success)
+			throw new Error(`Native theme probe had no successful response: ${result.stdout}`);
+		const observed = response.data.entries.find(
+			({ customType }) => customType === "kit-theme-smoke",
+		)?.data?.name;
+		if (typeof observed !== "string")
+			throw new Error("Native theme probe did not observe the active theme");
 		if ((observed === "calm") !== shouldLoad) {
 			throw new Error(`Native theme schema check failed for ${label}: selected ${observed}`);
 		}
@@ -98,20 +141,34 @@ try {
 	const promptNames = prompts.prompts.map(({ name }) => name).sort();
 	const expectedPrompts = ["fitch-setup", "github-open-issues-prs"];
 	if (JSON.stringify(promptNames) !== JSON.stringify(expectedPrompts)) {
-		throw new Error(`Expected ${JSON.stringify(expectedPrompts)}, got ${JSON.stringify(promptNames)}`);
+		throw new Error(
+			`Expected ${JSON.stringify(expectedPrompts)}, got ${JSON.stringify(promptNames)}`,
+		);
 	}
 	const errors = prompts.diagnostics.filter(({ severity }) => severity === "error");
 	if (errors.length > 0) throw new Error(`Prompt load errors: ${JSON.stringify(errors)}`);
-	if (extensions.errors.length > 0) throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
-	if (extensions.extensions.length !== 7) throw new Error(`Expected 7 extensions, got ${extensions.extensions.length}`);
-	const cleanFooter = extensions.extensions.find(({ path }) => path.endsWith("/extensions/clean-footer.ts"));
+	if (extensions.errors.length > 0)
+		throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
+	if (extensions.extensions.length !== 7)
+		throw new Error(`Expected 7 extensions, got ${extensions.extensions.length}`);
+	const cleanFooter = extensions.extensions.find(({ path }) =>
+		path.endsWith("/extensions/clean-footer.ts"),
+	);
 	if (!cleanFooter) throw new Error("Clean-footer extension missing");
-	const fastMode = extensions.extensions.find(({ path }) => path.endsWith("/extensions/fast-mode.ts"));
+	const fastMode = extensions.extensions.find(({ path }) =>
+		path.endsWith("/extensions/fast-mode.ts"),
+	);
 	if (!fastMode) throw new Error("Fast-mode extension missing");
-	const sessionName = extensions.extensions.find(({ path }) => path.endsWith("/extensions/session-name.ts"));
+	const sessionName = extensions.extensions.find(({ path }) =>
+		path.endsWith("/extensions/session-name.ts"),
+	);
 	if (!sessionName) throw new Error("Session-name extension missing");
-	const setupModels = extensions.extensions.find(({ path }) => path.endsWith("/extensions/setup-models.ts"));
-	const setupModelsTool = [...(setupModels?.tools.values() ?? [])].find(({ definition }) => definition.name === "fitch_setup_models")?.definition;
+	const setupModels = extensions.extensions.find(({ path }) =>
+		path.endsWith("/extensions/setup-models.ts"),
+	);
+	const setupModelsTool = [...(setupModels?.tools.values() ?? [])].find(
+		({ definition }) => definition.name === "fitch_setup_models",
+	)?.definition;
 	if (!setupModelsTool) throw new Error("Read-only setup model tool missing");
 	const legacyFiles = [
 		[join(cwd, ".pi", "commands", "legacy.md"), "project command"],
@@ -126,12 +183,22 @@ try {
 		{ provider: "openai", id: "gpt-6-astra" },
 		{ provider: "fireworks", id: "accounts/fireworks/routers/kimi-k3-fast" },
 	];
-	const modelStatus = await setupModelsTool.execute("models", {
-		routes: ["openai/gpt-6-astra", "fireworks/accounts/fireworks/routers/kimi-k3-fast", "anthropic/missing"],
-	}, undefined, () => {}, {
-		modelRegistry: { getAll: () => models, getAvailable: () => [models[0]] },
-		isProjectTrusted: () => true,
-	});
+	const modelStatus = await setupModelsTool.execute(
+		"models",
+		{
+			routes: [
+				"openai/gpt-6-astra",
+				"fireworks/accounts/fireworks/routers/kimi-k3-fast",
+				"anthropic/missing",
+			],
+		},
+		undefined,
+		() => {},
+		{
+			modelRegistry: { getAll: () => models, getAvailable: () => [models[0]] },
+			isProjectTrusted: () => true,
+		},
+	);
 	const expectedStatus = {
 		projectTrusted: true,
 		routes: [
@@ -140,15 +207,20 @@ try {
 			{ route: "anthropic/missing", known: false, available: false },
 		],
 	};
-	if (JSON.stringify(modelStatus.details) !== JSON.stringify(expectedStatus)
-		|| JSON.stringify(JSON.parse(modelStatus.content[0].text)) !== JSON.stringify(expectedStatus)) {
+	if (
+		JSON.stringify(modelStatus.details) !== JSON.stringify(expectedStatus) ||
+		JSON.stringify(JSON.parse(modelStatus.content[0].text)) !== JSON.stringify(expectedStatus)
+	) {
 		throw new Error(`Unexpected in-session model status: ${JSON.stringify(modelStatus)}`);
 	}
 	for (const [path, content] of legacyFiles) {
 		if (readFileSync(path, "utf8") !== content) throw new Error(`Model inspection changed ${path}`);
 	}
-	if (existsSync(join(cwd, ".pi", "prompts"))) throw new Error("Model inspection migrated project commands");
-	const writePrompt = extensions.extensions.find(({ path }) => path.endsWith("/extensions/write-prompt.ts"));
+	if (existsSync(join(cwd, ".pi", "prompts")))
+		throw new Error("Model inspection migrated project commands");
+	const writePrompt = extensions.extensions.find(({ path }) =>
+		path.endsWith("/extensions/write-prompt.ts"),
+	);
 	if (!writePrompt) throw new Error("Write-prompt extension missing");
 	extensions.runtime.getCommands = () =>
 		extensions.extensions.flatMap(({ commands }) =>
@@ -171,16 +243,20 @@ try {
 	const fastModeStart = fastMode.handlers.get("session_start")?.[0];
 	if (!fastModeStart) throw new Error("Fast-mode session_start handler missing");
 	const fastStatuses = new Map();
-	await fastModeStart({}, {
-		model: { provider: "openai-codex", id: "gpt-6-astra", api: "openai-codex-responses" },
-		sessionManager: SessionManager.inMemory(cwd),
-		hasUI: false,
-		ui: {
-			setStatus: (key, value) => fastStatuses.set(key, value),
-			theme: { fg: (_color, text) => text },
+	await fastModeStart(
+		{},
+		{
+			model: { provider: "openai-codex", id: "gpt-6-astra", api: "openai-codex-responses" },
+			sessionManager: SessionManager.inMemory(cwd),
+			hasUI: false,
+			ui: {
+				setStatus: (key, value) => fastStatuses.set(key, value),
+				theme: { fg: (_color, text) => text },
+			},
 		},
-	});
-	if (!fastStatuses.has("codex-fast")) throw new Error("Fast-mode footer status missing for OpenAI models");
+	);
+	if (!fastStatuses.has("codex-fast"))
+		throw new Error("Fast-mode footer status missing for OpenAI models");
 	if (fastStatuses.get("anthropic-fast") !== undefined) {
 		throw new Error("Fast-mode must clear the Anthropic status on OpenAI models");
 	}
@@ -190,7 +266,10 @@ try {
 	const toolNames = extensions.extensions
 		.flatMap(({ tools }) => [...tools.values()].map(({ definition }) => definition.name))
 		.sort();
-	if (JSON.stringify(toolNames) !== JSON.stringify(["fitch_setup_models", "name_session", "reader_present"])) {
+	if (
+		JSON.stringify(toolNames) !==
+		JSON.stringify(["fitch_setup_models", "name_session", "reader_present"])
+	) {
 		throw new Error(`Unexpected kit tools: ${JSON.stringify(toolNames)}`);
 	}
 	const sessionContext = sessionName.handlers.get("before_agent_start")?.[0];
@@ -205,9 +284,15 @@ try {
 	let footerNotice;
 	const footerSession = SessionManager.inMemory(join(home, "Projects", "demo"));
 	footerSession.appendSessionInfo("footer-smoke");
-	for (const usage of [{ input: 20, cacheRead: 80 }, { input: 100, cacheRead: 0 }]) {
+	for (const usage of [
+		{ input: 20, cacheRead: 80 },
+		{ input: 100, cacheRead: 0 },
+	]) {
 		const message = fauxAssistantMessage("footer smoke");
-		footerSession.appendMessage({ ...message, usage: { ...message.usage, ...usage, totalTokens: 100 } });
+		footerSession.appendMessage({
+			...message,
+			usage: { ...message.usage, ...usage, totalTokens: 100 },
+		});
 	}
 	const footerContext = {
 		mode: "tui",
@@ -232,34 +317,40 @@ try {
 		thinkingLevel: "high",
 	};
 	await cleanFooterStart({}, footerContext);
-	if (typeof footerFactory !== "function") throw new Error("Clean footer was not installed in TUI mode");
+	if (typeof footerFactory !== "function")
+		throw new Error("Clean footer was not installed in TUI mode");
 	const statuses = new Map([
 		["mcp", "MCP: 13 servers enabled (2 connected)"],
 		["todo", "todo 0 active · 1 pending"],
 		["verbosity", "🗣  medium"],
 	]);
-	const createFooter = () => footerFactory(
-		{ requestRender: () => {} },
-		{ fg: (_color, text) => text },
-		{
-			getGitBranch: () => "main",
-			getAvailableProviderCount: () => 2,
-			getExtensionStatuses: () => statuses,
-			onBranchChange: () => () => {},
-		},
-	);
+	const createFooter = () =>
+		footerFactory(
+			{ requestRender: () => {} },
+			{ fg: (_color, text) => text },
+			{
+				getGitBranch: () => "main",
+				getAvailableProviderCount: () => 2,
+				getExtensionStatuses: () => statuses,
+				onBranchChange: () => () => {},
+			},
+		);
 	const footer = createFooter();
 	const wideFooter = footer.render(170);
-	if (wideFooter.length !== 2) throw new Error(`Expected two wide footer lines, got ${JSON.stringify(wideFooter)}`);
+	if (wideFooter.length !== 2)
+		throw new Error(`Expected two wide footer lines, got ${JSON.stringify(wideFooter)}`);
 	if (!wideFooter.join("\n").includes("🗣 medium")) {
-		throw new Error(`Clean footer lost the controller's native verbosity status: ${wideFooter.join("\n")}`);
+		throw new Error(
+			`Clean footer lost the controller's native verbosity status: ${wideFooter.join("\n")}`,
+		);
 	}
 	const narrowFooter = footer.render(45);
 	const narrowText = narrowFooter.join("\n");
 	const normalizedNarrowText = narrowText.replace(/\s+/g, " ");
 	if (narrowText.includes("...")) throw new Error(`Clean footer truncated content: ${narrowText}`);
 	for (const hidden of ["↑", "↓", "$"]) {
-		if (narrowText.includes(hidden)) throw new Error(`Clean footer leaked cumulative counter ${hidden}`);
+		if (narrowText.includes(hidden))
+			throw new Error(`Clean footer leaked cumulative counter ${hidden}`);
 	}
 	for (const expected of [
 		"footer-smoke",
@@ -268,13 +359,17 @@ try {
 		"MCP: 13 servers enabled (2 connected)",
 		"todo 0 active · 1 pending",
 	]) {
-		if (!normalizedNarrowText.includes(expected)) throw new Error(`Clean footer lost ${expected}: ${narrowText}`);
+		if (!normalizedNarrowText.includes(expected))
+			throw new Error(`Clean footer lost ${expected}: ${narrowText}`);
 	}
-	if (wideFooter.join("\n").split("🗣").length !== 2) throw new Error("Verbosity status was rendered twice");
+	if (wideFooter.join("\n").split("🗣").length !== 2)
+		throw new Error("Verbosity status was rendered twice");
 	statuses.set("verbosity", "🗣  high");
-	if (!footer.render(170).join("\n").includes("🗣 high")) throw new Error("Footer did not follow updated native status");
+	if (!footer.render(170).join("\n").includes("🗣 high"))
+		throw new Error("Footer did not follow updated native status");
 	statuses.delete("verbosity");
-	if (footer.render(170).join("\n").includes("🗣")) throw new Error("Footer read verbosity from stale config without the controller");
+	if (footer.render(170).join("\n").includes("🗣"))
+		throw new Error("Footer read verbosity from stale config without the controller");
 	footer.dispose?.();
 
 	const cleanFooterCommand = cleanFooter.commands.get("clean-footer");
@@ -288,12 +383,24 @@ try {
 		throw new Error("Clean-footer command did not restore the compact footer");
 	}
 
-	const commandNames = extensions.extensions
-		.flatMap(({ commands }) => [...commands.keys()])
-		.sort();
-	const expectedCommands = ["ambitious", "anthropic-fast", "clean-footer", "codex-fast", "draft", "fast", "reader", "side-question", "ultrafast", "unreasonable", "xai-fast"];
+	const commandNames = extensions.extensions.flatMap(({ commands }) => [...commands.keys()]).sort();
+	const expectedCommands = [
+		"ambitious",
+		"anthropic-fast",
+		"clean-footer",
+		"codex-fast",
+		"draft",
+		"fast",
+		"reader",
+		"side-question",
+		"ultrafast",
+		"unreasonable",
+		"xai-fast",
+	];
 	if (JSON.stringify(commandNames) !== JSON.stringify(expectedCommands)) {
-		throw new Error(`Expected ${JSON.stringify(expectedCommands)}, got ${JSON.stringify(commandNames)}`);
+		throw new Error(
+			`Expected ${JSON.stringify(expectedCommands)}, got ${JSON.stringify(commandNames)}`,
+		);
 	}
 	for (const event of ["before_provider_request"]) {
 		const count = extensions.extensions.reduce(
@@ -303,7 +410,21 @@ try {
 		if (count !== 1) throw new Error(`Expected one ${event} handler, got ${count}`);
 	}
 
-	console.log(JSON.stringify({ ok: true, prompts: promptNames, themes: themeNames, themeSchema: "native CLI accepted calm and rejected missing mdHeading", commands: commandNames, tools: toolNames, extensions: extensions.extensions.length }, null, 2));
+	console.log(
+		JSON.stringify(
+			{
+				ok: true,
+				prompts: promptNames,
+				themes: themeNames,
+				themeSchema: "native CLI accepted calm and rejected missing mdHeading",
+				commands: commandNames,
+				tools: toolNames,
+				extensions: extensions.extensions.length,
+			},
+			null,
+			2,
+		),
+	);
 } finally {
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;

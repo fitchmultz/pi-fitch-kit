@@ -56,7 +56,10 @@ function repoName(root: string): { text: string; key: string } {
 }
 
 function sanitize(text: string): string {
-	return text.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
+	return text
+		.replace(/[\r\n\t]/g, " ")
+		.replace(/ +/g, " ")
+		.trim();
 }
 
 // File-wide facts include abandoned branches; usage belongs to the selected leaf.
@@ -85,11 +88,12 @@ class FooterSnapshot {
 
 	apply(entry: Pick<FooterEntry, "type" | "name" | "message">): void {
 		if (entry.type === "session_info") this.sessionName = entry.name?.trim() || undefined;
-		if (entry.type !== "message" || entry.message?.role !== "assistant" || !entry.message.usage) return;
+		if (entry.type !== "message" || entry.message?.role !== "assistant" || !entry.message.usage)
+			return;
 		const { input, cacheRead, cacheWrite } = entry.message.usage;
 		this.hasCacheActivity ||= cacheRead > 0 || cacheWrite > 0;
 		const promptTokens = input + cacheRead + cacheWrite;
-		this.latestCacheHitRate = promptTokens > 0 ? cacheRead / promptTokens * 100 : undefined;
+		this.latestCacheHitRate = promptTokens > 0 ? (cacheRead / promptTokens) * 100 : undefined;
 	}
 
 	read(ctx: ExtensionContext) {
@@ -105,7 +109,10 @@ class FooterSnapshot {
 			this.identity = identity;
 			this.dirty = true;
 		}
-		if (bootstrap || this.factsDirty && (this.pendingLeaf === undefined || leaf !== this.pendingLeaf)) {
+		if (
+			bootstrap ||
+			(this.factsDirty && (this.pendingLeaf === undefined || leaf !== this.pendingLeaf))
+		) {
 			// message_end is replaceable and precedes append. Read only the persisted suffix
 			// after the leaf advances (or settlement/tree navigation confirms finalization).
 			// ponytail: getEntries copies history once per reconciliation; Pi 1.0 has no public file-wide suffix iterator or out-of-band edit signal.
@@ -117,7 +124,15 @@ class FooterSnapshot {
 			if (this.pendingLeaf === undefined) this.factsDirty = false;
 			else this.pendingLeaf = leaf;
 		}
-		const key = JSON.stringify([identity, leaf, ctx.model?.provider, ctx.model?.id, ctx.model?.api, ctx.model?.baseUrl, ctx.model?.contextWindow]);
+		const key = JSON.stringify([
+			identity,
+			leaf,
+			ctx.model?.provider,
+			ctx.model?.id,
+			ctx.model?.api,
+			ctx.model?.baseUrl,
+			ctx.model?.contextWindow,
+		]);
 		if (this.dirty || key !== this.usageKey) {
 			this.usage = ctx.getContextUsage();
 			this.usageKey = key;
@@ -153,36 +168,47 @@ function installFooter(ctx: ExtensionContext, snapshot: FooterSnapshot): void {
 
 				const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
 				const percent = usage?.percent;
-				const contextText = percent == null ? `?/${formatCount(contextWindow)}` : `${percent.toFixed(1)}%/${formatCount(contextWindow)}`;
-				const context = percent != null && percent > 90
-					? theme.fg("error", contextText)
-					: percent != null && percent > 70
-						? theme.fg("warning", contextText)
-						: theme.fg("dim", contextText);
+				const contextText =
+					percent == null
+						? `?/${formatCount(contextWindow)}`
+						: `${percent.toFixed(1)}%/${formatCount(contextWindow)}`;
+				const context =
+					percent != null && percent > 90
+						? theme.fg("error", contextText)
+						: percent != null && percent > 70
+							? theme.fg("warning", contextText)
+							: theme.fg("dim", contextText);
 
 				const model = ctx.model?.id.split("/").pop() ?? "no-model";
 				const thinking = ctx.model?.reasoning ? ` • ${ctx.thinkingLevel ?? "off"}` : "";
-				const provider = footerData.getAvailableProviderCount() > 1 && ctx.model ? `(${ctx.model.provider}) ` : "";
+				const provider =
+					footerData.getAvailableProviderCount() > 1 && ctx.model ? `(${ctx.model.provider}) ` : "";
 				const extensionStatuses = footerData.getExtensionStatuses();
 				const verbosity = extensionStatuses.get("verbosity");
 				const rightText = `${provider}${model}${thinking}${verbosity ? ` • ${sanitize(verbosity)}` : ""}`;
-				const topLines = visibleWidth(location) + visibleWidth(rightText) + 2 <= width
-					? [location + " ".repeat(width - visibleWidth(location) - visibleWidth(rightText)) + theme.fg("dim", rightText)]
-					: [
-							...wrapTextWithAnsi(location, Math.max(1, width)),
-							...wrapTextWithAnsi(theme.fg("dim", rightText), Math.max(1, width)).map(
-								(line) => " ".repeat(Math.max(0, width - visibleWidth(line))) + line,
-							),
-						];
+				const topLines =
+					visibleWidth(location) + visibleWidth(rightText) + 2 <= width
+						? [
+								location +
+									" ".repeat(width - visibleWidth(location) - visibleWidth(rightText)) +
+									theme.fg("dim", rightText),
+							]
+						: [
+								...wrapTextWithAnsi(location, Math.max(1, width)),
+								...wrapTextWithAnsi(theme.fg("dim", rightText), Math.max(1, width)).map(
+									(line) => " ".repeat(Math.max(0, width - visibleWidth(line))) + line,
+								),
+							];
 
 				const statuses = [...extensionStatuses.entries()]
 					.filter(([key]) => key !== "verbosity")
 					.sort(([a], [b]) => a.localeCompare(b))
 					.map(([, text]) => sanitize(text));
 				const statusLines: string[] = [];
-				let current = hasCacheActivity && latestCacheHitRate !== undefined
-					? `${context} ${theme.fg("dim", `• CH${latestCacheHitRate.toFixed(1)}%`)}`
-					: context;
+				let current =
+					hasCacheActivity && latestCacheHitRate !== undefined
+						? `${context} ${theme.fg("dim", `• CH${latestCacheHitRate.toFixed(1)}%`)}`
+						: context;
 				for (const [index, status] of statuses.entries()) {
 					const candidate = `${current}${index === 0 ? ` ${theme.fg("dim", "•")}` : ""} ${status}`;
 					if (visibleWidth(candidate) <= width) current = candidate;
@@ -206,8 +232,12 @@ export default function (pi: ExtensionAPI) {
 		if (event.message.role === "assistant") snapshot.invalidateFacts(ctx);
 		snapshot.dirty = true;
 	});
-	pi.on("session_info_changed", (event) => snapshot.apply({ type: "session_info", name: event.name }));
-	const dirtyUsage = () => { snapshot.dirty = true; };
+	pi.on("session_info_changed", (event) =>
+		snapshot.apply({ type: "session_info", name: event.name }),
+	);
+	const dirtyUsage = () => {
+		snapshot.dirty = true;
+	};
 	pi.on("session_tree", () => snapshot.invalidateFacts());
 	pi.on("session_compact", () => snapshot.invalidateFacts());
 	pi.on("model_select", dirtyUsage);
@@ -220,9 +250,18 @@ export default function (pi: ExtensionAPI) {
 		// Only cold startup restores the file-wide choice saved by a checkpoint, and
 		// copied entries in a fork must not carry the parent instance's choice with them.
 		if (event.reason === "startup") {
-			const entry = ctx.sessionManager.getEntries().findLast((entry) => entry.type === "custom" && entry.customType === CHECKPOINT_ENTRY);
-			const saved = entry?.type === "custom" ? entry.data as { sessionId?: unknown; enabled?: unknown } | null : undefined;
-			if (saved?.sessionId === ctx.sessionManager.getSessionId() && typeof saved.enabled === "boolean") enabled = saved.enabled;
+			const entry = ctx.sessionManager
+				.getEntries()
+				.findLast((entry) => entry.type === "custom" && entry.customType === CHECKPOINT_ENTRY);
+			const saved =
+				entry?.type === "custom"
+					? (entry.data as { sessionId?: unknown; enabled?: unknown } | null)
+					: undefined;
+			if (
+				saved?.sessionId === ctx.sessionManager.getSessionId() &&
+				typeof saved.enabled === "boolean"
+			)
+				enabled = saved.enabled;
 		}
 		if (enabled && ctx.mode === "tui") installFooter(ctx, snapshot);
 	});

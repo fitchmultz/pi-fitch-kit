@@ -24,16 +24,16 @@ You are operating in **Debug Mode**: a hypothesis-driven debugging workflow. Do 
 
 Stay in exactly one phase at a time. Advance only when the exit criteria are met.
 
-| Phase | May edit / instrument | Exit criteria | Next |
-|-------|-----------------------|---------------|------|
-| **Explore** | read only | symptom in one sentence; expected vs actual; repro steps drafted; 3–5 hypotheses, each with a falsifying log prediction | Instrument |
-| **Instrument** | edit code (instrumentation only, if needed) | sufficient existing logs identified or tagged probes added; collector/log path documented; repro instructions + expected log signature per hypothesis emitted | Reproduce |
-| **Reproduce** | no edits | actual repro performed and sufficient runtime logs collected; user assistance only for a human-only step | Analyze |
-| **Analyze** | read only | every hypothesis scored confirmed/weakened/ruled_out; ≥1 confirmed, or all ruled out with a gap identified | Fix (if confirmed) or back to Instrument (if all ruled out) |
-| **Fix** | edit code/tests | change is minimal and maps to the confirmed hypothesis; no new instrumentation | Verify |
-| **Verify** | no edits | same repro rerun; observed result and post-fix runtime evidence show the invariant restored | Cleanup (if passed) or back to Analyze (if failed) |
-| **Cleanup** | edit code | all temporary debug calls and debug-only files removed; tests/lint pass if available | Done |
-| **Done** | — | terminal | — |
+| Phase          | May edit / instrument                       | Exit criteria                                                                                                                                                 | Next                                                        |
+| -------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **Explore**    | read only                                   | symptom in one sentence; expected vs actual; repro steps drafted; 3–5 hypotheses, each with a falsifying log prediction                                       | Instrument                                                  |
+| **Instrument** | edit code (instrumentation only, if needed) | sufficient existing logs identified or tagged probes added; collector/log path documented; repro instructions + expected log signature per hypothesis emitted | Reproduce                                                   |
+| **Reproduce**  | no edits                                    | actual repro performed and sufficient runtime logs collected; user assistance only for a human-only step                                                      | Analyze                                                     |
+| **Analyze**    | read only                                   | every hypothesis scored confirmed/weakened/ruled_out; ≥1 confirmed, or all ruled out with a gap identified                                                    | Fix (if confirmed) or back to Instrument (if all ruled out) |
+| **Fix**        | edit code/tests                             | change is minimal and maps to the confirmed hypothesis; no new instrumentation                                                                                | Verify                                                      |
+| **Verify**     | no edits                                    | same repro rerun; observed result and post-fix runtime evidence show the invariant restored                                                                   | Cleanup (if passed) or back to Analyze (if failed)          |
+| **Cleanup**    | edit code                                   | all temporary debug calls and debug-only files removed; tests/lint pass if available                                                                          | Done                                                        |
+| **Done**       | —                                           | terminal                                                                                                                                                      | —                                                           |
 
 **Forbidden transitions** (enforce these yourself; no engine does it for you): never jump from Explore/Instrument/Reproduce straight to Fix (no runtime evidence yet); never go Fix→Done or Verify→Done (must complete verify and cleanup).
 
@@ -50,11 +50,11 @@ Example probe (TypeScript):
 ```ts
 // DEBUG_PROBE_H2_1 — remove in cleanup
 debugLog({
-  sessionId: "dbg-REPLACE",
-  hypothesisId: "H2",
-  location: "checkout.ts:submitOrder:pre-tax",
-  message: "cart total before tax",
-  data: { subtotal, itemCount },
+	sessionId: "dbg-REPLACE",
+	hypothesisId: "H2",
+	location: "checkout.ts:submitOrder:pre-tax",
+	message: "cart total before tax",
+	data: { subtotal, itemCount },
 });
 ```
 
@@ -62,14 +62,14 @@ Minimal file sink:
 
 ```ts
 export function debugLog(event: {
-  sessionId: string;
-  hypothesisId: string;
-  location: string;
-  message: string;
-  data?: Record<string, unknown>;
+	sessionId: string;
+	hypothesisId: string;
+	location: string;
+	message: string;
+	data?: Record<string, unknown>;
 }) {
-  const line = JSON.stringify({ ...event, timestamp: Date.now(), level: "debug" });
-  fs.appendFileSync(`.debug/${event.sessionId}.jsonl`, line + "\n");
+	const line = JSON.stringify({ ...event, timestamp: Date.now(), level: "debug" });
+	fs.appendFileSync(`.debug/${event.sessionId}.jsonl`, line + "\n");
 }
 ```
 

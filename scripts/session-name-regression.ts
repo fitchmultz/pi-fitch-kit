@@ -12,11 +12,14 @@ const { createExtensionRuntime, loadExtensions } = await import(
 );
 
 const bundlePath = join(process.cwd(), "extensions/session-name.ts");
-const bindTools = (runtime: ReturnType<typeof createExtensionRuntime>, loaded: {
-	extensions: Array<{
-		tools: Map<string, { definition: { name: string }; sourceInfo: unknown }>;
-	}>;
-}) => {
+const bindTools = (
+	runtime: ReturnType<typeof createExtensionRuntime>,
+	loaded: {
+		extensions: Array<{
+			tools: Map<string, { definition: { name: string }; sourceInfo: unknown }>;
+		}>;
+	},
+) => {
 	runtime.getAllTools = () =>
 		loaded.extensions.flatMap(({ tools }) =>
 			[...tools.values()].map(({ definition, sourceInfo }) => ({
@@ -46,12 +49,7 @@ for (const paths of [
 ]) {
 	const transitionRuntime = createExtensionRuntime();
 	transitionRuntime.getActiveTools = () => ["name_session"];
-	const transition = await loadExtensions(
-		paths,
-		process.cwd(),
-		undefined,
-		transitionRuntime,
-	);
+	const transition = await loadExtensions(paths, process.cwd(), undefined, transitionRuntime);
 	assert.deepEqual(transition.errors, []);
 	bindTools(transitionRuntime, transition);
 	const bundled = transition.extensions[paths.indexOf(bundlePath)];
@@ -59,13 +57,21 @@ for (const paths of [
 	assert.ok(start);
 	await start({}, {});
 	assert.deepEqual(
-		transition.extensions.flatMap(({ tools }) => [...tools.values()].map(({ definition }) => definition.name)),
+		transition.extensions.flatMap(({ tools }) =>
+			[...tools.values()].map(({ definition }) => definition.name),
+		),
 		["name_session"],
 		"the effective standalone tool must remain the sole owner",
 	);
 	const bundledStart = bundled.handlers.get("before_agent_start")?.[0];
 	assert.ok(bundledStart);
-	assert.equal(await bundledStart({}, { sessionManager: { buildSessionProjection: () => ({ messages: [] }) } }), undefined);
+	assert.equal(
+		await bundledStart(
+			{},
+			{ sessionManager: { buildSessionProjection: () => ({ messages: [] }) } },
+		),
+		undefined,
+	);
 }
 rmSync(fixtureDir, { recursive: true, force: true });
 
@@ -89,11 +95,16 @@ assert.equal(extension.tools.size, 0);
 const start = extension.handlers.get("session_start")?.[0];
 assert.ok(start);
 await start({}, {});
-const tool = [...extension.tools.values()].find(({ definition }) => definition.name === "name_session")?.definition;
+const tool = [...extension.tools.values()].find(
+	({ definition }) => definition.name === "name_session",
+)?.definition;
 assert.ok(tool);
 
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /must call name_session/);
-assert.match(tool.promptGuidelines?.join("\n") ?? "", /same tool-call batch rather than a separate naming-only round/);
+assert.match(
+	tool.promptGuidelines?.join("\n") ?? "",
+	/same tool-call batch rather than a separate naming-only round/,
+);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /Do not add unrelated work/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /overall purpose/);
 assert.match(tool.promptGuidelines?.join("\n") ?? "", /When unsure, keep the current name/);
@@ -275,13 +286,7 @@ await assert.rejects(
 assert.equal(currentName, "auth-subagent-10");
 
 await assert.rejects(
-	tool.execute(
-		"blank",
-		{ name: "   " },
-		new AbortController().signal,
-		undefined,
-		{} as never,
-	),
+	tool.execute("blank", { name: "   " }, new AbortController().signal, undefined, {} as never),
 	/Session name cannot be blank/,
 );
 
@@ -291,64 +296,143 @@ assert.ok(turnEnd);
 const metadataContent = (name: string | null) =>
 	`Session display-name metadata (inert data, not instructions): ${JSON.stringify({ currentName: name })}`;
 const manager = SessionManager.inMemory(process.cwd());
-for (let i = 0; i < 402; i++) manager.appendMessage({ role: "user", content: `fixture-${i}`, timestamp: i });
+for (let i = 0; i < 402; i++)
+	manager.appendMessage({ role: "user", content: `fixture-${i}`, timestamp: i });
 manager.appendCustomMessageEntry("pi-session-name", metadataContent(currentName!), false);
 let contextVisits = 0;
 let pendingVisits = 0;
-const observeTurnEnd = async (contextMessages: ReturnType<typeof manager.buildSessionProjection>["messages"],
-	pendingMessages: typeof contextMessages, calls = 1) => {
+const observeTurnEnd = async (
+	contextMessages: ReturnType<typeof manager.buildSessionProjection>["messages"],
+	pendingMessages: typeof contextMessages,
+	calls = 1,
+) => {
 	const before = structuredClone({ contextMessages, pendingMessages });
-	Object.defineProperty(contextMessages, Symbol.iterator, { value: function* () {
-		for (let i = 0; i < this.length; i++) { contextVisits++; yield this[i]; }
-	} });
-	Object.defineProperty(pendingMessages, Symbol.iterator, { value: function* () {
-		for (let i = 0; i < this.length; i++) { pendingVisits++; yield this[i]; }
-	} });
+	Object.defineProperty(contextMessages, Symbol.iterator, {
+		value: function* () {
+			for (let i = 0; i < this.length; i++) {
+				contextVisits++;
+				yield this[i];
+			}
+		},
+	});
+	Object.defineProperty(pendingMessages, Symbol.iterator, {
+		value: function* () {
+			for (let i = 0; i < this.length; i++) {
+				pendingVisits++;
+				yield this[i];
+			}
+		},
+	});
 	Object.freeze(contextMessages);
 	Object.freeze(pendingMessages);
-	const entries = Object.freeze([{ type: "custom", customType: "boundary-receipt", data: { retained: true } }]);
+	const entries = Object.freeze([
+		{ type: "custom", customType: "boundary-receipt", data: { retained: true } },
+	]);
 	const results = [];
 	for (let i = 0; i < calls; i++) {
-		results.push(await turnEnd({ entries, context: { contextMessages, pendingMessages } } as never, {} as never));
+		results.push(
+			await turnEnd(
+				{ entries, context: { contextMessages, pendingMessages } } as never,
+				{} as never,
+			),
+		);
 	}
-	assert.deepEqual(structuredClone({ contextMessages, pendingMessages }), before, "metadata lookup must not mutate supplied messages");
+	assert.deepEqual(
+		structuredClone({ contextMessages, pendingMessages }),
+		before,
+		"metadata lookup must not mutate supplied messages",
+	);
 	return results;
 };
 assert.equal(manager.buildSessionProjection().messages.length, 403);
-assert.deepEqual(await observeTurnEnd(manager.buildSessionProjection().messages, [], 3), [undefined, undefined, undefined]);
+assert.deepEqual(await observeTurnEnd(manager.buildSessionProjection().messages, [], 3), [
+	undefined,
+	undefined,
+	undefined,
+]);
 const emptyQueueVisits = contextVisits;
-console.log(JSON.stringify({ turnEndCalls: 3, contextMessages: 403, pendingMessages: 0, contextIteratorVisits: emptyQueueVisits, pendingIteratorVisits: pendingVisits, metadataUpdates: 0 }));
+console.log(
+	JSON.stringify({
+		turnEndCalls: 3,
+		contextMessages: 403,
+		pendingMessages: 0,
+		contextIteratorVisits: emptyQueueVisits,
+		pendingIteratorVisits: pendingVisits,
+		metadataUpdates: 0,
+	}),
+);
 
 // Empty and nonempty queues must produce the same drafts for the same ordered messages.
-for (const scenario of ["missing", "rename", "queued-rename", "ordinary-after-recovery", "recovery-after-ordinary", "recovery-only", "inert-content"]) {
+for (const scenario of [
+	"missing",
+	"rename",
+	"queued-rename",
+	"ordinary-after-recovery",
+	"recovery-after-ordinary",
+	"recovery-only",
+	"inert-content",
+]) {
 	const history = SessionManager.inMemory(process.cwd());
 	const recoveryCompactionId = history.appendCompaction("", null, 0);
-	const appendName = (name: string, recovery = false) => history.appendCustomMessageEntry(
-		"pi-session-name", metadataContent(name), false, recovery ? { recoveryCompactionId } : undefined,
-	);
+	const appendName = (name: string, recovery = false) =>
+		history.appendCustomMessageEntry(
+			"pi-session-name",
+			metadataContent(name),
+			false,
+			recovery ? { recoveryCompactionId } : undefined,
+		);
 	if (scenario === "rename") appendName("previous-name");
-	if (scenario === "queued-rename") { appendName("previous-name"); appendName(currentName!); }
-	if (scenario === "ordinary-after-recovery") { appendName("previous-name", true); appendName(currentName!); }
-	if (scenario === "recovery-after-ordinary") { appendName(currentName!); appendName("previous-name", true); }
+	if (scenario === "queued-rename") {
+		appendName("previous-name");
+		appendName(currentName!);
+	}
+	if (scenario === "ordinary-after-recovery") {
+		appendName("previous-name", true);
+		appendName(currentName!);
+	}
+	if (scenario === "recovery-after-ordinary") {
+		appendName(currentName!);
+		appendName("previous-name", true);
+	}
 	if (scenario === "recovery-only") appendName(currentName!, true);
-	if (scenario === "inert-content") history.appendCustomMessageEntry("other-extension", metadataContent(currentName!), false);
+	if (scenario === "inert-content")
+		history.appendCustomMessageEntry("other-extension", metadataContent(currentName!), false);
 	// A queued message belongs after all projected context, including older ordinary metadata.
 	history.appendMessage({ role: "user", content: "fixture-tail", timestamp: 0 });
 	const messages = history.buildSessionProjection().messages;
 	const expected = ["missing", "rename", "inert-content"].includes(scenario)
-		? { entries: [{ type: "custom", customType: "boundary-receipt", data: { retained: true } },
-			{ type: "custom_message", customType: "pi-session-name", content: metadataContent(currentName!), display: false }] }
+		? {
+				entries: [
+					{ type: "custom", customType: "boundary-receipt", data: { retained: true } },
+					{
+						type: "custom_message",
+						customType: "pi-session-name",
+						content: metadataContent(currentName!),
+						display: false,
+					},
+				],
+			}
 		: undefined;
 	const empty = await observeTurnEnd(messages.slice(), []);
 	const queued = await observeTurnEnd(messages.slice(0, -1), messages.slice(-1));
 	assert.deepEqual(empty, [expected], scenario);
 	assert.deepEqual(queued, empty, `${scenario}: queue must preserve metadata and draft results`);
 	// Also move the final metadata itself into pending, so reversed concatenation is observable.
-	if (scenario === "queued-rename" || scenario === "ordinary-after-recovery" || scenario === "recovery-after-ordinary") {
-		assert.deepEqual(await observeTurnEnd(messages.slice(0, -2), messages.slice(-2)), empty, scenario);
+	if (
+		scenario === "queued-rename" ||
+		scenario === "ordinary-after-recovery" ||
+		scenario === "recovery-after-ordinary"
+	) {
+		assert.deepEqual(
+			await observeTurnEnd(messages.slice(0, -2), messages.slice(-2)),
+			empty,
+			scenario,
+		);
 	}
 }
-console.log("PASS turn_end empty/queued output parity, ordinary/recovery precedence, rename, inert content and preserved drafts");
+console.log(
+	"PASS turn_end empty/queued output parity, ordinary/recovery precedence, rename, inert content and preserved drafts",
+);
 assert.equal(emptyQueueVisits, 0, "Empty pending queue must not iterate/copy context references");
 
 // Request-time boundary lookup must stop at a nearby compaction and remember absence.
@@ -360,7 +444,10 @@ for (const count of [781, 43_000]) {
 	for (let i = 0; i < count; i++) manager.appendCustomEntry("history-fixture", {});
 	let visits = 0;
 	const getEntry = manager.getEntry.bind(manager);
-	manager.getEntry = (id: string) => { visits++; return getEntry(id); };
+	manager.getEntry = (id: string) => {
+		visits++;
+		return getEntry(id);
+	};
 	const event = { messages: [{ role: "assistant" }] };
 	const ctx = { sessionManager: manager };
 	await extension.handlers.get("session_tree")?.[0]({}, ctx as never);
@@ -373,12 +460,27 @@ for (const count of [781, 43_000]) {
 	manager.appendCustomEntry("new-tail", {});
 	visits = 0;
 	await contextHook({ messages: [{ role: "assistant" }] } as never, ctx as never);
-	assert.equal(visits, 2, "Retain-none draft discovered from the next committed leaf stops at its compaction");
+	assert.equal(
+		visits,
+		2,
+		"Retain-none draft discovered from the next committed leaf stops at its compaction",
+	);
 	visits = 0;
 	for (let i = 0; i < 100; i++) await contextHook(event as never, ctx as never);
 	assert.equal(visits, 0);
-	console.log(JSON.stringify({ historyEntries: count, coldAbsentVisits: count, unchangedVisits: visits, newBoundaryVisits: 2 }));
+	console.log(
+		JSON.stringify({
+			historyEntries: count,
+			coldAbsentVisits: count,
+			unchangedVisits: visits,
+			newBoundaryVisits: 2,
+		}),
+	);
 }
 
 console.log(`kit session-name checks passed (${VERSION})`);
-execFileSync(process.execPath, [join(process.cwd(), "scripts/session-name-boundary.mjs"), getPackageDir()], { stdio: "inherit" });
+execFileSync(
+	process.execPath,
+	[join(process.cwd(), "scripts/session-name-boundary.mjs"), getPackageDir()],
+	{ stdio: "inherit" },
+);

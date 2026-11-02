@@ -1,7 +1,12 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { clampThinkingLevel, contentText, type Message, type UserMessage } from "@earendil-works/pi-ai";
+import {
+	clampThinkingLevel,
+	contentText,
+	type Message,
+	type UserMessage,
+} from "@earendil-works/pi-ai";
 import {
 	BorderedLoader,
 	buildSessionContext,
@@ -15,22 +20,41 @@ import {
 	type ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
 import { getKeybindings, SelectList, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
-import { fitClaudeRequest, prepareClaudeImages, sharedImageCache } from "./anthropic-image-guard.ts";
+import {
+	fitClaudeRequest,
+	prepareClaudeImages,
+	sharedImageCache,
+} from "./anthropic-image-guard.ts";
 
 export const WRITE_PROMPT_FILE = "write-prompt.json";
-const WRITE_PROMPT_ACTIONS = ["Accept", "Copy prompt", "Tweak", "Restore original", "Deny"] as const;
+const WRITE_PROMPT_ACTIONS = [
+	"Accept",
+	"Copy prompt",
+	"Tweak",
+	"Restore original",
+	"Deny",
+] as const;
 const SIDE_QUESTION_ACTIONS = ["Copy answer", "Ask again", "Dismiss"] as const;
 const SAVED_DRAFT = "fitch-kit.draft";
 const SAVED_AMBITIOUS_DRAFT = "fitch-kit.ambitious";
 const SAVED_UNREASONABLE_DRAFT = "fitch-kit.unreasonable";
 const AMBITIOUS_MAX_CHARACTERS = 1800;
 
-function savedDraft(ctx: ExtensionCommandContext, customType: string): { source: string; draft: string } | undefined {
+function savedDraft(
+	ctx: ExtensionCommandContext,
+	customType: string,
+): { source: string; draft: string } | undefined {
 	for (const entry of ctx.sessionManager.getBranch().toReversed()) {
 		if (entry.type !== "custom" || entry.customType !== customType) continue;
 		const data = entry.data;
-		if (data && typeof data === "object" && "source" in data && "draft" in data
-			&& typeof data.source === "string" && typeof data.draft === "string") {
+		if (
+			data &&
+			typeof data === "object" &&
+			"source" in data &&
+			"draft" in data &&
+			typeof data.source === "string" &&
+			typeof data.draft === "string"
+		) {
 			return { source: data.source, draft: data.draft };
 		}
 	}
@@ -86,7 +110,15 @@ export function parseModelRef(ref: string): { provider: string; id: string } | u
 }
 
 type ThinkingLevel = ReturnType<ExtensionAPI["getThinkingLevel"]>;
-const THINKING_LEVELS: readonly ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+const THINKING_LEVELS: readonly ThinkingLevel[] = [
+	"off",
+	"minimal",
+	"low",
+	"medium",
+	"high",
+	"xhigh",
+	"max",
+];
 type WriterConfig = { provider?: string; model?: string; thinkingLevel?: ThinkingLevel };
 
 function configuredWriter(raw: string): WriterConfig {
@@ -96,13 +128,15 @@ function configuredWriter(raw: string): WriterConfig {
 	}
 	const fields = value as Record<string, unknown>;
 	for (const key of Object.keys(fields)) {
-		if (!["provider", "model", "thinkingLevel"].includes(key)) throw new Error(`Unknown field: ${key}`);
+		if (!["provider", "model", "thinkingLevel"].includes(key))
+			throw new Error(`Unknown field: ${key}`);
 	}
 	const config: WriterConfig = {};
 	for (const key of ["provider", "model"] as const) {
 		if (!(key in fields)) continue;
 		const text = fields[key];
-		if (typeof text !== "string" || !text.trim()) throw new Error(`${key} must be a non-empty string`);
+		if (typeof text !== "string" || !text.trim())
+			throw new Error(`${key} must be a non-empty string`);
 		config[key] = text.trim();
 	}
 	if ("thinkingLevel" in fields) {
@@ -125,27 +159,36 @@ function readWriterConfig(): WriterConfig {
 function resolveWriter(ctx: ExtensionCommandContext, sessionThinking: ThinkingLevel) {
 	try {
 		const config = readWriterConfig();
-		const legacy = config.provider === undefined && config.model ? parseModelRef(config.model) : undefined;
+		const legacy =
+			config.provider === undefined && config.model ? parseModelRef(config.model) : undefined;
 		const provider = config.provider ?? legacy?.provider ?? ctx.model?.provider;
 		const id = legacy?.id ?? config.model ?? ctx.model?.id;
 		const override = config.provider !== undefined || config.model !== undefined;
-		if (override && (!provider || !id)) throw new Error("Set both provider and model when no session model is selected");
+		if (override && (!provider || !id))
+			throw new Error("Set both provider and model when no session model is selected");
 		const model = override && provider && id ? ctx.modelRegistry.find(provider, id) : ctx.model;
-		if (!model) throw new Error(override ? `Unknown model: ${provider}/${id}` : "No model selected");
+		if (!model)
+			throw new Error(override ? `Unknown model: ${provider}/${id}` : "No model selected");
 		if (override && !ctx.modelRegistry.hasConfiguredAuth(model)) {
 			throw new Error(`No auth for ${model.provider}/${model.id}; configure it with /login`);
 		}
 		const requested = config.thinkingLevel ?? sessionThinking;
 		const thinkingLevel = clampThinkingLevel(model, requested);
 		if (thinkingLevel !== requested) {
-			ctx.ui.notify(`${model.provider}/${model.id} does not support ${requested} thinking; using ${thinkingLevel}`, "warning");
+			ctx.ui.notify(
+				`${model.provider}/${model.id} does not support ${requested} thinking; using ${thinkingLevel}`,
+				"warning",
+			);
 		}
 		if (override || config.thinkingLevel !== undefined) {
 			ctx.ui.notify(`Using ${model.provider}/${model.id} (${thinkingLevel} thinking)`, "info");
 		}
 		return { model, thinkingLevel };
 	} catch (error) {
-		ctx.ui.notify(`${WRITE_PROMPT_FILE}: ${error instanceof Error ? error.message : String(error)}`, "error");
+		ctx.ui.notify(
+			`${WRITE_PROMPT_FILE}: ${error instanceof Error ? error.message : String(error)}`,
+			"error",
+		);
 		return undefined;
 	}
 }
@@ -164,7 +207,12 @@ function sessionPrefix(ctx: ExtensionCommandContext): Message[] {
 // and the fixed-length UUID survives native 64-character cache-key clamping.
 function writerSessionId(ctx: ExtensionCommandContext): string {
 	const header = ctx.sessionManager.getHeader();
-	const session = JSON.stringify(["fitch-kit.writer", ctx.sessionManager.getSessionId(), header?.cwd, header?.timestamp]);
+	const session = JSON.stringify([
+		"fitch-kit.writer",
+		ctx.sessionManager.getSessionId(),
+		header?.cwd,
+		header?.timestamp,
+	]);
 	const bytes = createHash("sha256").update(session).digest();
 	bytes[6] = (bytes[6]! & 0x0f) | 0x80;
 	bytes[8] = (bytes[8]! & 0x3f) | 0x80;
@@ -178,7 +226,8 @@ export function flattenToolHistory(messages: Message[]): Message[] {
 		// Current instructions come from getSystemPrompt(), once. Transcript hosts
 		// also retain historical system messages with tool declarations; those are
 		// not conversation and must not enable tools in this off-transcript writer.
-		if (message.role !== "user" && message.role !== "assistant" && message.role !== "toolResult") continue;
+		if (message.role !== "user" && message.role !== "assistant" && message.role !== "toolResult")
+			continue;
 		if (message.role === "toolResult") {
 			const label = message.isError ? `${message.toolName} error` : `${message.toolName} result`;
 			out.push({
@@ -230,7 +279,9 @@ async function completeWriter(
 	if (signal?.aborted) return undefined;
 	const context = { systemPrompt, messages: outgoing };
 	const options = {
-		signal, cacheRetention: "short" as const, sessionId,
+		signal,
+		cacheRetention: "short" as const,
+		sessionId,
 		reasoning: thinkingLevel === "off" ? undefined : thinkingLevel,
 		onPayload: (payload: unknown) => fitClaudeRequest(model, payload, sharedImageCache()),
 	};
@@ -264,7 +315,16 @@ async function runWriter(
 		return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
 			const view = new BorderedLoader(tui, theme, loader);
 			view.onAbort = () => done(undefined);
-			completeWriter(ctx, model, thinkingLevel, systemPrompt, messages, userText, sessionId, view.signal)
+			completeWriter(
+				ctx,
+				model,
+				thinkingLevel,
+				systemPrompt,
+				messages,
+				userText,
+				sessionId,
+				view.signal,
+			)
 				.then(done)
 				.catch((error: unknown) => {
 					if (view.signal.aborted) return;
@@ -275,7 +335,16 @@ async function runWriter(
 		});
 	}
 	try {
-		return await completeWriter(ctx, model, thinkingLevel, systemPrompt, messages, userText, sessionId, ctx.signal);
+		return await completeWriter(
+			ctx,
+			model,
+			thinkingLevel,
+			systemPrompt,
+			messages,
+			userText,
+			sessionId,
+			ctx.signal,
+		);
 	} catch (error) {
 		ctx.ui.notify(error instanceof Error ? error.message : failed, "error");
 		return undefined;
@@ -329,12 +398,17 @@ function pickAction(ctx: ExtensionCommandContext, draft: string, actions: readon
 		let contentLines = 0;
 		const scrollPage = (direction: 1 | -1) => {
 			const step = Math.max(1, viewportLines);
-			scrollTop = Math.max(0, Math.min(Math.max(0, contentLines - viewportLines), scrollTop + direction * step));
+			scrollTop = Math.max(
+				0,
+				Math.min(Math.max(0, contentLines - viewportLines), scrollTop + direction * step),
+			);
 			tui.requestRender();
 		};
 		return {
 			render: (width: number) => {
-				const rows = Number.isFinite(tui.terminal.rows) ? tui.terminal.rows : Number.POSITIVE_INFINITY;
+				const rows = Number.isFinite(tui.terminal.rows)
+					? tui.terminal.rows
+					: Number.POSITIVE_INFINITY;
 				const content = draftText.render(width);
 				contentLines = content.length;
 				const chrome = [
@@ -436,13 +510,27 @@ function registerRewriteCommand(pi: ExtensionAPI, command: RewriteCommand): void
 				const { model, thinkingLevel, messages, systemPrompt, sessionId } = ready;
 				const originalTask = task;
 				for (let attempt = 0; attempt < 2; attempt++) {
-					const next = await runWriter(ctx, model, thinkingLevel, systemPrompt, messages, task, sessionId, command.loader, command.failure);
-					if (!next || !command.maxCharacters || [...next].length <= command.maxCharacters) return next;
+					const next = await runWriter(
+						ctx,
+						model,
+						thinkingLevel,
+						systemPrompt,
+						messages,
+						task,
+						sessionId,
+						command.loader,
+						command.failure,
+					);
+					if (!next || !command.maxCharacters || [...next].length <= command.maxCharacters)
+						return next;
 					task = `${originalTask}\n\nThe last draft exceeded ${command.maxCharacters} Unicode characters. Shorten it to fit. Preserve the boxed request, relevant session context, and revision notes. Remove optional elaboration, not requirements. Do not truncate.`;
 				}
-				ctx.ui.notify(`/${command.name} exceeded ${command.maxCharacters} characters twice; no new draft offered. Retry with a narrower request or use /draft for a longer prompt.`, "error");
+				ctx.ui.notify(
+					`/${command.name} exceeded ${command.maxCharacters} characters twice; no new draft offered. Retry with a narrower request or use /draft for a longer prompt.`,
+					"error",
+				);
 			};
-			let draft = saved?.draft ?? await rewrite(boxedTask(command.instruction, source));
+			let draft = saved?.draft ?? (await rewrite(boxedTask(command.instruction, source)));
 			if (!draft) return;
 
 			while (true) {
@@ -453,16 +541,16 @@ function registerRewriteCommand(pi: ExtensionAPI, command: RewriteCommand): void
 				}
 				if (action === "Accept") {
 					try {
-					// sendUserMessage is fire-and-forget: native async failures cannot
-					// be caught here. Keep both inputs off-model for rewrite recovery.
-					pi.appendEntry(command.savedType, { source, draft });
-					if (ctx.isIdle()) pi.sendUserMessage(draft);
-					else pi.sendUserMessage(draft, { deliverAs: "steer" });
-				} catch (error) {
-					ctx.ui.notify(error instanceof Error ? error.message : "Send failed", "error");
-					continue;
-				}
-				return;
+						// sendUserMessage is fire-and-forget: native async failures cannot
+						// be caught here. Keep both inputs off-model for rewrite recovery.
+						pi.appendEntry(command.savedType, { source, draft });
+						if (ctx.isIdle()) pi.sendUserMessage(draft);
+						else pi.sendUserMessage(draft, { deliverAs: "steer" });
+					} catch (error) {
+						ctx.ui.notify(error instanceof Error ? error.message : "Send failed", "error");
+						continue;
+					}
+					return;
 				}
 				if (action === "Restore original") {
 					ctx.ui.setEditorText(`/${command.name} ${source}`);
@@ -482,7 +570,10 @@ function registerRewriteCommand(pi: ExtensionAPI, command: RewriteCommand): void
 				const notes = await ctx.ui.editor("Tweak notes");
 				if (!notes?.trim()) continue;
 				const next = await rewrite(
-					boxedTask(command.tweakInstruction, `Original request:\n${source}\n\nCurrent draft:\n${draft}\n\nRevision notes:\n${notes.trim()}`),
+					boxedTask(
+						command.tweakInstruction,
+						`Original request:\n${source}\n\nCurrent draft:\n${draft}\n\nRevision notes:\n${notes.trim()}`,
+					),
 				);
 				if (!next) continue;
 				draft = next;
@@ -494,7 +585,8 @@ function registerRewriteCommand(pi: ExtensionAPI, command: RewriteCommand): void
 export default function writePrompt(pi: ExtensionAPI): void {
 	registerRewriteCommand(pi, {
 		name: "draft",
-		description: "Rewrite text into a better agent request; omit text to reopen the last accepted draft",
+		description:
+			"Rewrite text into a better agent request; omit text to reopen the last accepted draft",
 		usage: "/draft <text>",
 		savedType: SAVED_DRAFT,
 		instruction: REWRITE_INSTRUCTION,
@@ -504,7 +596,8 @@ export default function writePrompt(pi: ExtensionAPI): void {
 	});
 	registerRewriteCommand(pi, {
 		name: "ambitious",
-		description: "Rewrite text into a more ambitious agent request; omit text to reopen the last accepted draft",
+		description:
+			"Rewrite text into a more ambitious agent request; omit text to reopen the last accepted draft",
 		usage: "/ambitious <text>",
 		savedType: SAVED_AMBITIOUS_DRAFT,
 		instruction: AMBITIOUS_INSTRUCTION,
@@ -516,7 +609,8 @@ export default function writePrompt(pi: ExtensionAPI): void {
 
 	registerRewriteCommand(pi, {
 		name: "unreasonable",
-		description: "Rewrite text into an unreasonably demanding, outcome-driven request; omit text to reopen the last accepted draft",
+		description:
+			"Rewrite text into an unreasonably demanding, outcome-driven request; omit text to reopen the last accepted draft",
 		usage: "/unreasonable <text>",
 		savedType: SAVED_UNREASONABLE_DRAFT,
 		instruction: UNREASONABLE_INSTRUCTION,
@@ -526,7 +620,8 @@ export default function writePrompt(pi: ExtensionAPI): void {
 	});
 
 	pi.registerCommand("side-question", {
-		description: "Ask a question off-transcript using the current session, then copy, ask again, or dismiss",
+		description:
+			"Ask a question off-transcript using the current session, then copy, ask again, or dismiss",
 		handler: async (args, ctx) => {
 			const source = args.trim();
 			if (!source) {

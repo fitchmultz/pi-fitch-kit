@@ -181,9 +181,9 @@ My safe settings subset is checked in at [`examples/settings.json`](../examples/
 
 ```json
 {
-  "images": {
-    "autoResize": false
-  }
+	"images": {
+		"autoResize": false
+	}
 }
 ```
 
@@ -212,15 +212,15 @@ A green test suite does not replace required reviews, and old analysis cannot si
 
 In a sample of 139 top-level sessions from 8–15 July 2026, counted from aggregate tool and session metadata rather than raw conversation content:
 
-| Behavior | Sessions | Share |
-|---|---:|---:|
-| MCP integrations | 88 | 63% |
-| Any subagent | 80 | 58% |
-| File edits or writes | 79 | 57% |
-| Fresh reviewer profiles | 72 | 52% |
-| Browser automation or web search | 63 | 45% |
-| Repository search through FFF (sample period) | 61 | 44% |
-| Worker or fixer profiles | 9 | 6% |
+| Behavior                                      | Sessions | Share |
+| --------------------------------------------- | -------: | ----: |
+| MCP integrations                              |       88 |   63% |
+| Any subagent                                  |       80 |   58% |
+| File edits or writes                          |       79 |   57% |
+| Fresh reviewer profiles                       |       72 |   52% |
+| Browser automation or web search              |       63 |   45% |
+| Repository search through FFF (sample period) |       61 |   44% |
+| Worker or fixer profiles                      |        9 |    6% |
 
 The contrast is the point: the main session usually implements, while specialists most often provide reconnaissance and independent review. Connected services, browser work, and repository search are ordinary workflow, not demo features.
 

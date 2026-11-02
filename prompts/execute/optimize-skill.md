@@ -80,10 +80,11 @@ Harden the named Agent Skill end-to-end so it is current, operational, agent-opt
 
 <final_handoff>
 Return only:
+
 1. Outcome
 2. Files changed
 3. Trigger contract
 4. Currentness evidence
 5. Validation evidence
 6. Remaining blockers or follow-ups, only if real
-</final_handoff>
+   </final_handoff>

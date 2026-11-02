@@ -13,12 +13,7 @@ const MAX_CONTEXT_IMAGE_BASE64_CHARS = 64 * 1024 * 1024;
 const RESIZE_CONCURRENCY = Math.max(1, Math.min(4, availableParallelism() - 1));
 // Messages requests, including text, tools, and JSON framing: https://platform.claude.com/docs/en/api/errors
 const MAX_REQUEST_BYTES = 32_000_000;
-const ANTHROPIC_IMAGE_MIME_TYPES = new Set([
-	"image/gif",
-	"image/jpeg",
-	"image/png",
-	"image/webp",
-]);
+const ANTHROPIC_IMAGE_MIME_TYPES = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
 
 type Resized = Awaited<ReturnType<typeof resizeImage>>;
 type CachedImage = { mimeType: string; pending: Promise<Resized>; bytes: number };
@@ -55,7 +50,8 @@ class ImageGuardCache {
 // loaded guard's cache here instead of decoding every capture again.
 const SHARED_CACHE = Symbol.for("pi-fitch-kit.anthropic-image-cache");
 type SharedCache = { [SHARED_CACHE]?: ImageGuardCache };
-export const sharedImageCache = (): ImageGuardCache => ((globalThis as SharedCache)[SHARED_CACHE] ??= new ImageGuardCache());
+export const sharedImageCache = (): ImageGuardCache =>
+	((globalThis as SharedCache)[SHARED_CACHE] ??= new ImageGuardCache());
 
 /** Starts native resizes in arrival order, at most RESIZE_CONCURRENCY at a time. */
 function resizePool() {
@@ -64,15 +60,21 @@ function resizePool() {
 	return {
 		// Jobs wait only while every worker slot is busy.
 		idle: () => active < RESIZE_CONCURRENCY,
-		run: (data: string, mimeType: string, options?: Parameters<typeof resizeImage>[2]): Promise<Resized> =>
+		run: (
+			data: string,
+			mimeType: string,
+			options?: Parameters<typeof resizeImage>[2],
+		): Promise<Resized> =>
 			new Promise((resolve) => {
 				const start = () => {
 					active++;
-					resizeImage(Buffer.from(data, "base64"), mimeType, options).catch(() => null).then((result) => {
-						active--;
-						waiting.shift()?.();
-						resolve(result);
-					});
+					resizeImage(Buffer.from(data, "base64"), mimeType, options)
+						.catch(() => null)
+						.then((result) => {
+							active--;
+							waiting.shift()?.();
+							resolve(result);
+						});
 				};
 				if (active < RESIZE_CONCURRENCY) start();
 				else waiting.push(start);
@@ -123,7 +125,12 @@ export async function prepareClaudeImages(
 	// Admission favors the newest captures; only the request copy is transformed.
 	// Every miss starts before any result is awaited, so cold requests overlap workers.
 	for (const message of messages.toReversed()) {
-		if (message.role === "assistant" || !Array.isArray(message.content) || !message.content.some(isImagePart)) continue;
+		if (
+			message.role === "assistant" ||
+			!Array.isArray(message.content) ||
+			!message.content.some(isImagePart)
+		)
+			continue;
 		const plan = { message, parts: [] as unknown[], changed: false };
 		plans.push(plan);
 		for (const part of message.content.toReversed()) {
@@ -193,7 +200,11 @@ export async function prepareClaudeImages(
 			if (cache.entries.get(image.data)?.pending === pending) {
 				// Native results own base64 strings even when unchanged. Budget both
 				// strings conservatively as UTF-16, plus an entry/promise allowance.
-				cache.set(image.data, { mimeType, pending, bytes: 2 * (image.data.length + resized.data.length) + 512 });
+				cache.set(image.data, {
+					mimeType,
+					pending,
+					bytes: 2 * (image.data.length + resized.data.length) + 512,
+				});
 			}
 			if (!resized.wasResized) {
 				if (image.mimeType === resized.mimeType) {
@@ -226,16 +237,24 @@ export async function fitClaudeRequest(
 	payload: unknown,
 	cache: ImageGuardCache = new ImageGuardCache(),
 ): Promise<unknown> {
-	if (!isClaude(model) || !payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+	if (!isClaude(model) || !payload || typeof payload !== "object" || Array.isArray(payload))
+		return payload;
 	// Traverse only message image blocks, never tool schemas or tool-call arguments.
 	type Source = { type: string; data: string; media_type: string };
 	type Block = { type: string; source?: Source; content?: Block[]; text?: string };
 	const body = payload as { messages?: { content?: Block[] }[] };
-	const images: { content: Block[]; image: Block; note?: Block; originalWidth?: number; originalHeight?: number }[] = [];
+	const images: {
+		content: Block[];
+		image: Block;
+		note?: Block;
+		originalWidth?: number;
+		originalHeight?: number;
+	}[] = [];
 	const collect = (content: Block[] | undefined) => {
 		if (!Array.isArray(content)) return;
 		for (const image of content) {
-			if (image.type === "image" && image.source?.type === "base64") images.push({ content, image });
+			if (image.type === "image" && image.source?.type === "base64")
+				images.push({ content, image });
 			else if (image.type === "tool_result") collect(image.content);
 		}
 	};
@@ -248,9 +267,14 @@ export async function fitClaudeRequest(
 	if (bytes <= MAX_REQUEST_BYTES) return payload;
 	// Retain native cache-control markers when replacing an image with an explanation.
 	const omitted = (image: Block): Block => ({
-		...image, type: "text", source: undefined, text: "[Image omitted: Anthropic request size limit.]",
+		...image,
+		type: "text",
+		source: undefined,
+		text: "[Image omitted: Anthropic request size limit.]",
 	});
-	const withoutImages = bytes - images.reduce((total, { image }) => total + blockBytes(image) - blockBytes(omitted(image)), 0);
+	const withoutImages =
+		bytes -
+		images.reduce((total, { image }) => total + blockBytes(image) - blockBytes(omitted(image)), 0);
 	// Text/tool overflow belongs to Pi and the provider; image handling cannot heal it.
 	if (withoutImages > MAX_REQUEST_BYTES) return payload;
 
@@ -268,11 +292,15 @@ export async function fitClaudeRequest(
 	while (bytes > MAX_REQUEST_BYTES && images.length) {
 		// Resize the largest capture first, sharing the reduction across image bytes.
 		// Keep this list chronological so an irreducible image budget drops oldest first.
-		const [entry, ...smaller] = images.toSorted((a, b) => b.image.source!.data.length - a.image.source!.data.length);
+		const [entry, ...smaller] = images.toSorted(
+			(a, b) => b.image.source!.data.length - a.image.source!.data.length,
+		);
 		const { content, image } = entry;
 		const source = image.source!;
 		const imageChars = images.reduce((total, entry) => total + entry.image.source!.data.length, 0);
-		const maxBytes = Math.floor(source.data.length * (1 - (bytes - MAX_REQUEST_BYTES) / imageChars));
+		const maxBytes = Math.floor(
+			source.data.length * (1 - (bytes - MAX_REQUEST_BYTES) / imageChars),
+		);
 		let resized: Resized = null;
 		if (maxBytes > 0 && source.data.length <= MAX_IMAGE_BASE64_CHARS) {
 			visited.add(source.data);
@@ -281,19 +309,30 @@ export async function fitClaudeRequest(
 			// Idle workers start the next largest untouched captures at their first smaller encoding.
 			// Pi's resizer returns the first fixed-order encoding below maxBytes, so that
 			// result is exact for any later budget it still fits.
-			for (const { image: { source: next } } of smaller) {
+			for (const {
+				image: { source: next },
+			} of smaller) {
 				if (!pool.idle()) break;
-				if (captures.has(next!.data) && !cache.fits.has(next!.data) && next!.data.length <= MAX_IMAGE_BASE64_CHARS) {
+				if (
+					captures.has(next!.data) &&
+					!cache.fits.has(next!.data) &&
+					next!.data.length <= MAX_IMAGE_BASE64_CHARS
+				) {
 					run(next!, next!.data.length);
 				}
 			}
 			resized = await (pending ?? known!.pending);
-			if (!pending && !(resized && resized.data.length < maxBytes)) resized = await run(source, maxBytes);
+			if (!pending && !(resized && resized.data.length < maxBytes))
+				resized = await run(source, maxBytes);
 		}
 		if (resized) {
 			image.source = { ...source, data: resized.data, media_type: resized.mimeType };
 			// Base64 data and MIME types serialize without escapes.
-			bytes += resized.data.length - source.data.length + resized.mimeType.length - source.media_type.length;
+			bytes +=
+				resized.data.length -
+				source.data.length +
+				resized.mimeType.length -
+				source.media_type.length;
 			entry.originalWidth ??= resized.originalWidth;
 			entry.originalHeight ??= resized.originalHeight;
 			if (entry.note) {
@@ -301,7 +340,11 @@ export async function fitClaudeRequest(
 				bytes -= blockBytes(entry.note) + 1; // The note and its array comma.
 			}
 			if (resized.width !== entry.originalWidth || resized.height !== entry.originalHeight) {
-				const note = formatDimensionNote({ ...resized, originalWidth: entry.originalWidth, originalHeight: entry.originalHeight });
+				const note = formatDimensionNote({
+					...resized,
+					originalWidth: entry.originalWidth,
+					originalHeight: entry.originalHeight,
+				});
 				entry.note = {
 					type: "text",
 					text: `[Additional request-size resize: ${note} Apply this coordinate mapping before any earlier mapping for this image.]`,
@@ -323,7 +366,8 @@ export async function fitClaudeRequest(
 		if (bytes <= MAX_REQUEST_BYTES) bytes = requestBytes();
 	}
 	// Remember results only for this request's captures and their resized forms.
-	for (const data of cache.fits.keys()) if (!captures.has(data) && !visited.has(data)) cache.fits.delete(data);
+	for (const data of cache.fits.keys())
+		if (!captures.has(data) && !visited.has(data)) cache.fits.delete(data);
 	return payload;
 }
 

@@ -8,6 +8,7 @@ Focus area: ${1:-infer the highest-value Pi extension or package audit scope fro
 Audit the current Pi extension or package with a bias toward real user experience, installability, error handling, maintainability, and operational reliability.
 
 Check for:
+
 - broken or confusing user flows
 - weak defaults or surprising behavior
 - brittle configuration or packaging assumptions
@@ -16,6 +17,7 @@ Check for:
 - duplication, dead code, or unclear ownership boundaries
 
 Return:
+
 1. Executive summary
 2. Findings grouped by severity
 3. Root cause or likely cause when identifiable

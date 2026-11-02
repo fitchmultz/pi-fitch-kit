@@ -13,6 +13,7 @@ If a focus area is provided, prioritize it first and then scan adjacent areas th
 If no focus area is provided, infer the highest-value audit scope from the repo.
 
 Return:
+
 1. Executive summary
 2. Findings grouped by severity
 3. Concrete remediation guidance

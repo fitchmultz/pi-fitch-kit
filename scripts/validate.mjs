@@ -10,265 +10,467 @@ const packageLock = JSON.parse(readFileSync(join(root, "package-lock.json"), "ut
 const settingsExample = JSON.parse(readFileSync(join(root, "examples", "settings.json"), "utf-8"));
 
 const assert = (condition, message) => {
-  if (!condition) throw new Error(message);
+	if (!condition) throw new Error(message);
 };
 
-assert(manifest.schemaVersion === 8, "setup manifest schema must match the ordered required-alternatives shape");
 assert(
-  manifest.requiredModels.every((routes) => Array.isArray(routes) && routes.length > 0 && routes.every((route) => typeof route === "string" && route.includes("/"))),
-  "each requiredModels entry must be a non-empty ordered list of provider/model routes",
+	manifest.schemaVersion === 8,
+	"setup manifest schema must match the ordered required-alternatives shape",
 );
-const manifestModelRoutes = new Set([...manifest.requiredModels.flat(), ...manifest.optionalModels]);
+assert(
+	manifest.requiredModels.every(
+		(routes) =>
+			Array.isArray(routes) &&
+			routes.length > 0 &&
+			routes.every((route) => typeof route === "string" && route.includes("/")),
+	),
+	"each requiredModels entry must be a non-empty ordered list of provider/model routes",
+);
+const manifestModelRoutes = new Set([
+	...manifest.requiredModels.flat(),
+	...manifest.optionalModels,
+]);
 const compaction = settingsExample.compaction;
 for (const key of ["reserveTokens", "keepRecentTokens"]) {
-  assert(Number.isSafeInteger(compaction?.[key]) && compaction[key] > 0, `compaction.${key} must be a positive safe integer`);
+	assert(
+		Number.isSafeInteger(compaction?.[key]) && compaction[key] > 0,
+		`compaction.${key} must be a positive safe integer`,
+	);
 }
 assert(
-  manifest.modelContextWindows && Object.keys(manifest.modelContextWindows).length > 0,
-  "manifest must carry modelContextWindows",
+	manifest.modelContextWindows && Object.keys(manifest.modelContextWindows).length > 0,
+	"manifest must carry modelContextWindows",
 );
 for (const [route, value] of Object.entries(manifest.modelContextWindows)) {
-  assert(manifestModelRoutes.has(route), `modelContextWindows route ${route} must be a manifest-managed model route`);
-  assert(
-    Number.isSafeInteger(value) && value > compaction.reserveTokens + compaction.keepRecentTokens,
-    `modelContextWindows value for ${route} must be a safe integer exceeding the compaction reserve plus recent tokens`,
-  );
+	assert(
+		manifestModelRoutes.has(route),
+		`modelContextWindows route ${route} must be a manifest-managed model route`,
+	);
+	assert(
+		Number.isSafeInteger(value) && value > compaction.reserveTokens + compaction.keepRecentTokens,
+		`modelContextWindows value for ${route} must be a safe integer exceeding the compaction reserve plus recent tokens`,
+	);
 }
 const piFloor = /^>=(\d+\.\d+\.\d+)$/.exec(manifest.runtime.pi)?.[1];
 assert(piFloor === "1.4.0", "the kit requires Pi 1.4.0 or newer");
-assert(packageJson.engines.node === manifest.runtime.node, "package and manifest Node floors must match");
+assert(
+	packageJson.engines.node === manifest.runtime.node,
+	"package and manifest Node floors must match",
+);
 assert(/^\d+\.\d+\.\d+$/.test(packageJson.version), "package version must be a release version");
-assert(packageLock.version === packageJson.version && packageLock.packages[""].version === packageJson.version, "lockfile version must match package.json");
+assert(
+	packageLock.version === packageJson.version &&
+		packageLock.packages[""].version === packageJson.version,
+	"lockfile version must match package.json",
+);
 const resolvedOrigins = Object.values(packageLock.packages)
-  .map((entry) => entry.resolved)
-  .filter(Boolean)
-  .map((resolved) => new URL(resolved).origin);
+	.map((entry) => entry.resolved)
+	.filter(Boolean)
+	.map((resolved) => new URL(resolved).origin);
 assert(resolvedOrigins.length > 0, "the lockfile must contain resolved package origins");
 assert(
-  resolvedOrigins.every((origin) => origin === "https://registry.npmjs.org"),
-  `the public lockfile must use only the npm registry; found ${[...new Set(resolvedOrigins)].join(", ")}`,
+	resolvedOrigins.every((origin) => origin === "https://registry.npmjs.org"),
+	`the public lockfile must use only the npm registry; found ${[...new Set(resolvedOrigins)].join(", ")}`,
 );
-assert(!existsSync(join(root, "patches")), "Pi core patch artifacts are retired; the kit must stay patch-free");
 assert(
-  !Object.keys(packageJson.scripts).some((script) => script.includes("pi-core")),
-  "guarded Pi core scripts are retired with the patch stack",
+	!existsSync(join(root, "patches")),
+	"Pi core patch artifacts are retired; the kit must stay patch-free",
+);
+assert(
+	!Object.keys(packageJson.scripts).some((script) => script.includes("pi-core")),
+	"guarded Pi core scripts are retired with the patch stack",
 );
 for (const dependency of [
-  "@earendil-works/pi-ai",
-  "@earendil-works/pi-coding-agent",
-  "@earendil-works/pi-tui",
+	"@earendil-works/pi-ai",
+	"@earendil-works/pi-coding-agent",
+	"@earendil-works/pi-tui",
 ]) {
-  assert(/^\d+\.\d+\.\d+$/.test(packageJson.devDependencies[dependency]), `${dependency} must pin an exact Pi development baseline`);
-  assert(packageJson.devDependencies[dependency] === packageJson.devDependencies["@earendil-works/pi-coding-agent"], `${dependency} must use the coherent Pi development cohort`);
-  assert(packageJson.peerDependencies[dependency] === "*", `${dependency} must remain an unversioned Pi peer`);
-  assert(packageJson.peerDependenciesMeta[dependency]?.optional === true, `${dependency} must remain an optional Pi peer`);
+	assert(
+		/^\d+\.\d+\.\d+$/.test(packageJson.devDependencies[dependency]),
+		`${dependency} must pin an exact Pi development baseline`,
+	);
+	assert(
+		packageJson.devDependencies[dependency] ===
+			packageJson.devDependencies["@earendil-works/pi-coding-agent"],
+		`${dependency} must use the coherent Pi development cohort`,
+	);
+	assert(
+		packageJson.peerDependencies[dependency] === "*",
+		`${dependency} must remain an unversioned Pi peer`,
+	);
+	assert(
+		packageJson.peerDependenciesMeta[dependency]?.optional === true,
+		`${dependency} must remain an optional Pi peer`,
+	);
 }
 assert(
-  JSON.stringify(packageJson.pi.extensions) === JSON.stringify(manifest.kitResources.extensions.map((path) => `./${path}`)),
-  "package.json pi.extensions must match manifest kitResources.extensions",
+	JSON.stringify(packageJson.pi.extensions) ===
+		JSON.stringify(manifest.kitResources.extensions.map((path) => `./${path}`)),
+	"package.json pi.extensions must match manifest kitResources.extensions",
 );
 assert(
-  JSON.stringify(packageJson.pi.prompts) === JSON.stringify(manifest.kitResources.prompts.map((path) => `./${path}`)),
-  "package.json pi.prompts must match manifest kitResources.prompts",
+	JSON.stringify(packageJson.pi.prompts) ===
+		JSON.stringify(manifest.kitResources.prompts.map((path) => `./${path}`)),
+	"package.json pi.prompts must match manifest kitResources.prompts",
 );
 assert(
-  JSON.stringify(packageJson.pi.themes) === JSON.stringify(manifest.kitResources.themes.map((path) => `./${path}`)),
-  "package.json pi.themes must match manifest kitResources.themes",
+	JSON.stringify(packageJson.pi.themes) ===
+		JSON.stringify(manifest.kitResources.themes.map((path) => `./${path}`)),
+	"package.json pi.themes must match manifest kitResources.themes",
 );
 for (const resource of [
-  ...manifest.kitResources.extensions,
-  ...manifest.kitResources.prompts,
-  manifest.kitResources.workingAgreementTemplate,
-  manifest.kitResources.settingsExample,
+	...manifest.kitResources.extensions,
+	...manifest.kitResources.prompts,
+	manifest.kitResources.workingAgreementTemplate,
+	manifest.kitResources.settingsExample,
 ]) {
-  assert(lstatSync(join(root, resource)).isFile(), `manifest resource missing: ${resource}`);
+	assert(lstatSync(join(root, resource)).isFile(), `manifest resource missing: ${resource}`);
 }
 
 assert(!existsSync(join(root, "agents")), "agent profiles belong to pi-subagents, not the kit");
-assert(!existsSync(join(root, "extensions", "sync-agents.ts")), "sync-agents is redundant with pi-subagents defaults");
-assert(!existsSync(join(root, "extensions", "codex-context.ts")), "codex-context is retired; fast-mode owns the fast toggles");
 assert(
-  JSON.stringify(manifest.kitResources.extensions) ===
-    JSON.stringify([
-      "extensions/anthropic-image-guard.ts",
-      "extensions/clean-footer.ts",
-      "extensions/fast-mode.ts",
-      "extensions/session-name.ts",
-      "extensions/setup-models.ts",
-      "extensions/write-prompt.ts",
-      "extensions/paged-reader.ts",
-    ]),
-  "the kit must bundle the image-guard, clean-footer, fast-mode, session-name, setup-models, write-prompt, and paged-reader extensions",
+	!existsSync(join(root, "extensions", "sync-agents.ts")),
+	"sync-agents is redundant with pi-subagents defaults",
 );
-assert(!existsSync(join(root, "extensions", "session-restart.ts")), "the fork's native /restart replaces the retired kit helper");
+assert(
+	!existsSync(join(root, "extensions", "codex-context.ts")),
+	"codex-context is retired; fast-mode owns the fast toggles",
+);
+assert(
+	JSON.stringify(manifest.kitResources.extensions) ===
+		JSON.stringify([
+			"extensions/anthropic-image-guard.ts",
+			"extensions/clean-footer.ts",
+			"extensions/fast-mode.ts",
+			"extensions/session-name.ts",
+			"extensions/setup-models.ts",
+			"extensions/write-prompt.ts",
+			"extensions/paged-reader.ts",
+		]),
+	"the kit must bundle the image-guard, clean-footer, fast-mode, session-name, setup-models, write-prompt, and paged-reader extensions",
+);
+assert(
+	!existsSync(join(root, "extensions", "session-restart.ts")),
+	"the fork's native /restart replaces the retired kit helper",
+);
 
 for (const pkg of manifest.corePackages) {
-  assert(
-    /^npm:(?:@[\w.-]+\/)?[\w.-]+$/.test(pkg.source) || /^git:github\.com\/[\w-]+\/[\w-]+$/.test(pkg.source),
-    `corePackages ${pkg.id} must use an unpinned npm or Git source: ${pkg.source}`,
-  );
-  assert(!manifest.retiredPackageSources.includes(pkg.source), `corePackages ${pkg.id} cannot also be retired`);
+	assert(
+		/^npm:(?:@[\w.-]+\/)?[\w.-]+$/.test(pkg.source) ||
+			/^git:github\.com\/[\w-]+\/[\w-]+$/.test(pkg.source),
+		`corePackages ${pkg.id} must use an unpinned npm or Git source: ${pkg.source}`,
+	);
+	assert(
+		!manifest.retiredPackageSources.includes(pkg.source),
+		`corePackages ${pkg.id} cannot also be retired`,
+	);
 }
 const subagents = manifest.corePackages.find(({ id }) => id === "subagents");
 assert(
-  subagents?.source === "npm:@fitchmultz/pi-subagents",
-  "subagents must use the consolidated owned scoped npm source",
+	subagents?.source === "npm:@fitchmultz/pi-subagents",
+	"subagents must use the consolidated owned scoped npm source",
 );
-assert(!manifest.corePackages.some(({ id }) => id === "intercom"), "standalone intercom is retired into pi-subagents");
-assert(manifest.optionalIntegrations.includes("GitHub"), "active GitHub MCP integration must be selectable");
+assert(
+	!manifest.corePackages.some(({ id }) => id === "intercom"),
+	"standalone intercom is retired into pi-subagents",
+);
+assert(
+	manifest.optionalIntegrations.includes("GitHub"),
+	"active GitHub MCP integration must be selectable",
+);
 
 const mcp = manifest.corePackages.find(({ id }) => id === "mcp");
 assert(
-  mcp?.source === "git:github.com/fitchmultz/pi-mcp-adapter",
-  "MCP adapter must use its public source",
+	mcp?.source === "git:github.com/fitchmultz/pi-mcp-adapter",
+	"MCP adapter must use its public source",
 );
 
 const agentSkills = manifest.corePackages.find(({ id }) => id === "agent-skills");
 assert(
-  agentSkills?.source === "git:github.com/fitchmultz/pi-agent-skills",
-  "agent-skills must use its public source",
+	agentSkills?.source === "git:github.com/fitchmultz/pi-agent-skills",
+	"agent-skills must use its public source",
 );
 
 const pstack = manifest.corePackages.find(({ id }) => id === "pstack");
 assert(
-  pstack?.source === "git:github.com/fitchmultz/pi-pstack",
-  "pstack must use its public source",
+	pstack?.source === "git:github.com/fitchmultz/pi-pstack",
+	"pstack must use its public source",
 );
 
 const ctxInfo = manifest.corePackages.find(({ id }) => id === "ctx-info");
-assert(ctxInfo?.source === "git:github.com/fitchmultz/pi-ctx-info", "ctx-info must follow its public source");
+assert(
+	ctxInfo?.source === "git:github.com/fitchmultz/pi-ctx-info",
+	"ctx-info must follow its public source",
+);
 
-assert(!manifest.corePackages.some(({ id }) => id === "codex-context"), "codex-context is retired, not a core package");
-assert(!manifest.corePackages.some(({ id }) => id === "session-name"), "session-name now belongs to the kit");
+assert(
+	!manifest.corePackages.some(({ id }) => id === "codex-context"),
+	"codex-context is retired, not a core package",
+);
+assert(
+	!manifest.corePackages.some(({ id }) => id === "session-name"),
+	"session-name now belongs to the kit",
+);
 const askQuestion = manifest.corePackages.find(({ id }) => id === "ask-question");
 assert(
-  askQuestion?.source === "npm:@fitchmultz/pi-ask-question",
-  "ask-question must use the owned scoped npm source for the structured question tool",
+	askQuestion?.source === "npm:@fitchmultz/pi-ask-question",
+	"ask-question must use the owned scoped npm source for the structured question tool",
 );
 const ponytail = manifest.corePackages.find(({ id }) => id === "ponytail");
-assert(ponytail?.source === "git:github.com/fitchmultz/ponytail", "ponytail must use its public source");
-assert(!manifest.corePackages.some(({ id }) => id === "fff"), "fff is retired in favor of native repository search");
+assert(
+	ponytail?.source === "git:github.com/fitchmultz/ponytail",
+	"ponytail must use its public source",
+);
+assert(
+	!manifest.corePackages.some(({ id }) => id === "fff"),
+	"fff is retired in favor of native repository search",
+);
 for (const source of [
-  "git:github.com/fitchmultz/pi-codex-context",
-  "git:github.com/fitchmultz/pi-session-name",
-  "npm:@ff-labs/pi-fff",
-  "npm:pi-verbosity-control",
-  "git:github.com/DietrichGebert/ponytail",
+	"git:github.com/fitchmultz/pi-codex-context",
+	"git:github.com/fitchmultz/pi-session-name",
+	"npm:@ff-labs/pi-fff",
+	"npm:pi-verbosity-control",
+	"git:github.com/DietrichGebert/ponytail",
 ]) {
-  assert(
-    manifest.retiredPackageSources.includes(source),
-    `upgrades must remove the retired standalone package: ${source}`,
-  );
+	assert(
+		manifest.retiredPackageSources.includes(source),
+		`upgrades must remove the retired standalone package: ${source}`,
+	);
 }
 assert(
-  JSON.stringify(manifest.retiredExtensionLinks) === JSON.stringify([
-    {
-      path: "extensions/fold-responsive-footer.ts",
-      targetSuffix: "/fold-dev-environment/extensions/fold-responsive-footer.ts",
-    },
-    {
-      path: "extensions/openai-codex-fast-mode",
-      targetSuffix: "/fold-dev-environment/extensions/openai-codex-fast-mode",
-    },
-  ]),
-  "upgrades must retire the approved Fold footer and standalone fast-mode links",
+	JSON.stringify(manifest.retiredExtensionLinks) ===
+		JSON.stringify([
+			{
+				path: "extensions/fold-responsive-footer.ts",
+				targetSuffix: "/fold-dev-environment/extensions/fold-responsive-footer.ts",
+			},
+			{
+				path: "extensions/openai-codex-fast-mode",
+				targetSuffix: "/fold-dev-environment/extensions/openai-codex-fast-mode",
+			},
+		]),
+	"upgrades must retire the approved Fold footer and standalone fast-mode links",
 );
-assert(Array.isArray(manifest.consentBehaviors), "consentBehaviors must stay a declared list, even when empty");
+assert(
+	Array.isArray(manifest.consentBehaviors),
+	"consentBehaviors must stay a declared list, even when empty",
+);
 for (const behavior of manifest.consentBehaviors) {
-  assert(behavior?.consent?.required === true, "consent behaviors must require explicit consent");
-  assert(behavior?.consent?.default === "disabled", "consent behaviors must default off");
+	assert(behavior?.consent?.required === true, "consent behaviors must require explicit consent");
+	assert(behavior?.consent?.default === "disabled", "consent behaviors must default off");
 }
-assert(manifest.piCorePatch === undefined, "the retired Pi core patch must not reappear in the manifest");
+assert(
+	manifest.piCorePatch === undefined,
+	"the retired Pi core patch must not reappear in the manifest",
+);
 
-assert(manifest.kit.packageName === "@fitch/pi-kit", "setup must identify duplicate kit package entries");
+assert(
+	manifest.kit.packageName === "@fitch/pi-kit",
+	"setup must identify duplicate kit package entries",
+);
 
 const verbosity = manifest.corePackages.find(({ id }) => id === "verbosity");
-assert(verbosity?.source === "npm:@fitchmultz/pi-verbosity-control", "verbosity must use the owned scoped npm native-status controller");
-
-const calculator = manifest.corePackages.find(({ id }) => id === "calculator");
-assert(calculator?.source === "npm:@fitchmultz/pi-calculator", "calculator must use the owned scoped npm source");
-
-const editSession = manifest.corePackages.find(({ id }) => id === "edit-session");
-assert(editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place", "edit-session must follow its public Git source");
-
-const browser = manifest.corePackages.find(({ id }) => id === "agent-browser")?.externalPrerequisite;
-assert(/^\d+\.\d+\.\d+$/.test(browser?.minimumVersion), "Agent Browser prerequisite must declare its minimum version");
 assert(
-  browser.installCommand === "npm install --global agent-browser",
-  "Agent Browser install must use the canonical package name without a version",
+	verbosity?.source === "npm:@fitchmultz/pi-verbosity-control",
+	"verbosity must use the owned scoped npm native-status controller",
 );
 
-const setupPromptPath = manifest.kitResources.prompts.find((path) => path.endsWith("/fitch-setup.md"));
+const calculator = manifest.corePackages.find(({ id }) => id === "calculator");
+assert(
+	calculator?.source === "npm:@fitchmultz/pi-calculator",
+	"calculator must use the owned scoped npm source",
+);
+
+const editSession = manifest.corePackages.find(({ id }) => id === "edit-session");
+assert(
+	editSession?.source === "git:github.com/fitchmultz/pi-edit-session-in-place",
+	"edit-session must follow its public Git source",
+);
+
+const browser = manifest.corePackages.find(
+	({ id }) => id === "agent-browser",
+)?.externalPrerequisite;
+assert(
+	/^\d+\.\d+\.\d+$/.test(browser?.minimumVersion),
+	"Agent Browser prerequisite must declare its minimum version",
+);
+assert(
+	browser.installCommand === "npm install --global agent-browser",
+	"Agent Browser install must use the canonical package name without a version",
+);
+
+const setupPromptPath = manifest.kitResources.prompts.find((path) =>
+	path.endsWith("/fitch-setup.md"),
+);
 assert(setupPromptPath, "manifest must include prompts/fitch-setup.md");
 const setupPrompt = readFileSync(join(root, setupPromptPath), "utf-8");
 // Content contracts only; native resource smokes separately verify delivery, not model obedience.
 const agreement = readFileSync(join(root, manifest.kitResources.workingAgreementTemplate), "utf-8");
-const processBlock = agreement.match(/<!-- fitch-pi-kit:process:start -->([\s\S]*?)<!-- fitch-pi-kit:process:end -->/)?.[1] ?? "";
-assert(!setupPrompt.includes("pi-subagents/agents/"), "setup content must not reference a sibling profile tree");
-assert(!/`|\breviewer[-_][\w-]+/i.test(processBlock), "managed process content must avoid code spans and reviewer-prefixed identifiers");
+const processBlock =
+	agreement.match(
+		/<!-- fitch-pi-kit:process:start -->([\s\S]*?)<!-- fitch-pi-kit:process:end -->/,
+	)?.[1] ?? "";
 assert(
-  ["independent review", "unsatisfied", "self-review"].every((anchor) => processBlock.includes(anchor)),
-  "managed process content must retain the independent-review, unsatisfied, and self-review boundaries",
-);
-assert(setupPrompt.includes("selected or confirmed installed"), "setup content must scope optional ownership to selected or confirmed installed");
-assert(
-  ["minimum versions against the running runtime", "minimum check as unverified rather than as passing"]
-    .every((anchor) => setupPrompt.includes(anchor)),
-  "setup must assess the running-runtime minimum without treating unknown as a pass",
+	!setupPrompt.includes("pi-subagents/agents/"),
+	"setup content must not reference a sibling profile tree",
 );
 assert(
-  [
-    "running session's channel and build provenance",
-    "selected CLI may differ from the running session",
-    "compare it with the current maintained build or revision",
-    "matching version numbers do not establish identity or currency",
-    "host currency as unverified",
-    "current comparison target cannot be established",
-  ].every((anchor) => setupPrompt.includes(anchor)),
-  "setup must require channel/build provenance before confirming host currency",
+	!/`|\breviewer[-_][\w-]+/i.test(processBlock),
+	"managed process content must avoid code spans and reviewer-prefixed identifiers",
+);
+assert(
+	["independent review", "unsatisfied", "self-review"].every((anchor) =>
+		processBlock.includes(anchor),
+	),
+	"managed process content must retain the independent-review, unsatisfied, and self-review boundaries",
+);
+assert(
+	setupPrompt.includes("selected or confirmed installed"),
+	"setup content must scope optional ownership to selected or confirmed installed",
+);
+assert(
+	[
+		"minimum versions against the running runtime",
+		"minimum check as unverified rather than as passing",
+	].every((anchor) => setupPrompt.includes(anchor)),
+	"setup must assess the running-runtime minimum without treating unknown as a pass",
+);
+assert(
+	[
+		"running session's channel and build provenance",
+		"selected CLI may differ from the running session",
+		"compare it with the current maintained build or revision",
+		"matching version numbers do not establish identity or currency",
+		"host currency as unverified",
+		"current comparison target cannot be established",
+	].every((anchor) => setupPrompt.includes(anchor)),
+	"setup must require channel/build provenance before confirming host currency",
 );
 const hardReview = readFileSync(join(root, "prompts/review/hard-review.md"), "utf-8");
 assert(
-  hardReview.includes("GPT-family") && hardReview.includes("Claude-family"),
-  "hard-review content must retain both GPT-family and Claude-family requirements",
+	hardReview.includes("GPT-family") && hardReview.includes("Claude-family"),
+	"hard-review content must retain both GPT-family and Claude-family requirements",
 );
 assert(setupPrompt.includes("setup-manifest.json"), "setup prompt must reference the manifest");
 assert(setupPrompt.includes("pi-subagents"), "setup prompt must name the profile owner");
-assert(setupPrompt.includes("${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"), "setup prompt must honor the active Pi agent directory");
-assert(setupPrompt.includes("modelContextWindows"), "setup prompt must offer the context-window override step");
-assert(!setupPrompt.includes("pi --list-models"), "setup verification must not launch Pi's migration-capable model listing");
-assert(setupPrompt.includes("fitch_setup_models"), "setup must inspect models through the running session");
-assert(setupPrompt.includes("keep-or-overwrite"), "setup prompt must define rerun semantics for existing overrides");
-assert(setupPrompt.includes("long-context tier"), "setup prompt must disclose the OpenAI pricing consequence");
-const defaultRoute = `${settingsExample.defaultProvider}/${settingsExample.defaultModel}`;
-assert(manifest.requiredModels.some(([preferred]) => preferred === defaultRoute), "settings default model must be the preferred route of a required entry");
-assert(settingsExample.enabledModels.includes(defaultRoute), "settings default model must be enabled");
-assert(["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(settingsExample.defaultThinkingLevel), "settings thinking level must be valid");
-assert(settingsExample.compactView === true, "settings example must carry the optional compact-view preference");
-assert(setupPrompt.includes("/compact-view off"), "setup must explain how to restore the normal view");
-assert(new Set(settingsExample.enabledModels).size === settingsExample.enabledModels.length, "settings enabledModels must be unique");
-for (const route of settingsExample.enabledModels) {
-  assert(manifestModelRoutes.has(route), `settings enabled model ${route} must be a manifest-managed route`);
-}
-assert(Number.isSafeInteger(settingsExample.retry?.maxRetries) && settingsExample.retry.maxRetries > 0, "settings example must carry a retry budget");
-assert(Number.isSafeInteger(settingsExample.retry?.provider?.timeoutMs) && settingsExample.retry.provider.timeoutMs > 0, "settings example must carry a provider timeout");
-
-assert(!setupPrompt.includes("~/.pi/agent/AGENTS.md"), "setup prompt must not hardcode the default working-agreement path");
-assert(setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"), "setup prompt must safely retire legacy profile links");
-assert(setupPrompt.includes("consentBehaviors"), "setup prompt must honor consent-gated behavior");
-assert(setupPrompt.includes("openai-codex-fast.json"), "setup prompt must preserve fast-mode state during legacy removals");
-assert(setupPrompt.includes("retiredExtensionLinks"), "setup prompt must migrate approved extension collisions");
-assert(setupPrompt.includes("targetSuffix"), "setup prompt must verify retired link provenance");
-assert(setupPrompt.includes("pi-codex-context.json"), "setup prompt must preserve legacy compaction consent files");
-assert(setupPrompt.includes("apply the same filters to the selected package"), "setup prompt must preserve Ponytail filters when replacing a retired source");
-assert(setupPrompt.includes("enable, disable, or keep"), "setup must offer explicit consent revocation");
-assert(setupPrompt.includes("filtered, pinned, or duplicate"), "setup must normalize stale kit package entries");
 assert(
-  setupPrompt.includes("exactly one removal command per scope and package identity"),
-  "setup must not issue duplicate removal commands for one package identity",
+	setupPrompt.includes("${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"),
+	"setup prompt must honor the active Pi agent directory",
 );
-assert(setupPrompt.includes("stop immediately on the first failed command"), "setup must fail-stop after partial mutation");
-assert(!setupPrompt.includes("piCorePatch"), "the retired core patch must not survive in the setup prompt");
-assert(!setupPrompt.includes("@latest"), "setup prompt must reject mutable npm specs without spelling one");
+assert(
+	setupPrompt.includes("modelContextWindows"),
+	"setup prompt must offer the context-window override step",
+);
+assert(
+	!setupPrompt.includes("pi --list-models"),
+	"setup verification must not launch Pi's migration-capable model listing",
+);
+assert(
+	setupPrompt.includes("fitch_setup_models"),
+	"setup must inspect models through the running session",
+);
+assert(
+	setupPrompt.includes("keep-or-overwrite"),
+	"setup prompt must define rerun semantics for existing overrides",
+);
+assert(
+	setupPrompt.includes("long-context tier"),
+	"setup prompt must disclose the OpenAI pricing consequence",
+);
+const defaultRoute = `${settingsExample.defaultProvider}/${settingsExample.defaultModel}`;
+assert(
+	manifest.requiredModels.some(([preferred]) => preferred === defaultRoute),
+	"settings default model must be the preferred route of a required entry",
+);
+assert(
+	settingsExample.enabledModels.includes(defaultRoute),
+	"settings default model must be enabled",
+);
+assert(
+	["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(
+		settingsExample.defaultThinkingLevel,
+	),
+	"settings thinking level must be valid",
+);
+assert(
+	settingsExample.compactView === true,
+	"settings example must carry the optional compact-view preference",
+);
+assert(
+	setupPrompt.includes("/compact-view off"),
+	"setup must explain how to restore the normal view",
+);
+assert(
+	new Set(settingsExample.enabledModels).size === settingsExample.enabledModels.length,
+	"settings enabledModels must be unique",
+);
+for (const route of settingsExample.enabledModels) {
+	assert(
+		manifestModelRoutes.has(route),
+		`settings enabled model ${route} must be a manifest-managed route`,
+	);
+}
+assert(
+	Number.isSafeInteger(settingsExample.retry?.maxRetries) && settingsExample.retry.maxRetries > 0,
+	"settings example must carry a retry budget",
+);
+assert(
+	Number.isSafeInteger(settingsExample.retry?.provider?.timeoutMs) &&
+		settingsExample.retry.provider.timeoutMs > 0,
+	"settings example must carry a provider timeout",
+);
 
-console.log(JSON.stringify({ ok: true, manifestChecked: true, duplicateAgentSurfaceAbsent: true }, null, 2));
+assert(
+	!setupPrompt.includes("~/.pi/agent/AGENTS.md"),
+	"setup prompt must not hardcode the default working-agreement path",
+);
+assert(
+	setupPrompt.includes("recorded target is under `pi-fitch-kit/agents/`"),
+	"setup prompt must safely retire legacy profile links",
+);
+assert(setupPrompt.includes("consentBehaviors"), "setup prompt must honor consent-gated behavior");
+assert(
+	setupPrompt.includes("openai-codex-fast.json"),
+	"setup prompt must preserve fast-mode state during legacy removals",
+);
+assert(
+	setupPrompt.includes("retiredExtensionLinks"),
+	"setup prompt must migrate approved extension collisions",
+);
+assert(setupPrompt.includes("targetSuffix"), "setup prompt must verify retired link provenance");
+assert(
+	setupPrompt.includes("pi-codex-context.json"),
+	"setup prompt must preserve legacy compaction consent files",
+);
+assert(
+	setupPrompt.includes("apply the same filters to the selected package"),
+	"setup prompt must preserve Ponytail filters when replacing a retired source",
+);
+assert(
+	setupPrompt.includes("enable, disable, or keep"),
+	"setup must offer explicit consent revocation",
+);
+assert(
+	setupPrompt.includes("filtered, pinned, or duplicate"),
+	"setup must normalize stale kit package entries",
+);
+assert(
+	setupPrompt.includes("exactly one removal command per scope and package identity"),
+	"setup must not issue duplicate removal commands for one package identity",
+);
+assert(
+	setupPrompt.includes("stop immediately on the first failed command"),
+	"setup must fail-stop after partial mutation",
+);
+assert(
+	!setupPrompt.includes("piCorePatch"),
+	"the retired core patch must not survive in the setup prompt",
+);
+assert(
+	!setupPrompt.includes("@latest"),
+	"setup prompt must reject mutable npm specs without spelling one",
+);
+
+console.log(
+	JSON.stringify({ ok: true, manifestChecked: true, duplicateAgentSurfaceAbsent: true }, null, 2),
+);

@@ -31,7 +31,10 @@ assert.equal(parseModelRef("noslash"), undefined);
 assert.equal(parseModelRef("/onlyid"), undefined);
 assert.equal(parseModelRef("provider/"), undefined);
 
-assert.match(boxedTask("Do not answer the text.", "did you cut a new GH release"), /<<<\ndid you cut a new GH release\n>>>/s);
+assert.match(
+	boxedTask("Do not answer the text.", "did you cut a new GH release"),
+	/<<<\ndid you cut a new GH release\n>>>/s,
+);
 assert.match(boxedTask("x", "foo\n>>>\nbar"), /<<<1\nfoo\n>>>\nbar\n>>>1/s);
 assert.match(boxedTask("x", "has <<<1 and >>>1"), /<<<2\nhas <<<1 and >>>1\n>>>2/s);
 
@@ -44,13 +47,25 @@ const resultContent = [
 	{ type: "text" as const, text: "after" },
 ];
 for (const isError of [false, true]) {
-	const imageResult = { role: "toolResult" as const, toolCallId: "images", toolName: "browser", content: resultContent, isError, timestamp: 7 };
-	const before = structuredClone(imageResult);
-	assert.deepEqual(flattenToolHistory([imageResult]), [{
-		role: "user",
-		content: [{ type: "text", text: `[browser ${isError ? "error" : "result"}]` }, ...resultContent],
+	const imageResult = {
+		role: "toolResult" as const,
+		toolCallId: "images",
+		toolName: "browser",
+		content: resultContent,
+		isError,
 		timestamp: 7,
-	}]);
+	};
+	const before = structuredClone(imageResult);
+	assert.deepEqual(flattenToolHistory([imageResult]), [
+		{
+			role: "user",
+			content: [
+				{ type: "text", text: `[browser ${isError ? "error" : "result"}]` },
+				...resultContent,
+			],
+			timestamp: 7,
+		},
+	]);
 	assert.deepEqual(imageResult, before, "flattening must not mutate source history");
 }
 
@@ -58,7 +73,11 @@ const commands: Record<string, { handler: (args: string, ctx: never) => Promise<
 let sent: string | undefined;
 let sendOptions: { deliverAs?: string } | undefined;
 let sendFailure: Error | undefined;
-const savedDrafts: Array<{ type: "custom"; customType: string; data: { source: string; draft: string } }> = [];
+const savedDrafts: Array<{
+	type: "custom";
+	customType: string;
+	data: { source: string; draft: string };
+}> = [];
 writePrompt({
 	registerCommand(name: string, config: { handler: (args: string, ctx: never) => Promise<void> }) {
 		commands[name] = config;
@@ -114,10 +133,16 @@ function ctx(overrides: Record<string, unknown> = {}) {
 	const registry = context.modelRegistry;
 	return {
 		...context,
-		sessionManager: { getSessionId: () => "session", getHeader: () => null, ...context.sessionManager },
+		sessionManager: {
+			getSessionId: () => "session",
+			getHeader: () => null,
+			...context.sessionManager,
+		},
 		modelRegistry: {
 			...registry,
-			streamSimple: (...args: unknown[]) => ({ result: () => Reflect.apply(registry.complete, registry, args) }),
+			streamSimple: (...args: unknown[]) => ({
+				result: () => Reflect.apply(registry.complete, registry, args),
+			}),
 		},
 	};
 }
@@ -126,7 +151,10 @@ function ctx(overrides: Record<string, unknown> = {}) {
 for (const [config, expected] of [
 	[undefined, ["xai", "grok-4.6", "high"]],
 	[{}, ["xai", "grok-4.6", "high"]],
-	[{ provider: " alternate ", model: " other ", thinkingLevel: "low" }, ["alternate", "other", "low"]],
+	[
+		{ provider: " alternate ", model: " other ", thinkingLevel: "low" },
+		["alternate", "other", "low"],
+	],
 	[{ provider: "alternate" }, ["alternate", "grok-4.6", "high"]],
 	[{ model: "other" }, ["xai", "other", "high"]],
 	[{ thinkingLevel: "medium" }, ["xai", "grok-4.6", "medium"]],
@@ -143,9 +171,17 @@ for (const [config, expected] of [
 		modelRegistry: {
 			find: (provider: string, id: string) => ({ provider, id, reasoning: true }),
 			hasConfiguredAuth: () => true,
-			complete: async (model: { provider: string; id: string }, _context: unknown, options: { reasoning?: string }) => {
+			complete: async (
+				model: { provider: string; id: string },
+				_context: unknown,
+				options: { reasoning?: string },
+			) => {
 				calls.push([model.provider, model.id, options.reasoning]);
-				return { role: "assistant", content: [{ type: "text", text: "configured draft" }], stopReason: "stop" };
+				return {
+					role: "assistant",
+					content: [{ type: "text", text: "configured draft" }],
+					stopReason: "stop",
+				};
 			},
 		},
 		ui: { ...baseUi, select: async () => "Deny" },
@@ -175,13 +211,20 @@ for (const [raw, diagnostic] of [
 	writeFileSync(join(agentDir, WRITE_PROMPT_FILE), raw);
 	notices.length = 0;
 	let called = false;
-	await commands.draft.handler("invalid configuration", ctx({
-		modelRegistry: {
-			find: (provider: string, id: string) => id === "missing" ? undefined : { provider, id, reasoning: true },
-			hasConfiguredAuth: (model: { provider: string }) => model.provider !== "unauthenticated",
-			complete: async () => { called = true; throw new Error("must not call a model"); },
-		},
-	}) as never);
+	await commands.draft.handler(
+		"invalid configuration",
+		ctx({
+			modelRegistry: {
+				find: (provider: string, id: string) =>
+					id === "missing" ? undefined : { provider, id, reasoning: true },
+				hasConfiguredAuth: (model: { provider: string }) => model.provider !== "unauthenticated",
+				complete: async () => {
+					called = true;
+					throw new Error("must not call a model");
+				},
+			},
+		}) as never,
+	);
 	assert.equal(called, false, raw);
 	assert.match(notices[0], /^write-prompt\.json: /);
 	assert.match(notices[0], diagnostic, raw);
@@ -224,25 +267,31 @@ assert.equal(sent, undefined);
 
 sent = undefined;
 let idle = true;
-await commands.draft.handler("busy acceptance", ctx({
-	isIdle: () => idle,
-	ui: {
-		...baseUi,
-		select: async () => {
-			idle = false;
-			return "Accept";
+await commands.draft.handler(
+	"busy acceptance",
+	ctx({
+		isIdle: () => idle,
+		ui: {
+			...baseUi,
+			select: async () => {
+				idle = false;
+				return "Accept";
+			},
 		},
-	},
-}) as never);
+	}) as never,
+);
 assert.equal(sent, "better prompt", "Accept must not discard a draft when the agent becomes busy");
 assert.deepEqual(sendOptions, { deliverAs: "steer" });
 
 // Busy from the start is valid too, including recovery after a failed send.
 sent = undefined;
-await commands.draft.handler("already busy", ctx({
-	isIdle: () => false,
-	ui: { ...baseUi, select: async () => "Accept" },
-}) as never);
+await commands.draft.handler(
+	"already busy",
+	ctx({
+		isIdle: () => false,
+		ui: { ...baseUi, select: async () => "Accept" },
+	}) as never,
+);
 assert.equal(sent, "better prompt");
 assert.deepEqual(sendOptions, { deliverAs: "steer" });
 
@@ -252,36 +301,45 @@ sent = undefined;
 sendFailure = new Error("send unavailable");
 let attempts = 0;
 const original = "original input\nwith a second line  ";
-await commands.draft.handler(original, ctx({
-	ui: {
-		...baseUi,
-		select: async (title: string) => {
-			assert.equal(title, "better prompt");
-			if (++attempts === 2) {
-				assert.equal(sent, undefined);
-				assert.equal(notices.at(-1), "send unavailable");
-				assert.deepEqual(savedDrafts.at(-1)?.data, { source: original, draft: title });
-				sendFailure = undefined;
-			}
-			assert.ok(attempts <= 2, "retry must finish");
-			return "Accept";
+await commands.draft.handler(
+	original,
+	ctx({
+		ui: {
+			...baseUi,
+			select: async (title: string) => {
+				assert.equal(title, "better prompt");
+				if (++attempts === 2) {
+					assert.equal(sent, undefined);
+					assert.equal(notices.at(-1), "send unavailable");
+					assert.deepEqual(savedDrafts.at(-1)?.data, { source: original, draft: title });
+					sendFailure = undefined;
+				}
+				assert.ok(attempts <= 2, "retry must finish");
+				return "Accept";
+			},
 		},
-	},
-}) as never);
+	}) as never,
+);
 assert.equal(attempts, 2);
 assert.equal(sent, "better prompt");
 
 // Reopening needs no model request; the original is available in the editor.
 let restored: string | undefined;
 const recovery = ctx({
-	modelRegistry: { complete: () => { throw new Error("recovery must not rewrite"); } },
+	modelRegistry: {
+		complete: () => {
+			throw new Error("recovery must not rewrite");
+		},
+	},
 	ui: {
 		...baseUi,
 		select: async (title: string) => {
 			assert.equal(title, "better prompt");
 			return "Restore original";
 		},
-		setEditorText: (text: string) => { restored = text; },
+		setEditorText: (text: string) => {
+			restored = text;
+		},
 	},
 });
 recovery.sessionManager.getBranch = () => savedDrafts as never;
@@ -293,7 +351,11 @@ assert.equal(notices.at(-1), "Original restored to editor");
 writeFileSync(join(agentDir, WRITE_PROMPT_FILE), "invalid json");
 restored = undefined;
 await commands.draft.handler("", recovery as never);
-assert.equal(restored, `/draft ${original}`, "saved recovery does not require a working writer configuration");
+assert.equal(
+	restored,
+	`/draft ${original}`,
+	"saved recovery does not require a working writer configuration",
+);
 rmSync(join(agentDir, WRITE_PROMPT_FILE));
 
 // Rewrite flavors share UI guards. Native HTTP fixtures own the new
@@ -318,9 +380,18 @@ await commands["ambitious"].handler(
 		modelRegistry: {
 			find: () => undefined,
 			hasConfiguredAuth: () => true,
-			complete: async (_model: unknown, context: { messages: Array<{ content: Array<{ type: string; text?: string }> }> }) => {
-				ambitiousTask = (context.messages[0]?.content ?? []).map((part) => part.text ?? "").join("");
-				return { role: "assistant", content: [{ type: "text", text: "better prompt" }], stopReason: "stop" };
+			complete: async (
+				_model: unknown,
+				context: { messages: Array<{ content: Array<{ type: string; text?: string }> }> },
+			) => {
+				ambitiousTask = (context.messages[0]?.content ?? [])
+					.map((part) => part.text ?? "")
+					.join("");
+				return {
+					role: "assistant",
+					content: [{ type: "text", text: "better prompt" }],
+					stopReason: "stop",
+				};
 			},
 		},
 		ui: {
@@ -331,23 +402,33 @@ await commands["ambitious"].handler(
 );
 assert.match(ambitiousTask ?? "", /more ambitious coding-agent prompt/);
 assert.match(ambitiousTask ?? "", /<<<\nraise the thing\n>>>/);
-assert.doesNotMatch(ambitiousTask ?? "", /Rewrite the boxed text into a better coding-agent prompt/);
+assert.doesNotMatch(
+	ambitiousTask ?? "",
+	/Rewrite the boxed text into a better coding-agent prompt/,
+);
 assert.equal(sent, "better prompt");
 assert.equal(sendOptions, undefined, "idle acceptance keeps normal delivery");
 
 sent = undefined;
 let ambitiousIdle = true;
-await commands["ambitious"].handler("busy raise", ctx({
-	isIdle: () => ambitiousIdle,
-	ui: {
-		...baseUi,
-		select: async () => {
-			ambitiousIdle = false;
-			return "Accept";
+await commands["ambitious"].handler(
+	"busy raise",
+	ctx({
+		isIdle: () => ambitiousIdle,
+		ui: {
+			...baseUi,
+			select: async () => {
+				ambitiousIdle = false;
+				return "Accept";
+			},
 		},
-	},
-}) as never);
-assert.equal(sent, "better prompt", "Accept must not discard an ambitious draft when the agent becomes busy");
+	}) as never,
+);
+assert.equal(
+	sent,
+	"better prompt",
+	"Accept must not discard an ambitious draft when the agent becomes busy",
+);
 assert.deepEqual(sendOptions, { deliverAs: "steer" });
 
 // Recovery is scoped per command: an ambitious entry reopens through
@@ -355,16 +436,26 @@ assert.deepEqual(sendOptions, { deliverAs: "steer" });
 sent = undefined;
 let ambitiousRestored: string | undefined;
 const ambitiousOriginal = "ambitious original input";
-savedDrafts.push({ type: "custom", customType: "fitch-kit.ambitious", data: { source: ambitiousOriginal, draft: "ambitious prompt" } });
+savedDrafts.push({
+	type: "custom",
+	customType: "fitch-kit.ambitious",
+	data: { source: ambitiousOriginal, draft: "ambitious prompt" },
+});
 const ambitiousRecovery = ctx({
-	modelRegistry: { complete: () => { throw new Error("ambitious recovery must not rewrite"); } },
+	modelRegistry: {
+		complete: () => {
+			throw new Error("ambitious recovery must not rewrite");
+		},
+	},
 	ui: {
 		...baseUi,
 		select: async (title: string) => {
 			assert.equal(title, "ambitious prompt");
 			return "Restore original";
 		},
-		setEditorText: (text: string) => { ambitiousRestored = text; },
+		setEditorText: (text: string) => {
+			ambitiousRestored = text;
+		},
 	},
 });
 ambitiousRecovery.sessionManager.getBranch = () => savedDrafts as never;
@@ -376,12 +467,27 @@ assert.equal(notices.at(-1), "Original restored to editor");
 notices.length = 0;
 let draftSawAmbitious: string | undefined;
 const draftIsolation = ctx({
-	modelRegistry: { complete: () => { throw new Error("isolation must not rewrite"); } },
-	ui: { ...baseUi, select: async () => "Deny", setEditorText: (text: string) => { draftSawAmbitious = text; } },
+	modelRegistry: {
+		complete: () => {
+			throw new Error("isolation must not rewrite");
+		},
+	},
+	ui: {
+		...baseUi,
+		select: async () => "Deny",
+		setEditorText: (text: string) => {
+			draftSawAmbitious = text;
+		},
+	},
 });
-draftIsolation.sessionManager.getBranch = () => [savedDrafts.findLast((entry) => entry.customType === "fitch-kit.ambitious")] as never;
+draftIsolation.sessionManager.getBranch = () =>
+	[savedDrafts.findLast((entry) => entry.customType === "fitch-kit.ambitious")] as never;
 await commands.draft.handler("", draftIsolation as never);
-assert.equal(notices[0], "Usage: /draft <text>", "saved /ambitious entries must not reopen as /draft");
+assert.equal(
+	notices[0],
+	"Usage: /draft <text>",
+	"saved /ambitious entries must not reopen as /draft",
+);
 assert.equal(draftSawAmbitious, undefined);
 
 notices.length = 0;
@@ -428,20 +534,34 @@ notices.length = 0;
 sent = undefined;
 let revisionCalls = 0;
 let reviewCalls = 0;
-await commands.unreasonable.handler("review only; do not edit", ctx({
-	modelRegistry: { complete: async () => ++revisionCalls === 1
-		? { role: "assistant", content: [{ type: "text", text: "retained unreasonable draft" }], stopReason: "stop" }
-		: { role: "assistant", content: [{ type: "text", text: "partial" }], stopReason: "error", errorMessage: "revision unavailable" },
-	},
-	ui: {
-		...baseUi,
-		editor: async () => "make the review more exacting",
-		select: async (title: string) => {
-			assert.equal(title, "retained unreasonable draft");
-			return ++reviewCalls === 1 ? "Tweak" : "Deny";
+await commands.unreasonable.handler(
+	"review only; do not edit",
+	ctx({
+		modelRegistry: {
+			complete: async () =>
+				++revisionCalls === 1
+					? {
+							role: "assistant",
+							content: [{ type: "text", text: "retained unreasonable draft" }],
+							stopReason: "stop",
+						}
+					: {
+							role: "assistant",
+							content: [{ type: "text", text: "partial" }],
+							stopReason: "error",
+							errorMessage: "revision unavailable",
+						},
 		},
-	},
-}) as never);
+		ui: {
+			...baseUi,
+			editor: async () => "make the review more exacting",
+			select: async (title: string) => {
+				assert.equal(title, "retained unreasonable draft");
+				return ++reviewCalls === 1 ? "Tweak" : "Deny";
+			},
+		},
+	}) as never,
+);
 assert.equal(revisionCalls, 2);
 assert.equal(reviewCalls, 2);
 assert.ok(notices.includes("revision unavailable"));
@@ -480,7 +600,14 @@ await commands["draft"].handler(
 		mode: "tui",
 		ui: {
 			...baseUi,
-			custom: async (factory?: (tui: { requestRender: () => void }, theme: { fg: (color: string, text: string) => string }, kb: unknown, done: (value: string) => void) => unknown) => {
+			custom: async (
+				factory?: (
+					tui: { requestRender: () => void },
+					theme: { fg: (color: string, text: string) => string },
+					kb: unknown,
+					done: (value: string) => void,
+				) => unknown,
+			) => {
 				colorCalls += 1;
 				if (colorCalls === 1 || !factory) return colorCalls === 1 ? "better prompt" : "Accept";
 				try {
@@ -508,13 +635,22 @@ assert.equal(sent, "better prompt");
 
 // Long drafts clip to the TUI viewport and scroll with PageUp/PageDown
 // instead of being cut off. Select keys keep working through the same view.
-const longDraft = Array.from({ length: 40 }, (_, i) => `line ${i + 1} of the rewritten prompt`).join("\n");
+const longDraft = Array.from(
+	{ length: 40 },
+	(_, i) => `line ${i + 1} of the rewritten prompt`,
+).join("\n");
 const themeKey = Symbol.for("@earendil-works/pi-coding-agent:theme");
 const globalRecord = globalThis as unknown as Record<symbol, unknown>;
 const priorGlobalTheme = globalRecord[themeKey];
 globalRecord[themeKey] = { fg: (_color: string, text: string) => text };
-type DialogView = { render: (width: number) => string[]; invalidate: () => void; handleInput: (data: string) => unknown };
-let dialogFactory: ((tui: unknown, theme: unknown, kb: unknown, done: (value: string) => void) => DialogView) | undefined;
+type DialogView = {
+	render: (width: number) => string[];
+	invalidate: () => void;
+	handleInput: (data: string) => unknown;
+};
+let dialogFactory:
+	| ((tui: unknown, theme: unknown, kb: unknown, done: (value: string) => void) => DialogView)
+	| undefined;
 const chosen: string[] = [];
 let customSequence = 0;
 sent = undefined;
@@ -533,7 +669,14 @@ await commands.draft.handler(
 		},
 		ui: {
 			...baseUi,
-			custom: (async (factory?: (tui: unknown, theme: unknown, kb: unknown, done: (value: string) => void) => DialogView) => {
+			custom: (async (
+				factory?: (
+					tui: unknown,
+					theme: unknown,
+					kb: unknown,
+					done: (value: string) => void,
+				) => DialogView,
+			) => {
 				// First custom call is the off-transcript loader; the second is the dialog.
 				customSequence += 1;
 				if (customSequence === 1) return longDraft;
@@ -549,35 +692,82 @@ const fakeTheme = { fg: (_color: string, text: string) => text };
 const smallTui = { requestRender() {}, terminal: { rows: 20 } };
 const scrolledView = dialogFactory!(smallTui, fakeTheme, {}, (value) => chosen.push(value));
 const firstPage = scrolledView.render(80);
-assert.ok(firstPage.length <= 15, `clipped dialog must fit a 20-row viewport minus the dock reserve, got ${firstPage.length}`);
-assert.ok(firstPage.some((line) => /line 1 of/.test(line)), "starts at the top of the draft");
-assert.ok(!firstPage.some((line) => /line 40 of/.test(line)), "the last line is initially below the fold");
-assert.ok(firstPage.some((line) => /below/.test(line) && /scroll/.test(line)), "clipped drafts show a position indicator with the scroll keys");
+assert.ok(
+	firstPage.length <= 15,
+	`clipped dialog must fit a 20-row viewport minus the dock reserve, got ${firstPage.length}`,
+);
+assert.ok(
+	firstPage.some((line) => /line 1 of/.test(line)),
+	"starts at the top of the draft",
+);
+assert.ok(
+	!firstPage.some((line) => /line 40 of/.test(line)),
+	"the last line is initially below the fold",
+);
+assert.ok(
+	firstPage.some((line) => /below/.test(line) && /scroll/.test(line)),
+	"clipped drafts show a position indicator with the scroll keys",
+);
 for (let i = 0; i < 10; i += 1) scrolledView.handleInput("\x1b[6~");
 const bottom = scrolledView.render(80);
-assert.ok(bottom.some((line) => /line 40 of/.test(line)), "PageDown reaches the last line");
-assert.ok(bottom.some((line) => /above/.test(line)), "bottom page reports lines above");
+assert.ok(
+	bottom.some((line) => /line 40 of/.test(line)),
+	"PageDown reaches the last line",
+);
+assert.ok(
+	bottom.some((line) => /above/.test(line)),
+	"bottom page reports lines above",
+);
 assert.ok(!bottom.join("\n").includes("below"), "no lines remain below at the end");
 for (let i = 0; i < 10; i += 1) scrolledView.handleInput("\x1b[5~");
 const backToTop = scrolledView.render(80);
-assert.ok(backToTop.some((line) => /line 1 of/.test(line)), "PageUp returns to the top");
+assert.ok(
+	backToTop.some((line) => /line 1 of/.test(line)),
+	"PageUp returns to the top",
+);
 // The dialog renders in the editor dock slot under the chat tail and the
 // footer; its budget must reserve for those dock-mates, and the indicator
 // must stay one line even at widths where its natural text would wrap.
-const narrowView = dialogFactory!({ requestRender() {}, terminal: { rows: 20 } }, fakeTheme, {}, (value) => chosen.push(value));
+const narrowView = dialogFactory!(
+	{ requestRender() {}, terminal: { rows: 20 } },
+	fakeTheme,
+	{},
+	(value) => chosen.push(value),
+);
 narrowView.handleInput("\x1b[6~");
 const narrowPage = narrowView.render(50);
-assert.ok(narrowPage.length <= 15, `clipped dialog must fit rows minus the five-line dock reserve, got ${narrowPage.length}`);
-assert.ok(narrowPage.some((line) => /scroll/.test(line)), "the truncated indicator still names the scroll keys at width 50");
+assert.ok(
+	narrowPage.length <= 15,
+	`clipped dialog must fit rows minus the five-line dock reserve, got ${narrowPage.length}`,
+);
+assert.ok(
+	narrowPage.some((line) => /scroll/.test(line)),
+	"the truncated indicator still names the scroll keys at width 50",
+);
 const firstPageAgain = scrolledView.render(80);
-assert.ok(firstPageAgain.length <= 15, `wide clipped dialog must fit rows minus the dock reserve, got ${firstPageAgain.length}`);
+assert.ok(
+	firstPageAgain.length <= 15,
+	`wide clipped dialog must fit rows minus the dock reserve, got ${firstPageAgain.length}`,
+);
 
-const tallView = dialogFactory!({ requestRender() {}, terminal: { rows: 200 } }, fakeTheme, {}, (value) => chosen.push(value));
+const tallView = dialogFactory!(
+	{ requestRender() {}, terminal: { rows: 200 } },
+	fakeTheme,
+	{},
+	(value) => chosen.push(value),
+);
 const full = tallView.render(80);
-assert.ok(full.some((line) => /line 1 of/.test(line)) && full.some((line) => /line 40 of/.test(line)), "tall terminals show the whole draft");
+assert.ok(
+	full.some((line) => /line 1 of/.test(line)) && full.some((line) => /line 40 of/.test(line)),
+	"tall terminals show the whole draft",
+);
 assert.ok(!full.join("\n").match(/above|below/), "no indicator when nothing is clipped");
 scrolledView.handleInput("\r");
-assert.deepEqual(chosen, ["Accept"], "Enter still confirms the action through the scrollable scrolledView");
+assert.deepEqual(
+	chosen,
+	["Accept"],
+	"Enter still confirms the action through the scrollable scrolledView",
+);
 globalRecord[themeKey] = priorGlobalTheme;
 
 notices.length = 0;
@@ -600,7 +790,10 @@ await commands["draft"].handler(
 assert.equal(sent, undefined);
 assert.equal(notices.at(-1), "boom");
 
-writeFileSync(join(agentDir, WRITE_PROMPT_FILE), `${JSON.stringify({ model: "anthropic/claude-opus-5" })}\n`);
+writeFileSync(
+	join(agentDir, WRITE_PROMPT_FILE),
+	`${JSON.stringify({ model: "anthropic/claude-opus-5" })}\n`,
+);
 let found: { provider: string; id: string } | undefined;
 sent = undefined;
 notices.length = 0;
@@ -630,7 +823,11 @@ assert.equal(notices[0], "Using anthropic/claude-opus-5 (high thinking)");
 assert.equal(sent, "claude-opus-5");
 rmSync(join(agentDir, WRITE_PROMPT_FILE));
 
-const captured: Array<{ systemPrompt?: string; messages: Array<{ role?: string; content?: unknown }>; cacheRetention?: string }> = [];
+const captured: Array<{
+	systemPrompt?: string;
+	messages: Array<{ role?: string; content?: unknown }>;
+	cacheRetention?: string;
+}> = [];
 sent = undefined;
 await commands["draft"].handler(
 	"do the thing",
@@ -657,8 +854,16 @@ await commands["draft"].handler(
 		modelRegistry: {
 			find: () => undefined,
 			hasConfiguredAuth: () => true,
-			complete: async (_model: unknown, context: { systemPrompt?: string; messages: Array<{ role?: string; content?: unknown }> }, options?: { cacheRetention?: string }) => {
-				captured.push({ systemPrompt: context.systemPrompt, messages: context.messages, cacheRetention: options?.cacheRetention });
+			complete: async (
+				_model: unknown,
+				context: { systemPrompt?: string; messages: Array<{ role?: string; content?: unknown }> },
+				options?: { cacheRetention?: string },
+			) => {
+				captured.push({
+					systemPrompt: context.systemPrompt,
+					messages: context.messages,
+					cacheRetention: options?.cacheRetention,
+				});
 				return {
 					role: "assistant",
 					content: [{ type: "text", text: "better prompt" }],
@@ -680,8 +885,14 @@ assert.equal((captured[0]?.messages[0] as { role: string }).role, "user");
 assert.equal((captured[0]?.messages[1] as { role: string }).role, "assistant");
 assert.match(JSON.stringify(captured[0]?.messages[2]), /do the thing/);
 assert.match(JSON.stringify(captured[0]?.messages[2]), /Do not answer the text/);
-assert.match(JSON.stringify(captured[0]?.messages[2]), /Preserve intent and every explicit constraint/);
-assert.match(JSON.stringify(captured[0]?.messages[2]), /without adding unrequested scope or presenting assumptions as requirements/);
+assert.match(
+	JSON.stringify(captured[0]?.messages[2]),
+	/Preserve intent and every explicit constraint/,
+);
+assert.match(
+	JSON.stringify(captured[0]?.messages[2]),
+	/without adding unrequested scope or presenting assumptions as requirements/,
+);
 assert.match(JSON.stringify(captured[0]?.messages[2]), /phrase it as conditional/);
 assert.match(JSON.stringify(captured[0]?.messages[2]), /<<<\\ndo the thing\\n>>>/);
 assert.equal(sent, "better prompt");
@@ -694,7 +905,10 @@ await commands["draft"].handler(
 		modelRegistry: {
 			find: () => undefined,
 			hasConfiguredAuth: () => true,
-			complete: async (_model: unknown, context: { messages: Array<{ content?: Array<{ text?: string }> }> }) => {
+			complete: async (
+				_model: unknown,
+				context: { messages: Array<{ content?: Array<{ text?: string }> }> },
+			) => {
 				questionCapture.push(context.messages.at(-1)?.content?.[0]?.text ?? "");
 				return {
 					role: "assistant",
@@ -724,7 +938,10 @@ await commands["side-question"].handler(
 		modelRegistry: {
 			find: () => undefined,
 			hasConfiguredAuth: () => true,
-			complete: async (_model: unknown, context: { messages: Array<{ content?: Array<{ text?: string }> }> }) => {
+			complete: async (
+				_model: unknown,
+				context: { messages: Array<{ content?: Array<{ text?: string }> }> },
+			) => {
 				sideCapture.push(context.messages.at(-1)?.content?.[0]?.text ?? "");
 				return {
 					role: "assistant",
@@ -793,7 +1010,9 @@ for (const role of ["user", "toolResult"]) {
 			timestamp: "2026-01-01T00:00:00.000Z",
 			message: {
 				role,
-				...(role === "toolResult" ? { toolCallId: "image", toolName: "browser", isError: false } : {}),
+				...(role === "toolResult"
+					? { toolCallId: "image", toolName: "browser", isError: false }
+					: {}),
 				content: [
 					{
 						type: "image",
@@ -818,10 +1037,24 @@ for (const role of ["user", "toolResult"]) {
 			modelRegistry: {
 				find: () => undefined,
 				hasConfiguredAuth: () => true,
-				complete: async (_model: unknown, context: { messages: Array<{ content?: Array<{ type?: string; mimeType?: string; text?: string }> }> }, options: { onPayload?: (payload: unknown) => Promise<unknown> }) => {
+				complete: async (
+					_model: unknown,
+					context: {
+						messages: Array<{
+							content?: Array<{ type?: string; mimeType?: string; text?: string }>;
+						}>;
+					},
+					options: { onPayload?: (payload: unknown) => Promise<unknown> },
+				) => {
 					imageCapture.push(...(context.messages[0]?.content ?? []));
-					assert.equal(typeof options.onPayload, "function", "nested writer calls must guard the serialized payload");
-					const payload = { messages: [{ role: "user", content: [{ type: "text", text: "unchanged" }] }] };
+					assert.equal(
+						typeof options.onPayload,
+						"function",
+						"nested writer calls must guard the serialized payload",
+					);
+					const payload = {
+						messages: [{ role: "user", content: [{ type: "text", text: "unchanged" }] }],
+					};
 					assert.equal(await options.onPayload!(payload), payload);
 					return {
 						role: "assistant",
@@ -836,8 +1069,14 @@ for (const role of ["user", "toolResult"]) {
 			},
 		}) as never,
 	);
-	assert.equal(imageCapture.some((part) => part.type === "image"), false);
-	assert.match(imageCapture.map((part) => part.text ?? "").join("\n"), /does not support this image type/);
+	assert.equal(
+		imageCapture.some((part) => part.type === "image"),
+		false,
+	);
+	assert.match(
+		imageCapture.map((part) => part.text ?? "").join("\n"),
+		/does not support this image type/,
+	);
 	assert.deepEqual(history, saved, "writer image preparation must not rewrite saved history");
 }
 
@@ -849,27 +1088,46 @@ let markStarted!: () => void;
 let markSettled!: () => void;
 let view: { handleInput(data: string): void; dispose(): void };
 let apiSignal: AbortSignal | undefined;
-const started = new Promise<void>((resolve) => { markStarted = resolve; });
-const settled = new Promise<void>((resolve) => { markSettled = resolve; });
+const started = new Promise<void>((resolve) => {
+	markStarted = resolve;
+});
+const settled = new Promise<void>((resolve) => {
+	markSettled = resolve;
+});
 let doneCount = 0;
-const cancelledWriter = commands.draft.handler("cancel pending API", ctx({
-	mode: "tui",
-	modelRegistry: {
-		find: () => undefined, hasConfiguredAuth: () => true,
-		complete: (_model: unknown, _context: unknown, options: { signal?: AbortSignal }) => {
-			apiSignal = options.signal;
-			markStarted();
-			return new Promise((resolve) => { releaseCompletion = resolve; });
+const cancelledWriter = commands.draft.handler(
+	"cancel pending API",
+	ctx({
+		mode: "tui",
+		modelRegistry: {
+			find: () => undefined,
+			hasConfiguredAuth: () => true,
+			complete: (_model: unknown, _context: unknown, options: { signal?: AbortSignal }) => {
+				apiSignal = options.signal;
+				markStarted();
+				return new Promise((resolve) => {
+					releaseCompletion = resolve;
+				});
+			},
 		},
-	},
-	ui: { ...baseUi, custom: (factory: Function) => new Promise((resolve) => {
-		view = factory({ requestRender() {} }, { fg: (_color: string, value: string) => value }, {}, (value: unknown) => {
-			view.dispose();
-			resolve(value);
-			if (++doneCount === 2) markSettled();
-		});
-	}) },
-}) as never);
+		ui: {
+			...baseUi,
+			custom: (factory: Function) =>
+				new Promise((resolve) => {
+					view = factory(
+						{ requestRender() {} },
+						{ fg: (_color: string, value: string) => value },
+						{},
+						(value: unknown) => {
+							view.dispose();
+							resolve(value);
+							if (++doneCount === 2) markSettled();
+						},
+					);
+				}),
+		},
+	}) as never,
+);
 await started;
 view!.handleInput("\x1b");
 await cancelledWriter;
@@ -892,43 +1150,65 @@ for (const command of ["draft", "unreasonable", "side-question"]) {
 			model: { id: "claude-test", provider: "anthropic", api: "anthropic-messages" },
 			thinkingLevel: "off",
 			sessionManager: {
-				getEntries: () => [{
-					type: "message", id: "image", parentId: null, timestamp: "2026-01-01T00:00:00.000Z",
-					message: {
-						role: "user", timestamp: 1,
-						content: [{
-							type: "image", mimeType: "image/png",
-							data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
-						}],
+				getEntries: () => [
+					{
+						type: "message",
+						id: "image",
+						parentId: null,
+						timestamp: "2026-01-01T00:00:00.000Z",
+						message: {
+							role: "user",
+							timestamp: 1,
+							content: [
+								{
+									type: "image",
+									mimeType: "image/png",
+									data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+								},
+							],
+						},
 					},
-				}],
+				],
 				getLeafId: () => "image",
 			},
 			modelRegistry: {
 				complete: () => {
 					calls++;
 					started.resolve();
-					return new Promise((_resolve, reject) => { rejectCompletion = reject; });
+					return new Promise((_resolve, reject) => {
+						rejectCompletion = reject;
+					});
 				},
 			},
-			ui: { ...baseUi, custom: (factory: Function) => new Promise((resolve) => {
-				view = factory({ requestRender() {} }, { fg: (_color: string, value: string) => value }, {}, (value: unknown) => {
-					view.dispose();
-					resolve(value);
-					// The abort closes the loader first; the completion's own return is the second call.
-					if (++doneCalls === 2) finished.resolve();
-				});
-			}) },
+			ui: {
+				...baseUi,
+				custom: (factory: Function) =>
+					new Promise((resolve) => {
+						view = factory(
+							{ requestRender() {} },
+							{ fg: (_color: string, value: string) => value },
+							{},
+							(value: unknown) => {
+								view.dispose();
+								resolve(value);
+								// The abort closes the loader first; the completion's own return is the second call.
+								if (++doneCalls === 2) finished.resolve();
+							},
+						);
+					}),
+			},
 		});
 		for (const key of ["ui", "modelRegistry"] as const) {
 			const value = context[key];
-			Object.defineProperty(context, key, { get() {
-				if (retired) {
-					staleReads++;
-					throw new Error(`stale ${key}`);
-				}
-				return value;
-			} });
+			Object.defineProperty(context, key, {
+				get() {
+					if (retired) {
+						staleReads++;
+						throw new Error(`stale ${key}`);
+					}
+					return value;
+				},
+			});
 		}
 		notices.length = 0;
 		const pending = commands[command].handler("cancel before replacement", context as never);
@@ -951,31 +1231,36 @@ for (const action of ["Accept", "Restore original"] as const) {
 	let editorText = "";
 	let idle = true;
 	sent = undefined;
-	await commands.draft.handler("original TUI input", ctx({
-		mode: "tui",
-		isIdle: () => idle,
-		ui: {
-			...baseUi,
-			setEditorText: (text: string) => { editorText = text; },
-			custom: async (factory: Function) => {
-				if (++calls === 1) return "better prompt";
-				return new Promise((resolve) => {
-					const menu = factory(
-						{ requestRender() {}, terminal: { rows: 40 } },
-						{ fg: (_color: string, text: string) => text },
-						{},
-						resolve,
-					);
-					const screen = menu.render(80).join("\n");
-					assert.match(screen, /better prompt/);
-					assert.match(screen, /Restore original/);
-					for (let i = 0; i < (action === "Accept" ? 0 : 3); i++) menu.handleInput("\x1b[B");
-					idle = false;
-					menu.handleInput("\r");
-				});
+	await commands.draft.handler(
+		"original TUI input",
+		ctx({
+			mode: "tui",
+			isIdle: () => idle,
+			ui: {
+				...baseUi,
+				setEditorText: (text: string) => {
+					editorText = text;
+				},
+				custom: async (factory: Function) => {
+					if (++calls === 1) return "better prompt";
+					return new Promise((resolve) => {
+						const menu = factory(
+							{ requestRender() {}, terminal: { rows: 40 } },
+							{ fg: (_color: string, text: string) => text },
+							{},
+							resolve,
+						);
+						const screen = menu.render(80).join("\n");
+						assert.match(screen, /better prompt/);
+						assert.match(screen, /Restore original/);
+						for (let i = 0; i < (action === "Accept" ? 0 : 3); i++) menu.handleInput("\x1b[B");
+						idle = false;
+						menu.handleInput("\r");
+					});
+				},
 			},
-		},
-	}) as never);
+		}) as never,
+	);
 	if (action === "Accept") {
 		assert.equal(sent, "better prompt");
 		assert.deepEqual(sendOptions, { deliverAs: "steer" });

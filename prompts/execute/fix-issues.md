@@ -6,11 +6,13 @@ argument-hint: "[scope]"
 Act as the orchestrator for this project until all issues/tasks are cleared up. No bailing out.
 
 Manual workflow prerequisites:
+
 - This retained prompt is not registered by the kit. Delegated phases require a compatible installed delegation runtime with documented effective-profile discovery, bounded launches, fresh contexts, asynchronous completion/status, and review artifacts. Native Pi and the kit do not supply that runtime.
 - Inspect the available tools and installed owner's current docs, then discover executable effective profiles, instructions, routing, filters, and overrides. Select profiles by the task's capabilities, not presumed packaged names; do not create aliases or copies.
 - If a required delegation capability is unavailable, report the exact prerequisite and leave the dependent phase incomplete. If required independent review is unavailable, keep the review gate unsatisfied; never substitute parent self-review or silently waive an explicit named-reviewer or model-family requirement.
 
 You are the parent orchestrator:
+
 - Own the plan, sequencing, quality bar, issue/PR state, verification, release decisions, and final status.
 - Use subagents for delegated scouting, implementation, and review where useful.
 - Treat subagent output as evidence to inspect, not automatic truth.
@@ -18,6 +20,7 @@ You are the parent orchestrator:
 - Do not stop at a plan when implementation, review, verification, release, or issue follow-up remains.
 
 Model/delegation policy:
+
 - Use configured subagent defaults for delegated changes, scouting, implementation, and review.
 - Override model or thinking only when a concrete routing, provider-capability, model-diversity, or cost requirement justifies it.
 - When the installed delegation owner documents `anthropic/*` as a Claude Code CLI route, use it for fresh-context UI/fallback diversity, not as a global Pi provider model or fork-transcript import path. Do not use that route for forked invocations; use fresh context with a compact handoff instead.
@@ -25,6 +28,7 @@ Model/delegation policy:
 - The parent orchestrator must review all outputs, inspect diffs, run verification, decide what lands, and write the user-facing status.
 
 Non-negotiable operating rules:
+
 - Enumerate all issues/tasks.
 - Assess each issue/task for validity, priority, severity, owner/boundary, repro status, and required closure evidence.
 - Preserve existing behavior unless the issue/task explicitly requires changing it.
@@ -93,7 +97,7 @@ Workflow:
    - visual/manual verification for UI changes
    - `git diff --check`
    - issue-specific repro or non-repro evidence
-   If validation fails, triage and fix the cause. Do not report partial completion as success.
+     If validation fails, triage and fix the cause. Do not report partial completion as success.
 
 7. Ship
    - Push branches and open/update PRs.
@@ -140,9 +144,10 @@ Workflow:
    - review sign-off
    - release/publish/install verification
    - blocked comments and unblock requirements
-   The orchestration is not complete if any issue/task is unverified, narrowed, deferred without a blocker, or only probably satisfied.
+     The orchestration is not complete if any issue/task is unverified, narrowed, deferred without a blocker, or only probably satisfied.
 
 Final response format:
+
 - Shipped/merged work
 - Closed issues/tasks
 - Open blocked issues/tasks with exact blockers

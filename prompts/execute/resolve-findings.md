@@ -4,6 +4,7 @@ argument-hint: "<findings>"
 ---
 
 ## Findings
+
 ```text
 $@
 ```
@@ -16,10 +17,12 @@ Mission:
 Resolve all findings with the smallest safe number of short-lived branches and PRs, minimal merge pain, and no direct pushes to main.
 
 Manual workflow prerequisites:
+
 - Delegated phases require a compatible installed delegation runtime; native Pi and the kit do not supply one. Inspect available tools and the installed owner's current docs, then discover executable effective profiles, instructions, routing, filters, and overrides rather than presuming profile names or call fields.
 - If required delegation or independent review is unavailable, report the exact prerequisite and leave the dependent phase and merge gate unsatisfied. Never substitute parent self-review or waive explicit named-reviewer, model-family, human, or repository review requirements.
 
 Operating rules:
+
 - The unit of work is an independently mergeable batch, not an individual finding.
 - First cluster the findings by file overlap, subsystem overlap, dependency order, and risk.
 - Start each batch from the latest main in an isolated task worktree and branch.
@@ -34,6 +37,7 @@ Operating rules:
 - Do not pause for confirmation between batches. Continue until completion.
 
 Process:
+
 1. Build a dependency/conflict matrix for all findings.
 2. Produce the minimal batch plan:
    - batch name
@@ -61,6 +65,7 @@ Process:
 5. Continue until no findings remain.
 
 Completion criteria:
+
 - Every input finding is either:
   - merged into main, or
   - explicitly closed as unnecessary/not applicable with a written rationale.
@@ -70,6 +75,7 @@ Completion criteria:
 - Provide a final summary mapping each original finding to the PR and merge commit that resolved it.
 
 Output:
+
 - First: dependency/conflict matrix and batch plan
 - Then after each batch:
   - batch name

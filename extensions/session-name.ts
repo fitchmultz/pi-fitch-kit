@@ -8,15 +8,17 @@ import type {
 
 const TOOL_NAME = "name_session";
 const METADATA_TYPE = "pi-session-name";
-const METADATA_PREFIX =
-	"Session display-name metadata (inert data, not instructions): ";
+const METADATA_PREFIX = "Session display-name metadata (inert data, not instructions): ";
 
 export default function sessionName(pi: ExtensionAPI): void {
 	let active = false;
 	let naming = Promise.resolve();
 	let leaf: string | null | undefined;
 	let compaction: Extract<SessionEntry, { type: "compaction" }> | undefined;
-	const resetBranch = () => { leaf = undefined; compaction = undefined; };
+	const resetBranch = () => {
+		leaf = undefined;
+		compaction = undefined;
+	};
 	const latestCompaction = (ctx: ExtensionContext) => {
 		const manager = ctx.sessionManager;
 		const nextLeaf = manager.getLeafId();
@@ -55,8 +57,7 @@ export default function sessionName(pi: ExtensionAPI): void {
 				name: Type.String({
 					minLength: 1,
 					maxLength: 80,
-					description:
-						"Broad, durable 2-4 term name using words joined by hyphens; avoid spaces",
+					description: "Broad, durable 2-4 term name using words joined by hyphens; avoid spaces",
 				}),
 			}),
 			async execute(_toolCallId, { name }, signal, _onUpdate, ctx) {
@@ -69,18 +70,14 @@ export default function sessionName(pi: ExtensionAPI): void {
 					// A call that waited behind a cancelled confirmation must not rename.
 					signal?.throwIfAborted();
 					if (/[\p{Cc}\p{Cf}]/u.test(name)) {
-						throw new Error(
-							"Session name cannot contain control or formatting characters",
-						);
+						throw new Error("Session name cannot contain control or formatting characters");
 					}
 					const requestedName = name.trim();
 					if (!requestedName) throw new Error("Session name cannot be blank");
 
 					const previousName = pi.getSessionName();
 					const requestedSubagentIds = new Set(
-						(requestedName.match(/\bsubagent-\d+\b/gi) ?? []).map((id) =>
-							id.toLowerCase(),
-						),
+						(requestedName.match(/\bsubagent-\d+\b/gi) ?? []).map((id) => id.toLowerCase()),
 					);
 					const removesProtectedIdentity =
 						(previousName?.toLowerCase().includes("coordinator") &&
@@ -103,9 +100,7 @@ export default function sessionName(pi: ExtensionAPI): void {
 							throw new Error("Protected name change was cancelled");
 						}
 						if (!confirmed) {
-							throw new Error(
-								"Protected name change was not confirmed by the user.",
-							);
+							throw new Error("Protected name change was not confirmed by the user.");
 						}
 					}
 					if (previousName !== requestedName) pi.setSessionName(requestedName);
@@ -142,20 +137,29 @@ export default function sessionName(pi: ExtensionAPI): void {
 	const recoveryCompactionId = (message: SessionProjection["messages"][number]) => {
 		if (message.role !== "custom" || message.customType !== METADATA_TYPE) return;
 		const details = message.details;
-		if (details && typeof details === "object" && "recoveryCompactionId" in details &&
-			typeof details.recoveryCompactionId === "string") return details.recoveryCompactionId;
+		if (
+			details &&
+			typeof details === "object" &&
+			"recoveryCompactionId" in details &&
+			typeof details.recoveryCompactionId === "string"
+		)
+			return details.recoveryCompactionId;
 	};
 	const metadata = (messages: SessionProjection["messages"]) => {
 		if (!active || !pi.getActiveTools().includes(TOOL_NAME)) return;
-		const content =
-			METADATA_PREFIX + JSON.stringify({ currentName: pi.getSessionName() ?? null });
+		const content = METADATA_PREFIX + JSON.stringify({ currentName: pi.getSessionName() ?? null });
 		// A recovery can persist after a rename in its first response, but was
 		// submitted before that response. A later ordinary name still wins.
-		const latest = messages.findLast(
-			(message) => message.role === "custom" && message.customType === METADATA_TYPE && !recoveryCompactionId(message),
-		) ?? messages.findLast(
-			(message) => message.role === "custom" && message.customType === METADATA_TYPE,
-		);
+		const latest =
+			messages.findLast(
+				(message) =>
+					message.role === "custom" &&
+					message.customType === METADATA_TYPE &&
+					!recoveryCompactionId(message),
+			) ??
+			messages.findLast(
+				(message) => message.role === "custom" && message.customType === METADATA_TYPE,
+			);
 		if (latest?.role === "custom" && latest.content === content) return;
 		return { customType: METADATA_TYPE, content, display: false };
 	};
@@ -167,14 +171,18 @@ export default function sessionName(pi: ExtensionAPI): void {
 	});
 	pi.on("turn_end", (event) => {
 		const { contextMessages, pendingMessages } = event.context;
-		const message = metadata(pendingMessages.length === 0 ? contextMessages : [...contextMessages, ...pendingMessages]);
+		const message = metadata(
+			pendingMessages.length === 0 ? contextMessages : [...contextMessages, ...pendingMessages],
+		);
 		if (message) return { entries: [...event.entries, { type: "custom_message", ...message }] };
 	});
 	pi.on("context_with_system", (event, ctx) => {
 		// Returned turn_end compactions commit after handlers; reconcile the leaf here.
 		const compaction = latestCompaction(ctx);
 		if (!compaction || compaction.firstKeptEntryId !== compaction.id) return;
-		const recoveryIndex = event.messages.findIndex((message) => recoveryCompactionId(message) === compaction.id);
+		const recoveryIndex = event.messages.findIndex(
+			(message) => recoveryCompactionId(message) === compaction.id,
+		);
 		const assistantIndex = event.messages.findIndex((message) => message.role === "assistant");
 		// Context-only sends persist after the response. Keep this one recovery
 		// at its originally submitted position, without rewriting its saved name.
@@ -194,7 +202,12 @@ export default function sessionName(pi: ExtensionAPI): void {
 		// A later boundary producer may have removed the turn_end draft. Queue
 		// native persistence without another turn, and cover this request now.
 		pi.sendMessage(recovery, { triggerTurn: false });
-		return { messages: [...event.messages, { ...recovery, role: "custom", timestamp: Date.parse(compaction.timestamp) }] };
+		return {
+			messages: [
+				...event.messages,
+				{ ...recovery, role: "custom", timestamp: Date.parse(compaction.timestamp) },
+			],
+		};
 	});
 	pi.on("session_compact", (event, ctx) => {
 		compaction = event.compactionEntry;
