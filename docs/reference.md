@@ -313,7 +313,7 @@ Git remains a supported manual fallback: use `pi install git:github.com/fitchmul
 The package registers only two prompts:
 
 - `/fitch-setup` for installing or verifying the kit.
-- `/github-open-issues-prs` for the one prompt-backed operational flow still on my normal path.
+- `/github-open-issues-prs [owner]` audits open issues and PRs in the account's public non-fork repos. An explicitly named user also gets all their authored open issues and PRs across accessible repos, including private repos, forks, and their own repos.
 
 The older prompt files remain in `prompts/` as source material, but the package does not load them. Nothing is deleted; they simply no longer dominate autocomplete or the README.
 
