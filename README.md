@@ -54,7 +54,7 @@ The package loads seven extensions, two prompts, and the `calm` theme. Setup ins
 | `/reader` or `/reader list`                                        | Show the saved page or document list. Press `N` to write a section note. Use Ctrl+Enter to request a response.                                                                                          |
 | `/clean-footer`                                                    | Switch between the compact and built-in footers.                                                                                                                                                        |
 | `/codex-fast status`, `/anthropic-fast status`, `/xai-fast status` | Check the shared fast-mode settings.                                                                                                                                                                    |
-| `/github-open-issues-prs`                                          | Start the prompt for an audit of open GitHub issues and pull requests.                                                                                                                                  |
+| `/github-open-issues-prs [owner]`                                  | Audit open issues and PRs in public non-fork repos owned by the account. For an explicitly named user, also find their authored issues and PRs in other public non-fork repos.                          |
 
 Session names help you find saved sessions. The Claude image guard adapts Claude images to provider limits. The setup model tool reads the current model registry without a provider call.
 
