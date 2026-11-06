@@ -29,9 +29,11 @@ Preferred tools:
 - Use `gh` CLI if available.
 - Otherwise use the GitHub API.
 
-For the additional search, query GitHub's issue search API separately with `is:open is:issue author:USERNAME` and `is:open is:pr author:USERNAME`. Paginate both queries without filtering repository visibility, fork status, or owner. Private results are limited to the authenticated account's access; state this boundary without claiming coverage of inaccessible repos. If using the REST issues endpoint for owned repos, exclude entries with `pull_request` from issue results and query the pulls endpoint separately.
+For the additional search, query GitHub's issue search API separately with `is:open is:issue author:USERNAME` and `is:open is:pr author:USERNAME`. Paginate both queries without excluding results based on repository visibility, fork status, or owner. Owner or repository qualifiers may partition the search, but must not narrow the combined requested scope. Private results are limited to the authenticated account's access; state this boundary without claiming coverage of inaccessible repos. If using the REST issues endpoint for owned repos, exclude entries with `pull_request` from issue results and query the pulls endpoint separately.
 
 Check search `total_count` and `incomplete_results` as well as pagination. GitHub search exposes at most 1,000 results per query. Split larger searches into smaller created-date ranges and deduplicate overlapping boundaries. Retry incomplete searches or report the remaining gap; pagination alone does not prove completeness. See [GitHub's search API limits](https://docs.github.com/en/rest/search/search#about-search).
+
+GitHub also limits each REST search query to 4,000 matching repositories; `total_count` and `incomplete_results` do not establish coverage beyond that repository scope. Where needed, partition searches by `user:`, `org:`, or `repo:` and merge their results. Account organizations alone do not cover public repos elsewhere or all collaborator access. If repository coverage cannot be established, report this search-scope limit as an unresolved completeness gap, even when all returned pages were fetched. Do not claim all accessible authored items were found based only on an unscoped search.
 
 Return the result grouped by repo, with repos from the repository-wide scan first and additional repos second. Summary issue and PR totals cover both scopes.
 
