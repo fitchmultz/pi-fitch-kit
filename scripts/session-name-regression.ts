@@ -134,17 +134,17 @@ const tool = [...extension.tools.values()].find(
 )?.definition;
 assert.ok(tool);
 
-assert.match(tool.promptGuidelines?.join("\n") ?? "", /must call name_session/);
-assert.match(
-	tool.promptGuidelines?.join("\n") ?? "",
-	/same tool-call batch rather than a separate naming-only round/,
-);
-assert.match(tool.promptGuidelines?.join("\n") ?? "", /Do not add unrelated work/);
-assert.match(tool.promptGuidelines?.join("\n") ?? "", /overall purpose/);
-assert.match(tool.promptGuidelines?.join("\n") ?? "", /When unsure, keep the current name/);
-assert.match(tool.promptGuidelines?.join("\n") ?? "", /exact numbered subagent identifier/);
-assert.match(tool.promptGuidelines?.join("\n") ?? "", /require the user to confirm/);
-assert.match(tool.promptGuidelines?.join("\n") ?? "", /avoid spaces/);
+const guidelines = tool.promptGuidelines?.join("\n") ?? "";
+assert.match(guidelines, /must call name_session/);
+assert.match(guidelines, /even if no other tools are needed/);
+assert.match(guidelines, /same tool-call batch as calls you already need/);
+assert.match(guidelines, /do not add unrelated work/);
+assert.match(guidelines, /overall purpose/);
+assert.match(guidelines, /when unsure, keep the current name/);
+assert.match(guidelines, /name must contain coordinator/);
+assert.match(guidelines, /exact numbered subagent identifier/);
+assert.match(guidelines, /asks the user to confirm/);
+assert.match(JSON.stringify(tool.parameters), /avoid spaces/);
 
 const first = await tool.execute(
 	"first",
