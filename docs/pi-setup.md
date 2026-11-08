@@ -53,7 +53,7 @@ Fresh context is deliberate. Each child receives a bounded brief rather than inh
 
 ### 4. The parent owns design and integration
 
-The parent makes ordinary reversible decisions and uses direct implementation or useful independent helpers, keeping integration and validation accountable in one place. The [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) package provides `apply_patch`, `replace_text`, and `write_files` for mutations, with `preview_patch` for read-only inspection. Its own documentation defines the tool arguments and filesystem guarantees. Pair editor 1.0 with `pi-subagents` 0.39.1 or newer so completion tracking recognizes the new tools and committed paths from partial errors.
+The parent makes ordinary reversible decisions and uses direct implementation or useful independent helpers, keeping integration and validation accountable in one place. The [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) package provides `apply_patch`, `replace_text`, and `write_files` for mutations; each takes a `preview` flag for read-only inspection. Its own documentation defines the tool arguments and filesystem guarantees. Pair editor 1.0 with `pi-subagents` 0.39.1 or newer so completion tracking recognizes the new tools and committed paths from partial errors.
 
 An implementation helper is useful when an item is independent enough for an isolated worktree or true parallelism. A focused remediation helper receives a confirmed finding list and changes only those items. These are briefs for suitable available profiles, not mandatory profile names. The parent then inspects the real files and diff; a child success report is evidence, not proof.
 
@@ -157,7 +157,7 @@ The current connected services cover:
 - Notion knowledge;
 - Granola meetings.
 
-`pi-mcp-adapter` provides searchable tool discovery so hundreds of service tools do not have to sit in the model's prompt at once. The gateway can expose direct tools for common operations and nested catalogs for rarer ones. Its optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary. The setup uses only manifest-listed integrations and canonical package names for local stdio servers.
+`pi-mcp-adapter` registers service tools as deferred Pi tools, so hundreds of them do not have to sit in the model's prompt at once. Pi's native `tool_search` loads the ones a task needs, and `directTools` pins common tools at startup. The setup uses only manifest-listed integrations and canonical package names for local stdio servers.
 
 Authentication remains user-scoped. The setup process may inspect non-secret connection status, but it does not read credential stores or service payloads merely to claim that setup worked.
 

@@ -20,13 +20,13 @@ These are the extensions loaded in my current setup. Every external extension li
 
 ### Coding and task control
 
-| Extension                                                                      | What I use it for                                                                                                 |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits)               | `apply_patch`, `replace_text`, `write_files`, and read-only `preview_patch`; contracts live in the owning package |
-| [`pi-ask-question`](https://github.com/fitchmultz/pi-ask-question)             | Structured user decisions when ambiguity changes scope or safety                                                  |
-| [`pi-todo-list`](https://github.com/fitchmultz/pi-todo-list)                   | Persistent nested task state that survives long sessions and compaction                                           |
-| [`pi-change-working-dir`](https://github.com/fitchmultz/pi-change-working-dir) | Safe mid-session movement into worktrees and monorepo subprojects                                                 |
-| [`pi-calculator`](https://github.com/fitchmultz/pi-calculator)                 | Deterministic high-precision arithmetic instead of model estimation                                               |
+| Extension                                                                      | What I use it for                                                                                                            |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits)               | `apply_patch`, `replace_text`, and `write_files`, each with a read-only `preview` flag; contracts live in the owning package |
+| [`pi-ask-question`](https://github.com/fitchmultz/pi-ask-question)             | Structured user decisions when ambiguity changes scope or safety                                                             |
+| [`pi-todo-list`](https://github.com/fitchmultz/pi-todo-list)                   | Persistent nested task state that survives long sessions and compaction                                                      |
+| [`pi-change-working-dir`](https://github.com/fitchmultz/pi-change-working-dir) | Safe mid-session movement into worktrees and monorepo subprojects                                                            |
+| [`pi-calculator`](https://github.com/fitchmultz/pi-calculator)                 | Deterministic high-precision arithmetic instead of model estimation                                                          |
 
 ### Session quality and small friction reducers
 
@@ -160,9 +160,9 @@ The Fitch runtime defaults to off. [`examples/settings.json`](../examples/settin
 
 ### Optional integration discovery
 
-Pi 1.5 supplies native tool exposure, codemode, and tool search. The maintained Fitch runtime also supplies optional [extension-owned instruction groups](https://github.com/fitchmultz/pi) through its built-in `discover_tools`. Enabling instructions must not widen callable tool permissions. Review the owning extension's discovery support; coding tools, safeguards, recovery, and coordination should remain available.
+Pi 1.5 supplies native tool exposure, codemode, and tool search on official Pi and the maintained Fitch runtime. Extensions keep optional tools out of the prompt with `exposure: "deferred"`; `tool_search` loads them and codemode scripts call them. Extensions that defer tools activate Pi's registered `tool_search` themselves. Loading a tool does not widen its permissions, and coding tools, safeguards, recovery, and coordination should stay directly available.
 
-This is an optional host feature, not an extension dependency. Official Pi 1.5 and Fitch runtime builds without that feature retain ordinary tool exposure; the extensions continue working with their existing tools and instructions. The kit does not enable discovery, install a patched runtime, or change tool selection automatically. First use on a supporting host adds a discovery round; keep integrations eager if discovery harms task outcomes.
+The kit does not change tool selection automatically. First use of a deferred tool adds a search round.
 
 ### Experimental extension
 
@@ -224,12 +224,11 @@ Skills load task-specific operating instructions only when the work matches. [`p
 
 Companion skills ship beside their extensions:
 
-| Source                                                           | Skills                                                                                                                                                                                                                           |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`pi-pstack`](https://github.com/fitchmultz/pi-pstack)           | `poteto-mode` playbooks, 24 `principle-*` skills, `tdd`, `bro`, `how`, `why`, `architect`, `arena`, `swarm`, `interrogate`, `unslop`, `no-comments`, `ketchup`, `recall`, and `poteto-agent` / `comment-sicko` subagent profiles |
-| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents)     | `pi-subagents` orchestration and `pi-intercom` coordination guidance                                                                                                                                                             |
-| [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter) | `mcp-scripting` for discovering and composing MCP calls                                                                                                                                                                          |
-| [`ponytail`](https://github.com/fitchmultz/ponytail)             | `ponytail`, `ponytail-audit`, `ponytail-review` (my runtime filters the debt, gain, and help variants)                                                                                                                           |
+| Source                                                       | Skills                                                                                                                                                                                                                           |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`pi-pstack`](https://github.com/fitchmultz/pi-pstack)       | `poteto-mode` playbooks, 24 `principle-*` skills, `tdd`, `bro`, `how`, `why`, `architect`, `arena`, `swarm`, `interrogate`, `unslop`, `no-comments`, `ketchup`, `recall`, and `poteto-agent` / `comment-sicko` subagent profiles |
+| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) | `pi-subagents` orchestration and `pi-intercom` coordination guidance                                                                                                                                                             |
+| [`ponytail`](https://github.com/fitchmultz/ponytail)         | `ponytail`, `ponytail-audit`, `ponytail-review` (my runtime filters the debt, gain, and help variants)                                                                                                                           |
 
 Most `pi-pstack` leaf skills (including `bro`) are user-invoked or routed through `poteto-mode`, while `poteto-mode`, `tdd`, and the `pi-agent-skills` workflows are selected by task fit rather than loaded into every prompt.
 
@@ -252,7 +251,7 @@ The current setup has authenticated, read-only-discovery-verified connections fo
 | Notion                                    | Workspace search, pages, databases, comments, and meeting notes                                       |
 | Granola                                   | Meeting notes, summaries, folders, and transcripts                                                    |
 
-The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](../setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session. The optional `mcp_script` mode is trusted local code execution when enabled, not a sandbox or an authorization boundary. The setup configures only integrations listed in the manifest and uses canonical package names for local stdio servers.
+The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](../setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session. The setup configures only integrations listed in the manifest and uses canonical package names for local stdio servers.
 
 ## How the workflow fits together
 
