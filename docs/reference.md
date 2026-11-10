@@ -1,52 +1,24 @@
-# Configuration and workflow reference
+# Reference
 
-Detailed behavior, configuration, migration notes, and the extension/skill catalog for [pi-fitch-kit](../README.md). For installation and a first try, start with the README.
+Behavior and configuration for [pi-fitch-kit](../README.md). Start with the README for installation. Read [How I use Pi](pi-setup.md) for the workflow around these pieces.
 
-The kit installs public extension packages without patching [Pi](https://github.com/earendil-works/pi). The extensions work on stock Pi and [Fitch's Pi runtime](https://github.com/fitchmultz/pi). Optional host preferences such as compact view and integration discovery require a runtime that supports them; they are not extension dependencies. Credentials, private provider definitions, and user-local experiments stay user-managed. Provider error diagnostics, message types, and retry policy belong to Pi core; retiring the kit's provider patch did not implement its retired [metadata-hardening follow-up](https://github.com/fitchmultz/pi-fitch-kit/issues/19).
+The kit runs on official Pi and [Fitch Pi](https://github.com/fitchmultz/pi) through public extension APIs. It does not patch Pi.
 
-The daily workflow is driven by tools, agents, skills, and connected context; prompts are secondary.
+## Bundled extensions
 
-## Enabled extensions
+### Footer
 
-These are the extensions loaded in my current setup. Every external extension links to its source repository.
-
-### Orchestration and connected work
-
-| Extension                                                                          | What I use it for                                                                                                                      |
-| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents)                       | Fresh specialists, parallel work, chains, isolated worktrees, async review, durable artifacts, and coordination between local sessions |
-| [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter)                   | One searchable gateway over configured MCP servers and their tools                                                                     |
-| [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native) | Live documentation, browser automation, screenshots, product QA, and authenticated web flows                                           |
-
-### Coding and task control
-
-| Extension                                                                      | What I use it for                                                                                                            |
-| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits)               | `apply_patch`, `replace_text`, and `write_files`, each with a read-only `preview` flag; contracts live in the owning package |
-| [`pi-ask-question`](https://github.com/fitchmultz/pi-ask-question)             | Structured user decisions when ambiguity changes scope or safety                                                             |
-| [`pi-todo-list`](https://github.com/fitchmultz/pi-todo-list)                   | Persistent nested task state that survives long sessions and compaction                                                      |
-| [`pi-change-working-dir`](https://github.com/fitchmultz/pi-change-working-dir) | Safe mid-session movement into worktrees and monorepo subprojects                                                            |
-| [`pi-calculator`](https://github.com/fitchmultz/pi-calculator)                 | Deterministic high-precision arithmetic instead of model estimation                                                          |
-
-### Session quality and small friction reducers
-
-| Extension                                                                            | What I use it for                                                                                                    |
-| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| [`pi-ctx-info`](https://github.com/fitchmultz/pi-ctx-info)                           | `/ctx` breakdown of reported context usage, estimated composition, loaded resources, and the largest session entries |
-| [`pi-verbosity-control`](https://github.com/fitchmultz/pi-verbosity-control)         | Per-model OpenAI verbosity and its native footer status                                                              |
-| [`pi-tool-duration`](https://github.com/fitchmultz/pi-tool-duration)                 | Model-visible timing on slow tool calls                                                                              |
-| [`pi-edit-session-in-place`](https://github.com/fitchmultz/pi-edit-session-in-place) | Re-edit or remove an earlier user turn in the current branch                                                         |
-| [`pi-stash`](https://github.com/fitchmultz/pi-stash)                                 | Park and restore a draft message while handling another thought                                                      |
-| [`pi-copy-message`](https://github.com/fitchmultz/pi-copy-message)                   | Copy raw session messages without terminal formatting                                                                |
-| [`ponytail`](https://github.com/fitchmultz/ponytail)                                 | Persistent pressure toward reuse, deletion, native features, and the smallest root-cause fix                         |
-
-### Extensions bundled by this kit
-
-[`clean-footer`](../extensions/clean-footer.ts) removes cumulative token, cache, and cost counters while retaining the latest prompt cache hit rate, working directory, session name, context usage, model, thinking level, and extension statuses. The maintained [verbosity controller](https://github.com/fitchmultz/pi-verbosity-control), `npm:@fitchmultz/pi-verbosity-control`, supplies the same status used by the built-in footer; the kit does not read its configuration. `/fitch-setup` previews eligible controller migrations only when the maintained controller is selected, preserving `verbosity.json`. It uses two lines when everything fits and wraps whole status items onto additional lines instead of truncating them. `/clean-footer` toggles the compact and built-in footers for comparison.
+[`clean-footer`](../extensions/clean-footer.ts) replaces Pi's footer with a compact one. It removes cumulative token, cache, and cost counters while retaining the latest prompt cache hit rate, working directory, session name, context usage, model, thinking level, and extension statuses. Statuses come from Pi's native status API, so the footer shows what any extension reports and reads no other package's configuration. It uses two lines when everything fits and wraps whole status items onto additional lines instead of truncating them. `/clean-footer` toggles the compact and built-in footers for comparison.
 
 The footer bootstraps file-wide name/cache facts once and reconciles appended facts from the persisted journal after the leaf advances or the run settles, including abandoned branches and later `message_end` replacements. Each reconciliation acquires history once and processes only its new suffix; unchanged redraws do no history work. Native usage is a dirty snapshot keyed by session, leaf and model; resizing, themes and status-only redraws do not rescan history. An SDK owner making out-of-band journal edits must emit a lifecycle refresh; there is no public universal mutation signal. Git, provider/model/thinking and extension statuses remain live.
 
-[`session-name`](../extensions/session-name.ts) provides the `name_session` tool and inert session-name metadata that keep `/resume` searchable without renaming sessions for every subtask. It preserves coordinator and numbered subagent identities unless the user confirms their removal. When useful tools are already needed, naming joins the same tool-call batch rather than requiring a naming-only model round. Naming no longer forces that batch to run one call at a time, so siblings stay parallel whenever Pi's native batch is otherwise parallel (Pi's default, unless another tool in the batch or the agent's `toolExecution` option is sequential). Only naming calls wait for one another, so each one checks the name its predecessor left and a cancelled batch applies no queued rename. A sibling tool may open its own dialog during a protected-name confirmation; Pi's native dialog stack shows the confirmation again when that dialog closes. Older TUIs showed one dialog at a time and could lose it, stalling the turn; the kit's Pi 1.5.0 minimum includes the dialog stack. Text-only tasks still receive names; unrelated work must not be invented to batch naming. This guidance works on official Pi and the Fitch runtime. During migration, it defers to an already loaded standalone `name_session` tool until `/fitch-setup` removes that package and Pi restarts. Name metadata is stored as append-only conversation messages at native run/turn boundaries, not injected near the start of every request. Enabling naming and subsequent renames preserve the previous prompt prefix. A cached backward boundary walk stops at the first compaction (and reconciles committed retain-none drafts on the next request); supplied native request messages still own recovery placement. Native branch projection prevents duplicate metadata across reloads and restores the current name after compaction or tree navigation. Official Pi 1.5 and the maintained Fitch runtime use the public lifecycle and compaction path, including truthful metadata on the first in-run request after retain-none compaction. Naming preserves other extensions' boundary drafts and continuation decisions. When recovery is needed after those drafts commit, its saved metadata stays at its originally submitted position in later requests, including after rename or reload. Replacing the old synthetic metadata head can cause a one-time cache miss at upgrade.
+`/clean-footer` sets the footer for the running Pi instance; it is not a saved preference. Reload, new, resume, and fork start with the compact footer, and `/tree` leaves the current choice alone. On a cold start, the footer honors a `clean-footer-checkpoint` entry that an earlier kit version saved for the same session ID. An entry copied into a fork does not carry over.
+
+### Session naming
+
+[`session-name`](../extensions/session-name.ts) provides the `name_session` tool and inert session-name metadata that keep `/resume` searchable without renaming sessions for every subtask. It preserves coordinator and numbered subagent identities unless the user confirms their removal. When useful tools are already needed, naming joins the same tool-call batch rather than requiring a naming-only model round. Naming does not force that batch to run one call at a time: siblings stay parallel whenever Pi's native batch is otherwise parallel (Pi's default, unless another tool in the batch or the agent's `toolExecution` option is sequential). Only naming calls wait for one another, so each one checks the name its predecessor left and a cancelled batch applies no queued rename. A sibling tool may open its own dialog during a protected-name confirmation; Pi's native dialog stack shows the confirmation again when that dialog closes. Text-only tasks still receive names; unrelated work must not be invented to batch naming. This guidance works on official Pi and the Fitch runtime. If the archived standalone `pi-session-name` package is still loaded, the kit defers to its `name_session` tool; `/fitch-setup` offers to remove that package. Name metadata is stored as append-only conversation messages at native run/turn boundaries, not injected near the start of every request. Enabling naming and subsequent renames preserve the previous prompt prefix. A cached backward boundary walk stops at the first compaction (and reconciles committed retain-none drafts on the next request); supplied native request messages still own recovery placement. Native branch projection prevents duplicate metadata across reloads and restores the current name after compaction or tree navigation. Official Pi 1.5 and the maintained Fitch runtime use the public lifecycle and compaction path, including truthful metadata on the first in-run request after retain-none compaction. Naming preserves other extensions' boundary drafts and continuation decisions. When recovery is needed after those drafts commit, its saved metadata stays at its originally submitted position in later requests, including after rename or reload.
+
+### Paged reader
 
 [`paged-reader`](../extensions/paged-reader.ts) lets the agent use `reader_present` for a long, sectioned explanation when paced reading helps; short answers remain normal chat. The reader masks the moving transcript with a full-viewport native overlay but keeps the page itself at most 72×18 cells. Right or Space advances one page, Left goes back, and Escape closes at the saved place. The section heading stays on its own line while labeled page progress and note/reply status appear beneath it; editing a note is explicitly labeled `Note`. Long sections continue through word-wrapped subpages; narrowing or resizing the terminal keeps a content anchor, with no timer, internal reading scroll, or model call for navigation. `/reader` reopens the saved page, `/reader list` browses earlier documents and revisions, and `/reader demo` creates a sample without a model call. `L` opens the library from a page. Fullscreen mode also makes the visible action hints and library rows clickable; regular mode uses the same keyboard controls. Fullscreen temporarily renders inline images as text behind the mask and restores the terminal's image protocol on close. In regular mode, native image rows may remain visible behind the reader.
 
@@ -54,23 +26,28 @@ Press `N` on a section to edit a note in the bounded native editor. Each change 
 
 Reader state lives in native session custom entries and follows the active branch through restart, `/tree`, and compaction. On official Pi 1.5, sessions created with only `/reader demo` before their first user or assistant message still defer the initial JSONL write; restart durability begins once Pi has persisted that session. Both supported hosts provide native mouse controls in fullscreen; keyboard controls also work in regular mode.
 
+### Setup model check
+
 [`setup-models`](../extensions/setup-models.ts) provides `fitch_setup_models` for `/fitch-setup` to check requested model routes in the running session's registry. It reads the current snapshot without opening credential files, making network calls, or starting another Pi process; a trusted project's models may be present, so the results describe this session rather than proving user-global availability.
 
-#### Fast modes
+### Fast modes
 
 [`fast-mode`](../extensions/fast-mode.ts) owns shared per-user settings for three providers, plus an optional OpenAI override for one session. Installing or updating the kit never opts you into Ultrafast or changes the default model routes.
 
-| Command                      | Request policy                                           | State file in the Pi agent directory |
-| ---------------------------- | -------------------------------------------------------- | ------------------------------------ |
-| `/codex-fast [on             | off                                                      | toggle                               | status               | ultrafast]`                                                                  | Shared OpenAI off, priority, or Ultrafast; only one at a time | `openai-codex-fast.json` |
-| `/ultrafast [on              | off                                                      | toggle                               | status] [--session]` | Ultrafast toggle, shared by default; `--session` overrides only this session | Shared file above, or native session metadata                 |
-| `/ultrafast reset --session` | Clear this session's override and follow the shared mode | Native session metadata              |
-| `/anthropic-fast [on         | off                                                      | toggle                               | status]`             | Anthropic Opus fast mode                                                     | `anthropic-fast.json`                                         |
-| `/xai-fast [on               | off                                                      | toggle                               | status]`             | xAI priority                                                                 | `xai-fast.json`                                               |
+| Command                                            | Request policy                                                               | State                                       |
+| -------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------- |
+| `/codex-fast [on\|off\|toggle\|status\|ultrafast]` | Shared OpenAI off, priority, or Ultrafast; only one at a time                | `openai-codex-fast.json`                    |
+| `/fast`                                            | Toggle shared OpenAI priority                                                | `openai-codex-fast.json`                    |
+| `/ultrafast [on\|off\|toggle\|status] [--session]` | Ultrafast toggle, shared by default; `--session` overrides only this session | The shared file, or native session metadata |
+| `/ultrafast reset --session`                       | Clear this session's override and follow the shared mode                     | Native session metadata                     |
+| `/anthropic-fast [on\|off\|toggle\|status]`        | Anthropic Opus fast mode                                                     | `anthropic-fast.json`                       |
+| `/xai-fast [on\|off\|toggle\|status]`              | xAI priority                                                                 | `xai-fast.json`                             |
 
-Shared settings affect sessions sharing that directory. For OpenAI, a session override takes precedence over the shared mode. OpenAI/xAI settings apply to normal agent requests through Pi's payload hook. Built-in compaction and bare registry/nested streams bypass that hook on the verified hosts and retain their native policy; Anthropic's provider override also covers eligible internal calls. Footers follow changes made in other sessions. Changing a setting does not retier requests already in flight. The maintained Fitch runtime uses request-boundary execution, not live native successor chains.
+State files live in the Pi agent directory.
 
-##### OpenAI: priority and explicit Ultrafast
+Shared settings affect sessions sharing that directory. For OpenAI, a session override takes precedence over the shared mode. OpenAI/xAI settings apply to normal agent requests through Pi's payload hook. Built-in compaction and bare registry/nested streams bypass that hook on the verified hosts and retain their native policy; Anthropic's provider override also covers eligible internal calls. Footers follow changes made in other sessions. Changing a setting does not retier requests already in flight.
+
+#### OpenAI: priority and explicit Ultrafast
 
 **Shared controls stay compatible with Fast.** `/codex-fast on` selects priority; `/codex-fast off` disables either shared kit mode. Blank `/fast`, or the existing `toggle` action, turns an enabled shared mode off and turns off into priority; none of those actions enables Ultrafast. Blank `/codex-fast` only reports status. Existing `enabled: true` state means priority, not Ultrafast. `/codex-fast ultrafast` remains a global alias with no `--session` form.
 
@@ -91,13 +68,13 @@ Ultrafast eligibility is deliberately narrow:
 
 Cloudflare AI Gateway, GPT-5.6 preview models, other GPT models, o-series, Completions, and other proxies are not Ultrafast-eligible. Gateway priority support is unchanged; Ultrafast gateway support requires separate live proof before inclusion. If you move an Ultrafast-selected session to an unsupported route, the effective selection remains inactive, with no priority fallback. Shared Ultrafast shows `ultrafast requested` or `ultrafast unavailable`; a local Ultrafast override shows `session ultrafast requested` or `session ultrafast unavailable`. Local off shows `session OpenAI tiers off`. These labels describe kit request policy, not server confirmation. Route recognition cannot prove plan entitlement or residency eligibility.
 
-The kit sends `service_tier: "ultrafast"` through Pi's stock `before_provider_request` payload hook on each eligible ordinary request. It adds no OpenAI provider override, custom transport, or routing header. The hook exposes the selected session model, not an internal call's actual destination: custom code forwarding that agent's payload callback to a different provider or endpoint is unsupported. OpenAI supports HTTP streaming and strongly recommends WebSockets for this mode. This change does not add direct-API WebSockets; the verified Fitch runtime and official Pi 1.5 use HTTP/SSE there. Codex WebSockets are a different route, not a substitute for direct API support.
+The kit sends `service_tier: "ultrafast"` through Pi's stock `before_provider_request` payload hook on each eligible ordinary request. It adds no OpenAI provider override, custom transport, or routing header. The hook exposes the selected session model, not an internal call's actual destination: custom code forwarding that agent's payload callback to a different provider or endpoint is unsupported. OpenAI supports HTTP streaming and strongly recommends WebSockets for this mode. The kit adds no transport: official Pi 1.5.2 and Fitch Pi use HTTP streaming on the direct API route. Codex WebSockets are a different route, not a substitute for direct API support.
 
 **Cost and access, checked 29 September 2026:** [OpenAI's Ultrafast guide](https://developers.openai.com/api/docs/guides/ultrafast-mode) and [pricing](https://developers.openai.com/api/docs/pricing?latest-pricing=ultrafast) make Astra Ultrafast available to all API users at **6× standard API prices (3× Fast)**. Per million tokens, requests with at most 272k input tokens cost $60 input, $6 cached input, $75 cache write, and $300 output; above 272k they cost $120/$12/$150/$450. The [Astra model documentation](https://developers.openai.com/api/docs/models/gpt-6-astra) applies long-context pricing to the whole request. Initial Ultrafast limits are 500k tokens/minute for API tiers 1–3, 1M for tier 4, and 5M for tier 5. Processing supports global processing and US data residency only, not EU or other non-US regional inference. Astra's broad release is recorded in the [API changelog](https://developers.openai.com/api/docs/changelog); Sol remains a preview and is not enabled here.
 
 [Codex Ultrafast access](https://learn.chatgpt.com/docs/agent-configuration/speed) requires the $500 Pro plan or eligible Enterprise/Edu access. Other self-serve plans do not qualify even with purchased credits. Enterprise access is off by default and controlled by workspace owners. Ultrafast consumes **8× included allowance**, or **6× purchased credits/PAYG**; neither multiplier promises an 8× task-speed improvement. Activation, startup, and restored-Ultrafast notifications disclose these costs and plan prerequisites.
 
-**Native accounting is separate from this kit.** Official Pi 1.5 lacks Ultrafast's 6× cost adjustment; it can send the tier while native dollar estimates remain standard-rate. [Fitch source inspected at `9e0674ef` on 1 November 2026](https://github.com/fitchmultz/pi/tree/9e0674ef667e90a63a5fb64f18fbb476cd1b8a3f) applies a **6× monetary estimate for exact `gpt-6-astra` on native OpenAI Responses and Codex Responses**, only when the terminal response confirms `service_tier: "ultrafast"`. Requesting the tier alone is insufficient: missing, unknown, or `default` returned tiers do not confirm Ultrafast and do not apply that multiplier. A matching Pi version does not imply accounting parity. Provider billing remains authoritative; a native estimate is not proof of the billed tier or amount. The kit does not manufacture billing estimates or turn Codex's 8× allowance multiplier into a dollar estimate. Stop an old writer before migrating legacy native-window journals; preserve originals and follow that runtime's documented conversion path rather than reopening a live old-format file in another host.
+**Native accounting is separate from this kit.** Official Pi 1.5.2 has no Ultrafast cost adjustment; it can send the tier while its dollar estimates remain standard-rate. [Fitch Pi](https://github.com/fitchmultz/pi) applies a **6× monetary estimate for exact `gpt-6-astra` on native OpenAI Responses and Codex Responses**, only when the terminal response confirms `service_tier: "ultrafast"`. Requesting the tier alone is insufficient: missing, unknown, or `default` returned tiers do not confirm Ultrafast and do not apply that multiplier. A matching Pi version does not imply accounting parity. Provider billing remains authoritative; a native estimate is not proof of the billed tier or amount. The kit does not manufacture billing estimates or turn Codex's 8× allowance multiplier into a dollar estimate.
 
 Requested `service_tier` is observable through `onPayload` (`before_provider_request`); returned `response.service_tier` through `onProviderStreamEvent` (`provider_stream_event`). These existing raw hooks do not persist tier metadata or turn absent values into confirmation. No live Ultrafast generation, billing, or speed measurement is claimed here.
 
@@ -105,18 +82,34 @@ Priority continues to use `service_tier: "priority"` on `openai`, `openai-codex`
 
 Prior **priority**, not Ultrafast, measurements remain useful baselines: gateway `gpt-5.6-sol` echoed `service_tier: "priority"`; on `openai-codex/gpt-5.6-sol`, three interleaved pairs in one session on one account ran roughly 1.5× faster in throughput and 1.4× in completion time ([0.9.14 changelog](../CHANGELOG.md)). Fixed-length output matters: time-to-first-token did not improve (1641ms standard versus 1772ms priority). The Codex response returned `service_tier: "default"`, which does not confirm priority processing or explain backend semantics. Record requested and returned tiers separately, leaving missing returned values unknown. Adding the Codex CLI's `x-codex-routing-hint` measured inside noise at that sample size, so the kit sends no such header.
 
-##### xAI priority
+#### xAI priority
 
 `/xai-fast` requests `service_tier: "priority"` on `xai` and gateway models whose IDs start with `grok-`. Gateway `grok-4.6` is live-verified to echo priority. Time-to-first-token is often unchanged when idle; the tier buys queue priority under load. The footer shows `fast` only while enabled on an eligible model. Reported cost is not request-doubled: Pi applies the 2× Responses multiplier when the response confirms priority (`grok-4.5`); Completions models including `grok-4.6` stay on catalog rates.
 
-##### Anthropic Opus fast mode
+#### Anthropic Opus fast mode
 
 `/anthropic-fast` requests Anthropic's research-preview fast mode for Opus 5.5, Opus 5, and Opus 4.8 at double the token price, with reported cost rates doubled to match. It is verified on this setup's Claude subscription OAuth route, where identical output ran roughly 2× faster. The footer shows `fast` only while enabled on an eligible model.
 
 Anthropic fast mode cannot ride the stock hooks: pi-ai assembles `anthropic-beta` (OAuth identity and feature markers) inside its client after extension header hooks run and merges headers last-write-wins. A hook-written value would drop Pi's own markers. The extension therefore owns the `anthropic-messages` stream callback for exactly `anthropic` and `cloudflare-ai-gateway`, appending the mandatory beta at fetch time so `speed` and header travel atomically. Other Opus proxies such as `github-copilot` and `opencode` stay stock; caller-supplied `client` requests stay at standard speed.
 Accepted caveats of owning that callback: do not combine it with another Anthropic or gateway provider override without reviewing both, since Pi merges registrations last-write-wins; start a fresh Pi process after disabling or removing it, because `/reload` does not clear model-runtime provider overrides; and revalidate it when upgrading Pi, since it depends on Pi's provider composition and header-merge behavior.
 
+### Image guard
+
 [`anthropic-image-guard`](../extensions/anthropic-image-guard.ts) preserves full-resolution images for other models while resizing only Claude-bound images to Anthropic's inline limits, on every route that speaks `anthropic-messages` (direct, Cloudflare AI Gateway, proxies such as GitHub Copilot). Non-Claude models sharing that wire API keep their source images.
+
+Pi's `images.autoResize` defaults to `true`, which shrinks every image to at most 2000×2000 pixels. I turn it off so models can inspect the original detail:
+
+```json
+{
+	"images": {
+		"autoResize": false
+	}
+}
+```
+
+Anthropic has stricter image limits. The guard handles that one boundary instead of giving up source quality everywhere. It runs only on Claude models over the `anthropic-messages` API regardless of which provider routes them, reuses Pi's native image resizer, caches successful results within an estimated 128 MiB budget for source keys, result strings and entry overhead, clears that cache on session start and compaction, and retries later after resize failures. Cold misses decode in up to four native workers at once, and writer calls reuse the same cache. A bounded request-start snapshot preserves cache hits during newest-first traversal, even when the request exceeds the cache budget; cache eviction never omits an image. The snapshot can temporarily retain another cache budget's worth of strings during preparation. Before native decoding, it omits sources above 32 MiB of base64 and admits the newest images within a 64 MiB source budget, preserving conversation order and saved originals. On the bundled direct Anthropic and Cloudflare routes, and in writer calls, it also budgets the complete serialized request against Anthropic's 32 MB limit, including text and tool definitions. It resizes images further when needed, omitting oldest images first only when resizing cannot fit them; text/tool-only overflow retains native handling. The guard remembers those request-size results for the latest over-limit request's captures: a capture keeps its earlier result while it still fits, so repeated over-limit turns skip native work and resend the same image bytes.
+
+### Prompt-writing commands
 
 [`write-prompt`](../extensions/write-prompt.ts) adds `/draft <text>`, `/ambitious <text>`, `/unreasonable <text>`, and `/side-question <text>`. All four use the current session system prompt once and conversation off-transcript, flattening past tool-call semantics while retaining tool-result images, without replaying historical system messages or exposing tools. `/draft` rewrites the source into an agent request, then offers Accept, Copy prompt, Tweak, Restore original, or Deny. Accept sends normally when idle and steers the active agent when busy. Before sending, it saves the draft and original input in native session metadata outside model context. `/draft` without text reopens the last accepted draft on the current branch without another rewrite, including after a failed send. Restore original puts the original command back in the editor; synchronous send errors keep the dialog open for retry. In the TUI, a draft taller than the viewport is clipped to it with a lines-above/below indicator and scrolls with PageUp/PageDown; arrows, Enter, and Escape keep driving the action list, and terminals tall enough for the whole draft look exactly as before.
 
@@ -128,7 +121,7 @@ At session start it uses the request and available project context without inven
 
 `/side-question` answers off-transcript and offers Copy answer, Ask again, or Dismiss; it never sends to the agent. Copy does not touch the editor. All commands share the writer configuration below.
 
-#### Draft provider, model, and thinking
+#### Writer provider, model, and thinking
 
 By default, the writer inherits the active session's provider, model, and thinking level when rewriting starts. It uses Pi's native provider-neutral model API and configured authentication, without changing the session's settings. Pi handles provider-specific thinking mappings and token budgets; `/ambitious` additionally checks the completed prompt’s visible character limit, independent of provider tokens. `/draft`, `/unreasonable`, and `/side-question` have no kit-specific size cap. Main-agent verbosity hooks are not applied.
 
@@ -148,197 +141,97 @@ The existing `{ "model": "provider/model-id" }` form remains supported when `pro
 
 `thinkingLevel` accepts `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Pi adjusts unsupported levels to the selected model's capabilities and the writer reports the adjustment, including when `off` is unavailable. Malformed JSON, unknown fields, invalid values, unknown models, and missing authentication produce a named configuration error before a model call; they do not silently fall back to a different model.
 
-### Legacy footer preferences
+## Setup
 
-Pi 1.0 no longer exposes working-session checkpoints, metadata iterators, journal revisions, or usage-source labels. The kit uses public events and leaf identity on both hosts. Cold startup still reads old `clean-footer-checkpoint` entries for the matching session ID; copied parent entries cannot transfer a preference into a fork. New toggles are live instance choices, not a new persistent preference. `/tree` leaves the live choice alone; warm reload/new/resume/fork still create an enabled instance. Fast-mode policy remains in its existing shared files and native custom entries.
+`/fitch-setup` is a prompt, not an installer program. The main session follows it: it inspects the host, asks for the choices you have not already given, shows one preview, applies it, and verifies the result. `/fitch-setup verify` makes no changes.
 
-### Optional compact view
+Setup does these things:
 
-On a supporting Pi runtime, `/compact-view` switches between compact tool cards and the normal view. `/compact-view on` and `/compact-view off` choose explicitly. The change applies immediately to the current session and is remembered for new sessions; other open sessions are unchanged. Individual tool cards remain expandable by click in fullscreen mode, and Ctrl+O still expands or collapses all tools.
+- Compares the running Node.js and Pi versions with the manifest's minimums, and checks each selected package's own minimums. It stops before any write if the host is too old. It does not upgrade Node.js or Pi.
+- Checks model routes with the `fitch_setup_models` tool in the running session.
+- Installs each selected package with `pi install <source> --no-approve`, exactly as the manifest lists it.
+- Keeps a package that is already installed from the other channel. Pi treats npm and Git sources as different packages, and two copies would register the same tools twice.
+- Offers to remove an installed package that the manifest lists as retired, because its replacement registers the same tool or command.
+- Offers the settings example, the context windows, and the working-agreement blocks as separate choices.
+- Preserves everything else: other packages, resource filters, unrelated settings, and fast-mode state.
 
-The Fitch runtime defaults to off. [`examples/settings.json`](../examples/settings.json) includes `"compactView": true` as my optional preference, which `/fitch-setup` offers separately only when the installed runtime supports it. Installing the kit never enables it. Official Pi without this feature remains supported and skips this setting. Core owns the view; `pi-subagents` follows it for routine coordination notices. The kit adds no rendering extension and changes no tool results or model context.
+Setup never reads credentials, adds MCP servers, or makes provider calls. Provider login, MCP server configuration, and the `agent-browser` command-line tool remain your steps. Start a new Pi process after setup installs or removes a package.
 
-### Optional integration discovery
+### Setup manifest
 
-Pi 1.5 supplies native tool exposure, codemode, and tool search on official Pi and the maintained Fitch runtime. Extensions keep optional tools out of the prompt with `exposure: "deferred"`; `tool_search` loads them and codemode scripts call them. Extensions that defer tools activate Pi's registered `tool_search` themselves. Loading a tool does not widen its permissions, and coding tools, safeguards, recovery, and coordination should stay directly available.
+[`setup-manifest.json`](../setup-manifest.json) is the source of truth for setup.
 
-The kit does not change tool selection automatically. First use of a deferred tool adds a search round.
+| Field                      | Meaning                                                                                                                                                                                                        |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runtime`                  | Minimum Pi and Node.js versions for the kit itself                                                                                                                                                             |
+| `kit`                      | The kit's package name and install source                                                                                                                                                                      |
+| `kitResources`             | The extensions, prompts, and theme the package loads, plus the working-agreement template and settings example                                                                                                 |
+| `corePackages`             | The packages in complete core. Each entry has an `id`, an unpinned `source`, and what it `provides`. `externalPrerequisite` names a command-line tool the package needs and links to its install instructions. |
+| `optionalPackages`         | Packages outside complete core. `platform` limits an entry to one operating system.                                                                                                                            |
+| `retiredPackageSources`    | Archived packages that the kit or a core package replaces                                                                                                                                                      |
+| `modelContextWindows`      | The model routes this setup uses, and the context window chosen for each                                                                                                                                       |
+| `workingAgreementSections` | The managed blocks in the working-agreement template                                                                                                                                                           |
 
-### Experimental extension
+### Settings example
 
-[`macuse`](https://github.com/fitchmultz/macuse) adds native macOS Computer Use for tasks a browser DOM or CLI cannot handle. It runs on the Computer Use runtime installed with ChatGPT, so it stays outside Complete core and is marked experimental: OpenAI can change that runtime's private interfaces without notice.
+[`examples/settings.json`](../examples/settings.json) is the public subset of my Pi settings. It has no credentials, paths, package list, or trust setting.
 
-### User-local extensions
+| Key                                                       | Value                                                | Effect                                                                                                                     |
+| --------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `defaultProvider`, `defaultModel`, `defaultThinkingLevel` | `openai-codex`, `gpt-6-astra`, `xhigh`               | The startup model                                                                                                          |
+| `enabledModels`                                           | Eleven routes                                        | The models used for startup selection and model cycling. Each is a key of `modelContextWindows`.                           |
+| `defaultTools`                                            | `+codemode`, `+tool_search`, `+grep`, `+find`, `+ls` | Adds these built-in tools to Pi's default selection                                                                        |
+| `steeringMode`                                            | `all`                                                | Delivers every queued steering message at once                                                                             |
+| `compactView`                                             | `true`                                               | Groups tool activity in the transcript. Fitch Pi documents this setting; official Pi 1.5.2 does not.                       |
+| `images.autoResize`                                       | `false`                                              | Sends source images at full detail. See [Image guard](#image-guard).                                                       |
+| `terminal.imageWidthCells`                                | `120`                                                | Preferred inline image width                                                                                               |
+| `compaction`                                              | Reserve 64,000; keep 30,000 recent                   | Where automatic compaction starts, and how much recent conversation it keeps. Posthorse uses the same values for rollover. |
 
-Personal provider definitions, agent-profile overrides, and experimental extensions remain outside Complete core. The separately managed Posthorse extension uses public compaction hooks for summary-free rollover on official Pi and the maintained Fitch runtime; it is not a kit dependency. Setup preserves these choices and never copies private configuration into the public package.
+The manifest's `modelContextWindows` sets each route to 400,000 tokens. Setup merges a selected route into `models.json` as `providers.<provider>.modelOverrides.<model-id>.contextWindow`, which keeps the model's native capabilities and pricing. With the example's 64,000-token reserve, context rolls over at about 336,000 tokens.
 
-### Why the image guard exists
+For some routes, 400,000 is above Pi's native window for the model. On OpenAI routes, input above 272,000 tokens uses long-context pricing for the whole request. Check a route's pricing before you raise its window.
 
-Pi defaults `images.autoResize` to `true`, which protects provider limits by shrinking every image to at most 2000×2000. I disable it globally so vision-capable agents can inspect the original detail:
+### Working agreement
 
-```json
-{
-	"images": {
-		"autoResize": false
-	}
-}
-```
+[`templates/working-agreement.md`](../templates/working-agreement.md) has two managed blocks that setup can merge into `AGENTS.md` in the Pi agent directory:
 
-That exposed stricter Anthropic image limits. The bundled guard fixes the boundary instead of giving up source quality everywhere: it runs only on Claude models over the `anthropic-messages` API regardless of which provider routes them, reuses Pi's native image resizer, caches successful results within an estimated 128 MiB budget for source keys, result strings and entry overhead, clears that cache on session start and compaction, and retries later after resize failures. Cold misses decode in up to four native workers at once, and writer calls reuse the same cache. A bounded request-start snapshot preserves cache hits during newest-first traversal, even when the request exceeds the cache budget; cache eviction never omits an image. The snapshot can temporarily retain another cache budget's worth of strings during preparation. Before native decoding, it omits sources above 32 MiB of base64 and admits the newest images within a 64 MiB source budget, preserving conversation order and saved originals. On the bundled direct Anthropic and Cloudflare routes, and in writer calls, it also budgets the complete serialized request against Anthropic's 32 MB limit, including text and tool definitions. It resizes images further when needed, omitting oldest images first only when resizing cannot fit them; text/tool-only overflow retains native handling. The guard remembers those request-size results for the latest over-limit request's captures: a capture keeps its earlier result while it still fits, so repeated over-limit turns skip native work and resend the same image bytes. The complete safe settings subset is in [`examples/settings.json`](../examples/settings.json).
+- **Baseline** covers authority, evidence, and delivery through a repository's PR workflow.
+- **Process** adds team habits: an issue tracker, a worktree per task, and a fresh independent review before a shared-team PR is ready.
 
-## Subagent bench
+The process block requires an independent review, not a particular tool. A delegated child session with fresh context is one way to get it. If a required review is unavailable, the gate stays unsatisfied; self-review does not satisfy it.
 
-[`pi-subagents`](https://github.com/fitchmultz/pi-subagents) is an optional composition component that owns delegation, coordination, and its packaged profile defaults. The kit is not an orchestration runtime and works without it. Native Pi does not supply delegation tools or specialist profiles. Use the installed owner's current docs and effective executable inventory, not a fixed roster of sibling-only names.
+A working agreement is model policy. It is not a technical authorization boundary.
 
-| Job                              | Selection requirement                                                                             |
-| -------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Map, research, diagnose, or plan | A suitable available profile with a bounded, normally read-only brief                             |
-| Implement or remediate           | A suitable available profile, explicit scope, and isolated writes where needed                    |
-| Challenge the result             | Fresh independent review with the required correctness, security, maintainability, or UI coverage |
-| Cross-family review              | Effective routing and actual review evidence meeting each required model family                   |
-| Human-facing output              | A suitable available profile with the requested audience and deliverable                          |
+## Host features
 
-The parent session remains responsible for the task. Specialists return evidence; they do not become an autonomous hierarchy.
+The kit uses these Pi features but does not own them.
 
-The owner defines primary, fallback, thinking, context, tool, and output policy. User/project overrides, resource filters, disabled profiles, and trust can change the effective inventory. Setup inspects it and offers child-run settings only for a selected or confirmed installed owner, checking paths before reading. For a selected owner not yet installed, its documented capabilities are a preview, not proof of effective availability. Legacy kit-profile links are eligible for removal only after the installed owner and replacement basename are verified; unrelated files and links stay untouched.
+**Tool discovery.** Pi 1.5 supplies `tool_search` and `codemode`. An extension can register an optional tool as deferred, which keeps it out of the prompt until `tool_search` loads it or a `codemode` script calls it. Loading a tool does not widen its permissions. The first use of a deferred tool adds a search round.
 
-The optional working-agreement process block requires fresh independent review for shared-team changes, not any packaged profile identifier. Setup previews an available independent path or its missing prerequisite before adoption. If required independent review is unavailable, report the missing capability, profile, or family and leave the gate unsatisfied; self-review is not equivalent. Explicit named-reviewer and model-family obligations, human reviews, repository protections, and delivery authority remain binding. A model catalog entry alone is not an executable reviewer.
+**Compact view.** On Fitch Pi, `/compact-view` switches between grouped tool activity and the normal transcript, and remembers the choice for new sessions. Installing the kit never turns it on. Official Pi 1.5.2 has no compact view, and setup skips the setting there.
 
-## Active skills
+**Restart.** Fitch Pi supplies `/restart` and `pi restart`. On official Pi, quit and start Pi again.
 
-Skills load task-specific operating instructions only when the work matches. [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries the active reusable workflow set:
-
-| Skill                                                                                 | What it adds                                                                                                                                         |
-| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`ask-clarifying-questions`](https://github.com/fitchmultz/pi-agent-skills)           | Stop only for ambiguity that materially changes scope, safety, or reversibility                                                                      |
-| [`deslop`](https://github.com/fitchmultz/pi-agent-skills)                             | Remove AI-generated diff noise and ceremonial test tables without dropping real boundary coverage                                                    |
-| [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills)                   | Create editable SVG or D2 architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with rendered SVG/PNG review artifacts |
-| [`dogfood`](https://github.com/fitchmultz/pi-agent-skills)                            | Exploratory QA through real browser and terminal/TUI flows                                                                                           |
-| [`handoff`](https://github.com/fitchmultz/pi-agent-skills)                            | Paste-ready continuation or bounded delegation prompts for a new session                                                                             |
-| [`pi-extension-development`](https://github.com/fitchmultz/pi-agent-skills)           | Build, debug, validate, package, and release Pi extensions against current runtime contracts                                                         |
-| [`propose-then-ship-pi`](https://github.com/fitchmultz/pi-agent-skills)               | Rank one repository improvement, stop for direction, then implement, review, and ship it                                                             |
-| [`test-audit`](https://github.com/fitchmultz/pi-agent-skills)                         | Gate new tests and audit low-value, implementation-coupled, or duplicative ones                                                                      |
-| [`thermo-nuclear-code-quality-review`](https://github.com/fitchmultz/pi-agent-skills) | Strict maintainability review for large or structurally risky diffs                                                                                  |
-| [`ux-review`](https://github.com/fitchmultz/pi-agent-skills)                          | Review user-visible workflows for completion, recovery, progress, and truthful outcomes                                                              |
-| [`verification-before-completion`](https://github.com/fitchmultz/pi-agent-skills)     | Require current evidence before completion, commit, PR, or passing-check claims                                                                      |
-
-Companion skills ship beside their extensions:
-
-| Source                                                       | Skills                                                                                                                                                                                                                           |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`pi-pstack`](https://github.com/fitchmultz/pi-pstack)       | `poteto-mode` playbooks, 24 `principle-*` skills, `tdd`, `bro`, `how`, `why`, `architect`, `arena`, `swarm`, `interrogate`, `unslop`, `no-comments`, `ketchup`, `recall`, and `poteto-agent` / `comment-sicko` subagent profiles |
-| [`pi-subagents`](https://github.com/fitchmultz/pi-subagents) | `pi-subagents` orchestration and `pi-intercom` coordination guidance                                                                                                                                                             |
-| [`ponytail`](https://github.com/fitchmultz/ponytail)         | `ponytail`, `ponytail-audit`, `ponytail-review` (my runtime filters the debt, gain, and help variants)                                                                                                                           |
-
-Most `pi-pstack` leaf skills (including `bro`) are user-invoked or routed through `poteto-mode`, while `poteto-mode`, `tdd`, and the `pi-agent-skills` workflows are selected by task fit rather than loaded into every prompt.
-
-## Connected MCP services
-
-MCP is the context and action bus around the coding loop. Authentication is per-user and is never stored in this repository.
-
-The current setup has authenticated, read-only-discovery-verified connections for:
-
-| Connection                                | Capability                                                                                            |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `horizon`                                 | Internal integration gateway, authenticated identity, integration API calls, and nested tool catalogs |
-| GitHub                                    | Repositories, issues, pull requests, checks, reviews, releases, and code search                       |
-| Linear                                    | Issues, projects, teams, and planning context                                                         |
-| Slack, primary and development workspaces | Public and approved private conversation context, threads, users, and canvases                        |
-| Cloudflare                                | Documentation plus typed account API access                                                           |
-| Sentry                                    | Issues, events, traces, releases, and project context                                                 |
-| Datadog                                   | Dashboards, monitors, metrics, logs, traces, and operational context                                  |
-| Plain                                     | Support threads, customers, workspace data, and Sidekick sessions                                     |
-| Notion                                    | Workspace search, pages, databases, comments, and meeting notes                                       |
-| Granola                                   | Meeting notes, summaries, folders, and transcripts                                                    |
-
-The organization-specific endpoint and authentication configuration stay private. [`setup-manifest.json`](../setup-manifest.json) records only the service choices; `/fitch-setup` stops for each user's own login and never probes by reading service data. My personal runtime is fully approved: MCP is a tool transport, not an authorization layer, so operating boundaries come from the working agreement and the human directing the session. The setup configures only integrations listed in the manifest and uses canonical package names for local stdio servers.
-
-## How the workflow fits together
-
-A typical substantial change looks like this:
-
-1. The main session reads repository instructions and pulls the relevant issue or service context through MCP.
-2. Native repository search and, with a compatible delegation package, a useful fresh read-only code-mapping helper map the real code path before editing.
-3. The main session owns design and integration, using its editor tools or, with compatible delegation, independent implementation helpers as useful. Delegate code mapping, implementation, testing, and review when it helps and the required capabilities are available; preserve isolated worktrees and clear ownership.
-4. Agent Browser verifies browser-visible behavior when tests cannot prove the user experience.
-5. Repository checks and deterministic tools establish current evidence.
-6. Complete required reviews and use independent reviewers when helpful. Reviewers reconstruct the claim from the diff and evidence; refresh analysis when substantive changes invalidate it, not for unchanged behavior or metadata alone.
-7. The main session closes the loop through authorized PR delivery, check and review remediation, merge, local checkout/installation refresh, and task worktree cleanup. Current or standing authority covers ordinary prerequisites; explicit holds remain binding.
-
-The architecture stays modular:
-
-```text
-Pi core
-  ├─ public extensions and tools
-  ├─ bounded, model-routed subagents
-  ├─ task-selected skills and policy
-  └─ user-authenticated MCP services
-```
-
-This is already the working composition layer for a broader organization harness. Productizing it would add centralized provisioning, policy distribution, scoped credential brokerage, audit and cost visibility, managed local/cloud execution, and multi-user controls. It would not require turning the extensions into a monolith or locking the harness to one model provider.
-
-## Install the kit
-
-The kit supports the latest stable official Pi and the current Fitch build on Node.js 24.15 or newer. Setup requires Pi 1.5.0 or newer; passing that minimum alone does not establish that a host is current. When using `pi-apply-edits` with `pi-subagents`, use subagents 0.39.1 or newer so completion tracking recognizes the new editing tools and partial-error receipts. Setup checks each selected package's documented requirements before installing; installing the kit does not patch or replace Pi.
-
-```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent
-pi
-# Complete provider login in Pi, then:
-pi install git:github.com/fitchmultz/pi-fitch-kit
-# Start a fresh Pi process, then:
-/fitch-setup
-```
-
-`/fitch-setup` reads [`setup-manifest.json`](../setup-manifest.json), previews every package install and file change, and asks which parts to apply. It checks models through the running session's read-only `fitch_setup_models` tool, rather than starting a Pi CLI whose migrations can change files. It never reads or copies credentials. Reruns normalize filtered, pinned, or duplicate kit entries to one canonical source. They also preview eligible retired-package and verified symlink cleanup after the corresponding replacement is present. Archived Intercom removal is a dependent step in the same approved plan: install the selected owner, then verify after the required fresh process that its package metadata declares Intercom and Pi loaded that exact extension path. Pi's resource listing or a native conflict diagnostic naming both owner paths is acceptable pre-removal evidence; a same-named tool alone is not, because the archived registration can win. Back up the exact archived entry for rollback, perform the covered exact-source/scope removal, then verify the functional tool's installed-owner provenance and that only the replacement loads after the next fresh process. A failed pre-removal prerequisite leaves the archived source unchanged and the pending step reported, not silently discarded. A failed post-removal check stops with the failed migration and recorded rollback reported, never a completion claim. Legacy kit-profile cleanup needs a verified installed profile owner and same-basename replacement. Symlink cleanup never removes regular files or links from another source. A separate consent step merges the manifest's flat context-window overrides into `models.json` per route, keeping existing values unless explicitly overwritten. `/fitch-setup verify` reports scoped drift without changing anything; an absent unselected delegation owner is not kit drift.
-
-The manifest is the source of truth for package channels, models, bundled resources, and optional service connections. [`examples/settings.json`](../examples/settings.json) is a safe subset of my behavioral settings, not a credential-bearing config dump. It selects Astra through a ChatGPT/Codex subscription at medium reasoning; setup falls back to an OpenAI API key when there is no subscription and filters optional routes by availability. The manifest offers 300k context budgets.
-
-### Scoped core installs
-
-These four linked extensions use owned, unpinned scoped npm channels:
-
-```bash
-pi install npm:@fitchmultz/pi-subagents
-pi install npm:@fitchmultz/pi-ask-question
-pi install npm:@fitchmultz/pi-calculator
-pi install npm:@fitchmultz/pi-verbosity-control
-```
-
-Git remains a supported manual fallback: use `pi install git:github.com/fitchmultz/<repo>` with the corresponding repository name above. Do not install both channels for the same extension: npm and Git have different Pi package identities. `/fitch-setup` previews source switches, backs up affected package entries, and preserves resource filters and controller configuration. Workflows has its own scoped package, `npm:@fitchmultz/pi-workflows`, but is not a kit core default.
-
-## Prompts
-
-The package registers only two prompts:
-
-- `/fitch-setup` for installing or verifying the kit.
-- `/github-open-issues-prs [owner]` audits open issues and PRs in the account's public non-fork repos. An explicitly named user also gets all their authored open issues and PRs across accessible repos, including private repos, forks, and their own repos.
-
-The older prompt files remain in `prompts/` as source material, but the package does not load them. Nothing is deleted; they simply no longer dominate autocomplete or the README.
-
-The retained `execute/orchestrate.md`, `execute/fix-issues.md`, and `review/hard-review.md` can be used manually only with the compatible delegation lifecycle and effective-profile capabilities they declare. They are not registered commands and do not install an orchestration runtime. Missing required independent review leaves their gate incomplete, never satisfied by inline self-review. Hard review retains separate GPT-family and Claude-family reviews; an unavailable required family is an explicit prerequisite failure, not permission to substitute another model.
-
-## Trust and security boundaries
+## Trust and security
 
 - Pi extensions run with the permissions of the user who started Pi. Project trust is not a sandbox.
-- My personal setup runs with full approvals and does not put a confirmation dialog in front of each MCP call. The working agreement is model policy, not a technical authorization boundary.
 - Every person authenticates their own model providers and services.
-- The kit contains no keys, OAuth state, private endpoints, browser profiles, raw sessions, generated catalogs, or copied service responses.
-- Extension packages use bare Git or npm sources. Agent Browser's separate CLI prerequisite must satisfy the wrapper's documented requirements.
-- The settings example deliberately omits personal paths, package filters, credentials, and the trust default. Choose project trust explicitly.
-- External writes, deployments, merges, account changes, and production actions follow current or standing user authority and enforced platform boundaries; do not ask again for covered actions or treat setup consent as authority for unrelated service mutations.
+- The kit contains no keys, OAuth state, private endpoints, browser profiles, saved sessions, or copied service responses.
+- Package sources in the manifest are unpinned: an install follows the package's current release or default branch. Review a package before you install it.
+- The settings example leaves out the trust setting. Choose `defaultProjectTrust` for your environment.
+- Setup consent covers the previewed installs and file changes only. It is not authority for service writes, deployments, or account changes.
 
 ## Repository map
 
 ```text
-extensions/             footer, image guard, fast modes, session naming, paged reader, setup models, and writer commands
-examples/settings.json  safe, non-secret behavioral settings
-prompts/                setup, one active operational prompt, and retained source material
-themes/                 calm theme: event-horizon neutrals, single steel-blue accent family
-setup-manifest.json     package sources and selectable integrations
-templates/              optional working-agreement blocks
-docs/                   technical guide and overview
-scripts/                validation, package smoke, and focused regressions
+extensions/             footer, session naming, fast modes, image guard, prompt-writing commands, paged reader, setup model check
+prompts/                /fitch-setup and /github-open-issues-prs
+themes/                 calm theme
+setup-manifest.json     packages, model routes, and bundled resources
+examples/settings.json  public subset of my Pi settings
+templates/              working-agreement blocks
+docs/                   this reference, the usage guide, and development notes
+scripts/                validation, package smoke, and regressions
 ```
 
-For repository checks and host qualification, see [Development and validation](development.md).
+For repository checks, see [Development](development.md).

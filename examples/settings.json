@@ -1,34 +1,32 @@
 {
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-6-astra",
-  "defaultThinkingLevel": "medium",
-  "compactView": true,
+  "defaultThinkingLevel": "xhigh",
   "enabledModels": [
-    "anthropic/claude-opus-5-5",
+    "anthropic/claude-fable-5-2",
+    "cloudflare-ai-gateway/claude-fable-5-2",
     "cloudflare-ai-gateway/claude-opus-5-5",
-    "cloudflare-ai-gateway/claude-opus-5",
     "openai-codex/gpt-6-astra",
-    "openai/gpt-6-astra",
-    "openai/gpt-6-sol",
-    "xai/grok-4.7"
+    "openai-codex/gpt-6.1-sol",
+    "openai-codex/gpt-6.1-terra",
+    "openai-codex/gpt-6-luna",
+    "cloudflare-ai-gateway/gpt-6-astra",
+    "cloudflare-ai-gateway/gpt-6.1-sol",
+    "cloudflare-ai-gateway/gpt-6.1-terra",
+    "cloudflare-ai-gateway/gpt-6-luna"
   ],
+  "defaultTools": ["+codemode", "+tool_search", "+grep", "+find", "+ls"],
+  "steeringMode": "all",
+  "compactView": true,
   "images": {
     "autoResize": false
   },
   "terminal": {
     "imageWidthCells": 120
   },
-  "steeringMode": "all",
-  "retry": {
-    "enabled": true,
-    "maxRetries": 5,
-    "provider": {
-      "timeoutMs": 150000
-    }
-  },
   "compaction": {
     "enabled": true,
     "reserveTokens": 64000,
-    "keepRecentTokens": 40000
+    "keepRecentTokens": 30000
   }
 }

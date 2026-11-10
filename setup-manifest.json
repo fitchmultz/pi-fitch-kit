@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "runtime": {
     "pi": ">=1.5.0",
     "node": ">=24.15.0"
@@ -9,33 +9,6 @@
     "repository": "https://github.com/fitchmultz/pi-fitch-kit",
     "installSource": "git:github.com/fitchmultz/pi-fitch-kit"
   },
-  "requiredModels": [
-    ["openai-codex/gpt-6-astra", "openai/gpt-6-astra"],
-    [
-      "anthropic/claude-opus-5-5",
-      "anthropic/claude-fable-5-1",
-      "cloudflare-ai-gateway/claude-opus-5"
-    ]
-  ],
-  "requiredModelsNote": "Each entry is an ordered list of alternatives; the first available route satisfies it. Astra and Claude are this kit's opinionated composition baseline for OpenAI/Codex and Claude workflows, including the Claude-specific image/fast-mode boundary, not prerequisites imposed by a sibling profile or proof of an available independent reviewer. Gateway Opus 5 is this kit's selected gateway fallback, a route-policy choice rather than the newest Claude in Pi's catalog.",
-  "optionalModels": [
-    "cloudflare-ai-gateway/claude-opus-5-5",
-    "cloudflare-ai-gateway/claude-fable-5-1",
-    "openai/gpt-6-sol",
-    "xai/grok-4.7"
-  ],
-  "optionalModelsNote": "Optional routes require the user's own authentication and, where needed, provider configuration. Missing routes are reported and omitted from the selected setup; existing user profiles and fallbacks are preserved.",
-  "modelContextWindows": {
-    "anthropic/claude-fable-5-1": 300000,
-    "anthropic/claude-opus-5-5": 300000,
-    "cloudflare-ai-gateway/claude-fable-5-1": 300000,
-    "cloudflare-ai-gateway/claude-opus-5": 300000,
-    "cloudflare-ai-gateway/claude-opus-5-5": 300000,
-    "openai/gpt-6-astra": 300000,
-    "openai-codex/gpt-6-astra": 300000,
-    "xai/grok-4.7": 300000
-  },
-  "modelContextWindowsNote": "Optional budgets, merged per route as modelOverrides { contextWindow } to inherit native model capabilities. Existing choices remain unchanged unless explicitly overwritten. Inspect the effective model's pricing tiers before raising its window; the kit does not copy private provider definitions or pricing.",
   "kitResources": {
     "extensions": [
       "extensions/anthropic-image-guard.ts",
@@ -51,111 +24,104 @@
     "workingAgreementTemplate": "templates/working-agreement.md",
     "settingsExample": "examples/settings.json"
   },
-  "consentBehaviors": [],
-  "retiredPackageSources": [
-    "git:github.com/fitchmultz/pi-codex-context",
-    "git:github.com/fitchmultz/pi-session-name",
-    "npm:@ff-labs/pi-fff",
-    "npm:pi-verbosity-control",
-    "git:github.com/DietrichGebert/ponytail"
-  ],
-  "retiredExtensionLinks": [
-    {
-      "path": "extensions/fold-responsive-footer.ts",
-      "targetSuffix": "/fold-dev-environment/extensions/fold-responsive-footer.ts"
-    },
-    {
-      "path": "extensions/openai-codex-fast-mode",
-      "targetSuffix": "/fold-dev-environment/extensions/openai-codex-fast-mode"
-    }
-  ],
   "corePackages": [
     {
       "id": "subagents",
-      "source": "npm:@fitchmultz/pi-subagents"
+      "source": "git:github.com/fitchmultz/pi-subagents",
+      "provides": "Delegation to fresh or forked child sessions, saved child runs, and messaging between local sessions"
     },
     {
       "id": "apply-edits",
-      "source": "git:github.com/fitchmultz/pi-apply-edits"
+      "source": "git:github.com/fitchmultz/pi-apply-edits",
+      "provides": "File edits: apply_patch, replace_text, and write_files"
     },
     {
-      "id": "ask-question",
-      "source": "npm:@fitchmultz/pi-ask-question"
-    },
-    {
-      "id": "todo-list",
-      "source": "git:github.com/fitchmultz/pi-todo-list"
-    },
-    {
-      "id": "change-working-dir",
-      "source": "git:github.com/fitchmultz/pi-change-working-dir"
-    },
-    {
-      "id": "ponytail",
-      "source": "git:github.com/fitchmultz/ponytail"
+      "id": "posthorse",
+      "source": "git:github.com/fitchmultz/pi-posthorse",
+      "provides": "Context rollover without a model-written summary, task notes, and history search"
     },
     {
       "id": "agent-browser",
       "source": "git:github.com/fitchmultz/pi-agent-browser-native",
+      "provides": "Browser automation and web search",
       "externalPrerequisite": {
-        "package": "agent-browser",
-        "minimumVersion": "0.38.1",
-        "installCommand": "npm install --global agent-browser",
-        "runtimeDownloadCommand": "agent-browser install"
+        "command": "agent-browser",
+        "instructions": "https://github.com/fitchmultz/pi-agent-browser-native#install-and-start"
       }
     },
     {
       "id": "mcp",
-      "source": "git:github.com/fitchmultz/pi-mcp-adapter"
+      "source": "git:github.com/fitchmultz/pi-mcp-adapter",
+      "provides": "MCP servers as searchable, deferred Pi tools"
     },
     {
-      "id": "stash",
-      "source": "git:github.com/fitchmultz/pi-stash"
+      "id": "ask-question",
+      "source": "git:github.com/fitchmultz/pi-ask-question",
+      "provides": "Structured questions in the Pi UI"
     },
     {
-      "id": "verbosity",
-      "source": "npm:@fitchmultz/pi-verbosity-control"
-    },
-    {
-      "id": "tool-duration",
-      "source": "git:github.com/fitchmultz/pi-tool-duration"
-    },
-    {
-      "id": "edit-session",
-      "source": "git:github.com/fitchmultz/pi-edit-session-in-place"
-    },
-    {
-      "id": "copy-message",
-      "source": "git:github.com/fitchmultz/pi-copy-message"
+      "id": "change-working-dir",
+      "source": "git:github.com/fitchmultz/pi-change-working-dir",
+      "provides": "Mid-session working-directory changes"
     },
     {
       "id": "calculator",
-      "source": "npm:@fitchmultz/pi-calculator"
+      "source": "git:github.com/fitchmultz/pi-calculator",
+      "provides": "Deterministic high-precision arithmetic"
     },
     {
       "id": "ctx-info",
-      "source": "git:github.com/fitchmultz/pi-ctx-info"
+      "source": "git:github.com/fitchmultz/pi-ctx-info",
+      "provides": "/ctx breakdown of context usage"
+    },
+    {
+      "id": "stash",
+      "source": "git:github.com/fitchmultz/pi-stash",
+      "provides": "Stash and restore a draft message"
+    },
+    {
+      "id": "copy-message",
+      "source": "git:github.com/fitchmultz/pi-copy-message",
+      "provides": "Search and copy raw session messages"
     },
     {
       "id": "agent-skills",
-      "source": "git:github.com/fitchmultz/pi-agent-skills"
+      "source": "git:github.com/fitchmultz/pi-agent-skills",
+      "provides": "Review, QA, diagram, handoff, and Pi development skills"
     },
     {
       "id": "pstack",
-      "source": "git:github.com/fitchmultz/pi-pstack"
+      "source": "git:github.com/fitchmultz/pi-pstack",
+      "provides": "Engineering workflow skills adapted from Cursor's pstack"
     }
   ],
-  "optionalIntegrations": [
-    "Horizon",
-    "GitHub",
-    "Linear",
-    "Slack",
-    "Cloudflare",
-    "Sentry",
-    "Datadog",
-    "Plain",
-    "Notion",
-    "Granola"
+  "optionalPackages": [
+    {
+      "id": "macuse",
+      "source": "git:github.com/fitchmultz/macuse",
+      "provides": "Experimental native macOS app control through the Computer Use runtime installed with ChatGPT",
+      "platform": "darwin"
+    }
   ],
+  "retiredPackageSources": [
+    "git:github.com/fitchmultz/pi-codex-context",
+    "git:github.com/fitchmultz/pi-session-name",
+    "git:github.com/fitchmultz/pi-intercom"
+  ],
+  "retiredPackageSourcesNote": "Archived packages whose tools or commands now ship in the kit or in pi-subagents. Loading one beside its replacement registers the same tool or command twice.",
+  "modelContextWindows": {
+    "anthropic/claude-fable-5-2": 400000,
+    "cloudflare-ai-gateway/claude-fable-5-2": 400000,
+    "cloudflare-ai-gateway/claude-opus-5-5": 400000,
+    "openai-codex/gpt-6-astra": 400000,
+    "openai-codex/gpt-6.1-sol": 400000,
+    "openai-codex/gpt-6.1-terra": 400000,
+    "openai-codex/gpt-6-luna": 400000,
+    "cloudflare-ai-gateway/gpt-6-astra": 400000,
+    "cloudflare-ai-gateway/gpt-6.1-sol": 400000,
+    "cloudflare-ai-gateway/gpt-6.1-terra": 400000,
+    "cloudflare-ai-gateway/gpt-6-luna": 400000
+  },
+  "modelContextWindowsNote": "The model routes this setup uses and the context window chosen for each. Every route is optional and needs the user's own authentication. Setup offers only routes available in the running session and merges a selected window as modelOverrides { contextWindow }, which keeps the model's native capabilities and pricing. A window can be larger or smaller than the route's native value; check the route's long-context pricing before raising one.",
   "workingAgreementSections": ["baseline", "process"]
 }
