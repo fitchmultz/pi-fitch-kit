@@ -307,7 +307,6 @@
         "scripts/image-budget-regression.ts",
         "scripts/image-guard-smoke.ts",
         "scripts/package-smoke.ts",
-        "scripts/paged-reader-regression.ts",
         "scripts/session-name-boundary.ts",
         "scripts/session-name-regression.ts",
         "scripts/setup-lifecycle-smoke.ts",

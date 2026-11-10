@@ -200,8 +200,8 @@ try {
 	if (extensions.errors.length > 0) {
 		throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
 	}
-	if (extensions.extensions.length !== 7) {
-		throw new Error(`Expected 7 extensions, got ${extensions.extensions.length}`);
+	if (extensions.extensions.length !== 6) {
+		throw new Error(`Expected 6 extensions, got ${extensions.extensions.length}`);
 	}
 	const cleanFooter = extensions.extensions.find(({ path }) =>
 		path.endsWith("/extensions/clean-footer.ts"),
@@ -355,10 +355,7 @@ try {
 	const toolNames = extensions.extensions
 		.flatMap(({ tools }) => [...tools.values()].map(({ definition }) => definition.name))
 		.sort();
-	if (
-		JSON.stringify(toolNames) !==
-		JSON.stringify(["fitch_setup_models", "name_session", "reader_present"])
-	) {
+	if (JSON.stringify(toolNames) !== JSON.stringify(["fitch_setup_models", "name_session"])) {
 		throw new Error(`Unexpected kit tools: ${JSON.stringify(toolNames)}`);
 	}
 	const sessionContext = sessionName.handlers.get("before_agent_start")?.[0];
@@ -508,7 +505,6 @@ try {
 		"codex-fast",
 		"draft",
 		"fast",
-		"reader",
 		"side-question",
 		"ultrafast",
 		"unreasonable",

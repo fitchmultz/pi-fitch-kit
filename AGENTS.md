@@ -9,7 +9,6 @@
   - `extensions/clean-footer.ts` for a compact footer without cumulative token, cache, or cost counters.
   - `extensions/fast-mode.ts` for `/anthropic-fast`, `/codex-fast`, `/xai-fast`, and global/session-scoped `/ultrafast` controls.
   - `extensions/session-name.ts` for stable, searchable session naming and protected role identifiers.
-  - `extensions/paged-reader.ts` for bounded reader pages, section notes, native session state, and linked replies.
   - `extensions/setup-models.ts` for read-only model availability in the running Pi session during setup.
   - `extensions/write-prompt.ts` for `/draft` rewrite, `/ambitious` concise ambition rewrites, `/unreasonable` demanding outcome-driven rewrites, `/side-question` off-transcript answers, accept/copy/tweak/deny, and `write-prompt.json` model override.
   - `examples/settings.json` for the public subset of Mitch's Pi settings.
@@ -72,7 +71,6 @@
 - Run `npm run regression:fast-mode` after changing fast-mode toggles, eligibility, payload or header injection, or state handling.
 - Run `node --test scripts/validate-regression.ts` after changing the validator.
 - Run `npm run regression:session-name` after changing naming guidance, metadata injection, protected identities, or its migration gate.
-- Run `npm run regression:paged-reader` after changing reader pagination, drafts, feedback delivery, reply linkage, or native controls.
 - Run `npm run regression:write-prompt` after changing writer commands, config parsing, history, cancellation, or accept/copy/tweak/deny behavior.
 - For runtime-facing changes, also verify Pi loads the package through `pi install ...` and a fresh Pi process when practical.
 - Keep this file short and project-specific; point to `README.md` or Pi docs instead of copying generic coding rules.

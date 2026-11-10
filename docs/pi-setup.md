@@ -33,7 +33,7 @@ The [README](../README.md#what-setup-installs) lists every package in the setup,
 
 Every package is an independent repository. None depends on the kit, and the kit does not patch Pi.
 
-Setup also offers [`macuse`](https://github.com/fitchmultz/macuse), an optional and experimental package for native macOS apps, which I run on my Macs. My own configuration loads a few things that are not in the public setup: private skill packages and personal provider definitions. I filter out a few resources that I do not use, including the kit's paged reader and setup prompt.
+Setup also offers [`macuse`](https://github.com/fitchmultz/macuse), an optional and experimental package for native macOS apps, which I run on my Macs. My own configuration loads a few things that are not in the public setup: private skill packages and personal provider definitions. I filter out a few resources that I do not use, including the kit's setup prompt.
 
 ## One task from start to finish
 
