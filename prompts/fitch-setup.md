@@ -20,6 +20,7 @@ Resolve `<Pi agent dir>` once as `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}`.
 - Run `node --version`, `pi --version`, and `pi list --no-approve`. Compare the running Node and Pi versions with the manifest's `runtime` minimums. A version you cannot establish is unverified, not passing.
 - Each package states its own Node and Pi minimums in its README; some are stricter than the kit's. Check them for the packages in scope. If the host is too old, report the required upgrade and stop before any write. Setup does not upgrade Node or Pi.
 - Call `fitch_setup_models` with every key of the manifest's `modelContextWindows`. The result describes the running session, which can include routes from a trusted project. If the tool is unavailable, report model availability as unverified. Do not start another Pi process to list models: its startup migrations can change files.
+- Leave the kit's own package entry as it is, whatever its source, ref, or resource filters. A local path is a development checkout, and filters are the user's choice. Report an entry that is listed twice or pinned to a ref; do not change it.
 - A package already installed from npm or from Git counts as installed. Pi treats the two channels as different packages, so keep the existing channel and never install a second copy.
 
 ## Choose
@@ -44,7 +45,6 @@ Before any install or write, show one preview that lists:
 
 - every `pi install <source> --no-approve` command;
 - every `pi remove <source>` command for a listed source that matches `retiredPackageSources` in any ref or URL form, to run after its replacement is installed. Removal leaves that package's saved state in place;
-- a kit entry that is duplicated or pinned, with the one removal and one reinstall of `kit.installSource` that fixes it. Resource filters on the kit entry are the user's choice: keep them;
 - for a package with an `externalPrerequisite`, the commands its linked instructions give for that command-line tool;
 - every file that changes, and whether it is created or merged;
 - the selected settings keys and context windows, with any values they replace;
