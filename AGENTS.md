@@ -2,9 +2,9 @@
 
 ## Project shape
 
-- This repo is the public, opinionated composition package for Fitch's active Pi extensions, skills, settings, and setup flow.
+- This repo has two jobs. It ships the session extensions that are coupled to the harness and too small for their own repositories. It also publishes the Pi setup Mitch runs: a manifest of public packages, a settings example, a setup prompt, and a usage guide.
 - Canonical sources:
-  - `prompts/fitch-setup.md` and `prompts/audit/github-open-issues-prs.md` for the two registered slash commands; other prompt files are retained source material.
+  - `prompts/fitch-setup.md` and `prompts/audit/github-open-issues-prs.md` for the two registered slash commands.
   - `extensions/anthropic-image-guard.ts` for Claude-bound image handling when global auto-resize is off.
   - `extensions/clean-footer.ts` for a compact footer without cumulative token, cache, or cost counters.
   - `extensions/fast-mode.ts` for `/anthropic-fast`, `/codex-fast`, `/xai-fast`, and global/session-scoped `/ultrafast` controls.
@@ -12,12 +12,14 @@
   - `extensions/paged-reader.ts` for bounded reader pages, section notes, native session state, and linked replies.
   - `extensions/setup-models.ts` for read-only model availability in the running Pi session during setup.
   - `extensions/write-prompt.ts` for `/draft` rewrite, `/ambitious` concise ambition rewrites, `/unreasonable` demanding outcome-driven rewrites, `/side-question` off-transcript answers, accept/copy/tweak/deny, and `write-prompt.json` model override.
-  - `examples/settings.json` for the safe, non-secret behavioral settings subset.
-  - `setup-manifest.json` for unpinned package sources, required model routes, and kit resources.
+  - `examples/settings.json` for the public subset of Mitch's Pi settings.
+  - `setup-manifest.json` for unpinned package sources, model routes with their context windows, and kit resources.
   - `templates/working-agreement.md` for the optional managed working-agreement blocks.
   - `package.json#pi` for the resources Pi loads from this package.
-- Delegation packages own their runtime and packaged profiles; `pi-subagents` is an optional composition component, not a kit dependency. Discover effective executable profiles and routing instead of fixing a roster or requiring sibling-only names. Do not copy profiles into this kit or restore agent-sync code.
-- Keep `README.md`, `setup-manifest.json`, and `docs/pi-setup.md` aligned when prompts, packages, models, install flow, or source-of-truth rules change.
+- The manifest, settings example, README package table, and `docs/pi-setup.md` describe the setup Mitch runs, not an aspiration. Its source of truth is the private `fitchmultz/dotfiles` repository: `.chezmoitemplates/pi/settings.json` for packages, models, and settings, and `.chezmoitemplates/pi/models.json` for context windows. When that configuration changes, update all four together. List only public packages and public providers.
+- `pi-subagents` owns delegation: one agent type, no profiles. It is a core package in the manifest, not a kit dependency. Do not add agent profiles, routing tables, or agent-sync code here.
+- Link to the owning repository for another package's tool names, minimum versions, install commands, and skill lists. A copy here goes stale.
+- State the fast-mode and Ultrafast contract once, in `docs/reference.md#fast-modes`. Other files link to it.
 
 ## Commands
 
@@ -58,7 +60,6 @@
 - Gate Ultrafast by exact `gpt-6-astra`, native global/US OpenAI Responses or Codex Responses route, and serialized payload model. Unsupported routes never fall back to priority. Use the stock payload hook without an OpenAI provider override or routing header; native cost accounting/diagnostics remain separate Pi work. Installation never opts in.
 - Keep `extensions/session-name.ts` metadata inert and its coordinator/numbered-subagent removal confirmation intact.
 - Keep `extensions/write-prompt.ts` off the main transcript: native provider-neutral streaming completion without tools, session provider/model/thinking inheritance with optional `write-prompt.json` overrides, flattened tool history retaining result images, built-in dialogs, and `copyToClipboard` for Copy. Only rewrite-command Accept calls `sendUserMessage`; preserve busy steering and original/draft recovery, with `/draft`, `/ambitious`, and `/unreasonable` saved drafts isolated by entry type. Keep ambitious at 1,800 Unicode characters; unreasonable has no kit-specific cap and raises execution standards without widening scope or authority. Its Tweak retains those rules. `/side-question` never sends.
-- Keep the Agent Browser prerequisite aligned with the released wrapper's recommended baseline.
 - Do not reintroduce a kit `/restart`; the fork supplies native restart and official Pi users quit and relaunch.
 - Runtime dependencies belong in `dependencies`; Pi core packages stay peer dependencies with `"*"` unless installed Pi docs say otherwise.
 
@@ -66,9 +67,10 @@
 
 - Writer native HTTP fixtures own transcript, tool isolation, and asynchronous delivery/recovery; the opt-in live writer harness owns real-output quality checks, not mocked completions. Keep its task-specific constraints and review-only protections; command fixtures retain config denial, cancellation, synchronous failure, and real keyboard menu actions. Extend those keepers instead of copying helper/export inventories; menu navigation expectations must be independent of the production action array.
 
-- Run `npm run check` after edits to `package.json`, `setup-manifest.json`, `extensions/`, `scripts/`, or registered prompts; add `npm run smoke` when package resources changed.
+- `scripts/validate.ts` checks that the manifest, package metadata, lockfile, settings example, and template agree with each other. It does not pin the wording of prompts or docs; do not add assertions that do.
+- Run `npm run check` after edits to `package.json`, `setup-manifest.json`, `examples/settings.json`, `templates/`, `extensions/`, `scripts/`, or registered prompts; add `npm run smoke` when package resources changed.
 - Run `npm run regression:fast-mode` after changing fast-mode toggles, eligibility, payload or header injection, or state handling.
-- Run `node --test scripts/validate-regression.ts` after changing context-policy validation or its inputs.
+- Run `node --test scripts/validate-regression.ts` after changing the validator.
 - Run `npm run regression:session-name` after changing naming guidance, metadata injection, protected identities, or its migration gate.
 - Run `npm run regression:paged-reader` after changing reader pagination, drafts, feedback delivery, reply linkage, or native controls.
 - Run `npm run regression:write-prompt` after changing writer commands, config parsing, history, cancellation, or accept/copy/tweak/deny behavior.

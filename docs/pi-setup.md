@@ -1,183 +1,105 @@
-# How I actually use Pi
+# How I use Pi
 
-_Updated 2 November 2026. The kit supports the latest stable official Pi and the current Fitch build on Node.js 24.15 or newer. Setup requires Pi 1.5.0 or newer; passing that minimum does not establish that a host is current. Fork-only enhancements remain optional. Updating the kit does not activate or upgrade the runtime._
+_Reviewed 10 November 2026 against official Pi 1.5.2 and the current [Fitch Pi](https://github.com/fitchmultz/pi) build._
 
-The useful part of this setup is not the package count. It is the division of responsibility.
+A few people have asked about my terminal agent setup. This guide describes it. [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) is the public, installable version.
 
-One main Pi session owns the task. It gathers context, makes decisions, usually edits the code, verifies the result, and explains what happened. Fresh specialist sessions help with reconnaissance, research, bounded parallel work, and independent review. Extensions provide reliable tools. Skills provide task-specific operating rules. MCP connects the coding loop to the systems around it.
+I run [Fitch Pi](https://github.com/fitchmultz/pi), my maintained fork of [Pi](https://github.com/earendil-works/pi), a small terminal coding agent. Everything in this guide applies to official Pi too: the kit and every package here run on both through public extension APIs. The fork adds two conveniences that this setup can use, compact view and `/restart`, and the [reference](reference.md#host-features) marks them.
 
-This is not an autonomous swarm. The parent session is the lead engineer.
-
-## Architecture
+The useful part is not the package count. It is the division of responsibility:
 
 ```text
-Pi core
-  ├─ public extensions and deterministic tools
-  ├─ fresh, bounded subagents with per-role model routing
-  ├─ task-selected skills and working agreements
-  └─ user-authenticated MCP services
+Pi
+  ├─ one main session that owns the task
+  ├─ extensions that give it reliable tools
+  ├─ child sessions for bounded, independent work
+  ├─ skills that load a procedure when a task needs it
+  └─ MCP connections to the systems around the code
 ```
 
-[`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) packages the opinionated composition layer: seven bundled extensions, a safe settings example, unpinned package sources, and a setup prompt. Delegation and packaged profile defaults belong to optional owners such as [`pi-subagents`](https://github.com/fitchmultz/pi-subagents), not the kit. Most reusable extensions and all skill packages remain independent public repositories; the kit directly owns only its harness-coupled runtime.
+One main session owns the task. It gathers context, makes decisions, usually edits the code, verifies the result, and explains what happened. Child sessions help with reconnaissance, parallel work, and independent review. This is not an autonomous swarm. The main session is the lead engineer.
 
-## A representative task
+## What is installed
 
-Consider a behavior change that crosses an API and a browser-visible product. The issue is brief, relevant decisions live in connected services, and the current behavior must be checked before it changes.
+The [README](../README.md#what-setup-installs) lists every package in the setup, and the [setup manifest](../setup-manifest.json) is the source of truth. The groups are:
+
+- **Delegation and coordination:** [`pi-subagents`](https://github.com/fitchmultz/pi-subagents).
+- **Connected work:** [`pi-mcp-adapter`](https://github.com/fitchmultz/pi-mcp-adapter) and [`pi-agent-browser-native`](https://github.com/fitchmultz/pi-agent-browser-native).
+- **Repository work:** Pi's built-in `grep`, `find`, and `ls`, and [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) for changes.
+- **Long tasks:** [`pi-posthorse`](https://github.com/fitchmultz/pi-posthorse) for context rollover, notes, and history.
+- **Small tools:** structured questions, working-directory changes, a calculator, `/ctx`, draft stash, and raw message copy.
+- **Skills:** [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) and [`pi-pstack`](https://github.com/fitchmultz/pi-pstack).
+- **The kit's own extensions:** a compact footer, session naming, fast-mode controls, the Claude image guard, and the `/draft` family of prompt-writing commands. The [reference](reference.md#bundled-extensions) describes each one.
+
+Every package is an independent repository. None depends on the kit, and the kit does not patch Pi.
+
+Setup also offers [`macuse`](https://github.com/fitchmultz/macuse), an optional and experimental package for native macOS apps, which I run on my Macs. My own configuration loads a few things that are not in the public setup: private skill packages and personal provider definitions. I filter out a few resources that I do not use, including the kit's paged reader and setup prompt.
+
+## One task from start to finish
+
+Consider a behavior change that crosses an API and a browser-visible product. The issue is brief, the relevant decisions live in connected services, and the current behavior must be checked before it changes.
 
 ### 1. The main session takes ownership
 
-I start Pi in the repository and give it the issue or ask it to retrieve the issue through an authenticated integration.
+I start Pi in the repository and give it the issue, or ask it to fetch the issue through a connected service.
 
-The session reads my global working agreement and repository instructions. Those rules establish the boundaries: inspect before guessing, preserve unrelated work, act under current or standing authority without repeated permission prompts, and verify the real end state before claiming completion. Ask only for a material unresolved decision or user-only access, and honor explicit holds and enforced safety boundaries.
-
-Delegating part of the work does not delegate responsibility for the outcome.
+The session reads my global working agreement and the repository's instructions. Those rules set the boundaries: inspect before guessing, preserve unrelated work, act under standing authority without repeated permission prompts, and verify the real end state before claiming completion.
 
 ### 2. It gathers connected context
 
-Through MCP, the session can read planning context, approved conversations, support history, internal documentation, meeting notes, and observability data. It retrieves only what the task needs instead of dumping entire services into model context.
-
-Every person authenticates their own connections. The kit contains service names and setup choices, never credentials, private endpoints, or copied service data.
+Through MCP, the session reads planning context, conversations, meeting notes, and observability data. It retrieves what the task needs, not whole services.
 
 ### 3. It maps the code before editing
 
-Native repository search provides path and content discovery. The main session traces callers, tests, data boundaries, and repository conventions before it chooses where to change code.
+The session traces callers, tests, data boundaries, and repository conventions before it chooses where to change code.
 
-With a compatible delegation package installed, it may launch fresh specialists in parallel for an unfamiliar or broad surface. Select executable effective profiles by capability, for example:
-
-- read-only code mapping;
-- current external documentation or API research;
-- compact evidence handoffs across several systems;
-- failure reproduction and root-cause diagnosis without fixes.
-
-Fresh context is deliberate. Each child receives a bounded brief rather than inheriting the parent's assumptions.
+For a broad or unfamiliar area, it delegates. `delegate` starts a child session with a complete written assignment: the requirements, scope, authority, and expected result. A child starts with fresh context by default, so it does not inherit the parent's assumptions. Delegation is asynchronous. The parent continues other work and is notified when a child finishes. Children cannot delegate further.
 
 ### 4. The parent owns design and integration
 
-The parent makes ordinary reversible decisions and uses direct implementation or useful independent helpers, keeping integration and validation accountable in one place. The [`pi-apply-edits`](https://github.com/fitchmultz/pi-apply-edits) package provides `apply_patch`, `replace_text`, and `write_files` for mutations; each takes a `preview` flag for read-only inspection. Its own documentation defines the tool arguments and filesystem guarantees. Pair editor 1.0 with `pi-subagents` 0.39.1 or newer so completion tracking recognizes the new tools and committed paths from partial errors.
-
-An implementation helper is useful when an item is independent enough for an isolated worktree or true parallelism. A focused remediation helper receives a confirmed finding list and changes only those items. These are briefs for suitable available profiles, not mandatory profile names. The parent then inspects the real files and diff; a child success report is evidence, not proof.
+The parent makes ordinary reversible decisions and usually implements the change itself. A child implements only when a piece is independent enough for its own worktree. The parent then inspects the real files and diff. A child's success report is a lead, not proof.
 
 ### 5. It verifies the behavior
 
-The narrowest meaningful repository check runs first. Deterministic arithmetic goes through the calculator. If behavior is browser-visible, Agent Browser exercises the real flow and captures current evidence rather than treating unit tests as proof of the user experience.
+The narrowest meaningful repository check runs first. Arithmetic goes through the calculator. If the behavior is visible in a browser, Agent Browser exercises the real flow, because unit tests do not prove what the user sees.
 
 ### 6. Fresh reviewers challenge the claim
 
-A reviewer starts without the implementation conversation and reconstructs the claim from requirements, current files, the diff, and validation output.
+A reviewer starts without the implementation conversation and reconstructs the claim from the requirements, the current files, the diff, and the validation output. I add a second model family when the risk warrants it, by giving that child a different model.
 
-- Select a suitable executable effective reviewer for independent code review.
-- Add a second model family when risk warrants it; inspect effective routing and the model actually used rather than inferring family from a name.
-- Include security coverage for trust boundaries, authorization, secrets, privacy, and abuse paths.
-- Include visual and interaction review for user-visible work.
-
-The optional process block requires fresh independent review for shared-team changes, even on a kit-only installation. Before adoption, setup reports an available independent review path or the missing prerequisite. Explicit named-reviewer, model-family, human-review, and repository-protection requirements remain binding. If required review is unavailable, report it and leave the gate unsatisfied; self-review does not satisfy it.
-
-Reviewer judgment does not replace validation. Complete required reviews and refresh affected analysis when substantive changes or concrete unresolved concerns invalidate it; a mechanical base sync or metadata-only change with unchanged reviewed behavior does not require every reviewer to start over.
+Reviewer judgment does not replace validation, and a green test suite does not replace a required review. Substantive changes refresh the affected review. A mechanical base sync does not.
 
 ### 7. The main session closes the loop
 
-The parent fixes valid findings or rebuts incorrect ones with evidence, completes required checks and reviews, and ships through the authorized PR and merge workflow. It then refreshes the primary checkout and required local installation without overwriting unrelated work, verifies the shipped result, and removes only its own completed task worktrees and branches. Explicit holds remain binding.
+The parent fixes valid findings or rebuts incorrect ones with evidence, then ships through the PR workflow it is authorized to use. After the merge it refreshes the local checkout, verifies the shipped result, and removes only its own task worktrees.
 
-That is the recurring shape: connected evidence, focused help, parent ownership, and independent verification.
+Small work skips the ceremony. The structure is for changes where being wrong is expensive or where independent work saves time.
 
-## Enabled extension stack
+## Long tasks and context
 
-The [extension catalog](reference.md#enabled-extensions) links every loaded public extension to its repository. The main groups are:
+I set each model route's context window to 400,000 tokens and reserve 64,000 of it. Posthorse starts a fresh context window when a task reaches that line. It keeps a recent tail of about 30,000 tokens and does not ask a model to write a summary. A reminder prompts the session to save task state in notes before the rollover, and the session can search the earlier conversation afterward. The context window is not a deadline for the task.
 
-- orchestration and communication: `pi-subagents`, including its bundled Intercom runtime;
-- connected work: `pi-mcp-adapter`, `pi-agent-browser-native`;
-- repository work: native search plus `pi-apply-edits`;
-- task control: clarification guidance with `pi-ask-question`, persistent todos, session naming, and working-directory changes;
-- deterministic support: calculator, `/ctx` context inspection, tool duration, verbosity, session editing, stash, and raw message copy;
-- kit boundary: a compact non-truncating footer, stable session naming, a bounded paged reader for long explanations and section notes, read-only in-session model status for setup, Anthropic-only image resizing, shared fast-mode toggles for Anthropic Opus, OpenAI, and xAI routes, `/draft`, `/ambitious`, `/unreasonable`, and `/side-question`, while `pi-subagents` owns its profile defaults;
-- user-local only: provider definitions, agent-profile overrides, and separately managed Posthorse rollover on official Pi or the maintained Fitch runtime; none are copied into Complete core.
+For some routes, 400,000 is above the native window. On OpenAI routes that crosses a long-context price tier. These are my budgets, not a claim that one size suits everyone. Setup offers each window as a separate choice.
 
-Most reusable extensions stay independent. The kit directly owns only the small runtime surfaces coupled to this harness; no external package depends on the kit.
+## Tools load when needed
 
-[`macuse`](https://github.com/fitchmultz/macuse) is the experimental exception to the default stack. It adds native macOS Computer Use for tasks that cannot be handled through browser DOM or CLI tools. It runs on the Computer Use runtime installed with ChatGPT, and OpenAI can change that runtime's private interfaces without notice.
+A large setup does not need a large prompt. Extensions register optional tools as deferred, and Pi's `tool_search` loads one when a task needs it. `pi-mcp-adapter` does the same for MCP servers, so hundreds of service tools stay out of the prompt until used. Pi's `codemode` runs a script that calls several tools, which suits loops and filtering large output.
 
-## Model routing
+Skills work the same way. Pi shows the model a one-line description of each skill and loads the full procedure only when the task matches.
 
-The installed delegation package owns its default profiles and routing. Inspect its current docs and effective executable inventory, including primary models, ordered fallbacks, thinking levels, and context policy. User and project profiles, resource filters, and trust can change that inventory. Setup preserves them and previews the effective mapping only when that owner is selected or confirmed installed; it never reads an absent sibling tree or treats a frozen roster as authoritative.
+## Models
 
-The settings example selects `openai-codex/gpt-6-astra` (ChatGPT/Codex subscription) at medium reasoning, with `openai/gpt-6-astra` (OpenAI API key) as the fallback. Updating the kit does not change that choice or replace explicit cross-family reviewer routes.
+My default is `gpt-6-astra` through a ChatGPT subscription at `xhigh` thinking. Claude runs through Anthropic directly or through Cloudflare AI Gateway. The [settings example](../examples/settings.json) lists the routes I enable.
 
-Use `modelOverrides` for intentional changes to native models. A full matching `models[]` definition replaces the native model and can hide new capabilities such as incremental system messages. Setup can preview a narrow migration while preserving deliberate context/output limits, reasoning maps, pricing, and all unrelated configuration. It never invents provider authentication or copies private endpoints.
+None of these routes is required. The kit's extensions work with any model, and setup offers only the routes your session can use.
 
-Session naming appends inert metadata at native run/turn boundaries and restores it after compaction without rewriting the earlier transcript prefix. Cache-friendly composition also requires native model capabilities and cooperating prompt extensions: a full-prompt override elsewhere can still rebuild the leading prompt.
+A child session inherits the parent's model unless the assignment names another one. That is how a review gets a second model family.
 
-The off-transcript `/draft`, `/ambitious`, `/unreasonable`, and `/side-question` writer retains tool-result screenshots while removing executable tool semantics. `/draft` Accept sends normally when idle or as native steering when busy. Each acceptance saves the draft and original input in session metadata outside model context. Run `/draft` without text to reopen the last accepted draft on the current branch after a send failure; Restore original returns the original command to the editor. Synchronous send errors keep the dialog open. `/ambitious` applies the same machinery to produce a concise, standalone, outcome-focused request: the outcome, task-appropriate expert methods, adversarial assumption checks, justified targets, external runnable verification, and useful methods from adjacent disciplines. Recurring reports or toil can gain a repeatable solution while retaining the requested deliverable; bounded tasks gain depth rather than unrelated scope. At session start it uses the request and available project context without inventing prior work; mid-conversation it includes relevant goals, latest decisions, constraints, and current state rather than only resolving references. New rewrites and Tweak revisions are limited to 1,800 Unicode characters including whitespace, with one shortening retry and no truncation; failed revisions keep the previous draft. Its separate saved-entry type means blank `/ambitious` reopens only ambitious drafts without rewriting them, including older saved drafts, and `/draft` recovery ignores them. `/unreasonable` instead turns a tentative request into a forceful mandate for exceptional completion: task-selected methods and inspectable proof, not a longer checklist. Bounded fixes stay bounded; design exploration can demand genuinely distinct directions and comparison; non-code work gets source fidelity and rigorous reasoning rather than software rituals. It preserves settled context, constraints, budgets, and authority, including review-only limits. It shares the review dialog, configuration, acceptance, and recovery machinery, but keeps its own `fitch-kit.unreasonable` saved entries; blank `/unreasonable` reopens only its own accepted draft. It demands compact direct prose with no kit-specific character cap; `/ambitious` remains capped at 1,800.
+Fast modes cost more and are off unless you turn them on. The [fast-mode reference](reference.md#fast-modes) has the commands, eligibility rules, and prices.
 
-All four commands inherit the active session's provider, model, and thinking level when writing starts. Optional `provider`, `model`, and `thinkingLevel` fields in `~/.pi/agent/write-prompt.json` override those values independently; omitted fields inherit. The existing `model: "provider/id"` format remains supported. Native Pi APIs resolve authentication, thinking capabilities, and output limits. Unsupported thinking levels are adjusted with a warning; malformed or unresolvable configuration stops the writer with a clear error instead of silently changing models. Main-agent verbosity hooks are not applied. See [writer configuration and examples](reference.md#draft-provider-model-and-thinking).
+## Image quality
 
-The bundled [paged reader](reference.md#enabled-extensions) is a separate main-agent presentation path: `reader_present` stores long explanations as native session-only documents, and `/reader demo` is a no-model sample. Reading and local section drafts never call a model; Ctrl+Enter explicitly requests a response with the full original section and note. Busy requests wait locally until the current agent work succeeds; cancellation leaves them unsent rather than leaking into a later prompt. Replies are linked by feedback ID or by one unambiguous final-text answer, with ambiguous or incomplete responses retained in the library. Native session entries preserve cursors and notes on the active branch. Official Pi 1.5 defers a new session's first custom-entry disk write until its first user or assistant message, so a demo before that boundary is not yet restart-durable. Both supported hosts provide native fullscreen mouse controls and regular-mode keyboard controls.
-
-The maintained Fitch runtime uses request-boundary execution; live native steering, async tool successors, and the old native context-window framework are retired. Existing background subagents continue to use their durable launch handles and completion notifications. Installing this kit neither patches Pi nor changes provider execution policy.
-
-Provider error diagnostics, message types, and retry policy remain Pi-core responsibilities. The approved [patch retirement](https://github.com/fitchmultz/pi-fitch-kit/pull/24) removed the kit's Responses metadata implementation; its [hardening follow-up](https://github.com/fitchmultz/pi-fitch-kit/issues/19) is not planned in this package and should not be read as completed in Pi core.
-
-## Optional OpenAI Ultrafast
-
-Installation never selects Ultrafast or changes setup's model policy. `/ultrafast [on|off|toggle|status]` controls the shared OpenAI setting by default: blank means toggle, on selects Ultrafast, off disables kit OpenAI tiers, and toggle changes Ultrafast to off or any other mode to Ultrafast. `/codex-fast ultrafast` remains a global alias, with no `--session` form. The existing `openai-codex-fast.json` still stores mutually exclusive off/priority/ultrafast; legacy `enabled: true` means priority. `/codex-fast on`, blank `/fast`, and existing Fast toggle semantics remain unchanged; blank `/codex-fast` reports status.
-
-Add `--session` to on/off/toggle to set a session-specific override; status also accepts the flag but never writes one. `/ultrafast on --session` stores local Ultrafast; `/ultrafast off --session` suppresses both kit priority and Ultrafast injection. Local off does not guarantee standard processing: native Auto or project defaults can still select a tier. `/ultrafast toggle --session` changes effective Ultrafast to local off, otherwise to local Ultrafast. Only `/ultrafast reset --session` removes the override and resumes the current shared setting; unscoped reset is invalid.
-
-Overrides take precedence until cleared and persist in native metadata across same-ID resume, reload, `/tree`, and compaction. Forks and new session IDs do not inherit overrides; they follow current shared state. Global `/fast` and `/codex-fast` changes never clear local overrides. Status commands are read-only and show shared and effective settings, including mismatches. OpenAI modes follow normal agent payload hooks; built-in compaction and bare nested streams bypass that hook and retain native policy. Changes do not retier in-flight requests; the maintained Fitch runtime uses ordinary request boundaries.
-
-Ultrafast activation validates exact `gpt-6-astra` and its native route before writing either scope: `openai`/`openai-responses` at the native global or US API endpoint, or plan-entitled `openai-codex`/`openai-codex-responses` at the native ChatGPT backend. It never switches models, credentials, or endpoints. Gateway, other models, Completions, and other proxies remain excluded. Off and session reset work on unsupported routes.
-
-`--ultrafast` remains a shared, startup-only flag and conflicts with `--fast`; neither reapplies on reload, new, resume, or fork. Invalid startup leaves state unchanged. Interactive Pi blocks requests until an explicit mode-changing command resolves the error; headless Pi reports clear stderr and exits orderly with a nonzero status before paid requests. Extension-sourced input is left unchanged, not silently swallowed. Startup and restored-Ultrafast notices disclose cost and entitlement.
-
-The shared footer says `ultrafast requested` or `ultrafast unavailable`; session overrides say `session ultrafast requested`, `session ultrafast unavailable`, or `session OpenAI tiers off`. Unsupported effective Ultrafast is inactive, never a priority fallback. Labels describe kit request policy, not server confirmation or entitlement. [API access](https://developers.openai.com/api/docs/guides/ultrafast-mode) permits global processing and US data residency only; EU and other non-US regional inference are excluded. [API pricing](https://developers.openai.com/api/docs/pricing?latest-pricing=ultrafast) is 6× standard (3× Fast), including whole-request long-context pricing above 272k input tokens. [Codex access](https://learn.chatgpt.com/docs/agent-configuration/speed) requires $500 Pro or eligible Enterprise/Edu; other self-serve plans cannot unlock it with credits, and Enterprise access requires workspace-owner enablement. Included allowance is consumed at 8×, purchased credits/PAYG at 6×. These are billing multipliers, not a promised task-speed gain.
-
-The kit uses the stock payload hook, with no custom OpenAI provider or routing header. HTTP streaming is valid; OpenAI strongly recommends WebSockets. Official Pi 1.5 can send the tier but lacks native 6× monetary accounting, so its estimates may remain standard-rate. Fitch source inspected at revision `9e0674ef` on 1 November 2026 applies a 6× monetary estimate for exact `gpt-6-astra` on native OpenAI Responses and Codex Responses only when the terminal response confirms `service_tier: "ultrafast"`. Requesting the tier alone is insufficient. Provider billing remains authoritative; a native estimate does not prove the billed tier or amount, and Codex's 8× included allowance is not a dollar multiplier. Existing `onPayload`/`before_provider_request` and `onProviderStreamEvent`/`provider_stream_event` raw hooks expose requested and returned tiers without persisting tier metadata; missing, unknown, or `default` returned values do not confirm Ultrafast. See the [fast-mode reference](reference.md#fast-modes) for prices, rate limits, transport details, and existing priority/Anthropic caveats. Live Ultrafast verification is not claimed.
-
-## Active skills
-
-The public skills are source-managed rather than copied through a home directory:
-
-- [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) carries clarification, dogfooding, handoff prompts, test auditing, extension development, end-to-end shipping, UX review, completion verification, and strict review modes. Its [`diagram-creation`](https://github.com/fitchmultz/pi-agent-skills) skill produces editable D2 plus SVG/PNG architecture, sequence, data-flow, dependency, lifecycle, and before/after diagrams with generated review images.
-- [`pi-pstack`](https://github.com/fitchmultz/pi-pstack) adapts Cursor's `pstack` (`poteto-mode` playbooks, 24 engineering principles, `tdd`, `bro`, `how`, `why`, `architect`, `arena`, `swarm`, `interrogate`, `unslop`, `no-comments`, and `poteto-agent` / `comment-sicko` subagents) for Pi with automated upstream drift notifications.
-- `pi-subagents` ships both orchestration and Intercom usage skills.
-- [`ponytail`](https://github.com/fitchmultz/ponytail) supplies the active minimalism mode plus its focused review and whole-repo audit skills; my runtime filters its debt, gain, and help variants.
-
-Pi loads a skill only when the task matches. This keeps the default prompt small while giving specialized work an explicit procedure.
-
-## MCP and authenticated context
-
-The current connected services cover:
-
-- an internal integration gateway;
-- GitHub repositories, issues, pull requests, checks, reviews, and releases;
-- Linear planning context;
-- primary and development Slack workspaces;
-- Cloudflare infrastructure;
-- Sentry and Datadog observability;
-- Plain support context;
-- Notion knowledge;
-- Granola meetings.
-
-`pi-mcp-adapter` registers service tools as deferred Pi tools, so hundreds of them do not have to sit in the model's prompt at once. Pi's native `tool_search` loads the ones a task needs, and `directTools` pins common tools at startup. The setup uses only manifest-listed integrations and canonical package names for local stdio servers.
-
-Authentication remains user-scoped. The setup process may inspect non-secret connection status, but it does not read credential stores or service payloads merely to claim that setup worked.
-
-My personal runtime uses full approvals. MCP transports tool calls; it is not the authorization boundary. The working agreement tells the model when external writes need explicit user direction, but that is policy rather than a per-tool enforcement mechanism. A multi-user product needs its authorization controls in the surrounding identity and execution plane.
-
-## Compact transcript view
-
-Compact view is an optional native Pi feature, not a bundled extension. On [Fitch's supporting runtime](https://github.com/fitchmultz/pi), `/compact-view` toggles the current session; `/compact-view off` returns to the normal view. The preference is saved for new sessions without changing other open sessions. Click individual tool cards in fullscreen mode or use Ctrl+O to expand details.
-
-The native default is off. The safe settings example includes `"compactView": true` as an optional preference, not a package-install default. `/fitch-setup` offers it separately only when the installed Pi documents the setting and command, preserves an existing value or absence unless a change is selected, and skips it on unsupported runtimes. Official Pi remains supported. Core renders the tool cards; `pi-subagents` owns compact routine coordination notices. Neither the kit nor the view changes model context or saved tool results.
-
-## Compaction policy
-
-The settings example uses `compaction.reserveTokens: 64000` and `keepRecentTokens: 40000`. The manifest offers 300k context budgets, giving a 236k compaction threshold. These are selected budgets, not claims that one size or effort level is universally optimal.
-
-Setup derives each threshold from the selected window and effective reserve, previews changes, and preserves existing values unless an overwrite is approved. `modelOverrides` inherits native capability and pricing metadata. Raising a window may cross that route's long-context pricing tier; inspect the effective model rather than assuming direct OpenAI, Codex, and gateway routes share limits or billing. Custom provider definitions remain user-managed.
-
-## Image quality boundary
-
-My safe settings subset is checked in at [`examples/settings.json`](../examples/settings.json). The non-default image choice is intentional:
+I turn off Pi's global image resize so models can inspect original detail:
 
 ```json
 {
@@ -187,42 +109,42 @@ My safe settings subset is checked in at [`examples/settings.json`](../examples/
 }
 ```
 
-Disabling global resize preserves original detail for image analysis. [`anthropic-image-guard.ts`](../extensions/anthropic-image-guard.ts) then enforces the stricter boundary only for Claude models on the `anthropic-messages` API, whichever provider routes them (direct Anthropic, Cloudflare AI Gateway, proxies). It caches successful results within an estimated 128 MiB budget for source keys, result strings and entry overhead, clears that cache on session start and compaction, and retries failures. Cold misses decode in up to four native workers at once; `/draft`, `/ambitious`, `/unreasonable`, and `/side-question` reuse the same cache. A bounded request-start snapshot preserves cache hits during newest-first traversal and can temporarily retain another cache budget's worth of strings; cache eviction never omits an image. Before native decoding, it omits sources above 32 MiB of base64 and admits the newest images within a 64 MiB source budget, preserving conversation order and saved originals. This is the same pattern used elsewhere in the setup: retain capability globally, then adapt at the narrow provider boundary that needs it.
+Anthropic has stricter image limits, so the kit's [image guard](reference.md#image-guard) resizes only the images sent to Claude. This is the pattern in the rest of the setup too: keep the capability globally, then adapt at the one boundary that needs it.
 
-## Subagent launch policy
+## Connected services
 
-With a compatible delegation owner installed, use its actual schema and lifecycle:
+My MCP connections cover Linear, two Slack workspaces, Cloudflare, Datadog, Granola, and an internal gateway that fronts other services. GitHub goes through the `gh` command-line tool instead of MCP.
 
-- Use fresh context unless the task explicitly requires parent transcript history; inherited-context consistency checks need a compatible role and host.
-- Hand off with compact files such as `context.md`, `plan.md`, or `review.md` instead of inherited transcripts.
-- Use separate async reviewer runs so each completion can wake the parent without a polling loop.
-- Use foreground execution only when an incomplete active goal needs same-turn child evidence.
-- Use the owner's supported file-output mode for bulky saved output and return only the decision-relevant summary inline.
-- Keep the parent responsible for final decisions, verification, and user-facing status.
+Each person authenticates their own connections. The kit contains no service configuration, and setup does not add servers for you.
 
-## Evidence and review discipline
+My personal runtime runs with full approvals. MCP transports tool calls; it is not an authorization boundary. The working agreement tells the model when an external write needs explicit direction, but that is policy, not per-tool enforcement. A multi-user product needs authorization in the surrounding identity and execution layer.
 
-Reusable evidence means deterministic, machine-produced validation: command output, instrumented runtime checks, and CI tied to the same clean tree and environment.
+## Trust and security
 
-Reuse manual observations only when their build, environment, and tested journey still match. Reviewer findings and verdicts are analysis, not validation. Confirm unchanged reviewed behavior before carrying that analysis across mechanical base synchronization; substantive changes require affected review.
+Pi extensions run with the permissions of the user who started Pi. Project trust controls whether project-local configuration loads. It is not a sandbox.
 
-A green test suite does not replace required reviews, and old analysis cannot sign off new behavior.
+A shared setup must not distribute:
 
-## Usage evidence
+- authentication files, OAuth state, keys, or tokens;
+- private service endpoints;
+- browser profiles;
+- saved Pi sessions;
+- copied service responses.
 
-In a sample of 139 top-level sessions from 8–15 July 2026, counted from aggregate tool and session metadata rather than raw conversation content:
+The settings example leaves out the trust setting on purpose. Choose `defaultProjectTrust` for your environment instead of copying mine.
 
-| Behavior                                      | Sessions | Share |
-| --------------------------------------------- | -------: | ----: |
-| MCP integrations                              |       88 |   63% |
-| Any subagent                                  |       80 |   58% |
-| File edits or writes                          |       79 |   57% |
-| Fresh reviewer profiles                       |       72 |   52% |
-| Browser automation or web search              |       63 |   45% |
-| Repository search through FFF (sample period) |       61 |   44% |
-| Worker or fixer profiles                      |        9 |    6% |
+## Beyond one setup
 
-The contrast is the point: the main session usually implements, while specialists most often provide reconnaissance and independent review. Connected services, browser work, and repository search are ordinary workflow, not demo features.
+This stack is a working composition layer for a model-agnostic team harness:
+
+- several model providers, with the model chosen per session and per child;
+- independent extension packages instead of core patches;
+- bounded child sessions, worktrees, and independent review;
+- per-user authenticated access to planning, conversation, and observability systems;
+- policy, skills, and package sources kept in Git;
+- browser, terminal, and connected-system work in one runtime.
+
+A product would add central provisioning, single sign-on, policy distribution, scoped credential brokerage, audit and cost visibility, managed execution, and multi-user controls. Those belong above the reusable pieces, not inside every extension.
 
 ## Install and verify
 
@@ -231,46 +153,8 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 pi
 # Complete provider login, then:
 pi install git:github.com/fitchmultz/pi-fitch-kit
-# Start a fresh Pi process, then:
+# Start a new Pi process, then:
 /fitch-setup
 ```
 
-The setup prompt reads [`setup-manifest.json`](../setup-manifest.json), checks model routes through the running session's `fitch_setup_models` tool, shows one preview, and installs only the selected unpinned sources. A new Pi CLI invocation for model listing would run startup migrations before printing results, so verification does not use one. Upgrades normalize filtered, pinned, or duplicate kit entries to one canonical unfiltered source. The prompt offers the safe settings keys and the context-window overrides as separate consent steps, preserves unrelated configuration, pauses on failure, diagnoses and repairs covered prerequisites, reconciles partial effects before resuming, and reports completed and remaining steps when a genuine boundary prevents recovery. It verifies loaded resources in a fresh Pi process after extension-code or dependency changes. `/reload` refreshes settings and resources; the maintained Fitch runtime also reloads extension code. Use a fresh process for core changes or already-loaded package dependencies; a new conversation in the same process is insufficient. Use native `/restart` on a supporting Fitch runtime, or quit and relaunch the saved session.
-
-`/fitch-setup verify` is read-only. It reports drift in package identity and filters, extensions, prompts, skills, current-session model availability (including whether project resources are trusted), consent-gated route state, and `models.json` context-window overrides. Profile inventory, child-run settings, and legacy profile migration apply only to a selected or confirmed installed owner, with existence and replacement checks before tree reads or link removal. An absent unselected owner is not kit drift; unavailable required independent review is reported separately.
-
-The linked subagents, ask-question, calculator, and verbosity extensions install primarily from `npm:@fitchmultz/pi-subagents`, `npm:@fitchmultz/pi-ask-question`, `npm:@fitchmultz/pi-calculator`, and `npm:@fitchmultz/pi-verbosity-control`. The corresponding `git:github.com/fitchmultz/<repo>` sources remain supported manual fallbacks; see [scoped core installs](reference.md#scoped-core-installs). A source switch must be previewed because Pi treats npm and Git as different identities: back up affected package entries, carry resource filters across, and avoid loading both. Controller migration remains conditional on selecting the maintained controller and preserves `verbosity.json`. `npm:@fitchmultz/pi-workflows` is a separate optional project package, not a kit core default.
-
-## Trust and security boundaries
-
-Pi extensions run with the permissions of the user who started Pi. Project trust controls whether project-local configuration loads; it is not a sandbox. My personal setup runs fully approved, so the working agreement and operator oversight are policy controls rather than per-tool technical enforcement.
-
-A shared setup must not distribute:
-
-- authentication files, OAuth state, keys, or tokens;
-- private service endpoints;
-- browser profiles;
-- raw Pi sessions;
-- generated model catalogs or caches;
-- copied service responses.
-
-The settings example omits trust policy intentionally. Choose native `defaultProjectTrust` for the environment rather than copying mine; offer owner-specific child trust only with a selected or confirmed installed delegation package. Untrusted repositories should use `no-approve`.
-
-Extension packages use bare Git or npm sources. The separate Agent Browser CLI must satisfy the wrapper's documented requirements.
-
-Consequential external writes, production actions, account changes, and merges follow current or standing authorization. Do not repeat approval for covered actions; setup consent alone never authorizes unrelated service mutations.
-
-## From this setup to an organization harness
-
-The current stack already proves the reusable substrate:
-
-- multiple model providers with per-role routing and fallback;
-- independent extension packages, with narrow native APIs for runtime facts;
-- bounded multi-agent execution, worktrees, review loops, and local session coordination;
-- authenticated access to planning, conversation, support, knowledge, and observability systems;
-- Git-backed policy, skills, profiles, and updateable package sources;
-- durable local sessions, browser automation, and a clear permission boundary.
-
-A product layer would add central provisioning, SSO, policy distribution, scoped credential brokerage, audit and cost visibility, managed local/cloud execution, and multi-user controls. Those concerns belong above the reusable Pi primitives, not inside every extension.
-
-That is why this repository is useful beyond copying one setup: it is a running reference implementation of the composition layer an organization harness needs.
+`/fitch-setup` reads the manifest, checks model routes in the running session, shows one preview, and installs only what you select. `/fitch-setup verify` reports differences from the manifest without changing anything. The [reference](reference.md#setup) describes each step.
