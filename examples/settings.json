@@ -4,7 +4,6 @@
   "defaultThinkingLevel": "xhigh",
   "enabledModels": [
     "anthropic/claude-fable-5-2",
-    "cloudflare-ai-gateway/claude-fable-5-2",
     "cloudflare-ai-gateway/claude-opus-5-5",
     "openai-codex/gpt-6-astra",
     "openai-codex/gpt-6.1-sol",
@@ -16,6 +15,7 @@
     "cloudflare-ai-gateway/gpt-6-luna"
   ],
   "defaultTools": ["+codemode", "+tool_search", "+grep", "+find", "+ls"],
+  "extensions": ["-builtin:mcp"],
   "steeringMode": "all",
   "compactView": true,
   "images": {

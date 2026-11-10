@@ -33,6 +33,7 @@ Skip this section in `verify` mode. Reuse choices already given and ask only for
    - `images.autoResize: false` sends source images at full detail. The kit's image guard still resizes images sent to Claude.
    - `compaction` sets the reserve and the recent tail. With Posthorse installed, the same values set where context rolls over.
    - `defaultTools` turns on Pi's built-in `codemode`, `tool_search`, `grep`, `find`, and `ls`.
+   - `extensions: ["-builtin:mcp"]` applies only with the MCP adapter installed. The adapter replaces Pi's built-in MCP support, and Pi reports that in a startup warning until the built-in is turned off. Add the entry to an existing `extensions` list; do not replace the list.
    - `compactView` exists only on a Pi that documents it. Skip it elsewhere.
 4. **Context windows.** For each available route in `modelContextWindows`, whether to merge `providers.<provider>.modelOverrides.<model-id>.contextWindow` into `<Pi agent dir>/models.json`. Show the existing and proposed value for each route, and point out when the new window crosses a long-context price tier in that route's pricing. A route with a different existing value needs an explicit keep-or-overwrite answer. Leave a full `models[]` definition for the same route unchanged and report it, because it replaces the native model and the override would not apply.
 5. **Project trust.** Explain Pi's `defaultProjectTrust` setting and its tradeoffs. Do not copy another person's trust setting.

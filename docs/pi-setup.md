@@ -4,7 +4,9 @@ _Reviewed 10 November 2026 against official Pi 1.5.2 and the current [Fitch Pi](
 
 A few people have asked about my terminal agent setup. This guide describes it. [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) is the public, installable version.
 
-I use [Pi](https://github.com/earendil-works/pi), a small terminal coding agent, as the runtime. The useful part is not the package count. It is the division of responsibility:
+I run [Fitch Pi](https://github.com/fitchmultz/pi), my maintained fork of [Pi](https://github.com/earendil-works/pi), a small terminal coding agent. Everything in this guide applies to official Pi too: the kit and every package here run on both through public extension APIs. The fork adds two conveniences that this setup can use, compact view and `/restart`, and the [reference](reference.md#host-features) marks them.
+
+The useful part is not the package count. It is the division of responsibility:
 
 ```text
 Pi

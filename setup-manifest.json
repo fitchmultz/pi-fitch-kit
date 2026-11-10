@@ -111,7 +111,6 @@
   "retiredPackageSourcesNote": "Archived packages whose tools or commands now ship in the kit or in pi-subagents. Loading one beside its replacement registers the same tool or command twice.",
   "modelContextWindows": {
     "anthropic/claude-fable-5-2": 400000,
-    "cloudflare-ai-gateway/claude-fable-5-2": 400000,
     "cloudflare-ai-gateway/claude-opus-5-5": 400000,
     "openai-codex/gpt-6-astra": 400000,
     "openai-codex/gpt-6.1-sol": 400000,
