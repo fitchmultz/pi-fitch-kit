@@ -152,7 +152,7 @@ try {
 			.sort(),
 		["fitch-setup", "github-open-issues-prs"],
 	);
-	assert.equal(loader.getExtensions().extensions.length, 7);
+	assert.equal(loader.getExtensions().extensions.length, 6);
 	assert.equal(loader.getExtensions().errors.length, 0);
 	assert.equal(loader.getThemes().themes.length, 1);
 	assert.equal(loader.getThemes().diagnostics.filter(({ type }) => type === "error").length, 0);

@@ -2,7 +2,7 @@
 
 Fitch Kit is a package for [Pi](https://github.com/earendil-works/pi), a terminal coding agent. It has two parts:
 
-- **Session tools** that load with the package: a compact footer, session naming, fast-mode controls, prompt-writing commands, a Claude image guard, and a paged reader.
+- **Session tools** that load with the package: a compact footer, session naming, fast-mode controls, prompt-writing commands, and a Claude image guard.
 - **A setup prompt**, `/fitch-setup`, that installs the public packages I use with Pi and offers my settings.
 
 ![The kit loads session tools into Pi, which uses selected public extensions, task-specific skills, and optional authenticated MCP services.](.github/readme/kit-overview.png)
@@ -41,7 +41,7 @@ The session tools need no setup and work with any model. Step 3 is enough if you
 
 ## Commands
 
-The package loads seven extensions, two prompts, and the `calm` theme.
+The package loads six extensions, two prompts, and the `calm` theme.
 
 | Command                                                            | Use                                                                                                                                                                                                            |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -49,8 +49,6 @@ The package loads seven extensions, two prompts, and the `calm` theme.
 | `/ambitious <text>`                                                | Rewrite a request to aim higher: the outcome, expert methods, justified targets, and runnable verification. Maximum 1,800 characters.                                                                          |
 | `/unreasonable <text>`                                             | Rewrite a tentative request as a forceful mandate with stronger methods and proof. It adds no scope or permissions.                                                                                            |
 | `/side-question <text>`                                            | Ask a question with session context. The answer stays outside the main conversation.                                                                                                                           |
-| `/reader demo`                                                     | Open a sample document without a model call. Press Right or Space for the next page, Left for the previous page, and Escape to close.                                                                          |
-| `/reader` or `/reader list`                                        | Show the saved page or the document list. Press `N` to write a section note. Press Ctrl+Enter to request a response.                                                                                           |
 | `/clean-footer`                                                    | Switch between the compact footer and Pi's built-in footer.                                                                                                                                                    |
 | `/codex-fast status`, `/anthropic-fast status`, `/xai-fast status` | Check the fast-mode setting for each provider.                                                                                                                                                                 |
 | `/ultrafast status`                                                | Check OpenAI Ultrafast. Read the [cost and access limits](docs/reference.md#fast-modes) before you turn it on.                                                                                                 |

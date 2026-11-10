@@ -12,7 +12,6 @@ const testFiles = [
 	"scripts/session-name-boundary.ts",
 	"scripts/write-prompt-regression.ts",
 	"scripts/write-prompt-boundary.ts",
-	"scripts/paged-reader-regression.ts",
 	"scripts/setup-lifecycle-smoke.ts",
 	"scripts/validate.ts",
 	"scripts/validate-regression.ts",

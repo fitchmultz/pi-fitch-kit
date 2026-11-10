@@ -16,7 +16,6 @@
     "regression:clean-footer": "node scripts/clean-footer-regression.ts",
     "regression:fast-mode": "node --experimental-strip-types scripts/fast-mode-regression.ts",
     "regression:session-name": "node --experimental-strip-types scripts/session-name-regression.ts",
-    "regression:paged-reader": "node --experimental-strip-types scripts/paged-reader-regression.ts",
     "regression:write-prompt": "node --experimental-strip-types scripts/write-prompt-regression.ts && node scripts/write-prompt-boundary.ts",
     "check:ambitious:live": "node scripts/ambitious-live.ts",
     "smoke": "node scripts/package-smoke.ts",
@@ -37,8 +36,7 @@
       "./extensions/fast-mode.ts",
       "./extensions/session-name.ts",
       "./extensions/setup-models.ts",
-      "./extensions/write-prompt.ts",
-      "./extensions/paged-reader.ts"
+      "./extensions/write-prompt.ts"
     ],
     "prompts": [
       "./prompts/fitch-setup.md",

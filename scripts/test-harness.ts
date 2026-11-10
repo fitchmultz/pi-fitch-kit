@@ -12,12 +12,6 @@ export type DrivenCommand = {
 	handler: (args: string, ctx: unknown) => Promise<void>;
 };
 
-/** A registered tool as the loose callable a regression drives; call sites
- * pass the same (toolCallId, args, signal, onUpdate, ctx) shape Pi uses. */
-export type DrivenTool = {
-	execute: (...args: unknown[]) => Promise<unknown>;
-};
-
 /** A resolved-later gate for sequencing assertions. */
 export const gate = (): { promise: Promise<void>; open: () => void } => {
 	let open: () => void = () => {
@@ -108,17 +102,6 @@ export const toolContext = (ui?: Pick<ExtensionUIContext, "confirm">): Extension
 /** A richer partial tool-execute context fixture a regression builds itself. */
 export const toolContextFrom = (fixture: Record<string, unknown>): ExtensionToolContext =>
 	fixture as unknown as ExtensionToolContext;
-
-/** The tool definition registered under one name, as a loose callable. */
-export const toolFor = (extension: Extension, name: string): DrivenTool => {
-	const tool = [...extension.tools.values()].find(
-		({ definition }) => definition.name === name,
-	)?.definition;
-	if (tool === undefined) {
-		throw new Error(`missing tool registration: ${name}`);
-	}
-	return { execute: tool.execute.bind(tool) } as unknown as DrivenTool;
-};
 
 /* oxlint-enable typescript/no-unsafe-type-assertion */
 
