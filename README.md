@@ -9,7 +9,7 @@ Fitch Kit is a package for [Pi](https://github.com/earendil-works/pi), a termina
 
 ## Install
 
-I run [Fitch Pi](https://github.com/fitchmultz/pi), my fork of Pi. The kit and every package in the setup also run on official Pi. Use the latest stable official Pi or the current Fitch Pi build, on a current Node.js 24 release. The kit needs **Pi 1.5.0+** and **Node.js 24.15+**. Some packages that setup installs need newer versions; setup checks them before it installs anything.
+I run [Fitch Pi](https://github.com/fitchmultz/pi), my fork of Pi. The kit and every package in the setup also run on official Pi. Use the latest stable official Pi or the current Fitch Pi build, on a current Node.js 24 release. The kit needs **Pi 1.5.0+** and **Node.js 24.22.3+ within 24.x, or 26.13.1+**. Some packages that setup installs need newer versions; setup checks them before it installs anything.
 
 1. Install Pi if you do not have it.
 
