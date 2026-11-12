@@ -5,7 +5,7 @@ Records for the engineering standard adopted in `docs/engineering-standard.md` (
 ## Adoption record
 
 - **Repository:** `fitchmultz/pi-fitch-kit`; adopted standard version **v5.1.2**. Adopted copy digest (sha256, after oxfmt): `414820464b9eadfb645ea51dbd1ef3eac9c52958b986f19f44feaf79d2fae333`.
-- **Runtimes and package manager:** Node `>=24.15.0` (npm `12.2.0`).
+- **Runtimes and package manager:** Node `^24.22.3 || >=26.13.1` (npm `12.2.0`).
 - **Installed tool versions:** oxlint `1.90.0`, oxfmt `0.75.0`, oxlint-tsgolint `7.0.2005`, typescript `7.0.2`.
 - **Config paths:** `.oxlintrc.json` (Appendix A baseline plus role-mapped profile overrides), `.oxfmtrc.json` (section 7.1 settings preserving the established tab convention for TypeScript; JSON keeps 2-space output so npm-managed files stay stable).
 - **Acceptance paths:** `npm run check` (`scripts/run-gates.ts`: typecheck, lint, format, tests — aggregated so one failure cannot hide the rest), `npm run smoke` for package loading; hosted CI runs `npm run check:compat` through the fleet `pi-compatibility` workflow. `npm run lint` runs the full baseline lint.

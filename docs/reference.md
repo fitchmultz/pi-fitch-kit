@@ -139,7 +139,7 @@ The existing `{ "model": "provider/model-id" }` form remains supported when `pro
 
 Setup does these things:
 
-- Compares the running Node.js and Pi versions with the manifest's minimums, and checks each selected package's own minimums. It stops before any write if the host is too old. It does not upgrade Node.js or Pi.
+- Checks that the running Node.js and Pi versions satisfy the manifest's supported version ranges and each selected package's requirements. It stops before any write if a host version is outside those ranges, including an excluded major or vulnerable patch. It does not upgrade Node.js or Pi.
 - Checks model routes with the `fitch_setup_models` tool in the running session.
 - Installs each selected package with `pi install <source> --no-approve`, exactly as the manifest lists it.
 - Keeps a package that is already installed from the other channel. Pi treats npm and Git sources as different packages, and two copies would register the same tools twice.
@@ -155,7 +155,7 @@ Setup never reads credentials, adds MCP servers, or makes provider calls. Provid
 
 | Field                      | Meaning                                                                                                                                                                                                        |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `runtime`                  | Minimum Pi and Node.js versions for the kit itself                                                                                                                                                             |
+| `runtime`                  | Supported Pi and Node.js semver ranges for the kit itself                                                                                                                                                      |
 | `kit`                      | The kit's package name and install source                                                                                                                                                                      |
 | `kitResources`             | The extensions, prompts, and theme the package loads, plus the working-agreement template and settings example                                                                                                 |
 | `corePackages`             | The packages in complete core. Each entry has an `id`, an unpinned `source`, and what it `provides`. `externalPrerequisite` names a command-line tool the package needs and links to its install instructions. |
