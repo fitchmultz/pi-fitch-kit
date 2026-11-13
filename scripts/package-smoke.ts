@@ -505,6 +505,7 @@ try {
 		"codex-fast",
 		"draft",
 		"fast",
+		"google-tier",
 		"side-question",
 		"ultrafast",
 		"unreasonable",
@@ -520,8 +521,8 @@ try {
 			(total, extension) => total + (extension.handlers.get(event)?.length ?? 0),
 			0,
 		);
-		if (count !== 1) {
-			throw new Error(`Expected one ${event} handler, got ${count}`);
+		if (count !== 2) {
+			throw new Error(`Expected two ${event} handlers, got ${count}`);
 		}
 	}
 

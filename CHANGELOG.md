@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `/google-tier standard|flex|priority` to the fast-mode controls, with read-only blank/status commands, shared saved policy, and a requested-tier footer. It uses Google's native SDK payload through the existing Google route, including Cloudflare AI Gateway, without changing other providers or enabling a tier on install. Keep Flex's slower, best-effort behavior and Google's Priority downgrade visible; native Pi owns cost estimates from the returned tier.
+
 - **Breaking:** remove the paged reader: the `reader_present` tool, the `/reader` command, and `extensions/paged-reader.ts`. Reader documents and notes that earlier versions saved in a session stay in its file as inert entries. Remove a `-extensions/paged-reader.ts` filter from the kit entry in your settings.
 - **Breaking:** bring the setup up to date with the stack it describes. The manifest (schema 9) lists the public packages in daily use, all from Git: it adds `pi-posthorse`, moves `macuse` to `optionalPackages`, and drops `pi-todo-list`, `pi-tool-duration`, `pi-verbosity-control`, `ponytail`, and the archived `pi-edit-session-in-place`. Packages already installed stay installed; setup no longer installs or checks the dropped ones.
 - Replace the required and optional model lists with one `modelContextWindows` map of current routes at 400,000 tokens. Model routes are no longer a setup gate: setup offers the routes the session can use and continues without the rest. The settings example follows the same routes, defaults to `xhigh` thinking, keeps 30,000 recent tokens, adds `defaultTools`, and drops its retry overrides.

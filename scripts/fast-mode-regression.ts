@@ -85,6 +85,7 @@ assert.deepEqual(Object.keys(commands).sort(), [
 	"anthropic-fast",
 	"codex-fast",
 	"fast",
+	"google-tier",
 	"ultrafast",
 	"xai-fast",
 ]);
@@ -478,12 +479,22 @@ async function gatewayPriorityRequest(id: string) {
 }
 
 // OpenAI priority mode is provider-gated payload injection via the stock hook.
-const requestHook = handlerFor(handlers, "before_provider_request");
 const requestPayload = async (
 	model: unknown,
 	payload: unknown = { model: "m" },
 	sessionManager = defaultSession,
-) => requestHook({ payload }, { model, sessionManager });
+) => {
+	let current = payload;
+	let changed = false;
+	for (const handler of handlers.before_provider_request ?? []) {
+		const next = await handler({ payload: current }, { model, sessionManager });
+		if (next !== undefined) {
+			current = next;
+			changed = true;
+		}
+	}
+	return changed ? current : undefined;
+};
 const MODELS = {
 	openai: { provider: "openai", id: "gpt-5.6-sol", api: "openai-responses" },
 	codex: { provider: "openai-codex", id: "gpt-5.6-sol", api: "openai-codex-responses" },
@@ -1142,6 +1153,122 @@ for (const count of [781, 43_000]) {
 	entries.mock.restore();
 }
 
+// Google tiers use the host's real SDK serializer, not OpenAI's service_tier shape.
+const { googleGenerativeAIApi } = await import("@earendil-works/pi-ai/compat");
+const googleApi = googleGenerativeAIApi();
+const googleCarbon: Model<"google-generative-ai"> = {
+	id: "gemini-4-carbon",
+	name: "Gemini 4 Carbon",
+	provider: "google",
+	api: "google-generative-ai",
+	baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+	reasoning: true,
+	input: ["text"],
+	contextWindow: 400_000,
+	maxTokens: 32768,
+	cost: { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 0 },
+};
+const gatewayGoogle = {
+	...googleCarbon,
+	baseUrl: "https://gateway.ai.cloudflare.com/v1/acct-123/gw-456/google-ai-studio/v1beta",
+};
+const googleStatePath = join(agentDir, "google-tier.json");
+async function googleWireRequest(model: typeof googleCarbon) {
+	let payload: Record<string, unknown> | undefined;
+	let errorMessage: string | undefined;
+	const capture = mock.method(globalThis, "fetch", async (_input: unknown, init?: RequestInit) => {
+		const body = init?.body;
+		assert.ok(typeof body === "string");
+		payload = requireRecord(JSON.parse(body), "Google wire payload");
+		throw new Error("payload captured");
+	});
+	const stream = googleApi.streamSimple(
+		model,
+		normalizeContext({ messages: [{ role: "user", content: "test", timestamp: 0 }] }),
+		{
+			apiKey: "test",
+			maxRetries: 0,
+			onPayload: (body) => requestPayload(model, body),
+		},
+	);
+	try {
+		for await (const event of stream) {
+			if (event.type === "error") {
+				errorMessage = event.error.errorMessage;
+			}
+		}
+	} finally {
+		capture.mock.restore();
+	}
+	assert.ok(
+		payload,
+		`Google request must reach its native serializer: ${errorMessage ?? "unknown"}`,
+	);
+	return payload;
+}
+assert.equal((await googleWireRequest(gatewayGoogle)).serviceTier, undefined);
+await commandFor(commands, "google-tier").handler("", uiCtx(gatewayGoogle));
+assert.match(notices.at(-1) ?? "", /Google shared requests: standard/);
+assert.equal(fs.existsSync(googleStatePath), false, "status must not opt in or create state");
+for (const tier of ["priority", "flex", "standard"]) {
+	await commandFor(commands, "google-tier").handler(tier, uiCtx(gatewayGoogle));
+	assert.deepEqual(JSON.parse(readFileSync(googleStatePath, "utf8")), { tier });
+	for (const model of [googleCarbon, gatewayGoogle]) {
+		const payload = await googleWireRequest(model);
+		assert.equal(payload.serviceTier, tier, "the SDK must serialize the chosen Google tier");
+		assert.equal(payload.service_tier, undefined, "Google must not receive OpenAI fields");
+		assert.deepEqual(payload.contents, [{ parts: [{ text: "test" }], role: "user" }]);
+	}
+	assert.equal(status.get("google-tier"), `accent:Google ${tier} requested`);
+	const saved = readFileSync(googleStatePath, "utf8");
+	for (const args of ["", "status", "batch", "priority flex", "on", "flex --session"]) {
+		await commandFor(commands, "google-tier").handler(args, uiCtx(gatewayGoogle));
+		assert.equal(readFileSync(googleStatePath, "utf8"), saved);
+	}
+}
+await commandFor(commands, "google-tier").handler("flex", uiCtx(gatewayGoogle));
+for (const model of [
+	MODELS.openai,
+	{ ...googleCarbon, provider: "google-vertex", api: "google-vertex" },
+	{ ...googleCarbon, provider: "custom-google-proxy" },
+]) {
+	assert.equal(await requestPayload(model, { model: googleCarbon.id, config: {} }), undefined);
+	await runHandlers("model_select", {}, uiCtx(model));
+	assert.equal(status.get("google-tier"), undefined);
+}
+await runHandlers("model_select", {}, uiCtx(gatewayGoogle));
+assert.equal(status.get("google-tier"), "accent:Google flex requested");
+await commandFor(commands, "google-tier").handler("status", uiCtx(MODELS.openai));
+assert.match(notices.at(-1) ?? "", /inactive on this model/);
+const anotherFactory = await discoverAndLoadExtensions(
+	[fileURLToPath(new URL("../extensions/fast-mode.ts", import.meta.url))],
+	agentDir,
+	agentDir,
+);
+assert.deepEqual(anotherFactory.errors, []);
+await commandFor(drivenCommands(soleExtension(anotherFactory)), "google-tier").handler(
+	"status",
+	uiCtx(gatewayGoogle),
+);
+assert.match(notices.at(-1) ?? "", /Google shared requests: flex/);
+writeFileSync(googleStatePath, JSON.stringify({ tier: "priority" }));
+assert.equal((await googleWireRequest(gatewayGoogle)).serviceTier, "priority");
+for (const content of ['{"tier":"batch"}', "null", "{broken"]) {
+	writeFileSync(googleStatePath, content);
+	assert.equal((await googleWireRequest(gatewayGoogle)).serviceTier, undefined);
+}
+rmSync(googleStatePath);
+mkdirSync(googleStatePath);
+try {
+	await assert.rejects(
+		commandFor(commands, "google-tier").handler("priority", uiCtx(gatewayGoogle)),
+		/EISDIR/,
+	);
+	assert.equal((await googleWireRequest(gatewayGoogle)).serviceTier, undefined);
+} finally {
+	rmSync(googleStatePath, { recursive: true });
+}
+
 // A second start must not stack watchers: one shutdown has to release everything.
 await runHandlers("session_start", {}, uiCtx(gatewayOpus));
 await runHandlers("session_shutdown", {}, uiCtx(gatewayOpus));
@@ -1158,6 +1285,7 @@ console.log(
 		openaiUltrafast:
 			"native Astra Responses/Codex wire; shared and session overrides; resume/reload/tree/fork isolation; explicit startup policy",
 		xaiFast: "provider-gated priority",
+		googleTiers: "native Google SDK wire on direct and gateway routes; persisted shared state",
 		footer: "eligibility-scoped incl. proxy exclusion",
 		watchers: "released",
 	}),
