@@ -87,6 +87,8 @@ On an eligible model, the footer shows `Google standard requested`, `Google flex
 
 [Flex](https://aistudio.google.com/docs/flex-inference) costs half the Standard rate in exchange for slower, best-effort availability. Capacity errors retain Pi's normal retry behavior; the kit never upgrades Flex to paid Standard automatically. [Priority](https://aistudio.google.com/docs/priority-inference) costs more and can be served as Standard when Google's Priority limits are exceeded. For Gemini 4 Carbon, the [published price](https://aistudio.google.com/docs/pricing#gemini-4-carbon) is 1.8× Standard for Priority; other models can differ. Batch is a separate asynchronous job API, not a session tier.
 
+Google recommends a client timeout of at least ten minutes for queued Flex requests. Both verified Pi hosts default `httpIdleTimeoutMs` to `300000` (five minutes), so Flex can time out while waiting for capacity. Pi's existing setting accepts `600000` for ten minutes. The kit leaves timeouts unchanged.
+
 The kit does not calculate Google tier prices. Monetary estimates depend on the host's native accounting of the **returned** tier. Official Pi 1.5.2 keeps catalog-rate estimates; provider billing remains authoritative. Tiny live streaming requests through the configured gateway confirmed all three returned tiers on Gemini 4 Carbon. They establish route support, not a speed or billing benchmark.
 
 #### xAI priority
