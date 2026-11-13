@@ -25,6 +25,7 @@ import {
 	type SessionOpenAIMode,
 	type Toggle,
 } from "./fast-mode-policy.ts";
+import { registerGoogleTier } from "./google-tier.ts";
 
 export { fastRates } from "./fast-mode-policy.ts";
 
@@ -431,4 +432,5 @@ export default function fastMode(pi: ExtensionAPI): void {
 			"Toggle Astra Ultrafast globally, or use --session for a session-only override (6x API/credit price)",
 		handler: (args, ctx) => runUltrafastCommand(args, ctx, session, pi),
 	});
+	registerGoogleTier(pi);
 }

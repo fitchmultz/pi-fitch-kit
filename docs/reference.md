@@ -24,7 +24,7 @@ The footer bootstraps file-wide name/cache facts once and reconciles appended fa
 
 ### Fast modes
 
-[`fast-mode`](../extensions/fast-mode.ts) owns shared per-user settings for three providers, plus an optional OpenAI override for one session. Installing or updating the kit never opts you into Ultrafast or changes the default model routes.
+[`fast-mode`](../extensions/fast-mode.ts) owns shared per-user settings for four providers, plus an optional OpenAI override for one session. Installing or updating the kit never opts you into Ultrafast or changes the default model routes.
 
 | Command                                            | Request policy                                                               | State                                       |
 | -------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------- |
@@ -34,10 +34,11 @@ The footer bootstraps file-wide name/cache facts once and reconciles appended fa
 | `/ultrafast reset --session`                       | Clear this session's override and follow the shared mode                     | Native session metadata                     |
 | `/anthropic-fast [on\|off\|toggle\|status]`        | Anthropic Opus fast mode                                                     | `anthropic-fast.json`                       |
 | `/xai-fast [on\|off\|toggle\|status]`              | xAI priority                                                                 | `xai-fast.json`                             |
+| `/google-tier [standard\|flex\|priority\|status]`  | Google request tier                                                          | `google-tier.json`                          |
 
 State files live in the Pi agent directory.
 
-Shared settings affect sessions sharing that directory. For OpenAI, a session override takes precedence over the shared mode. OpenAI/xAI settings apply to normal agent requests through Pi's payload hook. Built-in compaction and bare registry/nested streams bypass that hook on the verified hosts and retain their native policy; Anthropic's provider override also covers eligible internal calls. Footers follow changes made in other sessions. Changing a setting does not retier requests already in flight.
+Shared settings affect sessions sharing that directory. For OpenAI, a session override takes precedence over the shared mode. OpenAI, xAI, and Google settings apply to normal agent requests through Pi's payload hook. Built-in compaction and bare registry/nested streams bypass that hook on the verified hosts and retain their native policy; Anthropic's provider override also covers eligible internal calls. Footers follow changes made in other sessions. Changing a setting does not retier requests already in flight.
 
 #### OpenAI: priority and explicit Ultrafast
 
@@ -73,6 +74,20 @@ Requested `service_tier` is observable through `onPayload` (`before_provider_req
 Priority continues to use `service_tier: "priority"` on `openai`, `openai-codex`, and the native OpenAI clone `chatgpt-rotate` supplied by `pi-chatgpt-sub-rotate`, plus gateway models whose IDs start with `gpt-` or are `o3`/`o4-mini` (including their exact `2025-04-16` snapshots). `chatgpt-rotate` follows the same shared `/fast` and `/codex-fast` setting and session-off override; this does not make it Ultrafast-eligible. Gateway o-series eligibility follows OpenAI's [Fast pricing](https://developers.openai.com/api/docs/pricing?latest-pricing=fast) and [o3](https://developers.openai.com/api/docs/models/o3) / [o4-mini](https://developers.openai.com/api/docs/models/o4-mini) documentation. Other gateway o-series and namespaced Workers AI models remain excluded. Local regression checks cover serialized requests and footer state; no live gateway o-series measurement is claimed. The priority footer reads `priority enabled`; notifications say `priority requests ON/OFF`. These describe request policy, not confirmed response handling.
 
 Prior **priority**, not Ultrafast, measurements remain useful baselines: gateway `gpt-5.6-sol` echoed `service_tier: "priority"`; on `openai-codex/gpt-5.6-sol`, three interleaved pairs in one session on one account ran roughly 1.5× faster in throughput and 1.4× in completion time ([0.9.14 changelog](../CHANGELOG.md)). Fixed-length output matters: time-to-first-token did not improve (1641ms standard versus 1772ms priority). The Codex response returned `service_tier: "default"`, which does not confirm priority processing or explain backend semantics. Record requested and returned tiers separately, leaving missing returned values unknown. Adding the Codex CLI's `x-codex-routing-hint` measured inside noise at that sample size, so the kit sends no such header.
+
+#### Google Standard, Flex, and Priority
+
+`/google-tier standard`, `/google-tier flex`, and `/google-tier priority` select the shared tier for `google/*` models using `google-generative-ai`. This includes the native Google AI Studio route through Cloudflare AI Gateway. Google Vertex AI and other providers are unchanged. Google enforces each model's tier availability.
+
+Blank `/google-tier` and `/google-tier status` report the saved policy without changing it. A missing or invalid state file leaves native defaults unchanged; Google's default is Standard. Selecting Standard explicitly requests Standard. The choice survives restart, reload, resume, and new or forked sessions because it is shared, not session metadata. It does not change OpenAI, xAI, or Anthropic settings. Installation creates no Google tier preference.
+
+On an eligible model, the footer shows `Google standard requested`, `Google flex requested`, or `Google priority requested` after an explicit selection. These labels describe requests, not confirmation from Google. Switching to another provider hides the label but retains the preference.
+
+[Google's streaming API](https://aistudio.google.com/api-reference/generate-content/stream-generate-content) accepts `serviceTier` and returns the served tier in `usageMetadata.serviceTier`. The kit sets the native SDK's `config.serviceTier` through Pi's stock payload hook; the SDK serializes it. There is no Google provider override, custom transport, or gateway reconfiguration.
+
+[Flex](https://aistudio.google.com/docs/flex-inference) costs half the Standard rate in exchange for slower, best-effort availability. Capacity errors retain Pi's normal retry behavior; the kit never upgrades Flex to paid Standard automatically. [Priority](https://aistudio.google.com/docs/priority-inference) costs more and can be served as Standard when Google's Priority limits are exceeded. For Gemini 4 Carbon, the [published price](https://aistudio.google.com/docs/pricing#gemini-4-carbon) is 1.8× Standard for Priority; other models can differ. Batch is a separate asynchronous job API, not a session tier.
+
+The kit does not calculate Google tier prices. Monetary estimates depend on the host's native accounting of the **returned** tier. Official Pi 1.5.2 keeps catalog-rate estimates; provider billing remains authoritative. Tiny live streaming requests through the configured gateway confirmed all three returned tiers on Gemini 4 Carbon. They establish route support, not a speed or billing benchmark.
 
 #### xAI priority
 
