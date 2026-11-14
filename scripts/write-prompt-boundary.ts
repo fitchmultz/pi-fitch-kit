@@ -15,6 +15,7 @@ import {
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { zstdDecompressSync } from "node:zlib";
 
@@ -878,9 +879,7 @@ try {
 				Date.now() < deadline,
 				`native delivery did not reach the expected state: ${JSON.stringify({ sendErrors, notices, inputs })}`,
 			);
-			await new Promise<void>((settle) => {
-				setTimeout(settle, 10);
-			});
+			await delay(10);
 		}
 	};
 	const delivered = () =>

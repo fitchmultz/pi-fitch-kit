@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Raise the Pi floor to 1.5.2 in the manifest, setup validation, and development cohort, and use native `@earendil-works/pi-tui` `styleText`/`indexedColor`, `crypto.hash`, `Promise.withResolvers`, and `timers/promises`.
 - Add `/google-tier standard|flex|priority` to the fast-mode controls, with read-only blank/status commands, shared saved policy, and a requested-tier footer. It uses Google's native SDK payload through the existing Google route, including Cloudflare AI Gateway, without changing other providers or enabling a tier on install. Keep Flex's slower, best-effort behavior and Google's Priority downgrade visible; native Pi owns cost estimates from the returned tier.
 
 - **Breaking:** remove the paged reader: the `reader_present` tool, the `/reader` command, and `extensions/paged-reader.ts`. Reader documents and notes that earlier versions saved in a session stay in its file as inert entries. Remove a `-extensions/paged-reader.ts` filter from the kit entry in your settings.

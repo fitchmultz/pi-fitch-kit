@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { hash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Api, clampThinkingLevel, type Message, type Model } from "@earendil-works/pi-ai";
@@ -233,7 +233,7 @@ export function writerSessionId(ctx: ExtensionCommandContext): string {
 		header?.cwd,
 		header?.timestamp,
 	]);
-	const bytes = createHash("sha256").update(session).digest();
+	const bytes = hash("sha256", session, "buffer");
 	bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x80;
 	bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
 	const hex = bytes.toString("hex", 0, 16);
