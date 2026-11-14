@@ -21,9 +21,37 @@ process.env.PI_CODING_AGENT_DIR = agentDir;
 
 // Keep one pass-through spy for the loaded extension's lifetime: Jiti may
 // capture a builtin import, rather than follow later replacement functions.
+const realWatch = fs.watch.bind(fs);
+const openStateWatchers = new Set<fs.FSWatcher>();
+const stateDirWatches = mock.method(
+	fs,
+	"watch",
+	(
+		filename: fs.PathLike,
+		options?: fs.WatchOptions | BufferEncoding | null,
+		listener?: fs.WatchListener<string>,
+	): fs.FSWatcher => {
+		let watcher: fs.FSWatcher;
+		if (typeof options === "function") {
+			watcher = realWatch(filename, options);
+		} else if (options === undefined) {
+			watcher = realWatch(filename, listener);
+		} else {
+			watcher = realWatch(filename, options, listener);
+		}
+		openStateWatchers.add(watcher);
+		const realClose = watcher.close.bind(watcher);
+		watcher.close = (): void => {
+			openStateWatchers.delete(watcher);
+			realClose();
+		};
+		return watcher;
+	},
+);
 const toggleFileReads = mock.method(fs, "readFileSync");
 syncBuiltinESMExports();
 process.on("exit", () => {
+	stateDirWatches.mock.restore();
 	toggleFileReads.mock.restore();
 	syncBuiltinESMExports();
 });
@@ -1287,6 +1315,11 @@ const waitFor = async (predicate: () => boolean, timeoutMs = 1500): Promise<void
 writeFileSync(join(agentDir, "anthropic-fast.json"), JSON.stringify({ enabled: false }));
 await runHandlers("session_start", {}, uiCtx(gatewayOpus));
 await runHandlers("session_start", {}, uiCtx(gatewayOpus));
+assert.equal(
+	openStateWatchers.size,
+	1,
+	"repeated session_start must close the previous FSWatcher instead of stacking handles",
+);
 assert.equal(statWatchers(), watcherBaseline, "UI sessions must not start StatWatcher pollers");
 assert.equal(status.get("anthropic-fast"), undefined);
 writeFileSync(join(agentDir, "anthropic-fast.json"), JSON.stringify({ enabled: true }));
@@ -1303,14 +1336,12 @@ assert.equal(
 	readsBeforeUnrelated,
 	"unrelated agentDir writes must not re-read shared tier files",
 );
+await runHandlers("session_start", {}, { ...uiCtx(gatewayGoogle), hasUI: false });
+assert.equal(openStateWatchers.size, 0, "headless session_start must close open FSWatchers");
+await runHandlers("session_start", {}, uiCtx(gatewayGoogle));
+assert.equal(openStateWatchers.size, 1, "UI session_start must open one FSWatcher");
 await runHandlers("session_shutdown", {}, uiCtx(gatewayOpus));
-writeFileSync(googleStatePath, JSON.stringify({ tier: "priority" }));
-await sleep(60);
-assert.equal(
-	status.get("google-tier"),
-	"accent:Google flex requested",
-	"session shutdown must stop external footer refreshes",
-);
+assert.equal(openStateWatchers.size, 0, "session_shutdown must close the active FSWatcher handle");
 assert.equal(statWatchers(), watcherBaseline, "session shutdown must release state-file watchers");
 
 console.log(
