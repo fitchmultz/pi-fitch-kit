@@ -1,4 +1,3 @@
-import { unwatchFile, watchFile } from "node:fs";
 import type {
 	BeforeProviderRequestEvent,
 	ExtensionAPI,
@@ -12,6 +11,7 @@ import {
 	SESSION_MODE_ENTRY,
 	TOGGLES,
 	ULTRAFAST_UNAVAILABLE,
+	createStateWatcher,
 	enabled,
 	fastStream,
 	notify,
@@ -25,7 +25,7 @@ import {
 	type SessionOpenAIMode,
 	type Toggle,
 } from "./fast-mode-policy.ts";
-import { registerGoogleTier } from "./google-tier.ts";
+import { GOOGLE_TIER_STATE_PATH, registerGoogleTier } from "./google-tier.ts";
 
 export { fastRates } from "./fast-mode-policy.ts";
 
@@ -58,7 +58,6 @@ class FastModeSession {
 	private sessionId: string | undefined;
 	private localMode: SessionOpenAIMode | undefined;
 	private footerContext: ExtensionContext | undefined;
-	private boundRefresh: (() => void) | undefined;
 
 	localModeFor(ctx: ExtensionContext): SessionOpenAIMode | undefined {
 		const id = ctx.sessionManager.getSessionId();
@@ -79,14 +78,12 @@ class FastModeSession {
 		this.footerContext = ctx;
 	}
 
-	setLocalMode(mode: SessionOpenAIMode | undefined): void {
-		this.localMode = mode;
+	setFooterContext(ctx: ExtensionContext): void {
+		this.footerContext = ctx;
 	}
 
-	/** One stable watcher callback for watchFile/unwatchFile listener identity. */
-	refreshCallback(): () => void {
-		this.boundRefresh ??= () => this.refreshFooter();
-		return this.boundRefresh;
+	setLocalMode(mode: SessionOpenAIMode | undefined): void {
+		this.localMode = mode;
 	}
 
 	/** Redraws the footer from the most recent TUI context, when there was one. */
@@ -157,15 +154,6 @@ const handleSessionStart = (
 		notify(ctx, openAIStatus(ctx, local));
 	}
 	updateFooterStatus(ctx, local);
-	const refreshFooter = session.refreshCallback();
-	for (const toggle of TOGGLES) {
-		// Unwatch first: a repeated session_start must not stack listeners, or a
-		// single shutdown would leave one behind holding the process open.
-		unwatchFile(toggle.statePath, refreshFooter);
-		if (ctx.hasUI) {
-			watchFile(toggle.statePath, { interval: 5000 }, refreshFooter);
-		}
-	}
 };
 
 /** Resolves the service_tier a priority-eligible request should carry, if any. */
@@ -280,6 +268,7 @@ const runToggleCommand = async (
 	session: FastModeSession,
 	request: ToggleRequest,
 ): Promise<void> => {
+	session.setFooterContext(ctx);
 	const parsed = parseToggleCommand(args, request);
 	if ("usage" in parsed) {
 		notify(ctx, parsed.usage, "warning");
@@ -336,6 +325,7 @@ const runUltrafastCommand = async (
 	session: FastModeSession,
 	pi: ExtensionAPI,
 ): Promise<void> => {
+	session.setFooterContext(ctx);
 	const parsed = parseUltrafastArgs(args);
 	if ("usage" in parsed) {
 		notify(ctx, parsed.usage, "warning");
@@ -402,17 +392,28 @@ export default function fastMode(pi: ExtensionAPI): void {
 	// OpenAI-compatible endpoints never receive it.
 	pi.on("before_provider_request", (event, ctx) => applyPriorityTier(event, ctx, session));
 
+	const refreshListeners: Array<() => void> = [() => session.refreshFooter()];
+	const stateWatcher = createStateWatcher(
+		[...TOGGLES.map((toggle) => toggle.statePath), GOOGLE_TIER_STATE_PATH],
+		() => {
+			for (const refresh of refreshListeners) {
+				refresh();
+			}
+		},
+	);
+
 	// The state files are shared by every session, so watch them rather than
 	// only redrawing after local toggles.
-	pi.on("session_start", (event, ctx) => handleSessionStart(pi, session, event, ctx));
+	pi.on("session_start", (event, ctx) => {
+		handleSessionStart(pi, session, event, ctx);
+		stateWatcher.start(ctx.hasUI);
+	});
 	pi.on("session_shutdown", () => {
-		const refreshFooter = session.refreshCallback();
-		for (const toggle of TOGGLES) {
-			unwatchFile(toggle.statePath, refreshFooter);
-		}
+		stateWatcher.stop();
 		session.release();
 	});
 	pi.on("model_select", (_event, ctx) => {
+		session.setFooterContext(ctx);
 		updateFooterStatus(ctx, session.localModeFor(ctx));
 	});
 
@@ -432,5 +433,5 @@ export default function fastMode(pi: ExtensionAPI): void {
 			"Toggle Astra Ultrafast globally, or use --session for a session-only override (6x API/credit price)",
 		handler: (args, ctx) => runUltrafastCommand(args, ctx, session, pi),
 	});
-	registerGoogleTier(pi);
+	refreshListeners.push(registerGoogleTier(pi));
 }
