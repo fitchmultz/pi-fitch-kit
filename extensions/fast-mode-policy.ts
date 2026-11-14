@@ -1,5 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { type FSWatcher, mkdirSync, readFileSync, watch, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import type { Api, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
 // ponytail: official 1.0's Jiti root alias breaks api/* subpaths. Use the public compat factory until the loader resolves narrow exports correctly.
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/compat";
@@ -136,6 +136,45 @@ export const XAI_TOGGLE: Toggle = {
 
 export const TOGGLES = [ANTHROPIC_TOGGLE, OPENAI_TOGGLE, XAI_TOGGLE];
 export const PRIORITY_TOGGLES = [OPENAI_TOGGLE, XAI_TOGGLE];
+
+export type StateWatcher = {
+	start: (active: boolean) => void;
+	stop: () => void;
+};
+
+/** Watches shared state files in the agent directory with one non-persistent OS FSWatcher instead of stat() polling. */
+export function createStateWatcher(
+	statePaths: readonly string[],
+	onChange: () => void,
+): StateWatcher {
+	const names = new Set(statePaths.map((statePath) => basename(statePath)));
+	const dir = dirname(statePaths[0] ?? getAgentDir());
+	let watcher: FSWatcher | undefined;
+	const stop = (): void => {
+		watcher?.close();
+		watcher = undefined;
+	};
+	return {
+		start(active: boolean): void {
+			stop();
+			if (!active) {
+				return;
+			}
+			try {
+				mkdirSync(dir, { recursive: true });
+				watcher = watch(dir, { persistent: false }, (_eventType, filename) => {
+					if (filename === null || names.has(filename)) {
+						onChange();
+					}
+				});
+				watcher.on("error", stop);
+			} catch {
+				stop();
+			}
+		},
+		stop,
+	};
+}
 
 export function ultrafastEligible(model: FastModel): boolean {
 	if (model?.id !== "gpt-6-astra") {

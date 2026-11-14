@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, unwatchFile, watchFile, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
 	type BeforeProviderRequestEvent,
@@ -9,7 +9,7 @@ import {
 import { type FastModel, notify } from "./fast-mode-policy.ts";
 
 type GoogleTier = "standard" | "flex" | "priority";
-const STATE_PATH = join(getAgentDir(), "google-tier.json");
+export const GOOGLE_TIER_STATE_PATH = join(getAgentDir(), "google-tier.json");
 const STATUS_KEY = "google-tier";
 const USAGE = "Usage: /google-tier [standard|flex|priority|status]";
 
@@ -24,7 +24,7 @@ const eligible = (model: FastModel): boolean =>
 
 const selectedTier = (): GoogleTier | undefined => {
 	try {
-		const state: unknown = JSON.parse(readFileSync(STATE_PATH, "utf8"));
+		const state: unknown = JSON.parse(readFileSync(GOOGLE_TIER_STATE_PATH, "utf8"));
 		return isRecord(state) && isGoogleTier(state.tier) ? state.tier : undefined;
 	} catch {
 		return undefined;
@@ -74,7 +74,7 @@ const reportTier = (ctx: ExtensionContext): void => {
 };
 
 /** Shared Google request policy, using Pi's stock payload hook and lifecycle. */
-export function registerGoogleTier(pi: ExtensionAPI): void {
+export function registerGoogleTier(pi: ExtensionAPI): () => void {
 	let context: ExtensionContext | undefined;
 	const refresh = (): void => {
 		if (context !== undefined) {
@@ -84,10 +84,11 @@ export function registerGoogleTier(pi: ExtensionAPI): void {
 	pi.registerCommand("google-tier", {
 		description: "Select Google request tier: standard, flex (half price), or priority (premium)",
 		handler: async (args, ctx) => {
+			context = ctx;
 			const command = args.trim().toLowerCase();
 			if (isGoogleTier(command)) {
-				mkdirSync(dirname(STATE_PATH), { recursive: true });
-				writeFileSync(STATE_PATH, `${JSON.stringify({ tier: command })}\n`);
+				mkdirSync(dirname(GOOGLE_TIER_STATE_PATH), { recursive: true });
+				writeFileSync(GOOGLE_TIER_STATE_PATH, `${JSON.stringify({ tier: command })}\n`);
 			} else if (command !== "" && command !== "status") {
 				notify(ctx, USAGE, "warning");
 				return;
@@ -100,17 +101,13 @@ export function registerGoogleTier(pi: ExtensionAPI): void {
 	pi.on("session_start", (_event, ctx) => {
 		context = ctx;
 		refresh();
-		unwatchFile(STATE_PATH, refresh);
-		if (ctx.hasUI) {
-			watchFile(STATE_PATH, { interval: 5000 }, refresh);
-		}
 	});
 	pi.on("model_select", (_event, ctx) => {
 		context = ctx;
 		refresh();
 	});
 	pi.on("session_shutdown", () => {
-		unwatchFile(STATE_PATH, refresh);
 		context = undefined;
 	});
+	return refresh;
 }
