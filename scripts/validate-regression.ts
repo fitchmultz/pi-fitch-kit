@@ -209,3 +209,21 @@ suite.push(
 		);
 	}),
 );
+
+suite.push(
+	test("manifest runtime.pi floor must match the locked Pi development baseline", () => {
+		rejects(
+			(input) => ({
+				...input,
+				manifest: {
+					...input.manifest,
+					runtime: {
+						...jsonField(input.manifest, "runtime", "manifest runtime"),
+						pi: ">=1.5.0",
+					},
+				},
+			}),
+			"manifest runtime.pi floor must match the locked @earendil-works/pi-coding-agent floor",
+		);
+	}),
+);

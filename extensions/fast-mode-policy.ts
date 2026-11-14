@@ -1,7 +1,7 @@
 import { type FSWatcher, mkdirSync, readFileSync, watch, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import type { Api, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
-// ponytail: official 1.0's Jiti root alias breaks api/* subpaths. Use the public compat factory until the loader resolves narrow exports correctly.
+// ponytail: Pi's Jiti root alias maps @earendil-works/pi-ai to its extension view and breaks api/* subpaths. Use the supported compat factory.
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/compat";
 import {
 	type ExtensionContext,

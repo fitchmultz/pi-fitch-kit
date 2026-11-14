@@ -13,16 +13,14 @@ export type DrivenCommand = {
 };
 
 /** A resolved-later gate for sequencing assertions. */
-export const gate = (): { promise: Promise<void>; open: () => void } => {
-	let open: () => void = () => {
-		throw new Error("gate opened before construction");
+export const gate = (): { promise: Promise<null>; open: () => void } => {
+	const { promise, resolve } = Promise.withResolvers<null>();
+	return {
+		promise,
+		open: () => {
+			resolve(null);
+		},
 	};
-	const promise = new Promise<void>((resolve) => {
-		open = () => {
-			resolve();
-		};
-	});
-	return { promise, open };
 };
 
 /** The value as a string-keyed record, failing loudly with the label when not. */

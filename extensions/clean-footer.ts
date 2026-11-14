@@ -8,7 +8,7 @@ import type {
 	ReadonlyFooterDataProvider,
 	Theme,
 } from "@earendil-works/pi-coding-agent";
-import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { indexedColor, styleText, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
 const CHECKPOINT_ENTRY = "clean-footer-checkpoint";
 
@@ -232,7 +232,7 @@ const renderLocation = (frame: FooterFrame): string => {
 	const name = frame.repoLabels.label(cwd);
 	let location =
 		name !== undefined
-			? `\x1b[38;5;${repoColor(name.key)}m${name.text}\x1b[39m`
+			? styleText(name.text, { fg: indexedColor(repoColor(name.key)) }, "256color")
 			: frame.theme.fg("dim", formatCwd(cwd));
 	// getGitBranch crawls into the home dotfiles repo; only show a branch for a real project repo.
 	const branch = frame.footerData.getGitBranch();

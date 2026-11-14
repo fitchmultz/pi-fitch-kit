@@ -92,6 +92,10 @@ for (const dependency of [
 		`${dependency} must remain an optional Pi peer`,
 	);
 }
+assert(
+	runtime.pi === `>=${String(devDependencies["@earendil-works/pi-coding-agent"])}`,
+	"manifest runtime.pi floor must match the locked @earendil-works/pi-coding-agent floor",
+);
 
 // Bundled resources: the manifest mirrors package.json#pi, and every file exists.
 const piField = jsonField(packageJson, "pi", "package pi field");
