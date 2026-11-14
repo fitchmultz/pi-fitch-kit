@@ -31,14 +31,10 @@ const stateDirWatches = mock.method(
 		options?: fs.WatchOptions | BufferEncoding | null,
 		listener?: fs.WatchListener<string>,
 	): fs.FSWatcher => {
-		let watcher: fs.FSWatcher;
-		if (typeof options === "function") {
-			watcher = realWatch(filename, options);
-		} else if (options === undefined) {
-			watcher = realWatch(filename, listener);
-		} else {
-			watcher = realWatch(filename, options, listener);
-		}
+		assert(typeof options === "object" && options !== null && listener !== undefined);
+		const watcher = realWatch(filename, options, (eventType, changed) => {
+			listener(eventType, typeof changed === "string" ? changed : (changed?.toString() ?? null));
+		});
 		openStateWatchers.add(watcher);
 		const realClose = watcher.close.bind(watcher);
 		watcher.close = (): void => {
