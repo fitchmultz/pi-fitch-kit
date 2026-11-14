@@ -392,12 +392,13 @@ export default function fastMode(pi: ExtensionAPI): void {
 	// OpenAI-compatible endpoints never receive it.
 	pi.on("before_provider_request", (event, ctx) => applyPriorityTier(event, ctx, session));
 
-	let refreshGoogleTier: (() => void) | undefined;
+	const refreshListeners: Array<() => void> = [() => session.refreshFooter()];
 	const stateWatcher = createStateWatcher(
 		[...TOGGLES.map((toggle) => toggle.statePath), GOOGLE_TIER_STATE_PATH],
 		() => {
-			session.refreshFooter();
-			refreshGoogleTier?.();
+			for (const refresh of refreshListeners) {
+				refresh();
+			}
 		},
 	);
 
@@ -432,5 +433,5 @@ export default function fastMode(pi: ExtensionAPI): void {
 			"Toggle Astra Ultrafast globally, or use --session for a session-only override (6x API/credit price)",
 		handler: (args, ctx) => runUltrafastCommand(args, ctx, session, pi),
 	});
-	refreshGoogleTier = registerGoogleTier(pi);
+	refreshListeners.push(registerGoogleTier(pi));
 }
