@@ -29,7 +29,7 @@ The [README](../README.md#what-setup-installs) lists every package in the setup,
 - **Long tasks:** [`pi-posthorse`](https://github.com/fitchmultz/pi-posthorse) for context rollover, notes, and history.
 - **Small tools:** structured questions, working-directory changes, a calculator, `/ctx`, draft stash, and raw message copy.
 - **Skills:** [`pi-agent-skills`](https://github.com/fitchmultz/pi-agent-skills) and [`pi-pstack`](https://github.com/fitchmultz/pi-pstack).
-- **The kit's own extensions:** a compact footer, session naming, fast-mode controls, the Claude image guard, and the `/draft` family of prompt-writing commands. The [reference](reference.md#bundled-extensions) describes each one.
+- **The kit's own extensions:** a compact footer, session naming, fast-mode controls, the Claude image guard, the backtick guard for shell calls, and the `/draft` family of prompt-writing commands. The [reference](reference.md#bundled-extensions) describes each one.
 
 Every package is an independent repository. None depends on the kit, and the kit does not patch Pi.
 
