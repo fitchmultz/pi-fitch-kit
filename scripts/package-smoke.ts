@@ -2,6 +2,7 @@
 // Loads this repo as a real Pi package in a throwaway agent dir and asserts
 // its active prompts, themes and bundled extensions load cleanly. Catches resource
 // breakage that static validation cannot see. Requires `npm install` first.
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -23,6 +24,7 @@ import {
 	jsonField,
 	jsonList,
 	jsonString,
+	jsonStrings,
 	requireRecord,
 	toolContextFrom,
 } from "./test-harness.ts";
@@ -40,6 +42,19 @@ type InstalledFooter = (
 ) => { render: (width: number) => string[]; dispose?: () => void };
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const packageJson = requireRecord(
+	JSON.parse(readFileSync(join(root, "package.json"), "utf8")),
+	"package.json",
+);
+const declaredExtensions = jsonStrings(
+	jsonField(packageJson, "pi", "package.json pi").extensions,
+	"package.json pi.extensions",
+);
+assert.ok(
+	declaredExtensions.length > 0,
+	"package.json pi.extensions must be a non-empty string list",
+);
+const expectedExtensions = declaredExtensions.map((entry) => resolve(root, entry)).sort();
 const temp = mkdtempSync(join(tmpdir(), "pi-fitch-kit-package-"));
 const home = join(temp, "home");
 const agentDir = join(home, "agent");
@@ -200,9 +215,8 @@ try {
 	if (extensions.errors.length > 0) {
 		throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
 	}
-	if (extensions.extensions.length !== 7) {
-		throw new Error(`Expected 7 extensions, got ${extensions.extensions.length}`);
-	}
+	const loadedExtensions = extensions.extensions.map(({ resolvedPath }) => resolvedPath).sort();
+	assert.deepStrictEqual(loadedExtensions, expectedExtensions);
 	const cleanFooter = extensions.extensions.find(({ path }) =>
 		path.endsWith("/extensions/clean-footer.ts"),
 	);

@@ -7,13 +7,26 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";
-import { jsonField, jsonList, jsonString, requireRecord } from "./test-harness.ts";
+import { jsonField, jsonList, jsonString, jsonStrings, requireRecord } from "./test-harness.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifest: Record<string, unknown> = requireRecord(
 	JSON.parse(readFileSync(join(root, "setup-manifest.json"), "utf8")),
 	"setup-manifest.json",
 );
+const packageJson: Record<string, unknown> = requireRecord(
+	JSON.parse(readFileSync(join(root, "package.json"), "utf8")),
+	"package.json",
+);
+const declaredExtensions = jsonStrings(
+	jsonField(packageJson, "pi", "package.json pi").extensions,
+	"package.json pi.extensions",
+);
+assert.ok(
+	declaredExtensions.length > 0,
+	"package.json pi.extensions must be a non-empty string list",
+);
+const expectedExtensions = declaredExtensions.map((entry) => resolve(root, entry)).sort();
 const runtimePi = jsonString(jsonField(manifest, "runtime", "manifest runtime").pi, "runtime.pi");
 const minimumPi = runtimePi.replace(/^>=/, "");
 const versionAtLeast = (actual: string, minimum: string): boolean => {
@@ -152,8 +165,12 @@ try {
 			.sort(),
 		["fitch-setup", "github-open-issues-prs"],
 	);
-	assert.equal(loader.getExtensions().extensions.length, 7);
-	assert.equal(loader.getExtensions().errors.length, 0);
+	const extensions = loader.getExtensions();
+	assert.deepEqual(extensions.errors, []);
+	assert.deepEqual(
+		extensions.extensions.map(({ resolvedPath }) => resolvedPath).sort(),
+		expectedExtensions,
+	);
 	assert.equal(loader.getThemes().themes.length, 1);
 	assert.equal(loader.getThemes().diagnostics.filter(({ type }) => type === "error").length, 0);
 
