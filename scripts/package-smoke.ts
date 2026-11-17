@@ -200,8 +200,8 @@ try {
 	if (extensions.errors.length > 0) {
 		throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
 	}
-	if (extensions.extensions.length !== 6) {
-		throw new Error(`Expected 6 extensions, got ${extensions.extensions.length}`);
+	if (extensions.extensions.length !== 7) {
+		throw new Error(`Expected 7 extensions, got ${extensions.extensions.length}`);
 	}
 	const cleanFooter = extensions.extensions.find(({ path }) =>
 		path.endsWith("/extensions/clean-footer.ts"),

@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 const testFiles = [
 	"scripts/image-guard-smoke.ts",
 	"scripts/image-budget-regression.ts",
+	"scripts/backtick-guard-boundary.ts",
 	"scripts/clean-footer-regression.ts",
 	"scripts/fast-mode-regression.ts",
 	"scripts/session-name-regression.ts",

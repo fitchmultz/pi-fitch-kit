@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Refuse a `bash` call whose command contains a backtick command substitution, before the shell starts. A model often puts prose in a double-quoted shell argument, such as a pull request body. A Markdown code span such as `` `env` `` then runs as a command and its output replaces the span, which can publish private data. The guard also checks calls from codemode scripts and Fitch Pi's `background_command`. Backticks in single quotes and in quoted heredocs still run, and the refusal tells the model to write `$(...)` for a real substitution. See the [backtick guard reference](docs/reference.md#backtick-guard). The guard reads commands with `sh-syntax`, the kit's first runtime dependency.
 - Raise the Pi floor to 1.5.2 in the manifest, setup validation, and development cohort, and use native `@earendil-works/pi-tui` `styleText`/`indexedColor`, `crypto.hash`, `Promise.withResolvers`, and `timers/promises`.
 - Add `/google-tier standard|flex|priority` to the fast-mode controls, with read-only blank/status commands, shared saved policy, and a requested-tier footer. It uses Google's native SDK payload through the existing Google route, including Cloudflare AI Gateway, without changing other providers or enabling a tier on install. Keep Flex's slower, best-effort behavior and Google's Priority downgrade visible; native Pi owns cost estimates from the returned tier.
 

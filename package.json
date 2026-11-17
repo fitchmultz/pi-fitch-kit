@@ -13,6 +13,7 @@
     "check": "node scripts/run-gates.ts",
     "check:compat": "npm run check && npm run smoke",
     "typecheck": "tsc --noEmit",
+    "regression:backtick-guard": "node scripts/backtick-guard-boundary.ts",
     "regression:clean-footer": "node scripts/clean-footer-regression.ts",
     "regression:fast-mode": "node scripts/fast-mode-regression.ts",
     "regression:session-name": "node scripts/session-name-regression.ts",
@@ -32,6 +33,7 @@
   "pi": {
     "extensions": [
       "./extensions/anthropic-image-guard.ts",
+      "./extensions/backtick-guard.ts",
       "./extensions/clean-footer.ts",
       "./extensions/fast-mode.ts",
       "./extensions/session-name.ts",
@@ -80,5 +82,8 @@
     "typebox": {
       "optional": true
     }
+  },
+  "dependencies": {
+    "sh-syntax": "0.8.7"
   }
 }

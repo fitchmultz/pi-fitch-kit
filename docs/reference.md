@@ -118,6 +118,30 @@ Pi's `images.autoResize` defaults to `true`, which shrinks every image to at mos
 
 Anthropic has stricter image limits. The guard handles that one boundary instead of giving up source quality everywhere. It runs only on Claude models over the `anthropic-messages` API regardless of which provider routes them, reuses Pi's native image resizer, caches successful results within an estimated 128 MiB budget for source keys, result strings and entry overhead, clears that cache on session start and compaction, and retries later after resize failures. Cold misses decode in up to four native workers at once, and writer calls reuse the same cache. A bounded request-start snapshot preserves cache hits during newest-first traversal, even when the request exceeds the cache budget; cache eviction never omits an image. The snapshot can temporarily retain another cache budget's worth of strings during preparation. Before native decoding, it omits sources above 32 MiB of base64 and admits the newest images within a 64 MiB source budget, preserving conversation order and saved originals. On the bundled direct Anthropic and Cloudflare routes, and in writer calls, it also budgets the complete serialized request against Anthropic's 32 MB limit, including text and tool definitions. It resizes images further when needed, omitting oldest images first only when resizing cannot fit them; text/tool-only overflow retains native handling. The guard remembers those request-size results for the latest over-limit request's captures: a capture keeps its earlier result while it still fits, so repeated over-limit turns skip native work and resend the same image bytes.
 
+### Backtick guard
+
+[`backtick-guard`](../extensions/backtick-guard.ts) refuses a `bash` call whose command contains a backtick command substitution. It refuses the call before the shell starts, so no part of the command runs. Calls that a codemode script makes are checked the same way. On Fitch Pi the guard also checks `background_command`.
+
+A model often puts prose inside a double-quoted shell argument, for example the body of a pull request. The shell still expands that text. A Markdown code span such as `` `env` `` then runs as a command, and its output replaces the span. With `env`, the published text contains every environment variable.
+
+The guard reads the command with [`sh-syntax`](https://github.com/un-ts/sh-syntax), a WebAssembly build of the `mvdan/sh` bash parser, and refuses only the backticks that bash would run:
+
+| Command text                                                | Result  |
+| ----------------------------------------------------------- | ------- |
+| Backticks in double quotes or in an unquoted word           | Refused |
+| Backticks in a heredoc with an unquoted delimiter (`<<EOF`) | Refused |
+| A command with a backtick that the parser cannot read       | Refused |
+| Backticks in single quotes                                  | Runs    |
+| Backticks in a heredoc with a quoted delimiter (`<<'EOF'`)  | Runs    |
+| Backticks in a comment, or after a backslash                | Runs    |
+| `$(...)` command substitution                               | Runs    |
+
+An unreadable command is refused because bash runs the lines before a syntax error.
+
+The refusal tells the model what to do: write `$(...)` for a real substitution, or put the text in a file and pass the file, for example with `--body-file`. The guard adds no text to the system prompt or to the tool declarations. It does not check a command that you type with `!`.
+
+To turn the guard off, run `pi config`, or add `-extensions/backtick-guard.ts` to the `extensions` list of the kit's package entry in your settings.
+
 ### Prompt-writing commands
 
 [`write-prompt`](../extensions/write-prompt.ts) adds `/draft <text>`, `/ambitious <text>`, `/unreasonable <text>`, and `/side-question <text>`. All four use the current session system prompt once and conversation off-transcript, flattening past tool-call semantics while retaining tool-result images, without replaying historical system messages or exposing tools. `/draft` rewrites the source into an agent request, then offers Accept, Copy prompt, Tweak, Restore original, or Deny. Accept sends normally when idle and steers the active agent when busy. Before sending, it saves the draft and original input in native session metadata outside model context. `/draft` without text reopens the last accepted draft on the current branch without another rewrite, including after a failed send. Restore original puts the original command back in the editor; synchronous send errors keep the dialog open for retry. In the TUI, a draft taller than the viewport is clipped to it with a lines-above/below indicator and scrolls with PageUp/PageDown; arrows, Enter, and Escape keep driving the action list, and terminals tall enough for the whole draft look exactly as before.
@@ -234,7 +258,7 @@ The kit uses these Pi features but does not own them.
 ## Repository map
 
 ```text
-extensions/             footer, session naming, fast modes, image guard, prompt-writing commands, setup model check
+extensions/             footer, session naming, fast modes, image guard, backtick guard, prompt-writing commands, setup model check
 prompts/                /fitch-setup and /github-open-issues-prs
 themes/                 calm theme
 setup-manifest.json     packages, model routes, and bundled resources

@@ -6,6 +6,7 @@
 - Canonical sources:
   - `prompts/fitch-setup.md` and `prompts/audit/github-open-issues-prs.md` for the two registered slash commands.
   - `extensions/anthropic-image-guard.ts` for Claude-bound image handling when global auto-resize is off.
+  - `extensions/backtick-guard.ts` for refusing shell tool calls whose command contains a backtick command substitution.
   - `extensions/clean-footer.ts` for a compact footer without cumulative token, cache, or cost counters.
   - `extensions/fast-mode.ts` for `/anthropic-fast`, `/codex-fast`, `/xai-fast`, `/google-tier`, and global/session-scoped `/ultrafast` controls.
   - `extensions/session-name.ts` for stable, searchable session naming and protected role identifiers.
@@ -53,6 +54,7 @@
 
 - Before changing Pi runtime/package behavior, read the installed Pi docs/types for the touched surface, especially `docs/packages.md`, `docs/prompt-templates.md`, and `docs/extensions.md` under the installed Pi root.
 - Keep `extensions/anthropic-image-guard.ts` scoped to Claude models on the `anthropic-messages` wire API (the API alone is shared by non-Claude vendors) and based on Pi's native `resizeImage`; preserve its pre-decode source limits and do not reintroduce global resizing logic.
+- Keep `extensions/backtick-guard.ts` on a real bash parser (`sh-syntax`). It refuses only the backticks that bash would run, and a command with a backtick that the parser cannot read. Do not replace the parser with a text scan: a scan refuses quoted heredocs, which are the safe way to pass text. Keep its guidance in the refusal, not in the system prompt.
 - Keep `extensions/clean-footer.ts` free of cumulative token, cache, and cost counters; preserve context usage, model details, extension statuses, and wrapping without truncation. Verbosity comes from the controller's native `verbosity` status, never another config reader.
 - Keep `extensions/fast-mode.ts` scoped. Preserve blank `/fast`, `/codex-fast on`, and `--fast` priority semantics: OpenAI and xAI priority ride `before_provider_request` for `openai`/`openai-codex`/`chatgpt-rotate`/`xai` plus `cloudflare-ai-gateway` models whose id starts with `gpt-` or is `o3`/`o4-mini` (including their exact `2025-04-16` snapshots) for the OpenAI toggle, or starts with `grok-` for the xAI toggle; other gateway o-series and namespaced Workers AI models stay excluded; Anthropic fast mode owns the `anthropic-messages` override for only the `anthropic` and `cloudflare-ai-gateway` providers, appends the beta at fetch time, and never sends `speed` when the header cannot be attached. Keep the gateway endpoint-placeholder resolution in `fastStream`, the existing state filenames, and the doubled Anthropic fast cost rates.
 - Keep `/google-tier` in `extensions/google-tier.ts`: explicit Standard, Flex, or Priority in shared `google-tier.json`, no preference written on install, and native `config.serviceTier` payload injection only for `google` models using `google-generative-ai`. Keep native retries and returned-tier cost accounting in Pi, not a Google provider override.
@@ -69,6 +71,7 @@
 
 - `scripts/validate.ts` checks that the manifest, package metadata, lockfile, settings example, and template agree with each other. It does not pin the wording of prompts or docs; do not add assertions that do.
 - Run `npm run check` after edits to `package.json`, `setup-manifest.json`, `examples/settings.json`, `templates/`, `extensions/`, `scripts/`, or registered prompts; add `npm run smoke` when package resources changed.
+- Run `npm run regression:backtick-guard` after changing the backtick guard or updating `sh-syntax`.
 - Run `npm run regression:fast-mode` after changing fast-mode toggles, eligibility, payload or header injection, or state handling.
 - Run `node --test scripts/validate-regression.ts` after changing the validator.
 - Run `npm run regression:session-name` after changing naming guidance, metadata injection, protected identities, or its migration gate.

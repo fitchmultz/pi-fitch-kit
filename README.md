@@ -2,7 +2,7 @@
 
 Fitch Kit is a package for [Pi](https://github.com/earendil-works/pi), a terminal coding agent. It has two parts:
 
-- **Session tools** that load with the package: a compact footer, session naming, fast-mode controls, prompt-writing commands, and a Claude image guard.
+- **Session tools** that load with the package: a compact footer, session naming, fast-mode controls, prompt-writing commands, a Claude image guard, and a guard that stops backtick commands in shell calls.
 - **A setup prompt**, `/fitch-setup`, that installs the public packages I use with Pi and offers my settings.
 
 ![The kit loads session tools into Pi, which uses selected public extensions, task-specific skills, and optional authenticated MCP services.](.github/readme/kit-overview.png)
@@ -41,7 +41,7 @@ The session tools need no setup and work with any model. Step 3 is enough if you
 
 ## Commands
 
-The package loads six extensions, two prompts, and the `calm` theme.
+The package loads seven extensions, two prompts, and the `calm` theme.
 
 | Command                                                            | Use                                                                                                                                                                                                            |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -55,7 +55,7 @@ The package loads six extensions, two prompts, and the `calm` theme.
 | `/ultrafast status`                                                | Check OpenAI Ultrafast. Read the [cost and access limits](docs/reference.md#fast-modes) before you turn it on.                                                                                                 |
 | `/github-open-issues-prs [owner]`                                  | Audit open issues and PRs in public non-fork repos owned by the account. For an explicitly named user, also find all their authored issues and PRs across accessible repos, including private repos and forks. |
 
-The kit also names sessions so you can find them later, and resizes images sent to Claude to fit Anthropic's limits. `/draft`, `/ambitious`, `/unreasonable`, and `/side-question` make model calls with your current provider, model, and thinking level.
+The kit also names sessions so you can find them later, and resizes images sent to Claude to fit Anthropic's limits. It refuses a shell command that contains a backtick command substitution, so text in a command cannot run as one. `/draft`, `/ambitious`, `/unreasonable`, and `/side-question` make model calls with your current provider, model, and thinking level.
 
 See the [reference](docs/reference.md#bundled-extensions) for each extension's behavior and settings.
 
