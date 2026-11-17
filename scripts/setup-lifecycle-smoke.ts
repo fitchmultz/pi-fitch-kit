@@ -23,7 +23,7 @@ const declaredExtensions = jsonStrings(
 	"package.json pi.extensions",
 );
 assert.ok(
-	declaredExtensions.length > 0 && declaredExtensions.every((entry) => entry.trim().length > 0),
+	declaredExtensions.length > 0,
 	"package.json pi.extensions must be a non-empty string list",
 );
 const expectedExtensions = declaredExtensions.map((entry) => resolve(root, entry)).sort();

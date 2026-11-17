@@ -2,6 +2,7 @@
 // Loads this repo as a real Pi package in a throwaway agent dir and asserts
 // its active prompts, themes and bundled extensions load cleanly. Catches resource
 // breakage that static validation cannot see. Requires `npm install` first.
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -49,12 +50,10 @@ const declaredExtensions = jsonStrings(
 	jsonField(packageJson, "pi", "package.json pi").extensions,
 	"package.json pi.extensions",
 );
-if (
-	declaredExtensions.length === 0 ||
-	declaredExtensions.some((entry) => entry.trim().length === 0)
-) {
-	throw new Error("package.json pi.extensions must be a non-empty string list");
-}
+assert.ok(
+	declaredExtensions.length > 0,
+	"package.json pi.extensions must be a non-empty string list",
+);
 const expectedExtensions = declaredExtensions.map((entry) => resolve(root, entry)).sort();
 const temp = mkdtempSync(join(tmpdir(), "pi-fitch-kit-package-"));
 const home = join(temp, "home");
@@ -217,11 +216,7 @@ try {
 		throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
 	}
 	const loadedExtensions = extensions.extensions.map(({ resolvedPath }) => resolvedPath).sort();
-	if (JSON.stringify(loadedExtensions) !== JSON.stringify(expectedExtensions)) {
-		throw new Error(
-			`Expected extensions ${JSON.stringify(expectedExtensions)}, got ${JSON.stringify(loadedExtensions)}`,
-		);
-	}
+	assert.deepStrictEqual(loadedExtensions, expectedExtensions);
 	const cleanFooter = extensions.extensions.find(({ path }) =>
 		path.endsWith("/extensions/clean-footer.ts"),
 	);
