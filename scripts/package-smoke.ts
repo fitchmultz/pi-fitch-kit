@@ -23,6 +23,7 @@ import {
 	jsonField,
 	jsonList,
 	jsonString,
+	jsonStrings,
 	requireRecord,
 	toolContextFrom,
 } from "./test-harness.ts";
@@ -40,6 +41,21 @@ type InstalledFooter = (
 ) => { render: (width: number) => string[]; dispose?: () => void };
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const packageJson = requireRecord(
+	JSON.parse(readFileSync(join(root, "package.json"), "utf8")),
+	"package.json",
+);
+const declaredExtensions = jsonStrings(
+	jsonField(packageJson, "pi", "package.json pi").extensions,
+	"package.json pi.extensions",
+);
+if (
+	declaredExtensions.length === 0 ||
+	declaredExtensions.some((entry) => entry.trim().length === 0)
+) {
+	throw new Error("package.json pi.extensions must be a non-empty string list");
+}
+const expectedExtensions = declaredExtensions.map((entry) => resolve(root, entry)).sort();
 const temp = mkdtempSync(join(tmpdir(), "pi-fitch-kit-package-"));
 const home = join(temp, "home");
 const agentDir = join(home, "agent");
@@ -200,8 +216,11 @@ try {
 	if (extensions.errors.length > 0) {
 		throw new Error(`Extension load errors: ${JSON.stringify(extensions.errors)}`);
 	}
-	if (extensions.extensions.length !== 7) {
-		throw new Error(`Expected 7 extensions, got ${extensions.extensions.length}`);
+	const loadedExtensions = extensions.extensions.map(({ resolvedPath }) => resolvedPath).sort();
+	if (JSON.stringify(loadedExtensions) !== JSON.stringify(expectedExtensions)) {
+		throw new Error(
+			`Expected extensions ${JSON.stringify(expectedExtensions)}, got ${JSON.stringify(loadedExtensions)}`,
+		);
 	}
 	const cleanFooter = extensions.extensions.find(({ path }) =>
 		path.endsWith("/extensions/clean-footer.ts"),
