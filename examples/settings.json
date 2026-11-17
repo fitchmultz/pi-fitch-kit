@@ -9,8 +9,8 @@
     "openai-codex/gpt-6.2-sol",
     "openai-codex/gpt-6.1-terra",
     "openai-codex/gpt-6-luna",
-    "cloudflare-ai-gateway/gpt-6.2-astra",
-    "cloudflare-ai-gateway/gpt-6.2-sol",
+    "cloudflare-ai-gateway/gpt-6-astra",
+    "cloudflare-ai-gateway/gpt-6.1-sol",
     "cloudflare-ai-gateway/gpt-6.1-terra",
     "cloudflare-ai-gateway/gpt-6-luna"
   ],

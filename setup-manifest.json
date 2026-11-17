@@ -116,8 +116,8 @@
     "openai-codex/gpt-6.2-sol": 400000,
     "openai-codex/gpt-6.1-terra": 400000,
     "openai-codex/gpt-6-luna": 400000,
-    "cloudflare-ai-gateway/gpt-6.2-astra": 400000,
-    "cloudflare-ai-gateway/gpt-6.2-sol": 400000,
+    "cloudflare-ai-gateway/gpt-6-astra": 400000,
+    "cloudflare-ai-gateway/gpt-6.1-sol": 400000,
     "cloudflare-ai-gateway/gpt-6.1-terra": 400000,
     "cloudflare-ai-gateway/gpt-6-luna": 400000
   },
