@@ -89,7 +89,7 @@ Skills work the same way. Pi shows the model a one-line description of each skil
 
 ## Models
 
-My default is `gpt-6-astra` through a ChatGPT subscription at `xhigh` thinking. Claude runs through Anthropic directly or through Cloudflare AI Gateway. The [settings example](../examples/settings.json) lists the routes I enable.
+My default is `gpt-6.2-astra` through a ChatGPT subscription at `xhigh` thinking. Claude runs through Anthropic directly or through Cloudflare AI Gateway. The [settings example](../examples/settings.json) lists the routes I enable.
 
 None of these routes is required. The kit's extensions work with any model, and setup offers only the routes your session can use.
 

@@ -19,6 +19,7 @@ import {
 	openAIStatus,
 	restoreSessionOpenAIMode,
 	ultrafastEligible,
+	ultrafastRequest,
 	updateFooterStatus,
 	writeEnabled,
 	type OpenAIMode,
@@ -109,7 +110,7 @@ const startupFlagError = (
 		return "Use either --fast or --ultrafast, not both. Select /codex-fast on, off, or ultrafast to continue.";
 	}
 	if (ultrafast && !ultrafastEligible(ctx.model)) {
-		return "--ultrafast requires gpt-6-astra on a native OpenAI Responses route. Select a supported model and /codex-fast ultrafast, or /codex-fast off to continue.";
+		return "--ultrafast requires gpt-6.2-astra or gpt-6-astra on a native OpenAI Responses route. Select a supported model and /codex-fast ultrafast, or /codex-fast off to continue.";
 	}
 	return undefined;
 };
@@ -188,7 +189,7 @@ const applyPriorityTier = (
 	}
 	if (tier === "ultrafast") {
 		const model = "model" in payload ? payload.model : undefined;
-		if (!ultrafastEligible(ctx.model) || model !== "gpt-6-astra") {
+		if (!ultrafastRequest(ctx.model, model)) {
 			return undefined;
 		}
 	}
@@ -366,7 +367,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 	});
 	pi.registerFlag("ultrafast", {
 		description:
-			"Start with Astra ultrafast requests (6x API/credit price; cannot combine with --fast)",
+			"Start with Astra ultrafast requests (up to 6x API/credit price; cannot combine with --fast)",
 		type: "boolean",
 		default: false,
 	});
@@ -430,7 +431,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 	registerToggleCommand("fast", OPENAI_TOGGLE, true);
 	pi.registerCommand("ultrafast", {
 		description:
-			"Toggle Astra Ultrafast globally, or use --session for a session-only override (6x API/credit price)",
+			"Toggle Astra Ultrafast globally, or use --session for a session-only override (up to 6x API/credit price)",
 		handler: (args, ctx) => runUltrafastCommand(args, ctx, session, pi),
 	});
 	refreshListeners.push(registerGoogleTier(pi));
