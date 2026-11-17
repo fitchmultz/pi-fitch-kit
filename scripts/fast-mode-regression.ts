@@ -774,15 +774,25 @@ assert.equal(
 	selectedUltraState,
 	"blank /codex-fast remains a status query",
 );
-for (const model of [astra, codexAstra, { ...astra, baseUrl: "https://us.api.openai.com/v1/" }]) {
-	assert.equal((await openaiWireRequest(model)).service_tier, "ultrafast");
+for (const model of [
+	astra,
+	codexAstra,
+	{ ...astra, baseUrl: "https://us.api.openai.com/v1/" },
+	{ ...astra, id: "gpt-6.2-astra" },
+	{ ...codexAstra, id: "gpt-6.2-astra" },
+]) {
+	const payload = await openaiWireRequest(model);
+	assert.equal(payload.service_tier, "ultrafast");
+	assert.equal(payload.model, model.id);
 	await runHandlers("model_select", {}, uiCtx(model));
 	assert.equal(status.get("codex-fast"), "accent:ultrafast requested");
 }
 for (const model of [
 	{ ...astra, id: "gpt-5.6-sol" },
 	{ ...astra, id: "gpt-6.1-sol" },
+	{ ...astra, id: "gpt-6.2-sol" },
 	{ ...astra, id: "gpt-6-astra-extra" },
+	{ ...astra, id: "gpt-6.2-astra-extra" },
 	{ ...astra, api: "openai-completions" as const },
 	{ ...astra, provider: "cloudflare-ai-gateway" },
 	{ ...astra, provider: "opencode" },
@@ -802,6 +812,11 @@ assert.equal(
 	(await openaiWireRequest({ ...astra, id: "gpt-5.6-sol" }, astra)).service_tier,
 	undefined,
 	"serialized model must match, even when the selected model is Astra",
+);
+assert.equal(
+	(await openaiWireRequest({ ...astra, id: "gpt-6.2-astra" }, astra)).service_tier,
+	undefined,
+	"serialized model must be the selected model, even when both are eligible",
 );
 for (const payload of [null, [], "raw", { model: "gpt-6-astra-extra" }]) {
 	assert.equal(await requestPayload(astra, payload), undefined);

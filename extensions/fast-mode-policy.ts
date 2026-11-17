@@ -27,6 +27,7 @@ export const ANTHROPIC_FAST_PROVIDERS = ["anthropic", "cloudflare-ai-gateway"];
 const OPENAI_PROVIDERS = new Set(["openai", "openai-codex", "chatgpt-rotate"]);
 // OpenAI Fast pricing supports these o-series models, not the whole family.
 const OPENAI_PRIORITY_O_MODELS = new Set(["o3", "o3-2025-04-16", "o4-mini", "o4-mini-2025-04-16"]);
+const ULTRAFAST_MODEL_IDS = new Set(["gpt-6.2-astra", "gpt-6-astra"]);
 // Ultrafast only rides native global/US OpenAI Responses or Codex Responses routes.
 const NATIVE_OPENAI_BASE_URLS = new Set([
 	"https://api.openai.com/v1",
@@ -83,9 +84,9 @@ export type OpenAIMode = "off" | "priority" | "ultrafast";
 export type SessionOpenAIMode = "off" | "ultrafast";
 export const SESSION_MODE_ENTRY = "openai-ultrafast";
 export const ULTRAFAST_UNAVAILABLE =
-	"Ultrafast requires gpt-6-astra on a native OpenAI Responses route; other models, non-US regional endpoints and gateways are not supported. No mode was changed.";
+	"Ultrafast requires gpt-6.2-astra or gpt-6-astra on a native OpenAI Responses route; other models, non-US regional endpoints and gateways are not supported. No mode was changed.";
 export const ULTRAFAST_NOTICE =
-	"6x API/credit price; 8x Codex included usage (Pro $500 or eligible Enterprise/Edu). Entitlement and rate limits apply; native cost accounting requires Ultrafast-capable Pi.";
+	"gpt-6.2-astra: 3x API/credit price through 28 Feb 2027, then 6x; 6x Codex included usage. gpt-6-astra: 6x API/credit price; 8x Codex included usage. Codex needs Pro $500 or eligible Enterprise/Edu. Entitlement and rate limits apply; native cost accounting requires Ultrafast-capable Pi.";
 
 export type Toggle = {
 	/** Slash command name and footer status key. */
@@ -115,7 +116,7 @@ export const ANTHROPIC_TOGGLE: Toggle = {
 export const OPENAI_TOGGLE: Toggle = {
 	name: "codex-fast",
 	label: "OpenAI",
-	description: "Select OpenAI priority/fast or Astra ultrafast mode (6x API/credit price)",
+	description: "Select OpenAI priority/fast or Astra ultrafast mode (up to 6x API/credit price)",
 	statePath: join(getAgentDir(), "openai-codex-fast.json"),
 	eligible: (model) =>
 		model?.provider !== undefined &&
@@ -177,7 +178,7 @@ export function createStateWatcher(
 }
 
 export function ultrafastEligible(model: FastModel): boolean {
-	if (model?.id !== "gpt-6-astra") {
+	if (model?.id === undefined || !ULTRAFAST_MODEL_IDS.has(model.id)) {
 		return false;
 	}
 	const baseUrl = model.baseUrl?.replace(/\/+$/, "");
@@ -192,6 +193,11 @@ export function ultrafastEligible(model: FastModel): boolean {
 		model.api === "openai-codex-responses" &&
 		NATIVE_CODEX_BASE_URLS.has(baseUrl)
 	);
+}
+
+/** True when a request's serialized model is the selected Ultrafast-eligible model. */
+export function ultrafastRequest(model: FastModel, payloadModel: unknown): boolean {
+	return ultrafastEligible(model) && payloadModel === model?.id;
 }
 
 export function openAIMode(): OpenAIMode {
