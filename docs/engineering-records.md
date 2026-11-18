@@ -6,7 +6,7 @@ Records for the engineering standard adopted in `docs/engineering-standard.md` (
 
 - **Repository:** `fitchmultz/pi-fitch-kit`; adopted standard version **v5.1.2**. Adopted copy digest (sha256, after oxfmt): `414820464b9eadfb645ea51dbd1ef3eac9c52958b986f19f44feaf79d2fae333`.
 - **Runtimes and package manager:** Node `^24.22.3 || >=26.13.1` (npm `12.2.0`).
-- **Installed tool versions:** oxlint `1.90.0`, oxfmt `0.75.0`, oxlint-tsgolint `7.0.2005`, typescript `7.0.2`.
+- **Installed tool versions:** oxlint `1.94.0`, oxfmt `0.79.0`, tsrs `7.1.0-beta.tsrs2`, typescript `7.0.2`.
 - **Config paths:** `.oxlintrc.json` (Appendix A baseline plus role-mapped profile overrides), `.oxfmtrc.json` (section 7.1 settings preserving the established tab convention for TypeScript; JSON keeps 2-space output so npm-managed files stay stable).
 - **Acceptance paths:** `npm run check` (`scripts/run-gates.ts`: typecheck, lint, format, tests — aggregated so one failure cannot hide the rest), `npm run smoke` for package loading; hosted CI runs `npm run check:compat` through the fleet `pi-compatibility` workflow. `npm run lint` runs the full baseline lint.
 - **Compiler projects and source profiles:** single `tsconfig.json` project. Production profile: `extensions/*.ts`, `scripts/validate.ts`. Test profile: the regression/smoke/boundary scripts under `scripts/`. No handwritten declarations exist in this repository, so `skipLibCheck: true` retains no unchecked handwritten declaration (section 4.2 allows an application to retain `skipLibCheck` when no handwritten declarations require a focused check).
@@ -20,7 +20,7 @@ Records for the engineering standard adopted in `docs/engineering-standard.md` (
 
 ```text
 ID and title: QX-001 — five-parameter tool execute callbacks in kit extensions.
-Rule, option, or threshold; installed tool versions: eslint/max-params (maximum 4); oxlint 1.90.0, oxlint-tsgolint 7.0.2005, typescript 7.0.2.
+Rule, option, or threshold; installed tool versions: eslint/max-params (maximum 4); oxlint 1.94.0, tsrs 7.1.0-beta.tsrs2, typescript 7.0.2.
 Scope: files, authorized operations, origins, or bounded pattern: execute callbacks passed to pi.registerTool in extensions/*.ts; the callback implements Pi's documented tool contract and cannot drop a parameter.
 Directive selectors/inventory and optional duplication bounds: oxlint-disable-next-line eslint/max-params on exactly the two execute sites — extensions/session-name.ts:310 and extensions/setup-models.ts:15. No other max-params directive exists in the repository.
 Diagnostic and required contract: oxlint reports eslint(max-params) "5 parameters, maximum allowed is 4" on each callback. Pi's installed declaration requires all five — execute(toolCallId, params, signal, onUpdate, ctx) at @earendil-works/pi-coding-agent dist/core/extensions/types.d.ts:514 — and the callbacks are assigned against that declaration.
@@ -36,7 +36,7 @@ Review and revisit trigger: any new pi.registerTool execute site, any change to 
 
 ```text
 ID and title: QX-002 — partial Pi fixtures behind narrowing casts in regression scripts.
-Rule, option, or threshold; installed tool versions: typescript/no-unsafe-type-assertion; oxlint 1.90.0, oxlint-tsgolint 7.0.2005, typescript 7.0.2.
+Rule, option, or threshold; installed tool versions: typescript/no-unsafe-type-assertion; oxlint 1.94.0, tsrs 7.1.0-beta.tsrs2, typescript 7.0.2.
 Scope: files, authorized operations, origins, or bounded pattern: offline regression scripts under scripts/ that drive real kit extensions with deliberately partial fixtures — recorders for ExtensionAPI/ExtensionCommandContext, a setFooter stub, a narrower ui.custom fixture, and a partial handler-context for one hook member.
 Directive selectors/inventory and optional duplication bounds: five oxlint-disable/oxlint-disable-next-line typescript/no-unsafe-type-assertion directives, all tagged QX-002 — scripts/test-harness.ts:88 (module-scoped), scripts/clean-footer-regression.ts:293, scripts/image-budget-regression.ts:207, scripts/session-name-regression.ts:488, scripts/write-prompt-regression.ts:85. No other no-unsafe-type-assertion directive exists outside QX-003's transport disables.
 Diagnostic and required contract: oxlint reports unsafe narrowing casts (e.g. "type 'X' is more narrow than the original type") where a partial fixture is cast to Pi's complete context interfaces. The fixtures intentionally provide only the members the code under test reads; building complete ExtensionAPI/ExtensionUIContext/TUI implementations would mock the very surfaces these regressions verify against the real host.
@@ -52,7 +52,7 @@ Review and revisit trigger: any new cast-to-Pi-interface site in scripts/, chang
 
 ```text
 ID and title: QX-003 — offline transport disable via WebSocket override.
-Rule, option, or threshold; installed tool versions: typescript/no-unsafe-type-assertion; oxlint 1.90.0, oxlint-tsgolint 7.0.2005, typescript 7.0.2.
+Rule, option, or threshold; installed tool versions: typescript/no-unsafe-type-assertion; oxlint 1.94.0, tsrs 7.1.0-beta.tsrs2, typescript 7.0.2.
 Scope: files, authorized operations, origins, or bounded pattern: offline boundary regressions that must guarantee no network transport can leave the process; assigning undefined to globalThis.WebSocket forces Pi's native auto transport onto the stubbed fetch endpoint.
 Directive selectors/inventory and optional duplication bounds: two oxlint-disable-next-line directives, both tagged QX-003 — scripts/session-name-boundary.ts:77 and scripts/write-prompt-boundary.ts:151. No other transport-disable cast exists.
 Diagnostic and required contract: `globalThis.WebSocket = undefined as unknown as typeof WebSocket` is an intentionally invalid runtime state (the global read thereafter yields undefined), so the assertion is flagged unsafe. The boundary regressions require exactly this: with WebSockets unavailable, the native transport must fall back to the fake HTTP endpoint, and any code path that still constructs a WebSocket fails the run.
@@ -68,7 +68,7 @@ Review and revisit trigger: any new offline boundary script needing the transpor
 
 ```text
 ID and title: QX-005 — unawaited abort when closing a native dialog.
-Rule, option, or threshold; installed tool versions: typescript/no-floating-promises; oxlint 1.90.0, oxlint-tsgolint 7.0.2005, typescript 7.0.2.
+Rule, option, or threshold; installed tool versions: typescript/no-floating-promises; oxlint 1.94.0, tsrs 7.1.0-beta.tsrs2, typescript 7.0.2.
 Scope: files, authorized operations, origins, or bounded pattern: scripts/session-name-boundary.ts:736, a dialog-answer stub that closes the dialog by aborting its own signal.
 Directive selectors/inventory and optional duplication bounds: exactly one oxlint-disable-next-line typescript/no-floating-promises, tagged QX-005.
 Diagnostic and required contract: current.abort() returns a promise that the stub intentionally does not await. Awaiting it would deadlock: the abort resolves the dialog the awaiting code is inside, and the boundary regression drives the dialog through its real close path.
