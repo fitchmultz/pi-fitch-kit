@@ -233,7 +233,7 @@ Native runtime type stripping is not typechecking and does not implement arbitra
 
 ### 5.1 Published tools and compatibility
 
-Use the latest stable published releases of Oxlint, `tsrs` (`tsrs-lint` for type-aware rules, replacing `oxlint-tsgolint`), Oxfmt, and any additional quality-tooling packages introduced by this standard. Resolve current releases when adopting or upgrading the toolchain. This standard prescribes no package version numbers or upgrade waiting period. Keep the canonical compiler/framework checker as a separate required gate.
+Use the latest stable published releases of Oxlint, `oxlint-tsgolint`, Oxfmt, and any additional quality-tooling packages introduced by this standard. Resolve current releases when adopting or upgrading the toolchain. This standard prescribes no package version numbers or upgrade waiting period. Keep the canonical compiler/framework checker as a separate required gate.
 
 Keep dependencies current through the repository's update workflow. Commit the updated dependency declarations and lockfile with each upgrade so local development, agents, CI, and supported editor integrations use the same resolved dependency tree. The lockfile records the current installation for reproducibility; it does not restrict how frequently dependencies may be updated. Automated and frequent upgrades are permitted.
 

@@ -6,13 +6,13 @@ Records for the engineering standard adopted in `docs/engineering-standard.md` (
 
 - **Repository:** `fitchmultz/pi-fitch-kit`; adopted standard version **v5.1.2**. Adopted copy digest (sha256, after oxfmt): `414820464b9eadfb645ea51dbd1ef3eac9c52958b986f19f44feaf79d2fae333`.
 - **Runtimes and package manager:** Node `^24.22.3 || >=26.13.1` (npm `12.2.0`).
-- **Installed tool versions:** oxlint `1.94.0`, oxfmt `0.79.0`, tsrs `7.1.0-beta.tsrs2`, typescript `7.0.2`.
+- **Installed tool versions:** oxlint `1.94.0`, oxfmt `0.79.0`, tsrs `7.1.0-beta.tsrs2` (Section 2 exception QX-006 replacing stable `oxlint-tsgolint`), typescript `7.0.2`.
 - **Config paths:** `.oxlintrc.json` (Appendix A baseline plus role-mapped profile overrides), `.oxfmtrc.json` (section 7.1 settings preserving the established tab convention for TypeScript; JSON keeps 2-space output so npm-managed files stay stable).
 - **Acceptance paths:** `npm run check` (`scripts/run-gates.ts`: typecheck, lint, format, tests — aggregated so one failure cannot hide the rest), `npm run smoke` for package loading; hosted CI runs `npm run check:compat` through the fleet `pi-compatibility` workflow. `npm run lint` runs the full baseline lint.
 - **Compiler projects and source profiles:** single `tsconfig.json` project. Production profile: `extensions/*.ts`, `scripts/validate.ts`. Test profile: the regression/smoke/boundary scripts under `scripts/`. No handwritten declarations exist in this repository, so `skipLibCheck: true` retains no unchecked handwritten declaration (section 4.2 allows an application to retain `skipLibCheck` when no handwritten declarations require a focused check).
 - **Formatter and generator ownership:** oxfmt owns all supported maintained files (`.ts`, `.mjs`, `.md`, `.json`, `.yaml`) except `package-lock.json`, whose formatting owner is npm. No maintained generator output exists in this repository.
 - **Migration status:** **complete.** Phased per section 9.2: the toolchain and formatter PR, the extensions PR, and the scripts PR each landed with their scope passing the full strict baseline, and this final PR wires repo-wide lint enforcement into `npm run check`. All maintained sources — `extensions/*.ts`, `scripts/*.ts` — pass the strict compiler options (noImplicitReturns, noFallthroughCasesInSwitch, noImplicitOverride, noUncheckedIndexedAccess, exactOptionalPropertyTypes, noUncheckedSideEffectImports, forceConsistentCasingInFileNames) and the type-aware lint baseline with warnings denied, with no finding budgets, baseline filtering, or incomplete-source exemptions remaining. The remaining `.oxlintrc.json` overrides are role-mapped profile settings for test scripts (complexity 15, max-depth 4, max-params 6, size limits off), not migration allowances.
-- **Integrated verification:** on the fully integrated tree of this final PR (merge of the scripts-phase head `5411daa` plus this change): `npm run check` exits 0 — typecheck pass, lint pass (oxlint --deny-warnings ., 0 findings), format pass, tests pass (33 tests, 0 failures); `npm run smoke` exits 0 loading all 7 extensions; `npm run regression:clean-footer`, `regression:paged-reader`, `regression:session-name`, `regression:fast-mode`, and `regression:write-prompt` each exit 0 on the integrated tree, and `node --test scripts/validate-regression.ts` exits 0 (the validate suite also runs inside the tests gate). Hosted CI (`pi-compatibility` fleet: official and fork hosts, ubuntu/macos, Node 24 and 26) passed on each phase PR's head revision.
+- **Integrated verification:** requalified 2026-11-18 with `oxlint 1.94.0`, `tsrs 7.1.0-beta.tsrs2`, and `oxfmt 0.79.0`: `npm run check:compat` (`npm run check && npm run smoke`: `tsc --noEmit`, `oxlint --deny-warnings .`, `oxfmt --check .`, `node --test` suites, and 7-extension package load smoke) exits 0; the adoption copy digest (`docs/engineering-standard.md`) stays verbatim `v5.1.2` (`414820464b9eadfb645ea51dbd1ef3eac9c52958b986f19f44feaf79d2fae333`).
 
 ## Quality-exception record
 
@@ -78,6 +78,22 @@ Structural comparison or unsafe-type evidence, where applicable: the unawaited p
 Verification commands, relevant tests, and results: `node_modules/.bin/oxlint --deny-warnings scripts/` exits 0; `npm run regression:session-name` exits 0 including the dialog-close scenario.
 Retained protection, lost detection, and established assumptions: no-floating-promises still enforces every other promise in the repository. Assumes the dialog stub keeps the abort-to-close shape.
 Review and revisit trigger: any new fire-and-forget abort in scripts/ or a Pi dialog API change that makes awaiting abort safe.
+```
+
+### QX-006 — Prerelease `tsrs` type-aware backend in place of stable `oxlint-tsgolint`
+
+```text
+ID and title: QX-006 — adopt prerelease tsrs@7.1.0-beta.tsrs2 as the type-aware lint backend in place of stable oxlint-tsgolint.
+Rule, option, or threshold; installed tool versions: Standard §5.1 ("latest stable published releases of Oxlint, oxlint-tsgolint, Oxfmt"); oxlint 1.94.0 (2026-11-16T12:26Z), tsrs 7.1.0-beta.tsrs2 (2026-11-16T11:59Z), oxfmt 0.79.0 (2026-11-16T12:27Z), typescript 7.0.2.
+Scope: files, authorized operations, origins, or bounded pattern: package.json / package-lock.json devDependencies and type-aware lint execution across the repository (oxlint discovers node_modules/.bin/tsrs-lint natively).
+Directive selectors/inventory and optional duplication bounds: none; backend package substitution only (QX-001 through QX-005 directive inventories remain unchanged).
+Diagnostic and required contract: Standard §5.1 requires stable published releases, whereas tsrs publishes prereleases only (dist-tags.latest is 0.25.0-ts7.1.0-beta; 7.1.0-beta.tsrs2 is an untagged newer prerelease; stable oxlint-tsgolint 7.0.2007 remains published on npm).
+Actual compliant alternative and demonstrated quality cost: retaining stable oxlint-tsgolint@7.0.2007 meets §5.1 literally at ~2.9x–5.3x slower type-aware lint execution and ~3x–6x higher peak memory across ecosystem repos.
+Chosen adjustment and why its scope is appropriate: owner-approved substitution of tsrs@7.1.0-beta.tsrs2; oxlint 1.94.0 discovers tsrs-lint automatically and fails closed if missing. All Appendix A type-aware rules and tsc compiler checks remain intact.
+Structural comparison or unsafe-type evidence, where applicable: verified by requalifying repo-wide `oxlint --deny-warnings .` and `npm run check:compat` (including QX-001..QX-005 directive checks with reportUnusedDisableDirectives: error).
+Verification commands, relevant tests, and results: `npm run check:compat` (tsc --noEmit, oxlint --deny-warnings ., oxfmt --check ., node --test suites, and smoke) exits 0 on 2026-11-18.
+Retained protection, lost detection, and established assumptions: all type-aware lint rules, directive inventories, and compiler checks stay enabled; assumes tsrs@7.1.0-beta.tsrs2 preserves diagnostic parity with oxlint-tsgolint.
+Review and revisit trigger: first stable tsrs release, any oxlint release changing backend discovery, or any type-aware diagnostic parity regression.
 ```
 
 Records for the engineering standard adopted in `docs/engineering-standard.md` (Strict Oxlint and Oxfmt Engineering Standard, v5.1.2). The standard's Appendix B defines the required record shapes.
