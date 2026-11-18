@@ -814,8 +814,12 @@ for (const model of [
 		"unsupported routes must not fall back to priority",
 	);
 	await runHandlers("model_select", {}, uiCtx(model));
-	assert.equal(status.get("codex-fast"), "warning:ultrafast unavailable");
+	assert.equal(status.get("codex-fast"), undefined, "ineligible routes clear the Ultrafast footer");
 }
+await runHandlers("model_select", {}, uiCtx(MODELS.anthropicOpus));
+assert.equal(status.get("codex-fast"), undefined);
+await runHandlers("model_select", {}, uiCtx({ ...astra, id: "gpt-6.2-sol" }));
+assert.equal(status.get("codex-fast"), "accent:ultrafast requested");
 assert.equal(
 	(await openaiWireRequest({ ...astra, id: "gpt-5.6-sol" }, astra)).service_tier,
 	undefined,
@@ -1016,7 +1020,9 @@ assert.equal(
 	"session activation succeeds on gpt-6.2-sol",
 );
 await runHandlers("model_select", {}, uiCtx(MODELS.openai, sessionA));
-assert.equal(status.get("codex-fast"), "warning:session ultrafast unavailable");
+assert.equal(status.get("codex-fast"), undefined);
+await runHandlers("model_select", {}, uiCtx({ ...codexAstra, id: "gpt-6.2-sol" }, sessionA));
+assert.equal(status.get("codex-fast"), "accent:session ultrafast requested");
 const beforeInvalid = readFileSync(sessionFile, "utf8");
 const beforeInvalidShared = readFileSync(statePath, "utf8");
 for (const args of ["reset", "on off", "on --session --session", "on --unknown"]) {
