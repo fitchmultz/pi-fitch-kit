@@ -8,7 +8,13 @@ import type {
 	ReadonlyFooterDataProvider,
 	Theme,
 } from "@earendil-works/pi-coding-agent";
-import { indexedColor, styleText, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import {
+	indexedColor,
+	replaceControlCharacters,
+	styleText,
+	visibleWidth,
+	wrapTextWithAnsi,
+} from "@earendil-works/pi-tui";
 
 const CHECKPOINT_ENTRY = "clean-footer-checkpoint";
 
@@ -95,7 +101,10 @@ function sanitize(text: string): string {
 }
 
 const trimmedOrUndefined = (text: string | undefined): string | undefined => {
-	const trimmed = text?.trim();
+	if (text === undefined) {
+		return undefined;
+	}
+	const trimmed = replaceControlCharacters(text).trim();
 	return trimmed === "" ? undefined : trimmed;
 };
 
@@ -232,16 +241,20 @@ const renderLocation = (frame: FooterFrame): string => {
 	const name = frame.repoLabels.label(cwd);
 	let location =
 		name !== undefined
-			? styleText(name.text, { fg: indexedColor(repoColor(name.key)) }, "256color")
-			: frame.theme.fg("dim", formatCwd(cwd));
+			? styleText(
+					replaceControlCharacters(name.text),
+					{ fg: indexedColor(repoColor(name.key)) },
+					"256color",
+				)
+			: frame.theme.fg("dim", replaceControlCharacters(formatCwd(cwd)));
 	// getGitBranch crawls into the home dotfiles repo; only show a branch for a real project repo.
 	const branch = frame.footerData.getGitBranch();
 	if (branch !== null && branch !== "" && name !== undefined) {
-		location += frame.theme.fg("dim", ` (${branch})`);
+		location += frame.theme.fg("dim", ` (${replaceControlCharacters(branch)})`);
 	}
 	const { sessionName } = frame.snapshot;
 	if (sessionName !== undefined) {
-		location += frame.theme.fg("dim", ` • ${sessionName}`);
+		location += frame.theme.fg("dim", ` • ${replaceControlCharacters(sessionName)}`);
 	}
 	return location;
 };
@@ -269,12 +282,14 @@ const contextSegment = (frame: FooterFrame, usage: ContextUsage | undefined): st
 
 /** Right-aligned segment: model, thinking level, provider, and verbosity. */
 const renderRightSegment = (frame: FooterFrame): string => {
-	const model = frame.ctx.model?.id.split("/").pop() ?? "no-model";
+	const model = replaceControlCharacters(frame.ctx.model?.id.split("/").pop() ?? "no-model");
 	const thinking =
-		frame.ctx.model?.reasoning === true ? ` • ${frame.ctx.thinkingLevel ?? "off"}` : "";
+		frame.ctx.model?.reasoning === true
+			? ` • ${replaceControlCharacters(frame.ctx.thinkingLevel ?? "off")}`
+			: "";
 	const provider =
 		frame.footerData.getAvailableProviderCount() > 1 && frame.ctx.model !== undefined
-			? `(${frame.ctx.model.provider}) `
+			? `(${replaceControlCharacters(frame.ctx.model.provider)}) `
 			: "";
 	const verbosity = frame.footerData.getExtensionStatuses().get("verbosity");
 	const suffix = verbosity !== undefined && verbosity !== "" ? ` • ${sanitize(verbosity)}` : "";

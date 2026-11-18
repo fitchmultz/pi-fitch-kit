@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { validateToolArguments } from "@earendil-works/pi-ai";
 import {
 	createExtensionRuntime,
 	type ExtensionContext,
@@ -145,6 +146,16 @@ assert.match(guidelines, /name must contain coordinator/);
 assert.match(guidelines, /exact numbered subagent identifier/);
 assert.match(guidelines, /asks the user to confirm/);
 assert.match(JSON.stringify(tool.parameters), /avoid spaces/);
+assert.throws(
+	() =>
+		validateToolArguments(tool, {
+			type: "toolCall",
+			id: "extra-field",
+			name: "name_session",
+			arguments: { name: "valid-name", extra: true },
+		}),
+	/Validation failed/,
+);
 
 const first = await tool.execute(
 	"first",

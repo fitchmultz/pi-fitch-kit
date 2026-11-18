@@ -1361,6 +1361,40 @@ for (const command of ["draft", "unreasonable", "side-question"]) {
 	}
 }
 
+// Draft dialog strips VT/OSC escape sequences from rendered draft text.
+let escapeCalls = 0;
+await writerCommand("draft").handler(
+	"escape check",
+	ctx({
+		mode: "tui",
+		ui: {
+			...baseUi,
+			custom: async (factory: WidgetFactory) => {
+				if (++escapeCalls === 1) {
+					return "\x1b[31mbetter\x1b[39m prompt\x1b]0;title\x07";
+				}
+				const dialog = factory(
+					{
+						requestRender() {
+							return;
+						},
+						terminal: { rows: 40 },
+					},
+					{ fg: (_color: string, text: string) => text },
+					{},
+					() => {
+						return;
+					},
+				);
+				const screen = dialog.render(80).join("\n");
+				assert.match(screen, /better prompt/);
+				assert.ok(!screen.includes("\x1b[31m") && !screen.includes("\x1b]0;"));
+				return "Deny";
+			},
+		},
+	}),
+);
+
 // Exercise the actual TUI menu and keyboard selection, including the recovery action.
 for (const action of ["Accept", "Restore original"] as const) {
 	let calls = 0;
