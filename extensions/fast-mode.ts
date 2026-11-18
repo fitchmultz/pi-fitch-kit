@@ -2,6 +2,7 @@ import type {
 	BeforeProviderRequestEvent,
 	ExtensionAPI,
 	ExtensionContext,
+	ProviderStreamEvent,
 	SessionStartEvent,
 } from "@earendil-works/pi-coding-agent";
 import {
@@ -54,17 +55,46 @@ const clearStartupError = (): void => {
 	startupGlobals[STARTUP_STATE] = {};
 };
 
+const TERMINAL_RESPONSES = new Set<unknown>([
+	"response.completed",
+	"response.done",
+	"response.incomplete",
+]);
+const RETURNED_TIER_STATUS = new Map<unknown, string>([
+	["ultrafast", "OpenAI confirmed Ultrafast"],
+	["default", "OpenAI reported Standard"],
+]);
+const UNCONFIRMED_ULTRAFAST = "OpenAI did not confirm Ultrafast";
+
+function returnedTierStatus(data: unknown): string | undefined {
+	if (
+		data === null ||
+		typeof data !== "object" ||
+		!("type" in data) ||
+		!TERMINAL_RESPONSES.has(data.type)
+	) {
+		return undefined;
+	}
+	const response = "response" in data ? data.response : undefined;
+	if (response === null || typeof response !== "object" || !("service_tier" in response)) {
+		return UNCONFIRMED_ULTRAFAST;
+	}
+	return RETURNED_TIER_STATUS.get(response.service_tier) ?? UNCONFIRMED_ULTRAFAST;
+}
+
 /** Session-scoped OpenAI tier override and footer wiring for one factory. */
 class FastModeSession {
 	private sessionId: string | undefined;
 	private localMode: SessionOpenAIMode | undefined;
 	private footerContext: ExtensionContext | undefined;
+	private lastReply: { model: NonNullable<ExtensionContext["model"]>; status: string } | undefined;
 
 	localModeFor(ctx: ExtensionContext): SessionOpenAIMode | undefined {
 		const id = ctx.sessionManager.getSessionId();
 		if (this.sessionId !== id) {
 			this.sessionId = id;
 			this.localMode = restoreSessionOpenAIMode(ctx);
+			this.lastReply = undefined;
 		}
 		return this.localMode;
 	}
@@ -77,6 +107,49 @@ class FastModeSession {
 		this.sessionId = ctx.sessionManager.getSessionId();
 		this.localMode = restoreSessionOpenAIMode(ctx);
 		this.footerContext = ctx;
+		this.lastReply = undefined;
+	}
+
+	observeReply(
+		{ data, provider, api, model: id }: ProviderStreamEvent,
+		ctx: ExtensionContext,
+	): void {
+		const status = returnedTierStatus(data);
+		if (status === undefined) {
+			return;
+		}
+		const model = ctx.model;
+		if (
+			model?.id !== id ||
+			model.provider !== provider ||
+			model.api !== api ||
+			!ultrafastEligible(model) ||
+			this.effectiveMode(ctx) !== "ultrafast"
+		) {
+			return;
+		}
+		this.lastReply = { model, status };
+	}
+
+	replyStatus(ctx: ExtensionContext): string {
+		const model = ctx.model;
+		if (
+			this.effectiveMode(ctx) !== "ultrafast" ||
+			model === undefined ||
+			!ultrafastEligible(model)
+		) {
+			return "";
+		}
+		const reply = this.lastReply;
+		if (
+			reply?.model.id === model.id &&
+			reply.model.provider === model.provider &&
+			reply.model.api === model.api &&
+			reply.model.baseUrl === model.baseUrl
+		) {
+			return ` Last reply: ${reply.status}.`;
+		}
+		return " No reply observed for this model with Ultrafast enabled in this Pi run.";
 	}
 
 	setFooterContext(ctx: ExtensionContext): void {
@@ -110,7 +183,7 @@ const startupFlagError = (
 		return "Use either --fast or --ultrafast, not both. Select /codex-fast on, off, or ultrafast to continue.";
 	}
 	if (ultrafast && !ultrafastEligible(ctx.model)) {
-		return "--ultrafast requires gpt-6.2-astra, gpt-6.2-sol, or gpt-6-astra on a native OpenAI Responses route. Select a supported model and /codex-fast ultrafast, or /codex-fast off to continue.";
+		return `${ULTRAFAST_UNAVAILABLE} Select a supported model and run /ultrafast on, or run /ultrafast off to continue.`;
 	}
 	return undefined;
 };
@@ -354,7 +427,8 @@ const runUltrafastCommand = async (
 		clearStartupError();
 	}
 	updateFooterStatus(ctx, session.localModeFor(ctx));
-	notify(ctx, openAIStatus(ctx, session.localModeFor(ctx)));
+	const reply = command === "status" ? session.replyStatus(ctx) : "";
+	notify(ctx, openAIStatus(ctx, session.localModeFor(ctx), reply));
 };
 
 export default function fastMode(pi: ExtensionAPI): void {
@@ -367,7 +441,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 	});
 	pi.registerFlag("ultrafast", {
 		description:
-			"Start with OpenAI ultrafast requests (GPT-6.2 Astra/Sol or GPT-6 Astra; up to 6x API/credit price; cannot combine with --fast)",
+			"Start with Ultrafast requests on supported OpenAI or ChatGPT rotation models (up to 6x API/credit price; cannot combine with --fast)",
 		type: "boolean",
 		default: false,
 	});
@@ -392,6 +466,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 	// service_tier is OpenAI/xAI priority; gate by provider so other
 	// OpenAI-compatible endpoints never receive it.
 	pi.on("before_provider_request", (event, ctx) => applyPriorityTier(event, ctx, session));
+	pi.on("provider_stream_event", (event, ctx) => session.observeReply(event, ctx));
 
 	const refreshListeners: Array<() => void> = [() => session.refreshFooter()];
 	const stateWatcher = createStateWatcher(

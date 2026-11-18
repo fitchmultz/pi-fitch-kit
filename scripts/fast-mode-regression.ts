@@ -693,6 +693,9 @@ const codexAstra = openaiCodexProvider()
 	.find((model) => model.id === "gpt-6-astra");
 assert.ok(astra);
 assert.ok(codexAstra);
+const rotatedCodexAstra = { ...codexAstra, provider: "chatgpt-rotate" };
+const codexSol62 = { ...codexAstra, id: "gpt-6.2-sol" };
+const rotatedCodexSol62 = { ...codexSol62, provider: "chatgpt-rotate" };
 
 async function openaiWireRequest(
 	model: Model<Api>,
@@ -778,25 +781,28 @@ assert.equal(
 	selectedUltraState,
 	"blank /codex-fast remains a status query",
 );
-for (const model of [
+const nativeUltrafast = [
 	astra,
-	codexAstra,
 	{ ...astra, baseUrl: "https://us.api.openai.com/v1/" },
 	{ ...astra, id: "gpt-6.2-astra" },
 	{ ...astra, id: "gpt-6.2-sol" },
 	{ ...astra, id: "gpt-6.2-sol", baseUrl: "https://us.api.openai.com/v1/" },
-	{ ...codexAstra, id: "gpt-6.2-astra" },
-	{ ...codexAstra, id: "gpt-6.2-sol" },
+	{ ...astra, id: "gpt-6.1-sol" },
+	{ ...astra, id: "gpt-6.1-sol", baseUrl: "https://eu.api.openai.com/v1" },
+];
+for (const { model, selected } of [
+	...nativeUltrafast.map((native) => ({ model: native, selected: native })),
+	{ model: { ...rotatingSol, provider: "openai" }, selected: rotatingSol },
+	{ model: codexSol62, selected: rotatedCodexSol62 },
 ]) {
-	const payload = await openaiWireRequest(model);
+	const payload = await openaiWireRequest(model, selected);
 	assert.equal(payload.service_tier, "ultrafast");
 	assert.equal(payload.model, model.id);
-	await runHandlers("model_select", {}, uiCtx(model));
+	await runHandlers("model_select", {}, uiCtx(selected));
 	assert.equal(status.get("codex-fast"), "accent:ultrafast requested");
 }
 for (const model of [
 	{ ...astra, id: "gpt-5.6-sol" },
-	{ ...astra, id: "gpt-6.1-sol" },
 	{ ...astra, id: "gpt-6-astra-extra" },
 	{ ...astra, id: "gpt-6.2-astra-extra" },
 	{ ...astra, id: "gpt-6.2-sol-extra" },
@@ -804,7 +810,9 @@ for (const model of [
 	{ ...astra, provider: "cloudflare-ai-gateway" },
 	{ ...astra, id: "gpt-6.2-sol", provider: "cloudflare-ai-gateway" },
 	{ ...astra, provider: "opencode" },
-	{ ...astra, provider: "chatgpt-rotate" },
+	codexAstra,
+	codexSol62,
+	{ ...rotatingSol, baseUrl: "https://proxy.invalid/v1" },
 	{ ...astra, baseUrl: "https://eu.api.openai.com/v1" },
 	{ ...astra, baseUrl: "https://proxy.invalid/v1" },
 ]) {
@@ -816,6 +824,42 @@ for (const model of [
 	await runHandlers("model_select", {}, uiCtx(model));
 	assert.equal(status.get("codex-fast"), undefined, "ineligible routes clear the Ultrafast footer");
 }
+await commandFor(commands, "ultrafast").handler("on", uiCtx(codexAstra));
+assert.match(notices.at(-1) ?? "", /No mode was changed/);
+assert.equal(readFileSync(statePath, "utf8"), selectedUltraState);
+
+const rotationStatus = () =>
+	commandFor(commands, "ultrafast").handler("status", uiCtx(rotatingSol));
+const rotationReply = (type: string, service_tier?: string) =>
+	runHandlers(
+		"provider_stream_event",
+		{
+			provider: rotatingSol.provider,
+			api: rotatingSol.api,
+			model: rotatingSol.id,
+			data: { type, response: { service_tier } },
+		},
+		uiCtx(rotatingSol),
+	);
+await rotationReply("response.created", "ultrafast");
+await rotationStatus();
+assert.match(notices.at(-1) ?? "", /No reply observed/);
+for (const [tier, summary] of [
+	["default", /Last reply: OpenAI reported Standard/],
+	["ultrafast", /Last reply: OpenAI confirmed Ultrafast/],
+	[undefined, /Last reply: OpenAI did not confirm Ultrafast/],
+] as const) {
+	await rotationReply("response.completed", tier);
+	await rotationStatus();
+	assert.match(notices.at(-1) ?? "", summary);
+	assert.equal(
+		status.get("codex-fast"),
+		"accent:ultrafast requested",
+		"footer only reports the request",
+	);
+}
+await commandFor(commands, "ultrafast").handler("status", uiCtx(astra));
+assert.match(notices.at(-1) ?? "", /No reply observed/);
 await runHandlers("model_select", {}, uiCtx(MODELS.anthropicOpus));
 assert.equal(status.get("codex-fast"), undefined);
 await runHandlers("model_select", {}, uiCtx({ ...astra, id: "gpt-6.2-sol" }));
@@ -913,7 +957,7 @@ const sessionFile = sessionA.getSessionFile();
 assert.ok(sessionFile !== undefined && sessionFile !== "", "expected a session file");
 const resumed = SessionManager.open(sessionFile);
 assert.equal(
-	(await openaiWireRequest(codexAstra, codexAstra, resumed)).service_tier,
+	(await openaiWireRequest(codexAstra, rotatedCodexAstra, resumed)).service_tier,
 	"ultrafast",
 	"same-ID resume restores the override",
 );
@@ -1006,22 +1050,16 @@ assert.equal(
 );
 await localCommand("toggle --session");
 assert.equal((await openaiWireRequest(astra, astra, sessionA)).service_tier, "ultrafast");
-await localCommand("off --session", sessionA, { ...codexAstra, id: "gpt-6.2-sol" });
-await localCommand("on --session", sessionA, { ...codexAstra, id: "gpt-6.2-sol" });
+await localCommand("off --session", sessionA, rotatedCodexSol62);
+await localCommand("on --session", sessionA, rotatedCodexSol62);
 assert.equal(
-	(
-		await openaiWireRequest(
-			{ ...codexAstra, id: "gpt-6.2-sol" },
-			{ ...codexAstra, id: "gpt-6.2-sol" },
-			sessionA,
-		)
-	).service_tier,
+	(await openaiWireRequest(codexSol62, rotatedCodexSol62, sessionA)).service_tier,
 	"ultrafast",
 	"session activation succeeds on gpt-6.2-sol",
 );
-await runHandlers("model_select", {}, uiCtx(MODELS.openai, sessionA));
+await runHandlers("model_select", {}, uiCtx(codexSol62, sessionA));
 assert.equal(status.get("codex-fast"), undefined);
-await runHandlers("model_select", {}, uiCtx({ ...codexAstra, id: "gpt-6.2-sol" }, sessionA));
+await runHandlers("model_select", {}, uiCtx(rotatedCodexSol62, sessionA));
 assert.equal(status.get("codex-fast"), "accent:session ultrafast requested");
 const beforeInvalid = readFileSync(sessionFile, "utf8");
 const beforeInvalidShared = readFileSync(statePath, "utf8");
@@ -1093,27 +1131,22 @@ for (const input of recreatedInputs) {
 }
 flags.set("fast", false);
 const offState = readFileSync(statePath, "utf8");
-await runHandlers("session_start", { reason: "startup" }, uiCtx(MODELS.openai));
-assert.equal(readFileSync(statePath, "utf8"), offState);
-assert.deepEqual(await handlerFor(handlers, "input")({}, uiCtx(MODELS.openai)), {
-	action: "handled",
-});
-await commandFor(commands, "codex-fast").handler("off", uiCtx(MODELS.openai));
-await runHandlers(
-	"session_start",
-	{ reason: "startup" },
-	uiCtx({ ...codexAstra, id: "gpt-6.2-sol" }),
-);
+for (const model of [MODELS.openai, codexAstra]) {
+	await runHandlers("session_start", { reason: "startup" }, uiCtx(model));
+	assert.equal(readFileSync(statePath, "utf8"), offState);
+	assert.deepEqual(await handlerFor(handlers, "input")({}, uiCtx(model)), {
+		action: "handled",
+	});
+	await commandFor(commands, "codex-fast").handler("off", uiCtx(model));
+}
+await runHandlers("session_start", { reason: "startup" }, uiCtx(rotatedCodexSol62));
 assert.equal(
-	(await openaiWireRequest({ ...codexAstra, id: "gpt-6.2-sol" })).service_tier,
+	(await openaiWireRequest(codexSol62, rotatedCodexSol62)).service_tier,
 	"ultrafast",
 	"--ultrafast must select the explicit shared tier",
 );
 assert.equal(
-	await handlerFor(handlers, "input")(
-		{ source: "interactive" },
-		uiCtx({ ...codexAstra, id: "gpt-6.2-sol" }),
-	),
+	await handlerFor(handlers, "input")({ source: "interactive" }, uiCtx(rotatedCodexSol62)),
 	undefined,
 	"--ultrafast must allow interactive input on gpt-6.2-sol",
 );
@@ -1409,7 +1442,7 @@ console.log(
 		openaiFast:
 			"native registered hook + gateway Responses wire: supported o3/o4-mini aliases/snapshots only",
 		openaiUltrafast:
-			"native GPT-6.2 Astra/Sol and GPT-6 Astra Responses/Codex wire; shared and session overrides; resume/reload/tree/fork isolation; explicit startup policy",
+			"native OpenAI and rotation wire; no direct Codex Ultrafast; returned tier status; shared and session overrides; resume/reload/tree/fork isolation; explicit startup policy",
 		xaiFast: "provider-gated priority",
 		googleTiers: "native Google SDK wire on direct and gateway routes; persisted shared state",
 		footer: "eligibility-scoped incl. proxy exclusion",
