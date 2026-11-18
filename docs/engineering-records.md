@@ -6,13 +6,13 @@ Records for the engineering standard adopted in `docs/engineering-standard.md` (
 
 - **Repository:** `fitchmultz/pi-fitch-kit`; adopted standard version **v5.1.2**. Adopted copy digest (sha256, after oxfmt): `414820464b9eadfb645ea51dbd1ef3eac9c52958b986f19f44feaf79d2fae333`.
 - **Runtimes and package manager:** Node `^24.22.3 || >=26.13.1` (npm `12.2.0`).
-- **Installed tool versions:** oxlint `1.90.0`, oxfmt `0.75.0`, oxlint-tsgolint `7.0.2005`, typescript `7.0.2`.
+- **Installed tool versions:** oxlint `1.94.0`, oxfmt `0.79.0`, tsrs `7.1.0-beta.tsrs2` (Section 2 exception QX-006 replacing stable `oxlint-tsgolint`), typescript `7.0.2`.
 - **Config paths:** `.oxlintrc.json` (Appendix A baseline plus role-mapped profile overrides), `.oxfmtrc.json` (section 7.1 settings preserving the established tab convention for TypeScript; JSON keeps 2-space output so npm-managed files stay stable).
 - **Acceptance paths:** `npm run check` (`scripts/run-gates.ts`: typecheck, lint, format, tests — aggregated so one failure cannot hide the rest), `npm run smoke` for package loading; hosted CI runs `npm run check:compat` through the fleet `pi-compatibility` workflow. `npm run lint` runs the full baseline lint.
 - **Compiler projects and source profiles:** single `tsconfig.json` project. Production profile: `extensions/*.ts`, `scripts/validate.ts`. Test profile: the regression/smoke/boundary scripts under `scripts/`. No handwritten declarations exist in this repository, so `skipLibCheck: true` retains no unchecked handwritten declaration (section 4.2 allows an application to retain `skipLibCheck` when no handwritten declarations require a focused check).
 - **Formatter and generator ownership:** oxfmt owns all supported maintained files (`.ts`, `.mjs`, `.md`, `.json`, `.yaml`) except `package-lock.json`, whose formatting owner is npm. No maintained generator output exists in this repository.
 - **Migration status:** **complete.** Phased per section 9.2: the toolchain and formatter PR, the extensions PR, and the scripts PR each landed with their scope passing the full strict baseline, and this final PR wires repo-wide lint enforcement into `npm run check`. All maintained sources — `extensions/*.ts`, `scripts/*.ts` — pass the strict compiler options (noImplicitReturns, noFallthroughCasesInSwitch, noImplicitOverride, noUncheckedIndexedAccess, exactOptionalPropertyTypes, noUncheckedSideEffectImports, forceConsistentCasingInFileNames) and the type-aware lint baseline with warnings denied, with no finding budgets, baseline filtering, or incomplete-source exemptions remaining. The remaining `.oxlintrc.json` overrides are role-mapped profile settings for test scripts (complexity 15, max-depth 4, max-params 6, size limits off), not migration allowances.
-- **Integrated verification:** on the fully integrated tree of this final PR (merge of the scripts-phase head `5411daa` plus this change): `npm run check` exits 0 — typecheck pass, lint pass (oxlint --deny-warnings ., 0 findings), format pass, tests pass (33 tests, 0 failures); `npm run smoke` exits 0 loading all 7 extensions; `npm run regression:clean-footer`, `regression:paged-reader`, `regression:session-name`, `regression:fast-mode`, and `regression:write-prompt` each exit 0 on the integrated tree, and `node --test scripts/validate-regression.ts` exits 0 (the validate suite also runs inside the tests gate). Hosted CI (`pi-compatibility` fleet: official and fork hosts, ubuntu/macos, Node 24 and 26) passed on each phase PR's head revision.
+- **Integrated verification:** on the fully integrated tree of the adoption PR (merge of the scripts-phase head `5411daa` plus the adoption change): `npm run check` exits 0 — typecheck pass, lint pass (`oxlint --deny-warnings .`, 0 findings), format pass, tests pass (33 tests, 0 failures); `npm run smoke` exits 0 loading all 7 extensions; `npm run regression:clean-footer`, `regression:paged-reader`, `regression:session-name`, `regression:fast-mode`, and `regression:write-prompt` each exit 0 on the integrated tree, and `node --test scripts/validate-regression.ts` exits 0. Requalification for `tsrs@7.1.0-beta.tsrs2`: code and lockfile tree verified at `15693de` via `npm run check:compat` (`npm run check && npm run smoke`: `tsc --noEmit`, `oxlint --deny-warnings .`, `oxfmt --check .`, `node --test`, and 7-extension load smoke) exiting `0` on `mitchs-m5-mbp` and hosted compatibility CI across ubuntu Node 24/26; this docs-only follow-up updates `docs/engineering-records.md` and exits `0` under `npm run check:compat`. The adoption copy digest (`docs/engineering-standard.md`) stays verbatim `v5.1.2` (`414820464b9eadfb645ea51dbd1ef3eac9c52958b986f19f44feaf79d2fae333`).
 
 ## Quality-exception record
 
@@ -20,7 +20,7 @@ Records for the engineering standard adopted in `docs/engineering-standard.md` (
 
 ```text
 ID and title: QX-001 — five-parameter tool execute callbacks in kit extensions.
-Rule, option, or threshold; installed tool versions: eslint/max-params (maximum 4); oxlint 1.90.0, oxlint-tsgolint 7.0.2005, typescript 7.0.2.
+Rule, option, or threshold; installed tool versions: eslint/max-params (maximum 4); oxlint 1.94.0, tsrs 7.1.0-beta.tsrs2, typescript 7.0.2.
 Scope: files, authorized operations, origins, or bounded pattern: execute callbacks passed to pi.registerTool in extensions/*.ts; the callback implements Pi's documented tool contract and cannot drop a parameter.
 Directive selectors/inventory and optional duplication bounds: oxlint-disable-next-line eslint/max-params on exactly the two execute sites — extensions/session-name.ts:310 and extensions/setup-models.ts:15. No other max-params directive exists in the repository.
 Diagnostic and required contract: oxlint reports eslint(max-params) "5 parameters, maximum allowed is 4" on each callback. Pi's installed declaration requires all five — execute(toolCallId, params, signal, onUpdate, ctx) at @earendil-works/pi-coding-agent dist/core/extensions/types.d.ts:514 — and the callbacks are assigned against that declaration.
@@ -36,7 +36,7 @@ Review and revisit trigger: any new pi.registerTool execute site, any change to 
 
 ```text
 ID and title: QX-002 — partial Pi fixtures behind narrowing casts in regression scripts.
-Rule, option, or threshold; installed tool versions: typescript/no-unsafe-type-assertion; oxlint 1.90.0, oxlint-tsgolint 7.0.2005, typescript 7.0.2.
+Rule, option, or threshold; installed tool versions: typescript/no-unsafe-type-assertion; oxlint 1.94.0, tsrs 7.1.0-beta.tsrs2, typescript 7.0.2.
 Scope: files, authorized operations, origins, or bounded pattern: offline regression scripts under scripts/ that drive real kit extensions with deliberately partial fixtures — recorders for ExtensionAPI/ExtensionCommandContext, a setFooter stub, a narrower ui.custom fixture, and a partial handler-context for one hook member.
 Directive selectors/inventory and optional duplication bounds: five oxlint-disable/oxlint-disable-next-line typescript/no-unsafe-type-assertion directives, all tagged QX-002 — scripts/test-harness.ts:88 (module-scoped), scripts/clean-footer-regression.ts:293, scripts/image-budget-regression.ts:207, scripts/session-name-regression.ts:488, scripts/write-prompt-regression.ts:85. No other no-unsafe-type-assertion directive exists outside QX-003's transport disables.
 Diagnostic and required contract: oxlint reports unsafe narrowing casts (e.g. "type 'X' is more narrow than the original type") where a partial fixture is cast to Pi's complete context interfaces. The fixtures intentionally provide only the members the code under test reads; building complete ExtensionAPI/ExtensionUIContext/TUI implementations would mock the very surfaces these regressions verify against the real host.
@@ -52,7 +52,7 @@ Review and revisit trigger: any new cast-to-Pi-interface site in scripts/, chang
 
 ```text
 ID and title: QX-003 — offline transport disable via WebSocket override.
-Rule, option, or threshold; installed tool versions: typescript/no-unsafe-type-assertion; oxlint 1.90.0, oxlint-tsgolint 7.0.2005, typescript 7.0.2.
+Rule, option, or threshold; installed tool versions: typescript/no-unsafe-type-assertion; oxlint 1.94.0, tsrs 7.1.0-beta.tsrs2, typescript 7.0.2.
 Scope: files, authorized operations, origins, or bounded pattern: offline boundary regressions that must guarantee no network transport can leave the process; assigning undefined to globalThis.WebSocket forces Pi's native auto transport onto the stubbed fetch endpoint.
 Directive selectors/inventory and optional duplication bounds: two oxlint-disable-next-line directives, both tagged QX-003 — scripts/session-name-boundary.ts:77 and scripts/write-prompt-boundary.ts:151. No other transport-disable cast exists.
 Diagnostic and required contract: `globalThis.WebSocket = undefined as unknown as typeof WebSocket` is an intentionally invalid runtime state (the global read thereafter yields undefined), so the assertion is flagged unsafe. The boundary regressions require exactly this: with WebSockets unavailable, the native transport must fall back to the fake HTTP endpoint, and any code path that still constructs a WebSocket fails the run.
@@ -68,7 +68,7 @@ Review and revisit trigger: any new offline boundary script needing the transpor
 
 ```text
 ID and title: QX-005 — unawaited abort when closing a native dialog.
-Rule, option, or threshold; installed tool versions: typescript/no-floating-promises; oxlint 1.90.0, oxlint-tsgolint 7.0.2005, typescript 7.0.2.
+Rule, option, or threshold; installed tool versions: typescript/no-floating-promises; oxlint 1.94.0, tsrs 7.1.0-beta.tsrs2, typescript 7.0.2.
 Scope: files, authorized operations, origins, or bounded pattern: scripts/session-name-boundary.ts:736, a dialog-answer stub that closes the dialog by aborting its own signal.
 Directive selectors/inventory and optional duplication bounds: exactly one oxlint-disable-next-line typescript/no-floating-promises, tagged QX-005.
 Diagnostic and required contract: current.abort() returns a promise that the stub intentionally does not await. Awaiting it would deadlock: the abort resolves the dialog the awaiting code is inside, and the boundary regression drives the dialog through its real close path.
@@ -78,6 +78,22 @@ Structural comparison or unsafe-type evidence, where applicable: the unawaited p
 Verification commands, relevant tests, and results: `node_modules/.bin/oxlint --deny-warnings scripts/` exits 0; `npm run regression:session-name` exits 0 including the dialog-close scenario.
 Retained protection, lost detection, and established assumptions: no-floating-promises still enforces every other promise in the repository. Assumes the dialog stub keeps the abort-to-close shape.
 Review and revisit trigger: any new fire-and-forget abort in scripts/ or a Pi dialog API change that makes awaiting abort safe.
+```
+
+### QX-006 — Prerelease `tsrs` type-aware backend in place of stable `oxlint-tsgolint`
+
+```text
+ID and title: QX-006 — adopt prerelease tsrs@7.1.0-beta.tsrs2 as the type-aware lint backend in place of stable oxlint-tsgolint.
+Rule, option, or threshold; installed tool versions: Standard §5.1 ("latest stable published releases of Oxlint, oxlint-tsgolint, Oxfmt"); oxlint 1.94.0 (2026-11-16T12:26Z), tsrs 7.1.0-beta.tsrs2 (2026-11-16T11:59Z), oxfmt 0.79.0 (2026-11-16T12:27Z), typescript 7.0.2.
+Scope: files, authorized operations, origins, or bounded pattern: package.json / package-lock.json devDependencies and type-aware lint execution across the repository (oxlint discovers node_modules/.bin/tsrs-lint natively).
+Directive selectors/inventory and optional duplication bounds: none; backend package substitution only (QX-001 through QX-005 directive inventories remain unchanged).
+Diagnostic and required contract: Standard §5.1 requires stable published releases, whereas tsrs publishes prereleases only (dist-tags.latest is 0.25.0-ts7.1.0-beta; 7.1.0-beta.tsrs2 is an untagged newer prerelease; stable oxlint-tsgolint 7.0.2007 remains published on npm).
+Actual compliant alternative and demonstrated quality cost: retaining stable oxlint-tsgolint@7.0.2007 meets §5.1 literally. In a matched A/B benchmark on mitchs-m5-mbp (Darwin arm64, oxlint 1.94.0 running `oxlint --deny-warnings .`, median of 3 warm runs each via OXLINT_TSGOLINT_PATH), oxlint-tsgolint@7.0.2007 took 0.38s wall time and 559.8 MiB maximum RSS vs 0.16s wall time and 231.4 MiB maximum RSS with tsrs@7.1.0-beta.tsrs2 (2.38x slower, 2.42x / 328.4 MiB higher peak RSS; both exited 0).
+Chosen adjustment and why its scope is appropriate: owner-approved substitution of tsrs@7.1.0-beta.tsrs2; oxlint 1.94.0 discovers tsrs-lint automatically and fails closed (exit 1) if missing. All Appendix A type-aware rules and tsc compiler checks remain intact.
+Structural comparison or unsafe-type evidence, where applicable: a matched 7-diagnostic parity probe across typescript(no-floating-promises), typescript(no-misused-promises), typescript(no-unsafe-assignment), typescript(no-unsafe-return), typescript(no-unsafe-member-access), typescript(no-unsafe-type-assertion), and typescript(prefer-promise-reject-errors) reported identical 7/7 diagnostics on exact lines under both oxlint-tsgolint@7.0.2007 and tsrs@7.1.0-beta.tsrs2 (exit 1), alongside requalifying repo-wide `oxlint --deny-warnings .` and `npm run check:compat` (including QX-001..QX-005 directive checks with reportUnusedDisableDirectives: error).
+Verification commands, relevant tests, and results: `npm run check:compat` (tsc --noEmit, oxlint --deny-warnings ., oxfmt --check ., node --test suites, and smoke) exits 0 on 2026-11-18.
+Retained protection, lost detection, and established assumptions: all type-aware lint rules, directive inventories, and compiler checks stay enabled; diagnostic parity across the exercised type-aware rules is directly verified by the parity and QX-001..QX-005 probes above.
+Review and revisit trigger: first stable tsrs release, any oxlint release changing backend discovery, or any type-aware diagnostic parity regression.
 ```
 
 Records for the engineering standard adopted in `docs/engineering-standard.md` (Strict Oxlint and Oxfmt Engineering Standard, v5.1.2). The standard's Appendix B defines the required record shapes.
