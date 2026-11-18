@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util";
 import {
 	type ExtensionCommandContext,
 	DynamicBorder,
@@ -11,6 +12,7 @@ import {
 	type KeybindingsManager,
 	SelectList,
 	Spacer,
+	stripTerminalSequences,
 	Text,
 	truncateToWidth,
 	type TUI,
@@ -58,7 +60,11 @@ class DraftDialog {
 		this.theme = theme;
 		this.topBorder = new DynamicBorder((s) => theme.fg("border", s));
 		this.bottomBorder = new DynamicBorder((s) => theme.fg("border", s));
-		this.draftText = new Text(theme.fg("text", options.draft), 1, 0);
+		this.draftText = new Text(
+			theme.fg("text", stripTerminalSequences(stripVTControlCharacters(options.draft))),
+			1,
+			0,
+		);
 		this.scrollHint = new Text(theme.fg("muted", ""), 1, 0);
 		this.spacer = new Spacer(1);
 		this.list = new SelectList(

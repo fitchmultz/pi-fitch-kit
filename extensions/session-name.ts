@@ -300,13 +300,16 @@ export default function sessionName(pi: ExtensionAPI): void {
 				"Set or update the current Pi session's display name to a broad, durable description of its overall purpose.",
 			promptSnippet: "Set or update the current Pi session's searchable display name",
 			promptGuidelines: TOOL_GUIDELINES,
-			parameters: Type.Object({
-				name: Type.String({
-					minLength: 1,
-					maxLength: 80,
-					description: "Broad, durable 2-4 term name using words joined by hyphens; avoid spaces",
-				}),
-			}),
+			parameters: Type.Object(
+				{
+					name: Type.String({
+						minLength: 1,
+						maxLength: 80,
+						description: "Broad, durable 2-4 term name using words joined by hyphens; avoid spaces",
+					}),
+				},
+				{ additionalProperties: false },
+			),
 			// oxlint-disable-next-line eslint/max-params -- QX-001: Pi's documented five-parameter tool execute callback.
 			async execute(_toolCallId, { name }, signal, _onUpdate, ctx) {
 				// Naming calls queue here because a sequential tool serializes every sibling call in its batch.

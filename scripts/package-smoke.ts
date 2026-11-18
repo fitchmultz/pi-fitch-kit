@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { fauxAssistantMessage } from "@earendil-works/pi-ai";
+import { fauxAssistantMessage, validateToolArguments } from "@earendil-works/pi-ai";
 import {
 	DefaultResourceLoader,
 	type SlashCommandInfo,
@@ -244,6 +244,16 @@ try {
 	if (!setupModelsTool) {
 		throw new Error("Read-only setup model tool missing");
 	}
+	assert.throws(
+		() =>
+			validateToolArguments(setupModelsTool, {
+				type: "toolCall",
+				id: "extra-field",
+				name: "fitch_setup_models",
+				arguments: { routes: [], extra: true },
+			}),
+		/Validation failed/,
+	);
 	const legacyFiles: Array<[string, string]> = [
 		[join(cwd, ".pi", "commands", "legacy.md"), "project command"],
 		[join(agentDir, "tools", "rg"), "older distinct binary"],

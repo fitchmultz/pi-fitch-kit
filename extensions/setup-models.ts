@@ -7,11 +7,14 @@ export default function setupModels(pi: ExtensionAPI): void {
 		label: "Fitch Setup Models",
 		description:
 			"Check requested model routes in this Pi session without starting another Pi process.",
-		parameters: Type.Object({
-			routes: Type.Array(
-				Type.String({ description: "Provider/model routes from setup-manifest.json" }),
-			),
-		}),
+		parameters: Type.Object(
+			{
+				routes: Type.Array(
+					Type.String({ description: "Provider/model routes from setup-manifest.json" }),
+				),
+			},
+			{ additionalProperties: false },
+		),
 		// oxlint-disable-next-line eslint/max-params -- QX-001: Pi's documented five-parameter tool execute callback.
 		async execute(_toolCallId, { routes }, _signal, _onUpdate, ctx) {
 			const known = new Set(

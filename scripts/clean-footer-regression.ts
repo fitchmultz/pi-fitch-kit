@@ -403,9 +403,15 @@ try {
 	assert.ok(render().includes(`${afterUsage.percent.toFixed(1)}%/200k`));
 	providerCount = 2;
 	statuses.set("status", "Working\nnow");
+	statuses.set("styled", "\x1b[36mfast\x1b[39m");
 	session.agent.state.model = { ...model, id: "other-model" };
 	session.agent.state.thinkingLevel = "high";
 	const dark = footer.render(120);
+	assert.ok(
+		dark.join("\n").includes("\x1b[36mfast\x1b[39m"),
+		"styled extension statuses retain ANSI colors",
+	);
+	statuses.delete("styled");
 	initTheme("light", false);
 	footer.invalidate();
 	assert.notDeepEqual(footer.render(120), dark);
@@ -422,6 +428,13 @@ try {
 	const original = [manager.getHeader(), ...manager.getEntries()];
 	await session.extensionRunner.emitMessageEnd({ type: "message_end", message: assistant(100, 0) });
 	manager.appendMessage(assistant(100, 0));
+	await session.extensionRunner.emit({
+		type: "session_info_changed",
+		name: "Evil\x1b[31m\x07Name",
+	});
+	const sanitizedSessionLines = currentFooter().render(120).join("\n");
+	assert.ok(!sanitizedSessionLines.includes("\x1b[31m") && !sanitizedSessionLines.includes("\x07"));
+	assert.match(stripTerminalSequences(sanitizedSessionLines), /Evil \[31m Name/);
 	session.setSessionName("Renamed\nbranch");
 	manager.branch(leaf);
 	assert.equal(manager.getLeafId(), leaf);
