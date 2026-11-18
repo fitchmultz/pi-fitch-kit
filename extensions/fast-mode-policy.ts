@@ -27,8 +27,7 @@ export const ANTHROPIC_FAST_PROVIDERS = ["anthropic", "cloudflare-ai-gateway"];
 const OPENAI_PROVIDERS = new Set(["openai", "openai-codex", "chatgpt-rotate"]);
 // OpenAI Fast pricing supports these o-series models, not the whole family.
 const OPENAI_PRIORITY_O_MODELS = new Set(["o3", "o3-2025-04-16", "o4-mini", "o4-mini-2025-04-16"]);
-const ULTRAFAST_MODEL_IDS = new Set(["gpt-6.2-astra", "gpt-6.2-sol", "gpt-6-astra"]);
-// Ultrafast only rides native global/US OpenAI Responses or Codex Responses routes.
+const ULTRAFAST_MODEL_IDS = new Set(["gpt-6.2-astra", "gpt-6.2-sol", "gpt-6-astra", "gpt-6.1-sol"]);
 const NATIVE_OPENAI_BASE_URLS = new Set([
 	"https://api.openai.com/v1",
 	"https://us.api.openai.com/v1",
@@ -83,10 +82,9 @@ export type FastRates = { input: number; output: number; cacheRead: number; cach
 export type OpenAIMode = "off" | "priority" | "ultrafast";
 export type SessionOpenAIMode = "off" | "ultrafast";
 export const SESSION_MODE_ENTRY = "openai-ultrafast";
-export const ULTRAFAST_UNAVAILABLE =
-	"Ultrafast requires gpt-6.2-astra, gpt-6.2-sol, or gpt-6-astra on a native OpenAI Responses route; other models, non-US regional endpoints and gateways are not supported. No mode was changed.";
+export const ULTRAFAST_UNAVAILABLE = `Ultrafast requires one of ${[...ULTRAFAST_MODEL_IDS].join(", ")} on a native openai or chatgpt-rotate route. No mode was changed.`;
 export const ULTRAFAST_NOTICE =
-	"gpt-6.2-astra/gpt-6.2-sol: 3x API/credit price through 28 Feb 2027, then 6x; 6x Codex included usage (Pro $200 for gpt-6.2-sol; Pro $500 or eligible Enterprise/Edu for both). gpt-6-astra: 6x API/credit price; 8x Codex included usage (Pro $500 or eligible Enterprise/Edu). Entitlement and rate limits apply; native cost accounting requires Ultrafast-capable Pi.";
+	"gpt-6.2-astra/gpt-6.2-sol: 3x API/credit price through 28 Feb 2027, then 6x; 6x Codex included usage (Pro $200 for gpt-6.2-sol; Pro $500 or eligible Enterprise/Edu for both). gpt-6-astra/gpt-6.1-sol: 6x API/credit price; 8x Codex included usage (Pro $500 or eligible Enterprise/Edu). Entitlement and rate limits apply; native cost accounting requires Ultrafast-capable Pi.";
 
 export type Toggle = {
 	/** Slash command name and footer status key. */
@@ -177,21 +175,27 @@ export function createStateWatcher(
 	};
 }
 
+function nativeUltrafastRoute(model: NonNullable<FastModel>): boolean {
+	const baseUrl = (model.baseUrl ?? "").replace(/\/+$/, "");
+	switch (model.provider ?? "") {
+		case "openai":
+			return (
+				model.api === "openai-responses" &&
+				(NATIVE_OPENAI_BASE_URLS.has(baseUrl) ||
+					(model.id === "gpt-6.1-sol" && baseUrl === "https://eu.api.openai.com/v1"))
+			);
+		case "chatgpt-rotate":
+			return model.api === "openai-responses"
+				? baseUrl === "https://api.openai.com/v1"
+				: model.api === "openai-codex-responses" && NATIVE_CODEX_BASE_URLS.has(baseUrl);
+		default:
+			return false;
+	}
+}
+
 export function ultrafastEligible(model: FastModel): boolean {
-	if (model?.id === undefined || !ULTRAFAST_MODEL_IDS.has(model.id)) {
-		return false;
-	}
-	const baseUrl = model.baseUrl?.replace(/\/+$/, "");
-	if (baseUrl === undefined) {
-		return false;
-	}
-	if (model.provider === "openai" && model.api === "openai-responses") {
-		return NATIVE_OPENAI_BASE_URLS.has(baseUrl);
-	}
 	return (
-		model.provider === "openai-codex" &&
-		model.api === "openai-codex-responses" &&
-		NATIVE_CODEX_BASE_URLS.has(baseUrl)
+		model?.id !== undefined && ULTRAFAST_MODEL_IDS.has(model.id) && nativeUltrafastRoute(model)
 	);
 }
 
@@ -269,7 +273,11 @@ export function notify(
 	}
 }
 
-export function openAIStatus(ctx: ExtensionContext, local: SessionOpenAIMode | undefined): string {
+export function openAIStatus(
+	ctx: ExtensionContext,
+	local: SessionOpenAIMode | undefined,
+	replyStatus = "",
+): string {
 	const shared = openAIMode();
 	const effective = local ?? shared;
 	const availability =
@@ -277,7 +285,7 @@ export function openAIStatus(ctx: ExtensionContext, local: SessionOpenAIMode | u
 			? " (unavailable on this route)"
 			: "";
 	return (
-		`OpenAI shared: ${shared}; session: ${local ?? "inherit"}; effective: ${effective}${availability}.` +
+		`OpenAI shared: ${shared}; session: ${local ?? "inherit"}; effective: ${effective}${availability}.${replyStatus}` +
 		(shared === "ultrafast" || local === "ultrafast" ? ` ${ULTRAFAST_NOTICE}` : "")
 	);
 }

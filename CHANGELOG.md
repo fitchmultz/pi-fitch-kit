@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Request Ultrafast for GPT-6.2 Astra, GPT-6.2 Sol, GPT-6 Astra, and GPT-6.1 Sol on native `openai` and `chatgpt-rotate` routes. Direct `openai-codex` no longer requests Ultrafast; regular Fast is unchanged. `/ultrafast status` distinguishes the requested mode from the tier OpenAI last reported for the selected route. (PFK-204)
+
 - Show Ultrafast in the footer only when it is enabled on a compatible model and route. Switching models keeps the saved preference. (PFK-203)
 
 - Move the setup's ChatGPT subscription routes to GPT-6.2. `modelContextWindows` and the settings example list `openai-codex/gpt-6.2-astra` and `openai-codex/gpt-6.2-sol` in place of `openai-codex/gpt-6-astra` and `openai-codex/gpt-6.1-sol`, at 400,000 tokens, and the example's default model is `openai-codex/gpt-6.2-astra`. Official Pi 1.5.2 lists the two models for `openai-codex` after a catalog refresh. The Cloudflare AI Gateway routes stay on `gpt-6-astra` and `gpt-6.1-sol`, the newest Astra and Sol models in the official gateway catalog.
