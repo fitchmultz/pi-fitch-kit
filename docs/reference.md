@@ -54,6 +54,8 @@ The startup-only `--ultrafast` flag still selects the **shared** mode; `--fast` 
 
 Explicit Ultrafast enablement validates an eligible model and the native route **before writing** shared state or a session override, without switching models, credentials, or endpoints. Off and session reset remain available on unsupported routes.
 
+The example settings start on `openai-codex`; none of their Codex or gateway routes can request Ultrafast. To try it without changing the defaults, authenticate `openai` with `OPENAI_API_KEY` or `/login openai` using an eligible ChatGPT account. Start `pi --model openai/gpt-6.2-sol`, then run `/ultrafast on --session`. If you installed `chatgpt-rotate` separately, you can select `chatgpt-rotate/gpt-6.2-sol` instead.
+
 Ultrafast uses the four exact IDs in [OpenAI's Ultrafast guide](https://developers.openai.com/api/docs/guides/ultrafast-mode): `gpt-6.2-astra`, `gpt-6.2-sol`, `gpt-6-astra`, and `gpt-6.1-sol`.
 
 | Selected provider | Eligible route                                                                                                                                                    |
