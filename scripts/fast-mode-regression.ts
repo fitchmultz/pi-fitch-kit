@@ -767,6 +767,10 @@ assert.match(notices.at(-1) ?? "", /No mode was changed/);
 await commandFor(commands, "codex-fast").handler("ultrafast", uiCtx(astra));
 assert.deepEqual(JSON.parse(readFileSync(statePath, "utf8")), { enabled: true, tier: "ultrafast" });
 assert.match(notices.at(-1) ?? "", /6x API\/credit price; 8x Codex included usage/);
+assert.match(
+	notices.at(-1) ?? "",
+	/gpt-6\.2-astra\/gpt-6\.2-sol: 3x API\/credit price.*Pro \$200 for gpt-6\.2-sol/,
+);
 const selectedUltraState = readFileSync(statePath, "utf8");
 await commandFor(commands, "codex-fast").handler("", uiCtx(astra));
 assert.equal(
@@ -779,7 +783,10 @@ for (const model of [
 	codexAstra,
 	{ ...astra, baseUrl: "https://us.api.openai.com/v1/" },
 	{ ...astra, id: "gpt-6.2-astra" },
+	{ ...astra, id: "gpt-6.2-sol" },
+	{ ...astra, id: "gpt-6.2-sol", baseUrl: "https://us.api.openai.com/v1/" },
 	{ ...codexAstra, id: "gpt-6.2-astra" },
+	{ ...codexAstra, id: "gpt-6.2-sol" },
 ]) {
 	const payload = await openaiWireRequest(model);
 	assert.equal(payload.service_tier, "ultrafast");
@@ -790,11 +797,12 @@ for (const model of [
 for (const model of [
 	{ ...astra, id: "gpt-5.6-sol" },
 	{ ...astra, id: "gpt-6.1-sol" },
-	{ ...astra, id: "gpt-6.2-sol" },
 	{ ...astra, id: "gpt-6-astra-extra" },
 	{ ...astra, id: "gpt-6.2-astra-extra" },
+	{ ...astra, id: "gpt-6.2-sol-extra" },
 	{ ...astra, api: "openai-completions" as const },
 	{ ...astra, provider: "cloudflare-ai-gateway" },
+	{ ...astra, id: "gpt-6.2-sol", provider: "cloudflare-ai-gateway" },
 	{ ...astra, provider: "opencode" },
 	{ ...astra, provider: "chatgpt-rotate" },
 	{ ...astra, baseUrl: "https://eu.api.openai.com/v1" },
@@ -817,6 +825,12 @@ assert.equal(
 	(await openaiWireRequest({ ...astra, id: "gpt-6.2-astra" }, astra)).service_tier,
 	undefined,
 	"serialized model must be the selected model, even when both are eligible",
+);
+assert.equal(
+	(await openaiWireRequest({ ...astra, id: "gpt-6.2-sol" }, { ...astra, id: "gpt-6.2-astra" }))
+		.service_tier,
+	undefined,
+	"serialized model must be the selected gpt-6.2 model, even when both are eligible",
 );
 for (const payload of [null, [], "raw", { model: "gpt-6-astra-extra" }]) {
 	assert.equal(await requestPayload(astra, payload), undefined);
@@ -988,6 +1002,19 @@ assert.equal(
 );
 await localCommand("toggle --session");
 assert.equal((await openaiWireRequest(astra, astra, sessionA)).service_tier, "ultrafast");
+await localCommand("off --session", sessionA, { ...codexAstra, id: "gpt-6.2-sol" });
+await localCommand("on --session", sessionA, { ...codexAstra, id: "gpt-6.2-sol" });
+assert.equal(
+	(
+		await openaiWireRequest(
+			{ ...codexAstra, id: "gpt-6.2-sol" },
+			{ ...codexAstra, id: "gpt-6.2-sol" },
+			sessionA,
+		)
+	).service_tier,
+	"ultrafast",
+	"session activation succeeds on gpt-6.2-sol",
+);
 await runHandlers("model_select", {}, uiCtx(MODELS.openai, sessionA));
 assert.equal(status.get("codex-fast"), "warning:session ultrafast unavailable");
 const beforeInvalid = readFileSync(sessionFile, "utf8");
@@ -1066,11 +1093,23 @@ assert.deepEqual(await handlerFor(handlers, "input")({}, uiCtx(MODELS.openai)), 
 	action: "handled",
 });
 await commandFor(commands, "codex-fast").handler("off", uiCtx(MODELS.openai));
-await runHandlers("session_start", { reason: "startup" }, uiCtx(astra));
+await runHandlers(
+	"session_start",
+	{ reason: "startup" },
+	uiCtx({ ...codexAstra, id: "gpt-6.2-sol" }),
+);
 assert.equal(
-	(await openaiWireRequest(astra)).service_tier,
+	(await openaiWireRequest({ ...codexAstra, id: "gpt-6.2-sol" })).service_tier,
 	"ultrafast",
 	"--ultrafast must select the explicit shared tier",
+);
+assert.equal(
+	await handlerFor(handlers, "input")(
+		{ source: "interactive" },
+		uiCtx({ ...codexAstra, id: "gpt-6.2-sol" }),
+	),
+	undefined,
+	"--ultrafast must allow interactive input on gpt-6.2-sol",
 );
 assert.match(
 	notices.at(-1) ?? "",
@@ -1364,7 +1403,7 @@ console.log(
 		openaiFast:
 			"native registered hook + gateway Responses wire: supported o3/o4-mini aliases/snapshots only",
 		openaiUltrafast:
-			"native Astra Responses/Codex wire; shared and session overrides; resume/reload/tree/fork isolation; explicit startup policy",
+			"native GPT-6.2 Astra/Sol and GPT-6 Astra Responses/Codex wire; shared and session overrides; resume/reload/tree/fork isolation; explicit startup policy",
 		xaiFast: "provider-gated priority",
 		googleTiers: "native Google SDK wire on direct and gateway routes; persisted shared state",
 		footer: "eligibility-scoped incl. proxy exclusion",
