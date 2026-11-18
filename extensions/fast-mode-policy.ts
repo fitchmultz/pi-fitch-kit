@@ -384,7 +384,7 @@ export function fastStream(
 		: messagesApi.streamSimple(target, context, streamOptions);
 }
 
-export type FooterLabel = { text: string; color: "accent" | "warning" | "muted" } | undefined;
+type FooterLabel = { text: string; color: "accent" | "muted" } | undefined;
 
 const setStatusLabel = (ctx: ExtensionContext, key: string, label: FooterLabel): void => {
 	if (label === undefined) {
@@ -406,11 +406,12 @@ const openAIFooterLabel = (
 	}
 	const mode = local ?? openAIMode();
 	if (mode === "ultrafast") {
-		const active = ultrafastEligible(ctx.model);
-		return {
-			text: `${local !== undefined ? "session " : ""}ultrafast ${active ? "requested" : "unavailable"}`,
-			color: active ? "accent" : "warning",
-		};
+		return ultrafastEligible(ctx.model)
+			? {
+					text: local === undefined ? "ultrafast requested" : "session ultrafast requested",
+					color: "accent",
+				}
+			: undefined;
 	}
 	if (mode !== "priority" || !OPENAI_TOGGLE.eligible(ctx.model)) {
 		return undefined;
@@ -426,8 +427,6 @@ const fastFooterLabel = (ctx: ExtensionContext, toggle: Toggle): FooterLabel => 
 	return { text: "fast", color: "accent" };
 };
 
-// Active labels mirror the request gates; an unsupported Ultrafast selection
-// stays visible as unavailable instead of silently becoming priority.
 export function updateFooterStatus(
 	ctx: ExtensionContext,
 	local: SessionOpenAIMode | undefined,
