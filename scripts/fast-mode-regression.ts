@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { zstdDecompressSync } from "node:zlib";
-import { mock } from "node:test";
+import { mock, test } from "node:test";
 import { normalizeContext, type Api, type Model } from "@earendil-works/pi-ai";
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-fast-mode-"));
@@ -507,11 +507,12 @@ const requestPayload = async (
 	model: unknown,
 	payload: unknown = { model: "m" },
 	sessionManager = defaultSession,
+	hasUI = true,
 ) => {
 	let current = payload;
 	let changed = false;
 	for (const handler of handlers.before_provider_request ?? []) {
-		const next = await handler({ payload: current }, { model, sessionManager });
+		const next = await handler({ payload: current }, { model, sessionManager, hasUI });
 		if (next !== undefined) {
 			current = next;
 			changed = true;
@@ -701,6 +702,7 @@ async function openaiWireRequest(
 	model: Model<Api>,
 	selectedModel = model,
 	sessionManager = defaultSession,
+	rejection?: { code: string; message: string },
 ) {
 	let payload: Record<string, unknown> | undefined;
 	let api: ReturnType<typeof openAIResponsesApi>;
@@ -734,6 +736,11 @@ async function openaiWireRequest(
 					const parsed: unknown = JSON.parse(body);
 					payload = requireRecord(parsed, "captured payload");
 				}
+				if (rejection !== undefined) {
+					return new Response(`data: ${JSON.stringify({ type: "error", ...rejection })}\n\n`, {
+						headers: { "Content-Type": "text/event-stream" },
+					});
+				}
 				throw new Error("payload captured");
 			},
 		},
@@ -742,6 +749,12 @@ async function openaiWireRequest(
 		/* Drain the capture abort. */
 	}
 	assert.ok(payload, `${model.provider}/${model.id} must reach its native serializer`);
+	if (rejection !== undefined) {
+		const message = await stream.result();
+		assert.equal(message.stopReason, "error");
+		assert.equal(message.errorMessage?.includes(rejection.message), true, message.errorMessage);
+		await runHandlers("message_end", { message }, uiCtx(selectedModel, sessionManager));
+	}
 	return payload;
 }
 
@@ -1218,7 +1231,154 @@ for (const reason of ["reload", "new", "resume", "fork"]) {
 	assert.equal(status.get("codex-fast"), undefined, `${reason} must leave the fast footer off`);
 }
 flags.set("fast", false);
+
+await test("delegated children ignore both shared OpenAI tiers but honor a session override", async (t) => {
+	const child = SessionManager.inMemory(agentDir);
+	const body = { model: rotatedCodexSol62.id };
+	const owner = defaultSession.getSessionId();
+	const env: NodeJS.ProcessEnv = {
+		...process.env,
+		PI_INTERCOM_ROOT_SESSION_ID: owner,
+		PI_INTERCOM_PARENT_SESSION_ID: owner,
+	};
+	t.mock.property(process, "env", env);
+	try {
+		for (const tier of ["priority", "ultrafast"]) {
+			writeFileSync(statePath, JSON.stringify({ enabled: true, tier }));
+			assert.equal(
+				await requestPayload(rotatedCodexSol62, body, child, false),
+				undefined,
+				`a delegated child must not inherit shared ${tier}`,
+			);
+		}
+		await localCommand("on --session", child, rotatedCodexSol62);
+		assert.equal(
+			requireRecord(await requestPayload(rotatedCodexSol62, body, child, false), "child payload")
+				.service_tier,
+			"ultrafast",
+		);
+		await localCommand("reset --session", child, rotatedCodexSol62);
+		assert.equal(await requestPayload(rotatedCodexSol62, body, child, false), undefined);
+		delete env.PI_INTERCOM_ROOT_SESSION_ID;
+		delete env.PI_INTERCOM_PARENT_SESSION_ID;
+		const cli = SessionManager.inMemory(agentDir);
+		const cliCtx = { ...uiCtx(rotatedCodexSol62, cli), hasUI: false };
+		for (const [flag, tier] of [
+			["fast", "priority"],
+			["ultrafast", "ultrafast"],
+		] as const) {
+			writeFileSync(statePath, offState);
+			flags.set(flag, true);
+			await runHandlers("session_start", { reason: "startup" }, cliCtx);
+			flags.set(flag, false);
+			assert.equal(
+				requireRecord(await requestPayload(rotatedCodexSol62, body, cli, false), "CLI payload")
+					.service_tier,
+				tier,
+				`headless --${flag} must still work`,
+			);
+		}
+	} finally {
+		flags.set("fast", false);
+		flags.set("ultrafast", false);
+		writeFileSync(statePath, offState);
+	}
+});
+
+await test("Codex rejects only the kit tier actually sent, until a mode change or session switch", async () => {
+	const manager = SessionManager.inMemory(agentDir);
+	const code = "service_tier_not_allowed";
+	const reject = (mode: string) => ({
+		code,
+		message: `${mode} mode isn't available for the selected model in your workspace. Choose Standard speed or another model.`,
+	});
+	const command = commandFor(commands, "codex-fast").handler;
+	const send = (model: Model<Api>, rejection?: { code: string; message: string }) =>
+		openaiWireRequest(model, model, manager, rejection);
+	try {
+		await command("on", uiCtx(codexSol62, manager));
+		assert.equal(
+			(await send(codexSol62, { code: "other_error", message: "Other error" })).service_tier,
+			"priority",
+		);
+		assert.equal((await send(codexSol62, reject("Fast"))).service_tier, "priority");
+		assert.equal((await send(codexSol62)).service_tier, undefined, "priority must not repeat");
+		assert.equal(status.get("codex-fast"), "muted:OpenAI priority paused");
+		assert.match(notices.at(-1) ?? "", /rejected priority.*this session/);
+		await command("status", uiCtx(codexSol62, manager));
+		assert.match(
+			notices.at(-1) ?? "",
+			/shared: priority; session: inherit; effective: off.*priority rejected/,
+		);
+		assert.equal((await send(codexSol62)).service_tier, undefined, "status must not reset");
+		assert.equal((await send(codexAstra)).service_tier, "priority", "other model is unaffected");
+		assert.equal(
+			(await send(rotatedCodexSol62)).service_tier,
+			"priority",
+			"other provider is unaffected",
+		);
+		await command("on", uiCtx(codexSol62, manager));
+		assert.equal((await send(codexSol62)).service_tier, "priority", "explicit on lets me retry");
+
+		await localCommand("on --session", manager, rotatedCodexSol62);
+		assert.equal((await send(rotatedCodexSol62, reject("Ultrafast"))).service_tier, "ultrafast");
+		assert.equal(
+			(await send(rotatedCodexSol62)).service_tier,
+			undefined,
+			"rejected local Ultrafast must not fall back to shared priority",
+		);
+		assert.equal(status.get("codex-fast"), "muted:OpenAI ultrafast paused");
+		await localCommand("on --session", manager, rotatedCodexSol62);
+		assert.equal(
+			(await send(rotatedCodexSol62)).service_tier,
+			"ultrafast",
+			"local on lets me retry",
+		);
+		assert.equal(
+			(await send(rotatedCodexSol62, { code, message: code })).service_tier,
+			"ultrafast",
+		);
+		const ctx = uiCtx(rotatedCodexSol62, manager);
+		await runHandlers("session_shutdown", { reason: "reload" }, ctx);
+		const reloadLoad = await discoverAndLoadExtensions(
+			[fileURLToPath(new URL("../extensions/fast-mode.ts", import.meta.url))],
+			agentDir,
+			agentDir,
+		);
+		assert.deepEqual(reloadLoad.errors, []);
+		const reloadHandlers = drivenHandlers(soleExtension(reloadLoad));
+		await handlerFor(reloadHandlers, "session_start")({ reason: "reload" }, ctx);
+		try {
+			assert.equal(
+				await handlerFor(reloadHandlers, "before_provider_request")(
+					{ payload: { model: rotatedCodexSol62.id } },
+					ctx,
+				),
+				undefined,
+				"reloading the same session keeps the rejected tier paused",
+			);
+		} finally {
+			await handlerFor(reloadHandlers, "session_shutdown")({ reason: "quit" }, ctx);
+		}
+		const other = SessionManager.inMemory(agentDir);
+		await runHandlers("session_start", { reason: "new" }, uiCtx(rotatedCodexSol62, other));
+		assert.equal(
+			(await openaiWireRequest(rotatedCodexSol62, rotatedCodexSol62, other)).service_tier,
+			"priority",
+		);
+		await runHandlers("session_start", { reason: "resume" }, uiCtx(rotatedCodexSol62, manager));
+		assert.equal(
+			(await send(rotatedCodexSol62)).service_tier,
+			"ultrafast",
+			"switching resets rejection, not the override",
+		);
+	} finally {
+		writeFileSync(statePath, offState);
+	}
+});
+
 assert.equal(status.get("anthropic-fast"), undefined, "no footer while off");
+await runHandlers("model_select", {}, uiCtx(MODELS.openai));
 assert.equal(status.get("codex-fast"), undefined);
 await commandFor(commands, "anthropic-fast").handler("on", uiCtx(gatewayOpus));
 assert.equal(status.get("anthropic-fast"), "accent:fast");
