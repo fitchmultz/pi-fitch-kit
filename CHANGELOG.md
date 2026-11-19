@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Keep shared OpenAI Fast and Ultrafast out of delegated children. If OpenAI rejects a tier, pause it for that provider and model in the current session instead of repeating the rejected request or falling back to another paid tier. (PFK-205)
+- Keep shared OpenAI Fast and Ultrafast out of delegated children. After a tier rejection or a reported Standard retry, pause that tier for the same provider and model on the active branch. Pauses survive reload and resume; they never fall back to another paid tier. (PFK-205)
 
 - Request Ultrafast for GPT-6.2 Astra, GPT-6.2 Sol, GPT-6 Astra, and GPT-6.1 Sol on native `openai` and `chatgpt-rotate` routes. Direct `openai-codex` no longer requests Ultrafast; regular Fast is unchanged. `/ultrafast status` distinguishes the requested mode from the tier OpenAI last reported for the selected route. (PFK-204)
 

@@ -1,9 +1,8 @@
 import type {
+	ExtensionAPI,
 	ExtensionContext,
 	MessageEndEvent,
 	ProviderStreamEvent,
-	SessionShutdownEvent,
-	SessionStartEvent,
 } from "@earendil-works/pi-coding-agent";
 import {
 	openAIMode,
@@ -15,13 +14,6 @@ import {
 	type OpenAIRequestPolicy,
 	type SessionOpenAIMode,
 } from "./fast-mode-policy.ts";
-
-const RELOAD_REJECTIONS = Symbol.for("pi-fitch-kit.openai-reload-rejections");
-const globals: typeof globalThis & {
-	[RELOAD_REJECTIONS]?: WeakMap<ExtensionContext["sessionManager"], Set<string>>;
-} = globalThis;
-const reloadRejections = globals[RELOAD_REJECTIONS] ?? new WeakMap();
-globals[RELOAD_REJECTIONS] = reloadRejections;
 
 const TERMINAL_RESPONSES = new Set<unknown>([
 	"response.completed",
@@ -51,50 +43,116 @@ function returnedTierStatus(data: unknown): string | undefined {
 }
 
 type OpenAITier = Exclude<OpenAIMode, "off">;
-const tierKey = (provider: string, model: string, tier: OpenAITier): string =>
+type TierRequest = { provider: string; model: string; tier: OpenAITier };
+type PauseAction = { action: "clear" } | ({ action: "pause" } & TierRequest);
+const PAUSE_ENTRY = "openai-tier-pause";
+
+const tierKey = ({ provider, model, tier }: TierRequest): string =>
 	JSON.stringify([provider, model, tier]);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
+function readPauseAction(data: unknown, sessionId: string): PauseAction | undefined {
+	// Forks can copy the entries but have a different native session ID.
+	if (!isRecord(data) || data.sessionId !== sessionId) {
+		return undefined;
+	}
+	const { action, provider, model, tier } = data;
+	if (action === "clear") {
+		return { action };
+	}
+	if (
+		action === "pause" &&
+		typeof provider === "string" &&
+		typeof model === "string" &&
+		(tier === "priority" || tier === "ultrafast")
+	) {
+		return { action, provider, model, tier };
+	}
+	return undefined;
+}
+
+function restoreRejectedTiers(ctx: ExtensionContext): Set<string> {
+	const rejected = new Set<string>();
+	const sessionId = ctx.sessionManager.getSessionId();
+	for (const entry of ctx.sessionManager.getBranch()) {
+		if (entry.type !== "custom" || entry.customType !== PAUSE_ENTRY) {
+			continue;
+		}
+		const data = readPauseAction(entry.data, sessionId);
+		if (data?.action === "clear") {
+			rejected.clear();
+		} else if (data?.action === "pause") {
+			rejected.add(tierKey(data));
+		}
+	}
+	return rejected;
+}
 
 // Official Pi's Codex transport can flatten the error into just the workspace message.
 const TIER_NOT_ALLOWED =
 	/\bservice_tier_not_allowed\b|\b(?:Ultrafast|Fast) mode isn't available for the selected model in your workspace\b/;
 
+function fallbackRejectedTier(value: unknown, tier: OpenAITier): boolean {
+	if (!isRecord(value) || value.type !== "service_tier_fallback") {
+		return false;
+	}
+	const { error, details } = value;
+	if (!isRecord(error) || error.code !== "service_tier_not_allowed") {
+		return false;
+	}
+	const rejected = isRecord(details) ? details.rejectedTier : undefined;
+	return rejected === undefined || rejected === tier;
+}
+
+function tierWasRejected(
+	message: Extract<MessageEndEvent["message"], { role: "assistant" }>,
+	tier: OpenAITier,
+): boolean {
+	if (message.stopReason === "error" && TIER_NOT_ALLOWED.test(message.errorMessage ?? "")) {
+		return true;
+	}
+	return (
+		"diagnostics" in message &&
+		Array.isArray(message.diagnostics) &&
+		message.diagnostics.some((diagnostic) => fallbackRejectedTier(diagnostic, tier))
+	);
+}
+
 /** OpenAI policy and request observations for the active session. */
 export class FastModeSession {
+	private readonly appendEntry: ExtensionAPI["appendEntry"];
 	private sessionId: string | undefined;
 	private localMode: SessionOpenAIMode | undefined;
 	private footerContext: ExtensionContext | undefined;
 	private lastReply: { model: NonNullable<ExtensionContext["model"]>; status: string } | undefined;
-	private pending: { provider: string; model: string; tier: OpenAITier } | undefined;
+	private pending: TierRequest | undefined;
 	private rejected = new Set<string>();
 
-	private bind(ctx: ExtensionContext): void {
+	constructor(appendEntry: ExtensionAPI["appendEntry"]) {
+		this.appendEntry = appendEntry;
+	}
+
+	adoptSession(ctx: ExtensionContext): void {
 		this.sessionId = ctx.sessionManager.getSessionId();
 		this.localMode = restoreSessionOpenAIMode(ctx);
 		this.lastReply = undefined;
-		this.rejected = new Set();
+		this.adoptBranch(ctx);
+	}
+
+	adoptBranch(ctx: ExtensionContext): void {
+		this.rejected = restoreRejectedTiers(ctx);
 		this.pending = undefined;
 	}
 
-	adoptSession(ctx: ExtensionContext, { reason }: SessionStartEvent): void {
-		this.bind(ctx);
-		// Pi recreates extension factories on reload but retains this session manager.
-		const prior = reloadRejections.get(ctx.sessionManager);
-		reloadRejections.delete(ctx.sessionManager);
-		if (reason === "reload" && prior !== undefined) {
-			this.rejected = prior;
-		}
-	}
-
-	release(ctx: ExtensionContext, { reason }: SessionShutdownEvent): void {
-		if (reason === "reload" && this.rejected.size > 0) {
-			reloadRejections.set(ctx.sessionManager, this.rejected);
-		}
+	release(): void {
 		this.footerContext = undefined;
 	}
 
 	policy(ctx: ExtensionContext): OpenAIRequestPolicy {
 		if (this.sessionId !== ctx.sessionManager.getSessionId()) {
-			this.bind(ctx);
+			this.adoptSession(ctx);
 		}
 		const shared = openAIMode();
 		const local = this.localMode;
@@ -105,7 +163,7 @@ export class FastModeSession {
 		const rejected =
 			mode !== "off" &&
 			model !== undefined &&
-			this.rejected.has(tierKey(model.provider, model.id, mode));
+			this.rejected.has(tierKey({ provider: model.provider, model: model.id, tier: mode }));
 		return { shared, local, delegated, mode, rejected };
 	}
 
@@ -135,16 +193,16 @@ export class FastModeSession {
 			this.sessionId !== ctx.sessionManager.getSessionId() ||
 			message.provider !== sent.provider ||
 			message.model !== sent.model ||
-			message.stopReason !== "error" ||
-			!TIER_NOT_ALLOWED.test(message.errorMessage ?? "")
+			!tierWasRejected(message, sent.tier)
 		) {
 			return;
 		}
-		this.rejected.add(tierKey(sent.provider, sent.model, sent.tier));
+		this.recordPauseAction(ctx, { action: "pause", ...sent });
+		this.rejected.add(tierKey(sent));
 		if (ctx.hasUI) {
 			this.updateFooter(ctx);
 			ctx.ui.notify(
-				`OpenAI rejected ${sent.tier} for ${sent.model}. Pi won't request that tier again for this model in this session unless you change the mode.`,
+				`OpenAI rejected ${sent.tier} for ${sent.model}. Later requests on this branch will omit that tier unless you reselect a mode.`,
 				"warning",
 			);
 		}
@@ -194,7 +252,12 @@ export class FastModeSession {
 		this.localMode = mode;
 	}
 
-	clearRejections(): void {
+	private recordPauseAction(ctx: ExtensionContext, action: PauseAction): void {
+		this.appendEntry(PAUSE_ENTRY, { sessionId: ctx.sessionManager.getSessionId(), ...action });
+	}
+
+	clearRejections(ctx: ExtensionContext): void {
+		this.recordPauseAction(ctx, { action: "clear" });
 		this.rejected.clear();
 		this.pending = undefined;
 	}

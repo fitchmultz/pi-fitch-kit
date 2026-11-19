@@ -290,7 +290,7 @@ export function openAIStatus(
 		effective === "ultrafast" && !ultrafastEligible(ctx.model)
 			? " (unavailable on this route)"
 			: "";
-	const rejection = rejected ? ` ${mode} rejected for this model in this session.` : "";
+	const rejection = rejected ? ` ${mode} rejected for this model on this branch.` : "";
 	return (
 		`OpenAI shared: ${shared}; session: ${local ?? "inherit"}; effective: ${effective}${availability}.${rejection}${replyStatus}` +
 		(shared === "ultrafast" || local === "ultrafast" ? ` ${ULTRAFAST_NOTICE}` : "")

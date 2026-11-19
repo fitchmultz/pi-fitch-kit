@@ -97,7 +97,7 @@ const handleSessionStart = (
 	event: SessionStartEvent,
 	ctx: ExtensionContext,
 ): void => {
-	session.adoptSession(ctx, event);
+	session.adoptSession(ctx);
 	if (event.reason === "startup") {
 		applyStartupFlags(pi, ctx);
 	}
@@ -160,6 +160,7 @@ const applyTierState = (
 	command: string,
 	request: ToggleRequest,
 	session: FastModeSession,
+	ctx: ExtensionContext,
 ): void => {
 	if (!TOGGLE_VERBS.has(command)) {
 		return;
@@ -174,7 +175,7 @@ const applyTierState = (
 	}
 	if (openai) {
 		clearStartupError();
-		session.clearRejections();
+		session.clearRejections(ctx);
 	}
 };
 
@@ -219,7 +220,7 @@ const runToggleCommand = async (
 		notify(ctx, ULTRAFAST_UNAVAILABLE, "warning");
 		return;
 	}
-	applyTierState(parsed.command, request, session);
+	applyTierState(parsed.command, request, session, ctx);
 	reportToggleResult(parsed.command, ctx, session, { request, previousMode });
 };
 
@@ -291,7 +292,7 @@ const runUltrafastCommand = async (
 			writeEnabled(OPENAI_TOGGLE.statePath, false);
 		}
 		clearStartupError();
-		session.clearRejections();
+		session.clearRejections(ctx);
 	}
 	const policy = session.policy(ctx);
 	session.updateFooter(ctx, policy);
@@ -300,7 +301,7 @@ const runUltrafastCommand = async (
 };
 
 export default function fastMode(pi: ExtensionAPI): void {
-	const session = new FastModeSession();
+	const session = new FastModeSession((type, data) => pi.appendEntry(type, data));
 
 	pi.registerFlag("fast", {
 		description: "Start with OpenAI priority/fast mode enabled",
@@ -353,9 +354,13 @@ export default function fastMode(pi: ExtensionAPI): void {
 		handleSessionStart(pi, session, event, ctx);
 		stateWatcher.start(ctx.hasUI);
 	});
-	pi.on("session_shutdown", (event, ctx) => {
+	pi.on("session_shutdown", () => {
 		stateWatcher.stop();
-		session.release(ctx, event);
+		session.release();
+	});
+	pi.on("session_tree", (_event, ctx) => {
+		session.adoptBranch(ctx);
+		session.updateFooter(ctx);
 	});
 	pi.on("model_select", (_event, ctx) => session.updateFooter(ctx));
 

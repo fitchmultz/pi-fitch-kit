@@ -56,7 +56,9 @@ Non-interactive children launched by [pi-subagents](https://github.com/fitchmult
 
 Explicit Ultrafast enablement validates an eligible model and the native route **before writing** shared state or a session override, without switching models, credentials, or endpoints. Off and session reset remain available on unsupported routes.
 
-If OpenAI rejects a kit-requested tier with `service_tier_not_allowed`, the kit leaves the failed turn as-is. Later requests in the same session omit that tier for the same provider and model. Rejected Ultrafast does not fall back to priority, and the kit does not force Standard or change the saved preference. The footer shows the paused tier and the status command explains why. A successful OpenAI mode command (including reselecting the same mode) or switching sessions clears the pause. `/reload` keeps it for the current session; quitting and starting Pi clears it.
+If OpenAI rejects a kit-requested tier with `service_tier_not_allowed`, later requests on that branch omit the tier for the same provider and model. The kit learns from either a failed turn or a fallback diagnostic when Fitch Pi retries the turn at Standard. Pi owns any retry; the kit never changes Ultrafast to priority, forces Standard, or changes the saved preference.
+
+The footer shows the paused tier, and the status command explains why. A successful OpenAI mode command, including reselecting the same mode, clears pauses on the active branch. Pauses survive `/reload` and resume on the same branch. `/tree` restores the pauses for the branch you select. New and forked sessions start without pauses.
 
 The example settings start on `openai-codex`; none of their Codex or gateway routes can request Ultrafast. To try it without changing the defaults, authenticate `openai` with `OPENAI_API_KEY` or `/login openai` using an eligible ChatGPT account. Start `pi --model openai/gpt-6.2-sol`, then run `/ultrafast on --session`. If you installed `chatgpt-rotate` separately, you can select `chatgpt-rotate/gpt-6.2-sol` instead.
 
