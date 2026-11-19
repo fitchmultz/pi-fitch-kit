@@ -12,8 +12,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { zstdDecompressSync } from "node:zlib";
-import { mock } from "node:test";
-import { normalizeContext, type Api, type Model } from "@earendil-works/pi-ai";
+import { mock, test } from "node:test";
+import {
+	fauxAssistantMessage,
+	normalizeContext,
+	type Api,
+	type Model,
+} from "@earendil-works/pi-ai";
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-fast-mode-"));
 process.on("exit", () => rmSync(agentDir, { recursive: true, force: true }));
@@ -124,16 +129,22 @@ assert.deepEqual(
 
 const notices: string[] = [];
 const status = new Map<string, string | undefined>();
-const uiCtx = (model: unknown, sessionManager = defaultSession) => ({
-	hasUI: true,
-	model,
-	sessionManager,
-	ui: {
-		notify: (message: string) => notices.push(message),
-		setStatus: (key: string, value: string | undefined) => status.set(key, value),
-		theme: { fg: (color: string, text: string) => `${color}:${text}` },
-	},
-});
+const uiCtx = (model: unknown, sessionManager = defaultSession) => {
+	// Mirror AgentSession's append binding for driven handlers on the loaded factory.
+	loaded.runtime.appendEntry = (type, data) => {
+		sessionManager.appendCustomEntry(type, data);
+	};
+	return {
+		hasUI: true,
+		model,
+		sessionManager,
+		ui: {
+			notify: (message: string) => notices.push(message),
+			setStatus: (key: string, value: string | undefined) => status.set(key, value),
+			theme: { fg: (color: string, text: string) => `${color}:${text}` },
+		},
+	};
+};
 
 // Wire-level capture through real pi-ai serialization: the registered override
 // streams against a fake fetch, proving what an actual request would carry.
@@ -507,11 +518,12 @@ const requestPayload = async (
 	model: unknown,
 	payload: unknown = { model: "m" },
 	sessionManager = defaultSession,
+	hasUI = true,
 ) => {
 	let current = payload;
 	let changed = false;
 	for (const handler of handlers.before_provider_request ?? []) {
-		const next = await handler({ payload: current }, { model, sessionManager });
+		const next = await handler({ payload: current }, { model, sessionManager, hasUI });
 		if (next !== undefined) {
 			current = next;
 			changed = true;
@@ -701,6 +713,7 @@ async function openaiWireRequest(
 	model: Model<Api>,
 	selectedModel = model,
 	sessionManager = defaultSession,
+	rejection?: { code: string; message: string },
 ) {
 	let payload: Record<string, unknown> | undefined;
 	let api: ReturnType<typeof openAIResponsesApi>;
@@ -730,9 +743,15 @@ async function openaiWireRequest(
 				} else if (typeof raw === "string") {
 					body = raw;
 				}
-				if (body !== undefined) {
+				// Fitch may retry a rejected request at Standard. Assert the original wire tier.
+				if (payload === undefined && body !== undefined) {
 					const parsed: unknown = JSON.parse(body);
 					payload = requireRecord(parsed, "captured payload");
+				}
+				if (rejection !== undefined) {
+					return new Response(`data: ${JSON.stringify({ type: "error", ...rejection })}\n\n`, {
+						headers: { "Content-Type": "text/event-stream" },
+					});
 				}
 				throw new Error("payload captured");
 			},
@@ -742,6 +761,12 @@ async function openaiWireRequest(
 		/* Drain the capture abort. */
 	}
 	assert.ok(payload, `${model.provider}/${model.id} must reach its native serializer`);
+	if (rejection !== undefined) {
+		const message = await stream.result();
+		assert.equal(message.stopReason, "error");
+		assert.equal(message.errorMessage?.includes(rejection.message), true, message.errorMessage);
+		await runHandlers("message_end", { message }, uiCtx(selectedModel, sessionManager));
+	}
 	return payload;
 }
 
@@ -929,10 +954,6 @@ sessionA.appendMessage({
 });
 const sessionB = SessionManager.inMemory(agentDir);
 const localCommand = async (args: string, sessionManager = sessionA, model: unknown = astra) => {
-	// Same native append binding used by AgentSession, not a fake persistence store.
-	loaded.runtime.appendEntry = (type, data) => {
-		sessionManager.appendCustomEntry(type, data);
-	};
 	await commandFor(commands, "ultrafast").handler(args, uiCtx(model, sessionManager));
 };
 await commandFor(commands, "codex-fast").handler("on", uiCtx(astra));
@@ -1218,7 +1239,239 @@ for (const reason of ["reload", "new", "resume", "fork"]) {
 	assert.equal(status.get("codex-fast"), undefined, `${reason} must leave the fast footer off`);
 }
 flags.set("fast", false);
+
+await test("delegated children ignore both shared OpenAI tiers but honor a session override", async (t) => {
+	const child = SessionManager.inMemory(agentDir);
+	const body = { model: rotatedCodexSol62.id };
+	const owner = defaultSession.getSessionId();
+	const env: NodeJS.ProcessEnv = {
+		...process.env,
+		PI_INTERCOM_ROOT_SESSION_ID: owner,
+		PI_INTERCOM_PARENT_SESSION_ID: owner,
+	};
+	t.mock.property(process, "env", env);
+	try {
+		for (const tier of ["priority", "ultrafast"]) {
+			writeFileSync(statePath, JSON.stringify({ enabled: true, tier }));
+			assert.equal(
+				await requestPayload(rotatedCodexSol62, body, child, false),
+				undefined,
+				`a delegated child must not inherit shared ${tier}`,
+			);
+		}
+		await localCommand("on --session", child, rotatedCodexSol62);
+		assert.equal(
+			requireRecord(await requestPayload(rotatedCodexSol62, body, child, false), "child payload")
+				.service_tier,
+			"ultrafast",
+		);
+		await localCommand("reset --session", child, rotatedCodexSol62);
+		assert.equal(await requestPayload(rotatedCodexSol62, body, child, false), undefined);
+		delete env.PI_INTERCOM_ROOT_SESSION_ID;
+		delete env.PI_INTERCOM_PARENT_SESSION_ID;
+		const cli = SessionManager.inMemory(agentDir);
+		const cliCtx = { ...uiCtx(rotatedCodexSol62, cli), hasUI: false };
+		for (const [flag, tier] of [
+			["fast", "priority"],
+			["ultrafast", "ultrafast"],
+		] as const) {
+			writeFileSync(statePath, offState);
+			flags.set(flag, true);
+			await runHandlers("session_start", { reason: "startup" }, cliCtx);
+			flags.set(flag, false);
+			assert.equal(
+				requireRecord(await requestPayload(rotatedCodexSol62, body, cli, false), "CLI payload")
+					.service_tier,
+				tier,
+				`headless --${flag} must still work`,
+			);
+		}
+	} finally {
+		flags.set("fast", false);
+		flags.set("ultrafast", false);
+		writeFileSync(statePath, offState);
+	}
+});
+
+await test("Codex errors pause only the kit tier actually sent, until a mode change", async () => {
+	const manager = SessionManager.inMemory(agentDir);
+	const code = "service_tier_not_allowed";
+	const reject = (mode: string) => ({
+		code,
+		message: `${mode} mode isn't available for the selected model in your workspace. Choose Standard speed or another model.`,
+	});
+	const command = commandFor(commands, "codex-fast").handler;
+	const send = (model: Model<Api>, rejection?: { code: string; message: string }) =>
+		openaiWireRequest(model, model, manager, rejection);
+	try {
+		await command("on", uiCtx(codexSol62, manager));
+		assert.equal(
+			(await send(codexSol62, { code: "other_error", message: "Other error" })).service_tier,
+			"priority",
+		);
+		assert.equal((await send(codexSol62, reject("Fast"))).service_tier, "priority");
+		assert.equal((await send(codexSol62)).service_tier, undefined, "priority must not repeat");
+		assert.equal(status.get("codex-fast"), "muted:OpenAI priority paused");
+		assert.match(notices.at(-1) ?? "", /rejected priority.*this branch/);
+		await command("status", uiCtx(codexSol62, manager));
+		assert.match(
+			notices.at(-1) ?? "",
+			/shared: priority; session: inherit; effective: off.*priority rejected/,
+		);
+		assert.equal((await send(codexSol62)).service_tier, undefined, "status must not reset");
+		assert.equal((await send(codexAstra)).service_tier, "priority", "other model is unaffected");
+		assert.equal(
+			(await send(rotatedCodexSol62)).service_tier,
+			"priority",
+			"other provider is unaffected",
+		);
+		await command("on", uiCtx(codexSol62, manager));
+		assert.equal((await send(codexSol62)).service_tier, "priority", "explicit on lets me retry");
+
+		await localCommand("on --session", manager, rotatedCodexSol62);
+		assert.equal((await send(rotatedCodexSol62, reject("Ultrafast"))).service_tier, "ultrafast");
+		assert.equal(
+			(await send(rotatedCodexSol62)).service_tier,
+			undefined,
+			"rejected local Ultrafast must not fall back to shared priority",
+		);
+		assert.equal(status.get("codex-fast"), "muted:OpenAI ultrafast paused");
+		await localCommand("on --session", manager, rotatedCodexSol62);
+		assert.equal(
+			(await send(rotatedCodexSol62)).service_tier,
+			"ultrafast",
+			"local on lets me retry",
+		);
+		assert.equal(
+			(await send(rotatedCodexSol62, { code, message: code })).service_tier,
+			"ultrafast",
+		);
+		assert.equal((await send(rotatedCodexSol62)).service_tier, undefined);
+	} finally {
+		writeFileSync(statePath, offState);
+	}
+});
+
+await test("a successful Fitch fallback pauses its tier durably on the active branch", async () => {
+	const model = rotatedCodexSol62;
+	const manager = SessionManager.create(agentDir, join(agentDir, "sessions"));
+	const ctx = uiCtx(model, manager);
+	const success = {
+		...fauxAssistantMessage("Completed at Standard"),
+		provider: model.provider,
+		model: model.id,
+		api: model.api,
+	};
+	manager.appendMessage(success);
+	assert.equal(success.stopReason, "stop");
+	const countsBefore = manager.buildSessionContext().messages.length;
+	const path = manager.getSessionFile();
+	assert.ok(path !== undefined);
+	try {
+		await commandFor(commands, "codex-fast").handler("ultrafast", ctx);
+		const beforePause = manager.getLeafId();
+		assert.ok(beforePause !== null);
+		for (const rejectedTier of ["priority", "ultrafast"]) {
+			assert.equal(
+				(await openaiWireRequest(model, model, manager)).service_tier,
+				"ultrafast",
+				"a diagnostic about another tier must not pause the one sent",
+			);
+			await runHandlers(
+				"message_end",
+				{
+					message: {
+						...success,
+						diagnostics: [
+							{
+								type: "service_tier_fallback",
+								error: { code: "service_tier_not_allowed", message: "Tier not allowed" },
+								details: { rejectedTier },
+							},
+						],
+					},
+				},
+				ctx,
+			);
+		}
+		assert.equal(
+			(await openaiWireRequest(model, model, manager)).service_tier,
+			undefined,
+			"a successful fallback must omit the rejected tier on the next turn",
+		);
+		assert.equal(
+			manager.buildSessionContext().messages.length,
+			countsBefore,
+			"pauses stay out of model context",
+		);
+		manager.appendMessage(success);
+		const pausedLeaf = manager.getLeafId();
+		assert.ok(pausedLeaf !== null);
+		await runHandlers("session_shutdown", { reason: "reload" }, ctx);
+
+		const reloadLoad = await discoverAndLoadExtensions(
+			[fileURLToPath(new URL("../extensions/fast-mode.ts", import.meta.url))],
+			agentDir,
+			agentDir,
+		);
+		assert.deepEqual(reloadLoad.errors, []);
+		const reopened = SessionManager.open(path);
+		const reopenedCtx = uiCtx(model, reopened);
+		reloadLoad.runtime.appendEntry = (type, data) => {
+			reopened.appendCustomEntry(type, data);
+		};
+		const reloadHandlers = drivenHandlers(soleExtension(reloadLoad));
+		const reloadRequest = () =>
+			handlerFor(reloadHandlers, "before_provider_request")(
+				{ payload: { model: model.id } },
+				reopenedCtx,
+			);
+		await handlerFor(reloadHandlers, "session_start")({ reason: "reload" }, reopenedCtx);
+		try {
+			assert.equal(await reloadRequest(), undefined, "reload restores the on-disk pause");
+			reopened.branch(beforePause);
+			await handlerFor(reloadHandlers, "session_tree")({}, reopenedCtx);
+			assert.equal(
+				requireRecord(await reloadRequest(), "branch payload").service_tier,
+				"ultrafast",
+			);
+			reopened.branch(pausedLeaf);
+			await handlerFor(reloadHandlers, "session_tree")({}, reopenedCtx);
+			assert.equal(
+				await reloadRequest(),
+				undefined,
+				"returning to the paused branch restores the pause",
+			);
+
+			const fork = SessionManager.forkFrom(path, agentDir, join(agentDir, "sessions"));
+			assert.equal(
+				(await openaiWireRequest(model, model, fork)).service_tier,
+				"ultrafast",
+				"a new session made by forking the paused branch must not inherit its pause",
+			);
+			const reloadCommands = drivenCommands(soleExtension(reloadLoad));
+			await commandFor(reloadCommands, "codex-fast").handler("ultrafast", reopenedCtx);
+			assert.equal(
+				requireRecord(await reloadRequest(), "cleared payload").service_tier,
+				"ultrafast",
+			);
+		} finally {
+			await handlerFor(reloadHandlers, "session_shutdown")({ reason: "quit" }, reopenedCtx);
+		}
+		const resumedAfterClear = SessionManager.open(path);
+		await runHandlers("session_start", { reason: "resume" }, uiCtx(model, resumedAfterClear));
+		assert.equal(
+			(await openaiWireRequest(model, model, resumedAfterClear)).service_tier,
+			"ultrafast",
+			"the clear entry survives resume",
+		);
+	} finally {
+		writeFileSync(statePath, offState);
+	}
+});
+
 assert.equal(status.get("anthropic-fast"), undefined, "no footer while off");
+await runHandlers("model_select", {}, uiCtx(MODELS.openai));
 assert.equal(status.get("codex-fast"), undefined);
 await commandFor(commands, "anthropic-fast").handler("on", uiCtx(gatewayOpus));
 assert.equal(status.get("anthropic-fast"), "accent:fast");
@@ -1243,14 +1496,18 @@ for (const count of [781, 43_000]) {
 		manager.appendCustomEntry("history-fixture", {});
 	}
 	const entries = mock.method(manager, "getEntries");
+	const branch = mock.method(manager, "getBranch");
 	await runHandlers("session_start", { reason: "resume" }, uiCtx(astra, manager));
 	assert.equal(entries.mock.callCount(), 1, "Session policy bootstraps once");
+	assert.equal(branch.mock.callCount(), 1, "Pauses are restored once from the active branch");
 	entries.mock.resetCalls();
+	branch.mock.resetCalls();
 	for (let i = 0; i < 100; i++) {
 		await requestPayload(astra, { model: astra.id }, manager);
 		await runHandlers("model_select", {}, uiCtx(astra, manager));
 	}
 	assert.equal(entries.mock.callCount(), 0, "Requests/status retain known-absent session policy");
+	assert.equal(branch.mock.callCount(), 0, "Requests/status do not rescan for pauses");
 	const before = readFileSync(statePath, "utf8");
 	writeFileSync(statePath, JSON.stringify({ enabled: true, tier: "ultrafast" }));
 	assert.equal(
@@ -1268,6 +1525,7 @@ for (const count of [781, 43_000]) {
 		}),
 	);
 	entries.mock.restore();
+	branch.mock.restore();
 }
 
 // Google tiers use the host's real SDK serializer, not OpenAI's service_tier shape.
@@ -1392,11 +1650,11 @@ const sleep = (ms: number): Promise<void> =>
 	new Promise<void>((resolve) => {
 		setTimeout(resolve, ms);
 	});
-const waitFor = async (predicate: () => boolean, timeoutMs = 1500): Promise<void> => {
-	const deadline = Date.now() + timeoutMs;
-	while (!predicate()) {
+const waitForStatus = async (key: string, expected: string): Promise<void> => {
+	const deadline = Date.now() + 1500;
+	while (status.get(key) !== expected) {
 		if (Date.now() >= deadline) {
-			assert.fail("timed out waiting for event-driven footer refresh");
+			assert.equal(status.get(key), expected, `timed out waiting for ${key} footer refresh`);
 		}
 		await sleep(15);
 	}
@@ -1412,11 +1670,11 @@ assert.equal(
 assert.equal(statWatchers(), watcherBaseline, "UI sessions must not start StatWatcher pollers");
 assert.equal(status.get("anthropic-fast"), undefined);
 writeFileSync(join(agentDir, "anthropic-fast.json"), JSON.stringify({ enabled: true }));
-await waitFor(() => status.get("anthropic-fast") === "accent:fast");
+await waitForStatus("anthropic-fast", "accent:fast");
 await runHandlers("model_select", {}, uiCtx(gatewayGoogle));
 assert.equal(status.get("google-tier"), undefined);
 writeFileSync(googleStatePath, JSON.stringify({ tier: "flex" }));
-await waitFor(() => status.get("google-tier") === "accent:Google flex requested");
+await waitForStatus("google-tier", "accent:Google flex requested");
 const readsBeforeUnrelated = toggleFileReads.mock.callCount();
 writeFileSync(join(agentDir, "unrelated-note.json"), "{}\n");
 await sleep(60);

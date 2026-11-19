@@ -81,6 +81,13 @@ export type FastModel =
 export type FastRates = { input: number; output: number; cacheRead: number; cacheWrite: number };
 export type OpenAIMode = "off" | "priority" | "ultrafast";
 export type SessionOpenAIMode = "off" | "ultrafast";
+export type OpenAIRequestPolicy = {
+	shared: OpenAIMode;
+	local: SessionOpenAIMode | undefined;
+	delegated: boolean;
+	mode: OpenAIMode;
+	rejected: boolean;
+};
 export const SESSION_MODE_ENTRY = "openai-ultrafast";
 export const ULTRAFAST_UNAVAILABLE = `Ultrafast requires one of ${[...ULTRAFAST_MODEL_IDS].join(", ")} on a native openai or chatgpt-rotate route. No mode was changed.`;
 export const ULTRAFAST_NOTICE =
@@ -275,17 +282,17 @@ export function notify(
 
 export function openAIStatus(
 	ctx: ExtensionContext,
-	local: SessionOpenAIMode | undefined,
+	{ shared, local, mode, rejected }: OpenAIRequestPolicy,
 	replyStatus = "",
 ): string {
-	const shared = openAIMode();
-	const effective = local ?? shared;
+	const effective = rejected ? "off" : mode;
 	const availability =
 		effective === "ultrafast" && !ultrafastEligible(ctx.model)
 			? " (unavailable on this route)"
 			: "";
+	const rejection = rejected ? ` ${mode} rejected for this model on this branch.` : "";
 	return (
-		`OpenAI shared: ${shared}; session: ${local ?? "inherit"}; effective: ${effective}${availability}.${replyStatus}` +
+		`OpenAI shared: ${shared}; session: ${local ?? "inherit"}; effective: ${effective}${availability}.${rejection}${replyStatus}` +
 		(shared === "ultrafast" || local === "ultrafast" ? ` ${ULTRAFAST_NOTICE}` : "")
 	);
 }
@@ -405,24 +412,27 @@ const setStatusLabel = (ctx: ExtensionContext, key: string, label: FooterLabel):
 /** OpenAI footer label: session off, ultrafast request, or priority state. */
 const openAIFooterLabel = (
 	ctx: ExtensionContext,
-	local: SessionOpenAIMode | undefined,
+	{ local, mode, rejected }: OpenAIRequestPolicy,
 ): FooterLabel => {
 	if (local === "off") {
 		return OPENAI_TOGGLE.eligible(ctx.model)
 			? { text: "session OpenAI tiers off", color: "muted" }
 			: undefined;
 	}
-	const mode = local ?? openAIMode();
-	if (mode === "ultrafast") {
-		return ultrafastEligible(ctx.model)
-			? {
-					text: local === undefined ? "ultrafast requested" : "session ultrafast requested",
-					color: "accent",
-				}
-			: undefined;
-	}
-	if (mode !== "priority" || !OPENAI_TOGGLE.eligible(ctx.model)) {
+	if (mode === "off" || !OPENAI_TOGGLE.eligible(ctx.model)) {
 		return undefined;
+	}
+	if (mode === "ultrafast" && !ultrafastEligible(ctx.model)) {
+		return undefined;
+	}
+	if (rejected) {
+		return { text: `OpenAI ${mode} paused`, color: "muted" };
+	}
+	if (mode === "ultrafast") {
+		return {
+			text: local === undefined ? "ultrafast requested" : "session ultrafast requested",
+			color: "accent",
+		};
 	}
 	return { text: "priority enabled", color: "accent" };
 };
@@ -435,14 +445,11 @@ const fastFooterLabel = (ctx: ExtensionContext, toggle: Toggle): FooterLabel => 
 	return { text: "fast", color: "accent" };
 };
 
-export function updateFooterStatus(
-	ctx: ExtensionContext,
-	local: SessionOpenAIMode | undefined,
-): void {
+export function updateFooterStatus(ctx: ExtensionContext, openai: OpenAIRequestPolicy): void {
 	for (const toggle of TOGGLES) {
 		try {
 			const label =
-				toggle === OPENAI_TOGGLE ? openAIFooterLabel(ctx, local) : fastFooterLabel(ctx, toggle);
+				toggle === OPENAI_TOGGLE ? openAIFooterLabel(ctx, openai) : fastFooterLabel(ctx, toggle);
 			setStatusLabel(ctx, toggle.name, label);
 		} catch {
 			// Headless hosts do not expose a footer.

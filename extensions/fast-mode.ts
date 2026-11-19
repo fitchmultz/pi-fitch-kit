@@ -2,7 +2,6 @@ import type {
 	BeforeProviderRequestEvent,
 	ExtensionAPI,
 	ExtensionContext,
-	ProviderStreamEvent,
 	SessionStartEvent,
 } from "@earendil-works/pi-coding-agent";
 import {
@@ -18,15 +17,12 @@ import {
 	notify,
 	openAIMode,
 	openAIStatus,
-	restoreSessionOpenAIMode,
 	ultrafastEligible,
-	ultrafastRequest,
-	updateFooterStatus,
 	writeEnabled,
 	type OpenAIMode,
-	type SessionOpenAIMode,
 	type Toggle,
 } from "./fast-mode-policy.ts";
+import { FastModeSession } from "./fast-mode-session.ts";
 import { GOOGLE_TIER_STATE_PATH, registerGoogleTier } from "./google-tier.ts";
 
 export { fastRates } from "./fast-mode-policy.ts";
@@ -54,124 +50,6 @@ const setStartupError = (message: string): void => {
 const clearStartupError = (): void => {
 	startupGlobals[STARTUP_STATE] = {};
 };
-
-const TERMINAL_RESPONSES = new Set<unknown>([
-	"response.completed",
-	"response.done",
-	"response.incomplete",
-]);
-const RETURNED_TIER_STATUS = new Map<unknown, string>([
-	["ultrafast", "OpenAI confirmed Ultrafast"],
-	["default", "OpenAI reported Standard"],
-]);
-const UNCONFIRMED_ULTRAFAST = "OpenAI did not confirm Ultrafast";
-
-function returnedTierStatus(data: unknown): string | undefined {
-	if (
-		data === null ||
-		typeof data !== "object" ||
-		!("type" in data) ||
-		!TERMINAL_RESPONSES.has(data.type)
-	) {
-		return undefined;
-	}
-	const response = "response" in data ? data.response : undefined;
-	if (response === null || typeof response !== "object" || !("service_tier" in response)) {
-		return UNCONFIRMED_ULTRAFAST;
-	}
-	return RETURNED_TIER_STATUS.get(response.service_tier) ?? UNCONFIRMED_ULTRAFAST;
-}
-
-/** Session-scoped OpenAI tier override and footer wiring for one factory. */
-class FastModeSession {
-	private sessionId: string | undefined;
-	private localMode: SessionOpenAIMode | undefined;
-	private footerContext: ExtensionContext | undefined;
-	private lastReply: { model: NonNullable<ExtensionContext["model"]>; status: string } | undefined;
-
-	localModeFor(ctx: ExtensionContext): SessionOpenAIMode | undefined {
-		const id = ctx.sessionManager.getSessionId();
-		if (this.sessionId !== id) {
-			this.sessionId = id;
-			this.localMode = restoreSessionOpenAIMode(ctx);
-			this.lastReply = undefined;
-		}
-		return this.localMode;
-	}
-
-	effectiveMode(ctx: ExtensionContext): OpenAIMode {
-		return this.localModeFor(ctx) ?? openAIMode();
-	}
-
-	adoptSession(ctx: ExtensionContext): void {
-		this.sessionId = ctx.sessionManager.getSessionId();
-		this.localMode = restoreSessionOpenAIMode(ctx);
-		this.footerContext = ctx;
-		this.lastReply = undefined;
-	}
-
-	observeReply(
-		{ data, provider, api, model: id }: ProviderStreamEvent,
-		ctx: ExtensionContext,
-	): void {
-		const status = returnedTierStatus(data);
-		if (status === undefined) {
-			return;
-		}
-		const model = ctx.model;
-		if (
-			model?.id !== id ||
-			model.provider !== provider ||
-			model.api !== api ||
-			!ultrafastEligible(model) ||
-			this.effectiveMode(ctx) !== "ultrafast"
-		) {
-			return;
-		}
-		this.lastReply = { model, status };
-	}
-
-	replyStatus(ctx: ExtensionContext): string {
-		const model = ctx.model;
-		if (
-			this.effectiveMode(ctx) !== "ultrafast" ||
-			model === undefined ||
-			!ultrafastEligible(model)
-		) {
-			return "";
-		}
-		const reply = this.lastReply;
-		if (
-			reply?.model.id === model.id &&
-			reply.model.provider === model.provider &&
-			reply.model.api === model.api &&
-			reply.model.baseUrl === model.baseUrl
-		) {
-			return ` Last reply: ${reply.status}.`;
-		}
-		return " No reply observed for this model with Ultrafast enabled in this Pi run.";
-	}
-
-	setFooterContext(ctx: ExtensionContext): void {
-		this.footerContext = ctx;
-	}
-
-	setLocalMode(mode: SessionOpenAIMode | undefined): void {
-		this.localMode = mode;
-	}
-
-	/** Redraws the footer from the most recent TUI context, when there was one. */
-	refreshFooter(): void {
-		const ctx = this.footerContext;
-		if (ctx !== undefined) {
-			updateFooterStatus(ctx, this.localModeFor(ctx));
-		}
-	}
-
-	release(): void {
-		this.footerContext = undefined;
-	}
-}
 
 /** The startup validation error implied by the --fast/--ultrafast flags, if any. */
 const startupFlagError = (
@@ -223,23 +101,14 @@ const handleSessionStart = (
 	if (event.reason === "startup") {
 		applyStartupFlags(pi, ctx);
 	}
-	const local = session.localModeFor(ctx);
-	if (readStartupError() === undefined && (openAIMode() === "ultrafast" || local === "ultrafast")) {
-		notify(ctx, openAIStatus(ctx, local));
+	const policy = session.policy(ctx);
+	if (
+		readStartupError() === undefined &&
+		(policy.local === "ultrafast" || (policy.shared === "ultrafast" && !policy.delegated))
+	) {
+		notify(ctx, openAIStatus(ctx, policy));
 	}
-	updateFooterStatus(ctx, local);
-};
-
-/** Resolves the service_tier a priority-eligible request should carry, if any. */
-const priorityTier = (
-	toggle: Toggle,
-	ctx: ExtensionContext,
-	session: FastModeSession,
-): "priority" | "ultrafast" | "off" => {
-	if (toggle !== OPENAI_TOGGLE) {
-		return enabled(toggle.statePath) ? "priority" : "off";
-	}
-	return session.effectiveMode(ctx);
+	session.updateFooter(ctx, policy);
 };
 
 /** Applies service_tier to a priority-eligible provider request payload. */
@@ -252,21 +121,14 @@ const applyPriorityTier = (
 	if (toggle === undefined) {
 		return undefined;
 	}
-	const tier = priorityTier(toggle, ctx, session);
-	if (tier === "off") {
-		return undefined;
-	}
 	const payload = event.payload;
 	if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
 		return undefined;
 	}
-	if (tier === "ultrafast") {
-		const model = "model" in payload ? payload.model : undefined;
-		if (!ultrafastRequest(ctx.model, model)) {
-			return undefined;
-		}
+	if (toggle === OPENAI_TOGGLE) {
+		return session.applyTier(payload, ctx);
 	}
-	return { ...payload, service_tier: tier };
+	return enabled(toggle.statePath) ? { ...payload, service_tier: "priority" } : undefined;
 };
 
 /** One registered toggle command, with its parsed request shape. */
@@ -294,7 +156,12 @@ const parseToggleCommand = (
 	return { command };
 };
 
-const applyTierState = (command: string, request: ToggleRequest): void => {
+const applyTierState = (
+	command: string,
+	request: ToggleRequest,
+	session: FastModeSession,
+	ctx: ExtensionContext,
+): void => {
 	if (!TOGGLE_VERBS.has(command)) {
 		return;
 	}
@@ -308,6 +175,7 @@ const applyTierState = (command: string, request: ToggleRequest): void => {
 	}
 	if (openai) {
 		clearStartupError();
+		session.clearRejections(ctx);
 	}
 };
 
@@ -320,20 +188,20 @@ const reportToggleResult = (
 	session: FastModeSession,
 	view: { request: ToggleRequest; previousMode: OpenAIMode | undefined },
 ): void => {
-	updateFooterStatus(ctx, session.localModeFor(ctx));
+	const policy = session.policy(ctx);
+	session.updateFooter(ctx, policy);
 	const openai = view.request.toggle === OPENAI_TOGGLE;
-	const mode = openai ? openAIMode() : undefined;
-	const local = session.localModeFor(ctx);
+	const mode = openai ? policy.shared : undefined;
 	if (
 		openai &&
-		(mode === "ultrafast" || local !== undefined || command === "status" || command === "")
+		(mode === "ultrafast" || policy.local !== undefined || command === "status" || command === "")
 	) {
-		notify(ctx, openAIStatus(ctx, local));
+		notify(ctx, openAIStatus(ctx, policy));
 		return;
 	}
-	const policy = openai ? togglePolicy(view.previousMode, mode) : "fast mode";
+	const label = openai ? togglePolicy(view.previousMode, mode) : "fast mode";
 	const on = openai ? mode !== "off" : enabled(view.request.toggle.statePath);
-	notify(ctx, `${view.request.toggle.label} ${policy} ${on ? "ON" : "OFF"}`, "info");
+	notify(ctx, `${view.request.toggle.label} ${label} ${on ? "ON" : "OFF"}`, "info");
 };
 
 const runToggleCommand = async (
@@ -342,7 +210,6 @@ const runToggleCommand = async (
 	session: FastModeSession,
 	request: ToggleRequest,
 ): Promise<void> => {
-	session.setFooterContext(ctx);
 	const parsed = parseToggleCommand(args, request);
 	if ("usage" in parsed) {
 		notify(ctx, parsed.usage, "warning");
@@ -353,7 +220,7 @@ const runToggleCommand = async (
 		notify(ctx, ULTRAFAST_UNAVAILABLE, "warning");
 		return;
 	}
-	applyTierState(parsed.command, request);
+	applyTierState(parsed.command, request, session, ctx);
 	reportToggleResult(parsed.command, ctx, session, { request, previousMode });
 };
 
@@ -399,7 +266,6 @@ const runUltrafastCommand = async (
 	session: FastModeSession,
 	pi: ExtensionAPI,
 ): Promise<void> => {
-	session.setFooterContext(ctx);
 	const parsed = parseUltrafastArgs(args);
 	if ("usage" in parsed) {
 		notify(ctx, parsed.usage, "warning");
@@ -407,7 +273,8 @@ const runUltrafastCommand = async (
 	}
 	const { local, command } = parsed;
 	if (command !== "status") {
-		const current = local ? session.effectiveMode(ctx) : openAIMode();
+		const policy = session.policy(ctx);
+		const current = local ? policy.mode : policy.shared;
 		const next = nextUltrafastTier(command, current);
 		if (next === "ultrafast" && !ultrafastEligible(ctx.model)) {
 			notify(ctx, ULTRAFAST_UNAVAILABLE, "warning");
@@ -425,14 +292,16 @@ const runUltrafastCommand = async (
 			writeEnabled(OPENAI_TOGGLE.statePath, false);
 		}
 		clearStartupError();
+		session.clearRejections(ctx);
 	}
-	updateFooterStatus(ctx, session.localModeFor(ctx));
-	const reply = command === "status" ? session.replyStatus(ctx) : "";
-	notify(ctx, openAIStatus(ctx, session.localModeFor(ctx), reply));
+	const policy = session.policy(ctx);
+	session.updateFooter(ctx, policy);
+	const reply = command === "status" ? session.replyStatus(ctx, policy) : "";
+	notify(ctx, openAIStatus(ctx, policy, reply));
 };
 
 export default function fastMode(pi: ExtensionAPI): void {
-	const session = new FastModeSession();
+	const session = new FastModeSession((type, data) => pi.appendEntry(type, data));
 
 	pi.registerFlag("fast", {
 		description: "Start with OpenAI priority/fast mode enabled",
@@ -467,6 +336,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 	// OpenAI-compatible endpoints never receive it.
 	pi.on("before_provider_request", (event, ctx) => applyPriorityTier(event, ctx, session));
 	pi.on("provider_stream_event", (event, ctx) => session.observeReply(event, ctx));
+	pi.on("message_end", (event, ctx) => session.observeMessage(event, ctx));
 
 	const refreshListeners: Array<() => void> = [() => session.refreshFooter()];
 	const stateWatcher = createStateWatcher(
@@ -488,10 +358,11 @@ export default function fastMode(pi: ExtensionAPI): void {
 		stateWatcher.stop();
 		session.release();
 	});
-	pi.on("model_select", (_event, ctx) => {
-		session.setFooterContext(ctx);
-		updateFooterStatus(ctx, session.localModeFor(ctx));
+	pi.on("session_tree", (_event, ctx) => {
+		session.adoptBranch(ctx);
+		session.updateFooter(ctx);
 	});
+	pi.on("model_select", (_event, ctx) => session.updateFooter(ctx));
 
 	const registerToggleCommand = (name: string, toggle: Toggle, emptyMeansToggle = false): void => {
 		pi.registerCommand(name, {
