@@ -743,7 +743,8 @@ async function openaiWireRequest(
 				} else if (typeof raw === "string") {
 					body = raw;
 				}
-				if (body !== undefined) {
+				// Fitch may retry a rejected request at Standard. Assert the original wire tier.
+				if (payload === undefined && body !== undefined) {
 					const parsed: unknown = JSON.parse(body);
 					payload = requireRecord(parsed, "captured payload");
 				}
