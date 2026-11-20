@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Raise the Pi floor to 1.6.0 in the manifest, setup validation, documentation, and development cohort, and tighten the `openai-codex-responses` `max_output_tokens` writer boundary check now that Pi 1.6.0 sends `max_output_tokens` natively. (PEA-222)
+
 - Clarify `name_session` guidance so sessions keep their name across subtasks, follow-up issues, phases, or detours within the same workstream and rename when pivoting to a clearly different primary project or goal, while preserving `coordinator` and numbered subagent identifiers and keeping the current name when unsure. (PFK-206)
 
 - Keep shared OpenAI Fast and Ultrafast out of delegated children. After a tier rejection or a reported Standard retry, pause that tier for the same provider and model on the active branch. Pauses survive reload and resume; they never fall back to another paid tier. (PFK-205)
