@@ -1,6 +1,6 @@
 # How I use Pi
 
-_Reviewed 10 November 2026 against official Pi 1.5.2 and the current [Fitch Pi](https://github.com/fitchmultz/pi) build._
+_Reviewed 20 November 2026 against official Pi 1.6.0 and the current [Fitch Pi](https://github.com/fitchmultz/pi) build._
 
 A few people have asked about my terminal agent setup. This guide describes it. [`pi-fitch-kit`](https://github.com/fitchmultz/pi-fitch-kit) is the public, installable version.
 

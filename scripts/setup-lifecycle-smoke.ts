@@ -48,15 +48,16 @@ mkdirSync(agentDir, { recursive: true });
 mkdirSync(home);
 mkdirSync(cwd);
 
+const packageDir = fileURLToPath(
+	new URL("..", import.meta.resolve("@earendil-works/pi-coding-agent")),
+);
 const env = {
 	...process.env,
 	HOME: home,
 	PI_CODING_AGENT_DIR: agentDir,
+	PI_PACKAGE_DIR: packageDir,
 	PI_OFFLINE: "1",
 };
-const packageDir = fileURLToPath(
-	new URL("..", import.meta.resolve("@earendil-works/pi-coding-agent")),
-);
 const hostPackage: Record<string, unknown> = requireRecord(
 	JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8")),
 	"host package.json",
