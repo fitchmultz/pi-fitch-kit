@@ -142,6 +142,12 @@ assert.match(guidelines, /same tool-call batch as calls you already need/);
 assert.match(guidelines, /do not add unrelated work/);
 assert.match(guidelines, /overall purpose/);
 assert.match(guidelines, /when unsure, keep the current name/);
+assert.match(guidelines, /across subtasks, follow-up issues, phases, or detours/i);
+assert.match(
+	guidelines,
+	/rename when the session pivots to a clearly different primary project or goal/i,
+);
+assert.doesNotMatch(guidelines, /permanently changed/i);
 assert.match(guidelines, /name must contain coordinator/);
 assert.match(guidelines, /exact numbered subagent identifier/);
 assert.match(guidelines, /asks the user to confirm/);
@@ -254,6 +260,47 @@ await tool.execute(
 );
 assert.equal(confirmations, 2);
 assert.equal(currentName, "release-planning");
+
+await tool.execute(
+	"pivot-coordinator-start",
+	{ name: "old-area-coordinator" },
+	new AbortController().signal,
+	undefined,
+	toolContext(),
+);
+let pivotConfirmations = 0;
+const pivotContext = (confirmed: boolean) =>
+	toolContext({
+		confirm: async () => {
+			pivotConfirmations++;
+			return confirmed;
+		},
+	});
+const pivotKept = await tool.execute(
+	"pivot-coordinator-keep",
+	{ name: "new-area-coordinator" },
+	new AbortController().signal,
+	undefined,
+	pivotContext(false),
+);
+assert.equal(pivotConfirmations, 0);
+assert.equal(currentName, "new-area-coordinator");
+assert.deepEqual(pivotKept.details, {
+	name: "new-area-coordinator",
+	previousName: "old-area-coordinator",
+});
+await assert.rejects(
+	tool.execute(
+		"pivot-coordinator-drop",
+		{ name: "new-area" },
+		new AbortController().signal,
+		undefined,
+		pivotContext(false),
+	),
+	/Protected name change was not confirmed by the user/,
+);
+assert.equal(pivotConfirmations, 1);
+assert.equal(currentName, "new-area-coordinator");
 
 currentName = "subagent-1-subagent-2";
 await assert.rejects(
