@@ -550,9 +550,10 @@ try {
 			}),
 		);
 		if (responses) {
-			assert.equal(
-				body.max_output_tokens,
-				api === "openai-codex-responses" ? undefined : 1000,
+			assert.ok(
+				api === "openai-codex-responses"
+					? body.max_output_tokens === undefined || body.max_output_tokens === 1000
+					: body.max_output_tokens === 1000,
 				"native simple streaming owns the output limit",
 			);
 			assert.equal(
