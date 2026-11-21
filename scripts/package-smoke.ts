@@ -531,6 +531,7 @@ try {
 		"fast",
 		"google-tier",
 		"side-question",
+		"ste",
 		"ultrafast",
 		"unreasonable",
 		"xai-fast",

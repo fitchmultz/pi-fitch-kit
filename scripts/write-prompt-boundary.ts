@@ -637,37 +637,49 @@ try {
 			["draft", "Tweak", "Deny"],
 			["ambitious", "Tweak", "Deny"],
 			["unreasonable", "Tweak", "Deny"],
+			["ste", "Tweak", "Deny"],
 			["side-question", "Ask again", "Dismiss"],
 		];
+		const expectedInstructions: Record<string, string> = {
+			draft: "a better coding-agent prompt",
+			ambitious: "a more ambitious coding-agent prompt",
+			unreasonable: "an unreasonably demanding, outcome-driven agent prompt",
+			ste: "an ASD-STE100 Issue 9 Simplified Technical English prompt",
+		};
+		const tweakPatterns: Record<string, RegExp> = {
+			unreasonable:
+				/unreasonably demanding.*Revise the current draft.*Original request:.*SOURCE_SENTINEL.*Revision notes:.*FOLLOWUP_SENTINEL/s,
+			ste: /ASD-STE100 Issue 9.*Revise the current draft.*Original request:.*SOURCE_SENTINEL.*Revision notes:.*FOLLOWUP_SENTINEL/s,
+		};
 		for (const [command, followup, dismiss] of commandTable) {
 			const start = requests.length;
 			actions.push(followup, dismiss);
 			await active.prompt(`/${command} SOURCE_SENTINEL`);
 			assert.equal(requests.length - start, 2, `${label} /${command} must complete and follow up`);
-			if (command !== "side-question") {
-				const instruction =
-					command === "unreasonable"
-						? "an unreasonably demanding, outcome-driven agent prompt"
-						: `a ${command === "ambitious" ? "more ambitious" : "better"} coding-agent prompt`;
+			const expectedInstruction = expectedInstructions[command];
+			if (expectedInstruction !== undefined) {
 				assert.ok(
-					JSON.stringify(requests[start]).includes(`Rewrite the boxed text into ${instruction}`),
+					JSON.stringify(requests[start]).includes(
+						`Rewrite the boxed text into ${expectedInstruction}`,
+					),
 					`${label} /${command} instruction`,
 				);
-				if (command === "unreasonable") {
-					const revisionRequest = requireRecord(
-						requests.at(start + 1),
-						"unreasonable revision request",
-					);
-					const revision = jsonList(
-						responses ? revisionRequest.input : revisionRequest.messages,
-						"unreasonable revision messages",
-					).at(-1);
-					assert.match(
-						JSON.stringify(revision),
-						/unreasonably demanding.*Revise the current draft.*Original request:.*SOURCE_SENTINEL.*Revision notes:.*FOLLOWUP_SENTINEL/s,
-						"Tweak retains unreasonable instructions in the new request, not just prior history",
-					);
-				}
+			}
+			const tweakPattern = tweakPatterns[command];
+			if (tweakPattern !== undefined) {
+				const revisionRequest = requireRecord(
+					requests.at(start + 1),
+					`${command} revision request`,
+				);
+				const revision = jsonList(
+					responses ? revisionRequest.input : revisionRequest.messages,
+					`${command} revision messages`,
+				).at(-1);
+				assert.match(
+					JSON.stringify(revision),
+					tweakPattern,
+					`Tweak retains ${command} instructions in the new request, not just prior history`,
+				);
 			}
 			for (const body of requests.slice(start)) {
 				check(body, history);
@@ -698,7 +710,7 @@ try {
 		const [identity] = sessions;
 		assert.ok(identity !== undefined, `${label}: writer requests carry a provider session`);
 		console.log(
-			`PASS ${api} ${label}: draft/ambitious/unreasonable tweak/deny and side-question/ask-again/dismiss`,
+			`PASS ${api} ${label}: draft/ambitious/unreasonable/ste tweak/deny and side-question/ask-again/dismiss`,
 		);
 		return identity;
 	};
@@ -895,7 +907,7 @@ try {
 	assert.equal(editorText, "", "successful acceptance must not replace editor input");
 
 	// A different flavor must not reopen the accepted /draft entry.
-	for (const command of ["ambitious", "unreasonable"]) {
+	for (const command of ["ambitious", "unreasonable", "ste"]) {
 		const before = requests.length;
 		await freshActive.prompt(`/${command}`);
 		assert.equal(requests.length, before);
@@ -1017,6 +1029,27 @@ try {
 		throw new Error("ambitious backup entry missing");
 	}
 	assert.deepEqual(ambitiousBackup.data, { source: "AMBITIOUS_ORIGINAL", draft: "WRITER_REPLY" });
+	// /ste delivers through the same native path, saves under fitch-kit.ste,
+	// and recovers through /ste without a rewrite.
+	actions.push("Accept");
+	await recoveredActive.prompt("/ste STE_ORIGINAL");
+	await until(
+		() =>
+			recovered.getBranch().filter((entry) => {
+				if (entry.type !== "message" || entry.message.role !== "user") {
+					return false;
+				}
+				return ai.contentText(entry.message.content) === "WRITER_REPLY";
+			}).length === 5,
+	);
+	await recoveredActive.waitForIdle();
+	const steBackup = recovered
+		.getBranch()
+		.findLast((entry) => entry.type === "custom" && entry.customType === "fitch-kit.ste");
+	if (steBackup === undefined || steBackup.type !== "custom") {
+		throw new Error("ste backup entry missing");
+	}
+	assert.deepEqual(steBackup.data, { source: "STE_ORIGINAL", draft: "WRITER_REPLY" });
 	const ambitiousRecoveryFile = join(temp, "ambitious-recovery.jsonl");
 	writeFileSync(
 		ambitiousRecoveryFile,
@@ -1034,6 +1067,7 @@ try {
 		["draft", "IDLE_ORIGINAL"],
 		["unreasonable", original],
 		["ambitious", "AMBITIOUS_ORIGINAL"],
+		["ste", "STE_ORIGINAL"],
 	];
 	for (const [command, source] of recoveryCases) {
 		actions.push("Restore original");
@@ -1047,11 +1081,11 @@ try {
 	}
 	assert.doesNotMatch(
 		JSON.stringify(ambitiousRecovered.buildSessionContext().messages),
-		/fitch-kit\.(?:draft|ambitious|unreasonable)|FAILED_ORIGINAL|AMBITIOUS_ORIGINAL/,
+		/fitch-kit\.(?:draft|ambitious|unreasonable|ste)|FAILED_ORIGINAL|AMBITIOUS_ORIGINAL|STE_ORIGINAL/,
 		"saved sources never enter model context",
 	);
 	console.log(
-		`PASS ${api}: draft/ambitious/unreasonable saved-entry isolation and resumed recovery`,
+		`PASS ${api}: draft/ambitious/unreasonable/ste saved-entry isolation and resumed recovery`,
 	);
 	console.log(
 		`PASS ${api}: native idle send, busy steering, async failure preservation and resumed retry`,
