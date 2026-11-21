@@ -443,13 +443,13 @@ Preserve tenant isolation. Do not introduce new dependencies.
 			errors.push("contains semicolon (STE Rule 8.1)");
 		}
 		if (
-			/\b(?:don't|doesn't|didn't|isn't|aren't|wasn't|weren't|won't|wouldn't|can't|couldn't|shouldn't|haven't|hasn't|hadn't|it's|that's|there's|you're|we're|they're)\b/i.test(
+			/\b(?:don|doesn|didn|isn|aren|wasn|weren|won|wouldn|can|couldn|shouldn|haven|hasn|hadn)['’]t\b|\b(?:it|that|there)['’]s\b|\b(?:you|we|they)['’]re\b/i.test(
 				prose,
 			)
 		) {
 			errors.push("contains contraction (STE Rule 4.2)");
 		}
-		if (/\b(?:e\.g\.|i\.e\.|etc\.?)\b/i.test(prose)) {
+		if (/(?:^|[^\w.])(?:e\.g\.|i\.e\.|etc\.?)(?=$|[\s,;:)])/i.test(prose)) {
 			errors.push("contains Latin abbreviation (STE GR-6)");
 		}
 		const nonSteMatch = prose.match(
