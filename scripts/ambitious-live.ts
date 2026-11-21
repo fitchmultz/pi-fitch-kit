@@ -56,8 +56,8 @@ const repeats = Number(process.argv[4] ?? 1);
 const command = process.argv[5] ?? "ambitious";
 assert.ok(Number.isInteger(repeats) && repeats > 0 && repeats <= 5, "repeats must be 1–5");
 assert.ok(
-	["ambitious", "unreasonable"].includes(command),
-	"command must be ambitious or unreasonable (fourth argument; default ambitious)",
+	["ambitious", "unreasonable", "ste"].includes(command),
+	"command must be ambitious, unreasonable, or ste (fourth argument; default ambitious)",
 );
 const sdkModule: unknown = await import(pathToFileURL(join(host, "dist/index.js")).href);
 if (!isHostSdk(sdkModule)) {
@@ -224,7 +224,53 @@ const unreasonableCases: WriterCase[] = [
 			/(?:annotat|feedback|comment)[\s\S]*(?:reason|rationale|evidence|support|prioriti[sz])|(?:reason|rationale|evidence|support|prioriti[sz])[\s\S]*(?:annotat|feedback|comment)/i,
 	},
 ];
-const cases = command === "ambitious" ? ambitiousCases : unreasonableCases;
+const steCases: WriterCase[] = [
+	{
+		name: "ste-procedural-fix",
+		source:
+			"Please ensure that duplicate invoice exports don't occur by checking the tenant invoice export streaming logic in src/export.ts; however, you shouldn't change CSV columns or public CLI flags (e.g., --tenant, --out), and don't add dependencies. Perform npm run test:exports when you've finished, and don't commit or deploy.",
+		history: [],
+		required: [
+			...constraints,
+			...noDelivery,
+			/src\/export\.ts/,
+			/--tenant/,
+			/--out/,
+			/invoice/i,
+			/(?:duplicate|once)/i,
+		],
+		forbidden: [/already (?:fixed|implemented|passed)/i],
+	},
+	{
+		name: "ste-in-progress-review",
+		source:
+			"Review the changes in src/export.ts and ensure they follow the settled streaming approach; however, don't edit files, commit, or deploy, etc.",
+		history: [
+			[
+				"user",
+				"Keep the existing streaming approach, preserve tenant isolation, and preserve CSV columns and public CLI flags. Add no dependencies.",
+			],
+			[
+				"assistant",
+				"I updated src/export.ts to deduplicate invoices per tenant. I have not run npm run test:exports yet. Unrelated note: the mascot is a purple otter.",
+			],
+		],
+		required: [
+			...exportConstraints,
+			...noDelivery,
+			/src\/export\.ts/,
+			/stream/i,
+			/(?:no|not|do not)\b[^.!?\n]*\b(?:edit|chang|modif)[^.!?\n]*\bfiles?|\bno file edits\b/i,
+		],
+		forbidden: [/purple|otter/i],
+	},
+];
+const caseMap: Record<string, WriterCase[]> = {
+	ambitious: ambitiousCases,
+	unreasonable: unreasonableCases,
+	ste: steCases,
+};
+const cases = caseMap[command] ?? ambitiousCases;
 try {
 	mkdirSync(agentDir);
 	mkdirSync(cwd);
@@ -372,10 +418,75 @@ Preserve tenant isolation. Do not introduce new dependencies.
 		return errors;
 	};
 
+	const steWordCount = (segment: string): number => {
+		const collapsed = segment
+			.replace(/```[\s\S]*?```/gu, " CODE ")
+			.replace(/`[^`]+`/gu, " CODE ")
+			.replace(/"[^"]*"/gu, " QUOTE ")
+			.replace(/\([^)]*\)/gu, " PAREN ")
+			.replace(/\b\d+(?:\.\d+)?\s*(?:ms|s|m|h|kb|mb|gb|mm|cm|kg|psi|%)\b/giu, " UNIT ");
+		const tokens = collapsed
+			.replace(/^[\s\-*•]+|^\s*(?:\(?\d+[.)]|\(?[a-z][.)])\s+/iu, "")
+			.trim()
+			.split(/\s+/u)
+			.filter(Boolean);
+		return tokens.length;
+	};
+
+	const steComplianceErrors = (draft: string): string[] => {
+		const errors: string[] = [];
+		const prose = draft
+			.replace(/```[\s\S]*?```/gu, " ")
+			.replace(/`[^`]+`/gu, " ")
+			.replace(/"[^"]*"/gu, " ");
+		if (prose.includes(";")) {
+			errors.push("contains semicolon (STE Rule 8.1)");
+		}
+		if (
+			/\b(?:don|doesn|didn|isn|aren|wasn|weren|won|wouldn|can|couldn|shouldn|haven|hasn|hadn)['’]t\b|\b(?:it|that|there)['’]s\b|\b(?:you|we|they)['’]re\b/i.test(
+				prose,
+			)
+		) {
+			errors.push("contains contraction (STE Rule 4.2)");
+		}
+		if (/(?:^|[^\w.])(?:e\.g\.|i\.e\.|etc\.?)(?=$|[\s,;:)])/i.test(prose)) {
+			errors.push("contains Latin abbreviation (STE GR-6)");
+		}
+		const nonSteMatch = prose.match(
+			/\b(?:ensure|ensures|ensured|perform|performs|performed|utilize|utilizes|utilized|however|therefore|should|shall|acceptable|simultaneously)\b/i,
+		);
+		if (nonSteMatch !== null) {
+			errors.push(`contains non-STE word "${nonSteMatch[0]}"`);
+		}
+		for (const block of draft.split(/\n{2,}/u)) {
+			const lines = block
+				.split("\n")
+				.map((line) => line.trim())
+				.filter(Boolean);
+			const listBlock = lines.some((line) => /^[-*•]|^(?:\(?\d+[.)]|\(?[a-z][.)])\s+/i.test(line));
+			const segments = listBlock
+				? lines.flatMap((line) => line.split(/(?<=[.!?])\s+|:\s*$/u))
+				: block.split(/(?<=[.!?])\s+/u);
+			const nonEmpty = segments.map((s) => s.trim()).filter(Boolean);
+			if (!listBlock && nonEmpty.length > 6) {
+				errors.push(`paragraph exceeds 6 sentences (${nonEmpty.length}, STE Rule 6.6)`);
+			}
+			for (const segment of nonEmpty) {
+				const words = steWordCount(segment);
+				if (words > 25) {
+					errors.push(`sentence exceeds 25 STE words (${words}): ${segment.slice(0, 60)}`);
+				}
+			}
+		}
+		return errors;
+	};
+
 	/** Collects the writer-contract errors for one generated draft. */
 	const collectErrors = (draft: string, fixture: WriterCase, writerCommand: string): string[] => [
 		...draftQualityErrors(draft, writerCommand),
-		...methodEvidenceErrors(draft, fixture),
+		...(writerCommand === "ste"
+			? steComplianceErrors(draft)
+			: methodEvidenceErrors(draft, fixture)),
 		...sentenceErrors(draft),
 		...ruleErrors(draft, fixture),
 	];

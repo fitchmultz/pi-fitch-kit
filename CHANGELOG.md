@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `/ste <text>` to `write-prompt`: an off-transcript prompt rewrite into ASD-STE100 Issue 9 Simplified Technical English that preserves intent, explicit constraints, settled session context, and verbatim code, paths, flags, and identifiers while applying STE vocabulary, multi-word noun, verb/voice, sentence/paragraph length, list, punctuation, and clarity rules. It shares the writer dialog, model configuration, Tweak (retaining STE rules), busy steering, and recovery path with isolated `fitch-kit.ste` saved drafts and no kit-specific total character cap. (PFK-207)
+
 - Raise the Pi floor to 1.6.0 in the manifest, setup validation, documentation, and development cohort, and tighten the `openai-codex-responses` `max_output_tokens` writer boundary check now that Pi 1.6.0 sends `max_output_tokens` natively. (PEA-222)
 
 - Clarify `name_session` guidance so sessions keep their name across subtasks, follow-up issues, phases, or detours within the same workstream and rename when pivoting to a clearly different primary project or goal, while preserving `coordinator` and numbered subagent identifiers and keeping the current name when unsure. (PFK-206)

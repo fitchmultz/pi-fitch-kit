@@ -389,7 +389,7 @@ rmSync(join(agentDir, WRITE_PROMPT_FILE));
 
 // Rewrite flavors share UI guards. Native HTTP fixtures own the new
 // flavor's instruction transport, delivery, and journal-backed isolation.
-for (const command of ["ambitious", "unreasonable"]) {
+for (const command of ["ambitious", "unreasonable", "ste"]) {
 	notices.length = 0;
 	sent = undefined;
 	await writerCommand(command).handler("", ctx());
@@ -1254,7 +1254,7 @@ releaseCompletion({ role: "assistant", content: [], stopReason: "aborted" });
 await settled.promise;
 
 // Cancelled work must not touch a context retired by /reload or /new.
-for (const command of ["draft", "unreasonable", "side-question"]) {
+for (const command of ["draft", "unreasonable", "ste", "side-question"]) {
 	for (const phase of ["image preparation", "provider rejection"]) {
 		let retired = false;
 		let staleReads = 0;

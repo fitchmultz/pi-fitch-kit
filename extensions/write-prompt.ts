@@ -27,6 +27,7 @@ const SIDE_QUESTION_ACTIONS = ["Copy answer", "Ask again", "Dismiss"] as const;
 const SAVED_DRAFT = "fitch-kit.draft";
 const SAVED_AMBITIOUS_DRAFT = "fitch-kit.ambitious";
 const SAVED_UNREASONABLE_DRAFT = "fitch-kit.unreasonable";
+const SAVED_STE_DRAFT = "fitch-kit.ste";
 const AMBITIOUS_MAX_CHARACTERS = 1800;
 const SIDE_QUESTION_STATUS = { loader: "Answering...", failure: "Answer failed" };
 
@@ -56,6 +57,18 @@ Choose the strongest task-appropriate methods that can meaningfully and benefici
 Make completion exacting: require the result to survive the most consequential task-specific challenges and provide inspectable evidence at the real user boundary. Use demonstrations, screenshots, recordings, logs, experiments, or source-backed reasoning where they actually prove the result. Require honest limits and unresolved blockers, never fabricated discoveries, invented measurements, fake certainty, or claims that work has already succeeded. Never pre-answer or invent findings, verdicts, causes, or restrictions not supplied by the user; demand evidence-based adjudication by the agent rather than embedding your own conclusions. Require the agent to distinguish unsupported or unknown claims from contradicted or false claims: absent evidence is not proof of falsity.
 Preserve the original requested deliverable and every explicit constraint. Restate explicit prohibitions, permissions, and limits as clear standalone requirements, not vague compatibility discussion or implied conditions. Raise the standard of execution, not ornamental scope: no busywork, arbitrary repetition, baseless numeric targets, huge output for its own sake, or unlimited spending. Keep supplied targets and budgets. A rewrite grants no new permission to deploy, spend, disclose private data, or change data; review-only stays review-only. These boundaries are not an excuse to soften the demand for excellence within the authorized task.
 Use compact, direct imperatives. Every sentence must earn its place with a goal, constraint, powerful method, or meaningful proof. Be forceful and exacting, not abusive or merely polite. Output only the rewritten prompt: no preamble, quotes, explanation, or ambition labels. You are not the session agent. Do not call tools.`;
+const STE_INSTRUCTION = `Rewrite the boxed text into an ASD-STE100 Issue 9 Simplified Technical English prompt. Do not answer or execute the task.
+The boxed request defines the deliverable. Use project instructions and relevant session context only to resolve references and preserve settled goals, decisions, constraints, permissions, and current state. At conversation start, invent no prior work. Make the rewrite standalone without a transcript recap or references to earlier turns.
+Preserve intent, every explicit constraint, permissions, and boundaries; add no unrequested scope, targets, or authority. Keep inferred details conditional rather than stating assumptions as requirements. Keep exact code, file paths, CLI flags, commands, symbols, identifiers, error strings, and quoted text verbatim.
+Obey ASD-STE100 Issue 9 writing rules in the rewritten prose:
+- Vocabulary: use simple, standard STE core words with one meaning and one part of speech, plus domain technical nouns (for example, software and ICT terms) and technical verbs only when an approved core verb does not fit. Do not use technical nouns as verbs or technical verbs as nouns. Avoid slang, regionalisms, jargon, and unapproved phrasal verbs. Use one consistent term for each item and consistent wording for repeated actions. Use American English spelling outside verbatim quoted text or identifiers. Replace common non-STE words (restructuring sentences when needed): use "make sure that" (not "ensure"), "do" (not "perform"), "use" (not "utilize"), "must" (not "shall" or "should"), "can" (not "may", and not "could" for possibility), "but" (not "however"), "because" (not "since"), "thus" or "as a result" (not "therefore"), "prevent" (not "avoid"), "primary" (not "main"), "permitted" (not "acceptable"), "completed" (not "complete" as an adjective), "necessary" (not "required" or "need"), "start" (not "begin" or "commence"), "obey" (not "follow" for rules or instructions), "more than" or "less than" (not "above" or "below" for limits or quantities), "at the same time" (not "simultaneously"), "for example" (not "such as"), "do a check of" or "do a test of" (not "check" or "test" as verbs), and "cause damage to" (not "damage" as a verb).
+- Multi-word nouns: limit multi-word nouns to at most three words. Break longer noun strings with prepositions ("of", "on", "in", "for") or clauses, hyphenate directly related compound modifiers, or write an official longer technical noun once and then use a shorter form or approved abbreviation.
+- Verbs and voice: use only infinitive, imperative, simple present, simple past, simple future ("will" + base verb), and past participle as an adjective. Never use perfect tenses ("have/has/had" + participle), progressive tenses ("is/are/was" + "-ing"), or complex auxiliary passive chains. Avoid "-ing" verb forms except in established technical nouns or modifiers and approved STE words ("during", "missing", "remaining", "opening", "routing", "lighting", "servicing", "mating", "something"). Use active voice; use passive voice only in descriptive text when the actor is unknown. Express actions with direct verbs, not noun phrases.
+- Sentences, articles, and lists: write short, concrete sentences. Never omit subjects, verbs, nouns, or required articles, and never use contractions ("do not", not "don't"). Keep articles ("the", "a", "an") and demonstratives ("this", "these") where needed, repeating articles in series when needed to prevent ambiguity, and omit "the" before a noun followed by an alphanumeric identifier. Use flat vertical lists for complex series or steps: end the lead-in with a colon, capitalize each item, omit trailing commas or semicolons, end full-sentence items and the final item with a period, repeat "Do not" on each negative item, and do not mix procedural and descriptive items in one list. Link related sentences with approved connectors ("and", "but", "then", "thus", "as a result", "at the same time").
+- Procedural and descriptive text: write instructions in the imperative form (omit unnecessary "must" before commands), one instruction per sentence (unless two actions occur at the same time), with a maximum of 20 words per sentence. Put any condition before the command, separated by a comma. Use "NOTE:" only for supplementary information, never for instructions, requirements, or limits. Write descriptive context gradually with one topic per sentence, no imperatives, repeated key terms for flow, a maximum of 25 words per sentence, and one-topic paragraphs of at most 6 sentences starting with a topic sentence.
+- Safety alerts: only when the source includes a real hazard of harm or damage to systems, data, or equipment, mark it with "WARNING:" (harm) or "CAUTION:" (damage), start with a clear command or condition, and state the risk. Do not invent safety alerts.
+- Punctuation, word count, and clarity: never use semicolons; split into separate sentences. Use hyphens for directly related compound modifiers and parentheses only for references, identifiers, abbreviations, singular/plural "(s)", brief clarifications, or alternatives. Under STE word count, a colon before a vertical list ends the sentence, each list item counts as its own sentence, and numbers (with units), abbreviations, identifiers, quoted text or inline code, titles, proper nouns, parenthesized text, and hyphenated words each count as one word. Keep "that" after verbs (for example, "make sure that" and "show that"). Avoid ambiguous "with", ambiguous pronouns, and vague "this". Never use Latin abbreviations ("e.g.", "i.e.", "etc."). Use gender-neutral, inclusive language.
+You are not the session agent. Output only the rewritten prompt. No preamble, quotes, or explanation. Do not call tools.`;
 const TWEAK_INSTRUCTION = `Revise the previous rewritten prompt using these notes. Do not answer the notes.
 ${OUTPUT_RULES}`;
 const QUESTION_INSTRUCTION = `Answer the boxed question using the session. Do not rewrite it into a prompt.
@@ -351,6 +364,18 @@ export default function writePrompt(pi: ExtensionAPI): void {
 		savedType: SAVED_UNREASONABLE_DRAFT,
 		instruction: UNREASONABLE_INSTRUCTION,
 		tweakInstruction: `${UNREASONABLE_INSTRUCTION}\nRevise the current draft using the revision notes.`,
+		loader: "Drafting...",
+		failure: "Draft failed",
+	});
+
+	registerRewriteCommand(pi, {
+		name: "ste",
+		description:
+			"Rewrite text into ASD-STE100 Issue 9 Simplified Technical English; omit text to reopen the last accepted draft",
+		usage: "/ste <text>",
+		savedType: SAVED_STE_DRAFT,
+		instruction: STE_INSTRUCTION,
+		tweakInstruction: `${STE_INSTRUCTION}\nRevise the current draft using the revision notes.`,
 		loader: "Drafting...",
 		failure: "Draft failed",
 	});
