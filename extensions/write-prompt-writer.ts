@@ -3,6 +3,7 @@ import {
 	contentText,
 	type Message,
 	type Model,
+	type TextContent,
 	type UserMessage,
 } from "@earendil-works/pi-ai";
 import { BorderedLoader, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
@@ -25,16 +26,25 @@ export type WriterRequest = {
 	sessionId: string;
 };
 
-/** Flattens one assistant message's tool calls into labeled text parts. */
+/** Flattens one assistant message to plain text, dropping thinking blocks and tool calls. */
 function assistantMessage(message: Message & { role: "assistant" }): Message {
-	const parts = message.content.filter((part) => part.type !== "toolCall");
-	const calls = message.content
-		.filter((part) => part.type === "toolCall")
-		.map((part) => {
-			const args = part.arguments;
-			const extra = Object.keys(args).length > 0 ? ` ${JSON.stringify(args)}` : "";
-			return `${part.name}${extra}`;
-		});
+	const parts: TextContent[] = [];
+	const calls: string[] = [];
+	for (const part of message.content) {
+		switch (part.type) {
+			case "thinking":
+				break;
+			case "toolCall": {
+				const args = part.arguments;
+				const extra = Object.keys(args).length > 0 ? ` ${JSON.stringify(args)}` : "";
+				calls.push(`${part.name}${extra}`);
+				break;
+			}
+			case "text":
+				parts.push({ type: "text", text: part.text });
+				break;
+		}
+	}
 	if (calls.length > 0) {
 		parts.push({ type: "text", text: `[called ${calls.join(", ")}]` });
 	}
