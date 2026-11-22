@@ -1470,6 +1470,62 @@ await test("a successful Fitch fallback pauses its tier durably on the active br
 	}
 });
 
+await test("compaction_trigger payloads skip tier injection without clobbering pending rejection tracking", async () => {
+	const manager = SessionManager.inMemory(agentDir);
+	const model = rotatedCodexSol62;
+	const ctx = uiCtx(model, manager);
+	const compactionPayload = {
+		model: model.id,
+		input: [{ role: "user", content: "earlier turn" }, { type: "compaction_trigger" }],
+	};
+	const normalPayload = {
+		model: model.id,
+		input: [{ role: "user", content: "normal turn" }],
+	};
+	const rejectedMessage = {
+		...fauxAssistantMessage(""),
+		provider: model.provider,
+		model: model.id,
+		api: model.api,
+		stopReason: "error" as const,
+		errorMessage: "service_tier_not_allowed",
+	};
+	try {
+		for (const commandArg of ["on", "ultrafast"] as const) {
+			const expectedTier = commandArg === "on" ? "priority" : "ultrafast";
+			await commandFor(commands, "codex-fast").handler(commandArg, ctx);
+			assert.equal(
+				await requestPayload(model, compactionPayload, manager),
+				undefined,
+				`compaction_trigger must skip ${expectedTier} injection`,
+			);
+			// A compaction_trigger with no prior pending request must not arm rejection tracking.
+			await runHandlers("message_end", { message: rejectedMessage }, ctx);
+			assert.equal(
+				requireRecord(await requestPayload(model, normalPayload, manager), "normal payload")
+					.service_tier,
+				expectedTier,
+				`normal request must still receive ${expectedTier} after an un-pending compaction_trigger`,
+			);
+			// Now this.pending holds expectedTier from normalPayload. An interleaved compaction_trigger
+			// must not inject service_tier and must leave this.pending intact for the upcoming message_end.
+			assert.equal(
+				await requestPayload(model, compactionPayload, manager),
+				undefined,
+				`interleaved compaction_trigger must skip ${expectedTier} injection`,
+			);
+			await runHandlers("message_end", { message: rejectedMessage }, ctx);
+			assert.equal(
+				await requestPayload(model, normalPayload, manager),
+				undefined,
+				`${expectedTier} rejection must still pause after an interleaved compaction_trigger`,
+			);
+		}
+	} finally {
+		writeFileSync(statePath, offState);
+	}
+});
+
 assert.equal(status.get("anthropic-fast"), undefined, "no footer while off");
 await runHandlers("model_select", {}, uiCtx(MODELS.openai));
 assert.equal(status.get("codex-fast"), undefined);

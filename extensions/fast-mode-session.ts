@@ -53,6 +53,14 @@ const tierKey = ({ provider, model, tier }: TierRequest): string =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 
+const isCompactionTrigger = (payload: object): boolean => {
+	if (!("input" in payload) || !Array.isArray(payload.input)) {
+		return false;
+	}
+	const last: unknown = payload.input.at(-1);
+	return isRecord(last) && last.type === "compaction_trigger";
+};
+
 function readPauseAction(data: unknown, sessionId: string): PauseAction | undefined {
 	// Forks can copy the entries but have a different native session ID.
 	if (!isRecord(data) || data.sessionId !== sessionId) {
@@ -168,6 +176,11 @@ export class FastModeSession {
 	}
 
 	applyTier(payload: object, ctx: ExtensionContext): Record<string, unknown> | undefined {
+		// Background provider-summary compaction requests never emit message_end
+		// and should stay on standard billing without disturbing pending tracking.
+		if (isCompactionTrigger(payload)) {
+			return undefined;
+		}
 		const { mode, rejected } = this.policy(ctx);
 		this.pending = undefined;
 		const model = ctx.model;

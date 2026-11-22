@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as piAi from "@earendil-works/pi-ai";
 import type { RegisteredCommand } from "@earendil-works/pi-coding-agent";
 import { gate, type DrivenCommand } from "./test-harness.ts";
 
@@ -173,6 +174,96 @@ assert.deepEqual(
 	assistantSnapshot,
 	"assistant flattening must not mutate source history",
 );
+
+// Post-providerSummary compaction transcripts start with system(providerSummary) + assistant.
+// On hosts that export getProviderSummaryStandIn (Fitch Pi), flattening prepends the host's
+// stand-in user message so Anthropic/Gemini do not reject a leading assistant turn, and never
+// duplicates it when messages already start with user. On official Pi (no providerSummary),
+// flattening leaves the transcript without a fabricated stand-in.
+const hasProviderSummaryStandIn =
+	typeof Reflect.get(piAi, "getProviderSummaryStandIn") === "function";
+const anthropicSummarySystem = {
+	role: "system" as const,
+	content: "session system",
+	providerSummary: {
+		provider: "anthropic",
+		api: "anthropic-messages",
+		model: "claude-opus-5",
+		block: { type: "compaction", content: "Prior architecture decisions." },
+		timestamp: 42,
+	},
+	timestamp: 1,
+};
+const anthropicSummaryInput = [anthropicSummarySystem, plainThinkingAssistant];
+const anthropicSummarySnapshot = structuredClone(anthropicSummaryInput);
+const anthropicFlattened = flattenToolHistory(anthropicSummaryInput);
+const flattenedPlainAssistant = {
+	...plainThinkingAssistant,
+	content: [{ type: "text", text: "Done." }],
+};
+if (hasProviderSummaryStandIn) {
+	assert.deepEqual(anthropicFlattened, [
+		{
+			role: "user",
+			content: "Summary of the earlier conversation:\n\nPrior architecture decisions.",
+			timestamp: 42,
+		},
+		flattenedPlainAssistant,
+	]);
+	assert.equal(anthropicFlattened[0]?.role, "user");
+	assert.deepEqual(
+		flattenToolHistory(anthropicFlattened),
+		anthropicFlattened,
+		"flattening a transcript that already starts with user must not duplicate the stand-in",
+	);
+} else {
+	assert.deepEqual(anthropicFlattened, [flattenedPlainAssistant]);
+}
+assert.deepEqual(
+	anthropicSummaryInput,
+	anthropicSummarySnapshot,
+	"providerSummary flattening must not mutate source history",
+);
+
+const openaiSummarySystem = {
+	role: "system" as const,
+	content: "session system",
+	providerSummary: {
+		provider: "openai",
+		api: "openai-responses",
+		model: "gpt-6.2-sol",
+		block: { type: "compaction", encrypted_content: "SYNTHETIC_COMPACTION" },
+	},
+	timestamp: 12,
+};
+const openaiFlattened = flattenToolHistory([openaiSummarySystem, plainThinkingAssistant]);
+if (hasProviderSummaryStandIn) {
+	assert.deepEqual(openaiFlattened, [
+		{
+			role: "user",
+			content:
+				"The earlier conversation was summarized. Its summary is not available to this model.",
+			timestamp: 12,
+		},
+		flattenedPlainAssistant,
+	]);
+	assert.equal(openaiFlattened[0]?.role, "user");
+} else {
+	assert.deepEqual(openaiFlattened, [flattenedPlainAssistant]);
+}
+
+const plainSystemWithUser = [
+	{ role: "system" as const, content: "session system", timestamp: 1 },
+	{ role: "user" as const, content: "first real user turn", timestamp: 2 },
+	plainThinkingAssistant,
+];
+assert.deepEqual(flattenToolHistory(plainSystemWithUser), [
+	{ role: "user", content: "first real user turn", timestamp: 2 },
+	{
+		...plainThinkingAssistant,
+		content: [{ type: "text", text: "Done." }],
+	},
+]);
 
 const commands: Record<string, { handler: RegisteredCommand["handler"] }> = {};
 let sent: string | undefined;
@@ -1003,6 +1094,7 @@ const captured: Array<{
 	systemPrompt: string | undefined;
 	messages: Array<{ role?: string; content?: unknown }>;
 	cacheRetention: string | undefined;
+	reasoningSummary: unknown;
 }> = [];
 sent = undefined;
 await writerCommand("draft").handler(
@@ -1035,12 +1127,13 @@ await writerCommand("draft").handler(
 			complete: async (
 				_model: unknown,
 				context: { systemPrompt?: string; messages: Array<{ role?: string; content?: unknown }> },
-				options?: { cacheRetention?: string },
+				options?: { cacheRetention?: string; reasoningSummary?: unknown },
 			) => {
 				captured.push({
 					systemPrompt: context.systemPrompt,
 					messages: context.messages,
 					cacheRetention: options?.cacheRetention,
+					reasoningSummary: options?.reasoningSummary,
 				});
 				return {
 					role: "assistant",
@@ -1062,6 +1155,7 @@ if (firstCapture === undefined) {
 }
 assert.equal(firstCapture.systemPrompt, "session system");
 assert.equal(firstCapture.cacheRetention, "short");
+assert.equal(firstCapture.reasoningSummary, null);
 assert.equal(firstCapture.messages.length, 3);
 assert.equal(firstCapture.messages[0]?.role, "user");
 assert.equal(firstCapture.messages[1]?.role, "assistant");

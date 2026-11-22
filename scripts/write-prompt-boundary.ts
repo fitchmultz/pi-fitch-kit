@@ -337,6 +337,21 @@ try {
 		return typeof request.reasoning_effort === "string" ? request.reasoning_effort : undefined;
 	};
 	const nativeOffEffort = effortOf(requireRecord(requests.at(-1), "off control request"));
+	const summaryControlOptions = {
+		reasoning: "high" as const,
+		reasoningSummary: null,
+	};
+	const summaryControl = await runtime.completeSimple(
+		model,
+		{ messages: [{ role: "user", content: "summary control", timestamp: 0 }] },
+		summaryControlOptions,
+	);
+	assert.equal(summaryControl.stopReason, "stop");
+	const summaryControlBody = requireRecord(requests.at(-1), "summary control request");
+	const hostSupportsReasoningSummaryNull =
+		responses &&
+		isRecord(summaryControlBody.reasoning) &&
+		summaryControlBody.reasoning.summary === undefined;
 	const manager = sdk.SessionManager.inMemory(cwd);
 	manager.appendMessage({
 		role: "system",
@@ -561,6 +576,13 @@ try {
 				"high",
 				"writer inherits the session thinking level",
 			);
+			if (hostSupportsReasoningSummaryNull) {
+				assert.equal(
+					isRecord(body.reasoning) ? body.reasoning.summary : undefined,
+					undefined,
+					"writer omits reasoning.summary when the host supports reasoningSummary: null",
+				);
+			}
 			assert.equal(body.temperature, undefined);
 			const reasoning = jsonList(body.input, "request input").filter(
 				(item) => requireRecord(item, "request input item").type === "reasoning",

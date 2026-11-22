@@ -1,11 +1,4 @@
-import {
-	type Api,
-	contentText,
-	type Message,
-	type Model,
-	type TextContent,
-	type UserMessage,
-} from "@earendil-works/pi-ai";
+import * as piAi from "@earendil-works/pi-ai";
 import { BorderedLoader, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import {
 	fitClaudeRequest,
@@ -17,18 +10,44 @@ import type { ThinkingLevel } from "./write-prompt-config.ts";
 /** A cancelled dialog result. */
 const cancelled = (): string | undefined => undefined;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isUserMessage = (value: unknown): value is piAi.UserMessage =>
+	isRecord(value) &&
+	value.role === "user" &&
+	(typeof value.content === "string" || Array.isArray(value.content)) &&
+	typeof value.timestamp === "number";
+
+type StandInResolver = (messages: readonly piAi.Message[]) => unknown;
+
+const isStandInResolver = (value: unknown): value is StandInResolver => typeof value === "function";
+
+/**
+ * Returns the stand-in user message for a leading system message's provider summary
+ * when the host exports `getProviderSummaryStandIn`.
+ */
+function providerSummaryStandIn(messages: readonly piAi.Message[]): piAi.UserMessage | undefined {
+	const resolver: unknown = Reflect.get(piAi, "getProviderSummaryStandIn");
+	if (!isStandInResolver(resolver)) {
+		return undefined;
+	}
+	const standIn = resolver(messages);
+	return isUserMessage(standIn) ? standIn : undefined;
+}
+
 /** Everything one writer run needs, resolved once per command invocation. */
 export type WriterRequest = {
-	model: Model<Api>;
+	model: piAi.Model<piAi.Api>;
 	thinkingLevel: ThinkingLevel;
 	systemPrompt: string;
-	messages: Message[];
+	messages: piAi.Message[];
 	sessionId: string;
 };
 
 /** Flattens one assistant message to plain text, dropping thinking blocks and tool calls. */
-function assistantMessage(message: Message & { role: "assistant" }): Message {
-	const parts: TextContent[] = [];
+function assistantMessage(message: piAi.Message & { role: "assistant" }): piAi.Message {
+	const parts: piAi.TextContent[] = [];
 	const calls: string[] = [];
 	for (const part of message.content) {
 		switch (part.type) {
@@ -54,8 +73,12 @@ function assistantMessage(message: Message & { role: "assistant" }): Message {
 	};
 }
 
-export function flattenToolHistory(messages: Message[]): Message[] {
-	const out: Message[] = [];
+export function flattenToolHistory(messages: piAi.Message[]): piAi.Message[] {
+	const out: piAi.Message[] = [];
+	const standIn = providerSummaryStandIn(messages);
+	if (standIn !== undefined) {
+		out.push(standIn);
+	}
 	for (const message of messages) {
 		// Current instructions come from getSystemPrompt(), once. Transcript hosts
 		// also retain historical system messages with tool declarations; those are
@@ -91,7 +114,7 @@ async function completeWriter(
 	userText: string,
 	signal?: AbortSignal,
 ): Promise<string | undefined> {
-	const pending: UserMessage = {
+	const pending: piAi.UserMessage = {
 		role: "user",
 		content: [{ type: "text", text: userText }],
 		timestamp: Date.now(),
@@ -104,6 +127,7 @@ async function completeWriter(
 	const context = { systemPrompt: request.systemPrompt, messages: outgoing };
 	const options = {
 		cacheRetention: "short" as const,
+		reasoningSummary: null,
 		sessionId: request.sessionId,
 		onPayload: (payload: unknown) => fitClaudeRequest(request.model, payload, sharedImageCache()),
 		...(signal !== undefined ? { signal } : {}),
@@ -117,7 +141,7 @@ async function completeWriter(
 		ctx.ui.notify(response.errorMessage ?? `Writer stopped (${response.stopReason})`, "error");
 		return undefined;
 	}
-	const text = contentText(response.content).trim();
+	const text = piAi.contentText(response.content).trim();
 	if (text === "") {
 		ctx.ui.notify("Writer returned no text", "error");
 		return undefined;
