@@ -10,9 +10,6 @@ import type { ThinkingLevel } from "./write-prompt-config.ts";
 /** A cancelled dialog result. */
 const cancelled = (): string | undefined => undefined;
 
-const UNAVAILABLE_PROVIDER_SUMMARY =
-	"The earlier conversation was summarized. Its summary is not available to this model.";
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -26,36 +23,17 @@ type StandInResolver = (messages: readonly piAi.Message[]) => unknown;
 
 const isStandInResolver = (value: unknown): value is StandInResolver => typeof value === "function";
 
-function fallbackProviderSummaryStandIn(
-	lead: piAi.Message | undefined,
-): piAi.UserMessage | undefined {
-	if (lead?.role !== "system") {
-		return undefined;
-	}
-	const summary: unknown = "providerSummary" in lead ? lead.providerSummary : undefined;
-	if (!isRecord(summary) || !isRecord(summary.block)) {
-		return undefined;
-	}
-	const text = summary.block.content;
-	const content =
-		typeof text === "string" && text.length > 0
-			? `Summary of the earlier conversation:\n\n${text}`
-			: UNAVAILABLE_PROVIDER_SUMMARY;
-	const timestamp = typeof summary.timestamp === "number" ? summary.timestamp : lead.timestamp;
-	return { role: "user", content, timestamp };
-}
-
 /**
- * Returns the stand-in user message for a leading system message's provider summary,
- * using the host's helper when available and matching its fallback on official Pi.
+ * Returns the stand-in user message for a leading system message's provider summary
+ * when the host exports `getProviderSummaryStandIn`.
  */
 function providerSummaryStandIn(messages: readonly piAi.Message[]): piAi.UserMessage | undefined {
 	const resolver: unknown = Reflect.get(piAi, "getProviderSummaryStandIn");
-	if (isStandInResolver(resolver)) {
-		const standIn = resolver(messages);
-		return isUserMessage(standIn) ? standIn : undefined;
+	if (!isStandInResolver(resolver)) {
+		return undefined;
 	}
-	return fallbackProviderSummaryStandIn(messages[0]);
+	const standIn = resolver(messages);
+	return isUserMessage(standIn) ? standIn : undefined;
 }
 
 /** Everything one writer run needs, resolved once per command invocation. */

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as piAi from "@earendil-works/pi-ai";
 import type { RegisteredCommand } from "@earendil-works/pi-coding-agent";
 import { gate, type DrivenCommand } from "./test-harness.ts";
 
@@ -175,8 +176,12 @@ assert.deepEqual(
 );
 
 // Post-providerSummary compaction transcripts start with system(providerSummary) + assistant.
-// Flattening must prepend a stand-in user message so Anthropic/Gemini do not reject a leading
-// assistant turn, and must never duplicate the stand-in when messages already start with user.
+// On hosts that export getProviderSummaryStandIn (Fitch Pi), flattening prepends the host's
+// stand-in user message so Anthropic/Gemini do not reject a leading assistant turn, and never
+// duplicates it when messages already start with user. On official Pi (no providerSummary),
+// flattening leaves the transcript without a fabricated stand-in.
+const hasProviderSummaryStandIn =
+	typeof Reflect.get(piAi, "getProviderSummaryStandIn") === "function";
 const anthropicSummarySystem = {
 	role: "system" as const,
 	content: "session system",
@@ -192,23 +197,28 @@ const anthropicSummarySystem = {
 const anthropicSummaryInput = [anthropicSummarySystem, plainThinkingAssistant];
 const anthropicSummarySnapshot = structuredClone(anthropicSummaryInput);
 const anthropicFlattened = flattenToolHistory(anthropicSummaryInput);
-assert.deepEqual(anthropicFlattened, [
-	{
-		role: "user",
-		content: "Summary of the earlier conversation:\n\nPrior architecture decisions.",
-		timestamp: 42,
-	},
-	{
-		...plainThinkingAssistant,
-		content: [{ type: "text", text: "Done." }],
-	},
-]);
-assert.equal(anthropicFlattened[0]?.role, "user");
-assert.deepEqual(
-	flattenToolHistory(anthropicFlattened),
-	anthropicFlattened,
-	"flattening a transcript that already starts with user must not duplicate the stand-in",
-);
+const flattenedPlainAssistant = {
+	...plainThinkingAssistant,
+	content: [{ type: "text", text: "Done." }],
+};
+if (hasProviderSummaryStandIn) {
+	assert.deepEqual(anthropicFlattened, [
+		{
+			role: "user",
+			content: "Summary of the earlier conversation:\n\nPrior architecture decisions.",
+			timestamp: 42,
+		},
+		flattenedPlainAssistant,
+	]);
+	assert.equal(anthropicFlattened[0]?.role, "user");
+	assert.deepEqual(
+		flattenToolHistory(anthropicFlattened),
+		anthropicFlattened,
+		"flattening a transcript that already starts with user must not duplicate the stand-in",
+	);
+} else {
+	assert.deepEqual(anthropicFlattened, [flattenedPlainAssistant]);
+}
 assert.deepEqual(
 	anthropicSummaryInput,
 	anthropicSummarySnapshot,
@@ -227,18 +237,20 @@ const openaiSummarySystem = {
 	timestamp: 12,
 };
 const openaiFlattened = flattenToolHistory([openaiSummarySystem, plainThinkingAssistant]);
-assert.deepEqual(openaiFlattened, [
-	{
-		role: "user",
-		content: "The earlier conversation was summarized. Its summary is not available to this model.",
-		timestamp: 12,
-	},
-	{
-		...plainThinkingAssistant,
-		content: [{ type: "text", text: "Done." }],
-	},
-]);
-assert.equal(openaiFlattened[0]?.role, "user");
+if (hasProviderSummaryStandIn) {
+	assert.deepEqual(openaiFlattened, [
+		{
+			role: "user",
+			content:
+				"The earlier conversation was summarized. Its summary is not available to this model.",
+			timestamp: 12,
+		},
+		flattenedPlainAssistant,
+	]);
+	assert.equal(openaiFlattened[0]?.role, "user");
+} else {
+	assert.deepEqual(openaiFlattened, [flattenedPlainAssistant]);
+}
 
 const plainSystemWithUser = [
 	{ role: "system" as const, content: "session system", timestamp: 1 },
