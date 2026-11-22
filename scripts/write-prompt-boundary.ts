@@ -367,7 +367,13 @@ try {
 			thinkingSignature: JSON.stringify(encrypted),
 		});
 	}
-	historyContent.push({ type: "text", text: "HISTORY_REPLY" });
+	historyContent.push({
+		type: "text",
+		text: "HISTORY_REPLY",
+		...(responses
+			? { textSignature: JSON.stringify({ v: 1, id: "msg_history", phase: "commentary" }) }
+			: {}),
+	});
 	historyContent.push({
 		type: "toolCall",
 		id: "call-1",
@@ -543,9 +549,8 @@ try {
 			messages.every((m) => {
 				const record = requireRecord(m, "request message");
 				return (
-					(typeof record.role === "string" &&
-						["system", "developer", "user", "assistant"].includes(record.role)) ||
-					record.type === "reasoning"
+					typeof record.role === "string" &&
+					["system", "developer", "user", "assistant"].includes(record.role)
 				);
 			}),
 		);
@@ -562,8 +567,13 @@ try {
 			);
 			assert.deepEqual(
 				reasoning,
-				history && body.model === "writer" ? [encrypted] : [],
-				"encrypted reasoning replays only for the same model",
+				[],
+				"off-transcript writer must not replay thinking signatures from flattened history",
+			);
+			assert.doesNotMatch(
+				serialized,
+				/SYNTHETIC_ENCRYPTED_REASONING|msg_history/,
+				"dropped thinking and paired message signatures must not reach the wire",
 			);
 			if (api === "openai-codex-responses") {
 				assert.equal(body.prompt_cache_options, undefined);

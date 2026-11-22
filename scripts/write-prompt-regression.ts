@@ -71,6 +71,109 @@ for (const isError of [false, true]) {
 	assert.deepEqual(imageResult, before, "flattening must not mutate source history");
 }
 
+// Off-transcript history drops thinking blocks and signatures so mutated turns do not break
+// thinking-model replay on GPT-6.2, Claude, or Gemini.
+const assistantBase = {
+	role: "assistant" as const,
+	api: "openai-responses" as const,
+	provider: "openai",
+	model: "gpt-6.2-sol",
+	usage: {
+		input: 0,
+		output: 0,
+		cacheRead: 0,
+		cacheWrite: 0,
+		totalTokens: 0,
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+	},
+	stopReason: "toolUse" as const,
+	timestamp: 8,
+};
+const toolAssistant = {
+	...assistantBase,
+	content: [
+		{
+			type: "thinking" as const,
+			thinking: "internal reasoning",
+			thinkingSignature: "sig_tool",
+		},
+		{
+			type: "thinking" as const,
+			thinking: "",
+			thinkingSignature: "sig_redacted",
+			redacted: true,
+		},
+		{
+			type: "text" as const,
+			text: "Checking the file.",
+			textSignature: '{"v":1,"id":"msg_1","phase":"commentary"}',
+		},
+		{
+			type: "toolCall" as const,
+			id: "call_1",
+			name: "read",
+			arguments: { path: "README.md" },
+		},
+	],
+};
+const plainThinkingAssistant = {
+	...assistantBase,
+	stopReason: "stop" as const,
+	content: [
+		{
+			type: "thinking" as const,
+			thinking: "later reasoning",
+			thinkingSignature: "sig_later",
+		},
+		{
+			type: "text" as const,
+			text: "Done.",
+			textSignature: '{"v":1,"id":"msg_2","phase":"final_answer"}',
+		},
+	],
+};
+const thinkingOnlyAssistant = {
+	...assistantBase,
+	stopReason: "stop" as const,
+	content: [
+		{
+			type: "thinking" as const,
+			thinking: "",
+			thinkingSignature: "sig_only",
+		},
+	],
+};
+const assistantSnapshot = structuredClone([
+	toolAssistant,
+	plainThinkingAssistant,
+	thinkingOnlyAssistant,
+]);
+assert.deepEqual(
+	flattenToolHistory([toolAssistant, plainThinkingAssistant, thinkingOnlyAssistant]),
+	[
+		{
+			...toolAssistant,
+			content: [
+				{ type: "text", text: "Checking the file." },
+				{ type: "text", text: '[called read {"path":"README.md"}]' },
+			],
+		},
+		{
+			...plainThinkingAssistant,
+			content: [{ type: "text", text: "Done." }],
+		},
+		{
+			...thinkingOnlyAssistant,
+			content: [{ type: "text", text: "[empty]" }],
+		},
+	],
+);
+assert.deepEqual(
+	[toolAssistant, plainThinkingAssistant, thinkingOnlyAssistant],
+	assistantSnapshot,
+	"assistant flattening must not mutate source history",
+);
+
 const commands: Record<string, { handler: RegisteredCommand["handler"] }> = {};
 let sent: string | undefined;
 let sendOptions: { deliverAs?: string } | undefined;

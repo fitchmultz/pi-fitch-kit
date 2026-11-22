@@ -20,11 +20,23 @@ const TERMINAL_RESPONSES = new Set<unknown>([
 	"response.done",
 	"response.incomplete",
 ]);
+const CHATGPT_ROTATE_APIS = new Set<unknown>(["openai-responses", "openai-codex-responses"]);
 const RETURNED_TIER_STATUS = new Map<unknown, string>([
 	["ultrafast", "OpenAI confirmed Ultrafast"],
 	["default", "OpenAI reported Standard"],
 ]);
 const UNCONFIRMED_ULTRAFAST = "OpenAI did not confirm Ultrafast";
+
+function matchesReplyApi(model: NonNullable<ExtensionContext["model"]>, api: string): boolean {
+	if (model.api === api) {
+		return true;
+	}
+	return (
+		model.provider === "chatgpt-rotate" &&
+		CHATGPT_ROTATE_APIS.has(model.api) &&
+		CHATGPT_ROTATE_APIS.has(api)
+	);
+}
 
 function returnedTierStatus(data: unknown): string | undefined {
 	if (
@@ -220,7 +232,7 @@ export class FastModeSession {
 		if (
 			model?.id !== id ||
 			model.provider !== provider ||
-			model.api !== api ||
+			!matchesReplyApi(model, api) ||
 			!ultrafastEligible(model)
 		) {
 			return;
