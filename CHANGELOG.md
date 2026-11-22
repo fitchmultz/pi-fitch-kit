@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Accept both `openai-responses` and `openai-codex-responses` terminal stream events when observing returned Ultrafast tiers for `chatgpt-rotate` models, while keeping exact API matching for non-rotated providers and leaving direct `openai-codex` Ultrafast off. Strip `thinking` blocks and text signatures when `write-prompt` flattens assistant history so off-transcript writer calls do not replay invalid reasoning signatures. (PFK-208)
+- Strip `thinking` blocks and text signatures when `write-prompt` flattens assistant history so off-transcript writer calls do not replay invalid reasoning signatures. (PFK-208)
 
 - Add `/ste <text>` to `write-prompt`: an off-transcript prompt rewrite into ASD-STE100 Issue 9 Simplified Technical English that preserves intent, explicit constraints, settled session context, and verbatim code, paths, flags, and identifiers while applying STE vocabulary, multi-word noun, verb/voice, sentence/paragraph length, list, punctuation, and clarity rules. It shares the writer dialog, model configuration, Tweak (retaining STE rules), busy steering, and recovery path with isolated `fitch-kit.ste` saved drafts and no kit-specific total character cap. (PFK-207)
 

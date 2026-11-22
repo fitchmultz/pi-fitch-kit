@@ -853,23 +853,18 @@ await commandFor(commands, "ultrafast").handler("on", uiCtx(codexAstra));
 assert.match(notices.at(-1) ?? "", /No mode was changed/);
 assert.equal(readFileSync(statePath, "utf8"), selectedUltraState);
 
-const rotationStatus = (model: Model<Api> = rotatingSol) =>
-	commandFor(commands, "ultrafast").handler("status", uiCtx(model));
-const rotationReply = (
-	type: string,
-	service_tier?: string,
-	api: string = rotatingSol.api,
-	model: Model<Api> = rotatingSol,
-) =>
+const rotationStatus = () =>
+	commandFor(commands, "ultrafast").handler("status", uiCtx(rotatingSol));
+const rotationReply = (type: string, service_tier?: string) =>
 	runHandlers(
 		"provider_stream_event",
 		{
-			provider: model.provider,
-			api,
-			model: model.id,
+			provider: rotatingSol.provider,
+			api: rotatingSol.api,
+			model: rotatingSol.id,
 			data: { type, response: { service_tier } },
 		},
-		uiCtx(model),
+		uiCtx(rotatingSol),
 	);
 await rotationReply("response.created", "ultrafast");
 await rotationStatus();
@@ -888,50 +883,8 @@ for (const [tier, summary] of [
 		"footer only reports the request",
 	);
 }
-// chatgpt-rotate models registered as openai-responses can dispatch WORK turns over
-// openai-codex-responses (and vice versa), while unrelated APIs stay ignored.
-await rotationReply("response.done", "ultrafast", "openai-codex-responses");
-await rotationStatus();
-assert.match(
-	notices.at(-1) ?? "",
-	/Last reply: OpenAI confirmed Ultrafast/,
-	"chatgpt-rotate Codex turns must confirm terminal tier status",
-);
-await rotationReply("response.completed", "default", "openai-completions");
-await rotationStatus();
-assert.match(
-	notices.at(-1) ?? "",
-	/Last reply: OpenAI confirmed Ultrafast/,
-	"unrelated APIs must not overwrite chatgpt-rotate reply status",
-);
-await rotationReply("response.completed", "ultrafast", "anthropic-messages", rotatedCodexSol62);
-await rotationStatus(rotatedCodexSol62);
-assert.match(
-	notices.at(-1) ?? "",
-	/No reply observed/,
-	"unrelated APIs must not record reply status for chatgpt-rotate Codex models",
-);
-await rotationReply("response.completed", "ultrafast", "openai-responses", rotatedCodexSol62);
-await rotationStatus(rotatedCodexSol62);
-assert.match(
-	notices.at(-1) ?? "",
-	/Last reply: OpenAI confirmed Ultrafast/,
-	"chatgpt-rotate Codex models must accept personal openai-responses replies",
-);
-await rotationReply("response.completed", "ultrafast", "openai-codex-responses", astra);
 await commandFor(commands, "ultrafast").handler("status", uiCtx(astra));
-assert.match(
-	notices.at(-1) ?? "",
-	/No reply observed/,
-	"direct openai models must require exact API match",
-);
-await rotationReply("response.completed", "ultrafast", "openai-codex-responses", codexSol62);
-await commandFor(commands, "ultrafast").handler("status", uiCtx(codexSol62));
-assert.match(
-	notices.at(-1) ?? "",
-	/unavailable on this route/,
-	"direct openai-codex must remain ineligible for Ultrafast",
-);
+assert.match(notices.at(-1) ?? "", /No reply observed/);
 await runHandlers("model_select", {}, uiCtx(MODELS.anthropicOpus));
 assert.equal(status.get("codex-fast"), undefined);
 await runHandlers("model_select", {}, uiCtx({ ...astra, id: "gpt-6.2-sol" }));
