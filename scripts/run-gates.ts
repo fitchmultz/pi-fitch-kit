@@ -11,6 +11,8 @@ const testFiles = [
 	"scripts/fast-mode-regression.ts",
 	"scripts/session-name-regression.ts",
 	"scripts/session-name-boundary.ts",
+	"scripts/watch-video-regression.ts",
+	"scripts/watch-video-boundary.ts",
 	"scripts/write-prompt-regression.ts",
 	"scripts/write-prompt-boundary.ts",
 	"scripts/setup-lifecycle-smoke.ts",

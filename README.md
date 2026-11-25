@@ -41,7 +41,7 @@ The session tools need no setup and work with any model. Step 3 is enough if you
 
 ## Commands
 
-The package loads seven extensions, two prompts, and the `calm` theme.
+The package loads eight extensions, two prompts, and the `calm` theme.
 
 | Command                                                            | Use                                                                                                                                                                                                            |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
