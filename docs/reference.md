@@ -91,13 +91,18 @@ Prior **priority**, not Ultrafast, measurements remain useful baselines: gateway
 
 #### Google Standard, Flex, and Priority
 
-`/google-tier standard`, `/google-tier flex`, and `/google-tier priority` select the shared tier for `google/*` models using `google-generative-ai`. This includes the native Google AI Studio route through Cloudflare AI Gateway. Google Vertex AI and other providers are unchanged. Google enforces each model's tier availability.
+`/google-tier standard`, `/google-tier flex`, and `/google-tier priority` select the shared tier for `google/*` models using `google-generative-ai` or `google-interactions`. This includes the native GenerateContent route through Cloudflare AI Gateway. Google Vertex AI and other providers are unchanged. Google enforces each model's tier availability.
 
 Blank `/google-tier` and `/google-tier status` report the saved policy without changing it. A missing or invalid state file leaves native defaults unchanged; Google's default is Standard. Selecting Standard explicitly requests Standard. The choice survives restart, reload, resume, and new or forked sessions because it is shared, not session metadata. It does not change OpenAI, xAI, or Anthropic settings. Installation creates no Google tier preference.
 
 On an eligible model, the footer shows `Google standard requested`, `Google flex requested`, or `Google priority requested` after an explicit selection. These labels describe requests, not confirmation from Google. Switching to another provider hides the label but retains the preference.
 
-[Google's streaming API](https://aistudio.google.com/api-reference/generate-content/stream-generate-content) accepts `serviceTier` and returns the served tier in `usageMetadata.serviceTier`. The kit sets the native SDK's `config.serviceTier` through Pi's stock payload hook; the SDK serializes it. There is no Google provider override, custom transport, or gateway reconfiguration.
+The kit uses Pi's native payload hook on both routes:
+
+- [GenerateContent](https://aistudio.google.com/api-reference/generate-content/stream-generate-content): The kit sets `config.serviceTier` on the SDK request. The SDK serializes it as `serviceTier`. Google reports the served tier in `usageMetadata.serviceTier`.
+- [Interactions](https://googleapis.github.io/js-genai/release%5Fdocs/types/gaos_models_interactions_create-model-interaction.CreateModelInteraction.html): The kit sets `service_tier` at the top level of the request.
+
+There is no Google provider override, custom transport, or gateway reconfiguration.
 
 [Flex](https://aistudio.google.com/docs/flex-inference) costs half the Standard rate in exchange for slower, best-effort availability. Capacity errors retain Pi's normal retry behavior; the kit never upgrades Flex to paid Standard automatically. [Priority](https://aistudio.google.com/docs/priority-inference) costs more and can be served as Standard when Google's Priority limits are exceeded. For Gemini 4 Carbon, the [published price](https://aistudio.google.com/docs/pricing#gemini-4-carbon) is 1.8× Standard for Priority; other models can differ. Batch is a separate asynchronous job API, not a session tier.
 

@@ -1584,7 +1584,7 @@ for (const count of [781, 43_000]) {
 	branch.mock.restore();
 }
 
-// Google tiers use the host's real SDK serializer, not OpenAI's service_tier shape.
+// Test GenerateContent through the host's SDK serializer and Interactions at the payload hook.
 const { googleGenerativeAIApi } = await import("@earendil-works/pi-ai/compat");
 const googleApi = googleGenerativeAIApi();
 const googleCarbon: Model<"google-generative-ai"> = {
@@ -1603,6 +1603,8 @@ const gatewayGoogle = {
 	...googleCarbon,
 	baseUrl: "https://gateway.ai.cloudflare.com/v1/acct-123/gw-456/google-ai-studio/v1beta",
 };
+const googleNeon = { provider: "google", api: "google-interactions", id: "gemini-4-neon" };
+const interactionPayload = { model: googleNeon.id, input: "test", stream: true };
 const googleStatePath = join(agentDir, "google-tier.json");
 async function googleWireRequest(model: typeof googleCarbon) {
 	let payload: Record<string, unknown> | undefined;
@@ -1638,6 +1640,7 @@ async function googleWireRequest(model: typeof googleCarbon) {
 	return payload;
 }
 assert.equal((await googleWireRequest(gatewayGoogle)).serviceTier, undefined);
+assert.equal(await requestPayload(googleNeon, interactionPayload), undefined);
 await commandFor(commands, "google-tier").handler("", uiCtx(gatewayGoogle));
 assert.match(notices.at(-1) ?? "", /Google shared requests: standard/);
 assert.equal(fs.existsSync(googleStatePath), false, "status must not opt in or create state");
@@ -1651,6 +1654,15 @@ for (const tier of ["priority", "flex", "standard"]) {
 		assert.deepEqual(payload.contents, [{ parts: [{ text: "test" }], role: "user" }]);
 	}
 	assert.equal(status.get("google-tier"), `accent:Google ${tier} requested`);
+	assert.deepEqual(
+		await requestPayload(googleNeon, interactionPayload),
+		{ ...interactionPayload, service_tier: tier },
+		"Interactions must send the selected tier as a top-level service_tier field",
+	);
+	await runHandlers("model_select", {}, uiCtx(googleNeon));
+	assert.equal(status.get("google-tier"), `accent:Google ${tier} requested`);
+	await commandFor(commands, "google-tier").handler("status", uiCtx(googleNeon));
+	assert.equal(notices.at(-1)?.startsWith(`Google shared requests: ${tier}.`), true);
 	const saved = readFileSync(googleStatePath, "utf8");
 	for (const args of ["", "status", "batch", "priority flex", "on", "flex --session"]) {
 		await commandFor(commands, "google-tier").handler(args, uiCtx(gatewayGoogle));
@@ -1667,6 +1679,11 @@ for (const model of [
 	await runHandlers("model_select", {}, uiCtx(model));
 	assert.equal(status.get("google-tier"), undefined);
 }
+assert.equal(
+	await requestPayload({ ...googleNeon, provider: "custom-google-proxy" }, interactionPayload),
+	undefined,
+	"Interactions tier requests must stay scoped to the google provider",
+);
 await runHandlers("model_select", {}, uiCtx(gatewayGoogle));
 assert.equal(status.get("google-tier"), "accent:Google flex requested");
 await commandFor(commands, "google-tier").handler("status", uiCtx(MODELS.openai));

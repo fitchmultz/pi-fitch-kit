@@ -35,7 +35,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 
 const eligible = (model: FastModel): boolean =>
-	model?.provider === "google" && model.api === "google-generative-ai";
+	model?.provider === "google" &&
+	(model.api === "google-generative-ai" || model.api === "google-interactions");
 
 const selectedTier = (): GoogleTier | undefined => {
 	try {
@@ -56,6 +57,9 @@ const requestTier = (
 	const tier = selectedTier();
 	if (tier === undefined || !isRecord(event.payload)) {
 		return undefined;
+	}
+	if (ctx.model?.api === "google-interactions") {
+		return { ...event.payload, service_tier: tier };
 	}
 	const { config } = event.payload;
 	if (config !== undefined && !isRecord(config)) {
