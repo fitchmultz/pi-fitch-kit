@@ -96,7 +96,8 @@ const tool: ToolDefinition<typeof parameters> = {
 	description:
 		"Ask the active model to analyze a local video with native video input. Returns text only.",
 	parameters,
-	async execute(...[, args, signal, , ctx]) {
+	// oxlint-disable-next-line eslint/max-params -- QX-001: Pi's documented five-parameter tool execute callback.
+	async execute(_toolCallId, { path, question }, signal, _onUpdate, ctx) {
 		const { model } = ctx;
 		const route = resolveVideoRoute(model);
 		if (!hasModelApi(model) || route === undefined) {
@@ -104,15 +105,15 @@ const tool: ToolDefinition<typeof parameters> = {
 				"The active model route does not support native video. Select a video-capable route first.",
 			);
 		}
-		const requested = args.question?.trim() ?? "";
-		const question = requested === "" ? questionDefault : requested;
-		const video = await readVideo({ path: args.path, cwd: ctx.cwd, route, question, signal });
+		const requested = question?.trim() ?? "";
+		const prompt = requested === "" ? questionDefault : requested;
+		const video = await readVideo({ path, cwd: ctx.cwd, route, question: prompt, signal });
 		const answer = await completeVideo({
 			registry: ctx.modelRegistry,
 			model,
 			route,
 			video,
-			question,
+			question: prompt,
 			signal,
 		});
 		return {

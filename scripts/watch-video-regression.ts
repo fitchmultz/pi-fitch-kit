@@ -113,3 +113,14 @@ await test("Neon agentic mode and configurable request byte ceilings", () => {
 		600,
 	);
 });
+
+await test("OpenRouter uses its configured request ceiling instead of the 10 MB fallback", () => {
+	const model = { api: "openai-responses", baseUrl: openRouter, id: "google/gemini-4-neon" };
+	assert.equal(resolveVideoRoute(model)?.maxRequestBytes, 10_000_000);
+	for (const maxRequestBytes of [600, 25_000_000]) {
+		assert.equal(
+			resolveVideoRoute({ ...model, inputLimits: { maxRequestBytes } })?.maxRequestBytes,
+			maxRequestBytes,
+		);
+	}
+});

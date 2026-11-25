@@ -320,6 +320,38 @@ await test("a native Chat Completions tool call sends one off-transcript video a
 	assert.ok(!JSON.stringify(requests[2]?.body).includes(data));
 });
 
+// ISO BMFF ftyp: major "M4V ", compatible isom/iso2/avc1/mp41, followed by moov.
+const m4v = Buffer.from(
+	"00000020667479704d3456200000020069736f6d69736f32617663316d703431000000086d6f6f76",
+	"hex",
+);
+for (const suffix of ["mp4", "m4v"]) {
+	await test(`M4V-branded .${suffix} sends its original bytes as MP4`, async (t) => {
+		const { session } = await createSession(completions);
+		t.after(() => session.dispose());
+		const path = `apple-video.${suffix}`;
+		await writeFile(join(cwd, path), m4v);
+		const requests: Wire[] = [];
+		t.mock.method(
+			globalThis,
+			"fetch",
+			captureFetch((request) => {
+				requests.push(request);
+				return completion({ content: answer });
+			}),
+		);
+		const result = await executeVideo(session, path);
+		assert.deepEqual(result.content, [{ type: "text", text: answer }]);
+		assert.equal(requests.length, 1);
+		const [request] = requests;
+		assert.ok(request);
+		assert.deepEqual(userParts(request.body, "messages", "content")[1], {
+			type: "video_url",
+			video_url: { url: `data:video/mp4;base64,${m4v.toString("base64")}` },
+		});
+	});
+}
+
 await test("local file and base64 request budgets reject before the provider sends", async (t) => {
 	const { session } = await createSession({
 		...completions,

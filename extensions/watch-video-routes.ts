@@ -80,7 +80,8 @@ export function resolveVideoRoute(model: VideoModel | undefined): VideoRoute | u
 	return { ...route, maxRequestBytes: Math.min(modelLimit, route.maxRequestBytes) };
 }
 
-function nativeRoute({ api, id }: VideoModel, url: URL): VideoRoute | undefined {
+function nativeRoute(model: VideoModel, url: URL): VideoRoute | undefined {
+	const { api, id } = model;
 	switch (api) {
 		case "google-interactions":
 		case "google-generative-ai":
@@ -91,7 +92,7 @@ function nativeRoute({ api, id }: VideoModel, url: URL): VideoRoute | undefined 
 		case "openai-completions":
 		case "openai-responses":
 			return (
-				openRouterRoute(api, id, url) ??
+				openRouterRoute(model, url) ??
 				(api === "openai-completions" ? directCompletionsRoute(id, url) : undefined)
 			);
 		case "anthropic-messages":
@@ -152,8 +153,7 @@ function bedrockRoute(id: string, { hostname }: URL): VideoRoute | undefined {
 }
 
 function openRouterRoute(
-	api: string,
-	id: string,
+	{ api, id, inputLimits }: VideoModel,
 	{ hostname, pathname }: URL,
 ): VideoRoute | undefined {
 	if (
@@ -165,7 +165,7 @@ function openRouterRoute(
 	}
 	return {
 		wire: api === "openai-responses" ? "responses" : "completions",
-		maxRequestBytes: 10 * MB,
+		maxRequestBytes: inputLimits?.maxRequestBytes ?? 10 * MB,
 		formats: openRouterFormats,
 	};
 }

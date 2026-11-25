@@ -33,7 +33,16 @@ type ReadVideoRequest = {
 };
 
 const isVideoFormat = (value: string): value is VideoFormat => Object.hasOwn(videoMimes, value);
-const canonicalFormat = (value: string): string => (value === "mpg" ? "mpeg" : value);
+function canonicalFormat(value: string): string {
+	switch (value) {
+		case "m4v":
+			return "mp4";
+		case "mpg":
+			return "mpeg";
+		default:
+			return value;
+	}
+}
 
 export function checkVideoBudget(size: number, overhead: number, limit: number): void {
 	if (Math.ceil(size / 3) * 4 + overhead > limit) {
@@ -49,7 +58,7 @@ function videoFormatForPath(path: string, formats: readonly VideoFormat[]): Vide
 	const format = canonicalFormat(extname(path).slice(1).toLowerCase());
 	if (!isVideoFormat(format)) {
 		throw new Error(
-			"Use a video file with an MP4, MOV, WebM, MPEG/MPG, AVI, MKV, WMV, 3GP, or FLV extension.",
+			"Use a video file with an MP4/M4V, MOV, WebM, MPEG/MPG, AVI, MKV, WMV, 3GP, or FLV extension.",
 		);
 	}
 	if (!formats.includes(format)) {
