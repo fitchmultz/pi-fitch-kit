@@ -1,3 +1,4 @@
+import { constants } from "node:buffer";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { openRouterVideoModels } from "./watch-video-openrouter.ts";
 
@@ -10,10 +11,7 @@ export type VideoRoute = {
 	agentic?: true;
 };
 
-type VideoModel = Pick<Model<Api>, "baseUrl" | "id" | "inputLimits"> & {
-	api: string;
-	input?: readonly string[];
-};
+type VideoModel = Pick<Model<Api>, "baseUrl" | "id" | "inputLimits"> & { api: string };
 
 const geminiModels = new Set([
 	"gemini-2.5-flash",
@@ -69,8 +67,6 @@ const MB = 1_000_000;
 // https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/video-understanding#api-endpoint-and-context-window-limits
 const vertexInlineBudget = 256 * MB;
 
-const hasVideoInput = ({ input }: VideoModel): boolean => input?.includes("video") === true;
-
 /** The endpoint and wire API must agree; a provider label can describe any local proxy. */
 export function resolveVideoRoute(model: VideoModel | undefined): VideoRoute | undefined {
 	if (model === undefined) {
@@ -89,22 +85,22 @@ export function resolveVideoRoute(model: VideoModel | undefined): VideoRoute | u
 }
 
 function nativeRoute(model: VideoModel, url: URL): VideoRoute | undefined {
-	const { api } = model;
+	const { api, id } = model;
 	switch (api) {
 		case "google-interactions":
 		case "google-generative-ai":
 		case "google-vertex":
-			return googleRoute(model, url);
+			return googleRoute(api, id, url);
 		case "bedrock-converse-stream":
-			return bedrockRoute(model, url);
+			return bedrockRoute(id, url);
 		case "openai-completions":
 		case "openai-responses":
 			return (
 				openRouterRoute(model, url) ??
-				(api === "openai-completions" ? directCompletionsRoute(model, url) : undefined)
+				(api === "openai-completions" ? directCompletionsRoute(id, url) : undefined)
 			);
 		case "anthropic-messages":
-			return minimaxRoute(model, url);
+			return minimaxRoute(id, url);
 		default:
 			return undefined;
 	}
@@ -126,14 +122,9 @@ function googleEndpoint(
 	return direct ? "direct" : undefined;
 }
 
-function googleRoute(videoModel: VideoModel, url: URL): VideoRoute | undefined {
-	const { api, id } = videoModel;
+function googleRoute(api: string, id: string, url: URL): VideoRoute | undefined {
 	const model = id.replace(/^(?:(?:publishers\/)?google\/(?:models\/)?|models\/)/u, "");
-	if (
-		!hasVideoInput(videoModel) &&
-		!geminiModels.has(model) &&
-		!/^gemini-robotics-er-2(?:\.\d+)?(?:-preview)?$/u.test(model)
-	) {
+	if (!geminiModels.has(model) && !/^gemini-robotics-er-2(?:\.\d+)?(?:-preview)?$/u.test(model)) {
 		return undefined;
 	}
 	const vertex = api === "google-vertex";
@@ -152,30 +143,33 @@ function googleRoute(videoModel: VideoModel, url: URL): VideoRoute | undefined {
 	};
 }
 
-function bedrockRoute(videoModel: VideoModel, { hostname }: URL): VideoRoute | undefined {
-	const model = videoModel.id.replace(
+function bedrockRoute(id: string, { hostname }: URL): VideoRoute | undefined {
+	const model = id.replace(
 		/^arn:aws(?:-cn|-us-gov)?:bedrock:[\w-]+:(?:\d*):(?:foundation-model|inference-profile)\//u,
 		"",
 	);
 	const nova =
 		/^(?:(?:us|eu|apac|global|ca|jp|au|in)\.)?amazon\.nova-(?:2-lite|lite|pro|premier)-v1:0$/u;
 	const endpoint = /^bedrock-runtime(?:-fips)?\.[a-z0-9-]+\.(?:amazonaws\.com(?:\.cn)?|api\.aws)$/u;
-	return endpoint.test(hostname) && (hasVideoInput(videoModel) || nova.test(model))
+	return endpoint.test(hostname) && nova.test(model)
 		? { wire: "converse", maxRequestBytes: 25 * MB, formats: converseFormats }
 		: undefined;
 }
 
-function openRouterRoute(model: VideoModel, { hostname, pathname }: URL): VideoRoute | undefined {
+function openRouterRoute(
+	{ api, id, inputLimits }: VideoModel,
+	{ hostname, pathname }: URL,
+): VideoRoute | undefined {
 	if (
 		!/^(?:(?:us|eu)\.)?openrouter\.ai$/u.test(hostname) ||
 		!/^\/api\/v1\/?$/u.test(pathname) ||
-		!(hasVideoInput(model) || openRouterVideoModels.has(model.id))
+		!openRouterVideoModels.has(id)
 	) {
 		return undefined;
 	}
 	return {
-		wire: model.api === "openai-responses" ? "responses" : "completions",
-		maxRequestBytes: model.inputLimits?.maxRequestBytes ?? 10 * MB,
+		wire: api === "openai-responses" ? "responses" : "completions",
+		maxRequestBytes: inputLimits?.maxRequestBytes ?? 10 * MB,
 		formats: openRouterFormats,
 	};
 }
@@ -206,30 +200,25 @@ const directCompletions: ReadonlyArray<
 	{
 		endpoint: /^api\.fireworks\.ai\/inference(?:\/v1)?\/?$/u,
 		model: /^accounts\/fireworks\/models\/glm-5p3-flash$/u,
-		// The Fireworks video guide's 10 MB budget is for a dedicated deployment example.
-		maxRequestBytes: Infinity,
+		// Fireworks does not publish an inline cap. Bound local base64 and JSON serialization.
+		maxRequestBytes: constants.MAX_STRING_LENGTH,
 		formats: ["mp4"],
 	},
 ];
 
-function directCompletionsRoute(
-	videoModel: VideoModel,
-	{ hostname, pathname }: URL,
-): VideoRoute | undefined {
+function directCompletionsRoute(id: string, { hostname, pathname }: URL): VideoRoute | undefined {
 	const route = directCompletions.find(
-		({ endpoint, model }) =>
-			endpoint.test(hostname + pathname) &&
-			(hasVideoInput(videoModel) || model.test(videoModel.id)),
+		({ endpoint, model }) => endpoint.test(hostname + pathname) && model.test(id),
 	);
 	return (
 		route && { wire: "completions", maxRequestBytes: route.maxRequestBytes, formats: route.formats }
 	);
 }
 
-function minimaxRoute(model: VideoModel, { hostname, pathname }: URL): VideoRoute | undefined {
+function minimaxRoute(id: string, { hostname, pathname }: URL): VideoRoute | undefined {
 	return (hostname === "api.minimax.io" || hostname === "api.minimaxi.com") &&
 		/^\/anthropic\/?$/u.test(pathname) &&
-		(hasVideoInput(model) || /^minimax-m3(?:\.1-flash)?$/iu.test(model.id))
+		/^minimax-m3(?:\.1-flash)?$/iu.test(id)
 		? { wire: "minimax", maxRequestBytes: 64 * MB, formats: minimaxFormats }
 		: undefined;
 }

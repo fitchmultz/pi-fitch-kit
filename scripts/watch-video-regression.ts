@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { constants } from "node:buffer";
 import { test } from "node:test";
+import { checkVideoBudget } from "../extensions/watch-video-file.ts";
 import { resolveVideoRoute } from "../extensions/watch-video-routes.ts";
 
 const google = "https://generativelanguage.googleapis.com/v1beta";
@@ -103,41 +105,6 @@ await test("only documented native video model and endpoint pairs qualify", () =
 	}
 });
 
-await test("Pi's video input signal qualifies new models only on implemented routes", () => {
-	const id = "future-video-model";
-	const input = ["text", "image", "video"];
-	const supported = [
-		["google-interactions", google, "interactions"],
-		["google-generative-ai", google, "generate-content"],
-		["google-vertex", vertex, "generate-content"],
-		["bedrock-converse-stream", bedrock, "converse"],
-		["openai-completions", openRouter, "completions"],
-		["openai-completions", alibaba, "completions"],
-		["openai-completions", moonshot, "completions"],
-		["openai-completions", zai, "completions"],
-		["openai-completions", fireworks, "completions"],
-		["openai-responses", openRouter, "responses"],
-		["anthropic-messages", minimax, "minimax"],
-	] as const;
-	for (const [api, baseUrl, wire] of supported) {
-		assert.equal(resolveVideoRoute({ api, baseUrl, id, input })?.wire, wire, `${api} ${baseUrl}`);
-	}
-	const unsupported = [
-		["anthropic-messages", "https://api.anthropic.com", "claude-opus-4-8"],
-		["anthropic-messages", "https://ai-gateway.vercel.sh", id],
-		["openai-completions", "https://api.openai.com/v1", id],
-		["openai-responses", "https://api.openai.com/v1", id],
-		["openai-responses", fireworks, id],
-	] as const;
-	for (const [api, baseUrl, modelId] of unsupported) {
-		assert.equal(
-			resolveVideoRoute({ api, baseUrl, id: modelId, input }),
-			undefined,
-			`${api} ${baseUrl}`,
-		);
-	}
-});
-
 await test("Vertex uses its inline part budget and keeps the Cloudflare gateway ceiling", () => {
 	const model = { api: "google-vertex", baseUrl: vertex, id: "gemini-3.1-pro-preview" };
 	assert.equal(resolveVideoRoute(model)?.maxRequestBytes, 256_000_000);
@@ -148,16 +115,31 @@ await test("Vertex uses its inline part budget and keeps the Cloudflare gateway 
 	);
 });
 
-await test("Fireworks applies a request ceiling only when configured", () => {
+await test("Fireworks rejects clips that would exceed Node's string limit before encoding", () => {
 	const model = {
 		api: "openai-completions",
 		baseUrl: fireworks,
 		id: "accounts/fireworks/models/glm-5p3-flash",
 	};
-	assert.equal(resolveVideoRoute(model)?.maxRequestBytes, Infinity);
+	const route = resolveVideoRoute(model);
+	assert.ok(route);
+	const overhead = Buffer.byteLength(JSON.stringify("What happens in this video?"));
+	const maxVideoBytes = Math.floor((constants.MAX_STRING_LENGTH - overhead) / 4) * 3;
+	checkVideoBudget(maxVideoBytes, overhead, route.maxRequestBytes);
+	assert.throws(
+		() => checkVideoBudget(maxVideoBytes + 1, overhead, route.maxRequestBytes),
+		/the selected route can fit at most .* file bytes inline/u,
+	);
 	assert.equal(
 		resolveVideoRoute({ ...model, inputLimits: { maxRequestBytes: 25_000_000 } })?.maxRequestBytes,
 		25_000_000,
+	);
+	assert.equal(
+		resolveVideoRoute({
+			...model,
+			inputLimits: { maxRequestBytes: constants.MAX_STRING_LENGTH + 1 },
+		})?.maxRequestBytes,
+		constants.MAX_STRING_LENGTH,
 	);
 });
 
