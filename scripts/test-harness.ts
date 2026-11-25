@@ -2,6 +2,7 @@ import type {
 	Extension,
 	ExtensionToolContext,
 	ExtensionUIContext,
+	RegisteredCommand,
 } from "@earendil-works/pi-coding-agent";
 
 /** A registered event handler as the loose callable a regression drives. */
@@ -10,6 +11,7 @@ export type DrivenHandler = (...args: unknown[]) => Promise<unknown>;
 /** A registered slash command as the loose callable a regression drives. */
 export type DrivenCommand = {
 	handler: (args: string, ctx: unknown) => Promise<void>;
+	getArgumentCompletions?: RegisteredCommand["getArgumentCompletions"];
 };
 
 /** A resolved-later gate for sequencing assertions. */

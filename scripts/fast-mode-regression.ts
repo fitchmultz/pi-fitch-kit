@@ -1747,6 +1747,96 @@ await runHandlers("session_shutdown", {}, uiCtx(gatewayOpus));
 assert.equal(openStateWatchers.size, 0, "session_shutdown must close the active FSWatcher handle");
 assert.equal(statWatchers(), watcherBaseline, "session shutdown must release state-file watchers");
 
+await test("fixed-option commands provide accurate argument completions", async () => {
+	const complete = async (name: string, prefix: string) => {
+		const completions = commandFor(commands, name).getArgumentCompletions;
+		if (completions === undefined) {
+			throw new Error(`/${name} must define getArgumentCompletions`);
+		}
+		return await completions(prefix);
+	};
+	const values = async (name: string, prefix: string) =>
+		(await complete(name, prefix))?.map((item) => item.value) ?? null;
+
+	for (const name of ["anthropic-fast", "xai-fast"]) {
+		const all = await complete(name, "");
+		assert.ok(all !== null);
+		assert.deepEqual(
+			all.map((item) => item.value),
+			["on", "off", "toggle", "status"],
+		);
+		assert.ok(
+			all.every((item) => item.label === item.value && (item.description?.length ?? 0) > 0),
+		);
+		assert.deepEqual(await values(name, "o"), ["on", "off"]);
+		assert.deepEqual(await values(name, "ST"), ["status"]);
+		assert.equal(await complete(name, "ultrafast"), null);
+		assert.equal(await complete(name, "on "), null);
+		assert.equal(await complete(name, "on extra"), null);
+	}
+
+	for (const name of ["codex-fast", "fast"]) {
+		const all = await complete(name, "");
+		assert.ok(all !== null);
+		assert.deepEqual(
+			all.map((item) => item.value),
+			["on", "off", "toggle", "status", "ultrafast"],
+		);
+		assert.ok(
+			all.every((item) => item.label === item.value && (item.description?.length ?? 0) > 0),
+		);
+		assert.deepEqual(await values(name, "u"), ["ultrafast"]);
+		assert.deepEqual(await values(name, "o"), ["on", "off"]);
+		assert.equal(await complete(name, "nope"), null);
+		assert.equal(await complete(name, "on "), null);
+		assert.equal(await complete(name, "on --session"), null);
+	}
+
+	const googleAll = await complete("google-tier", "");
+	assert.ok(googleAll !== null);
+	assert.deepEqual(
+		googleAll.map((item) => item.value),
+		["standard", "flex", "priority", "status"],
+	);
+	assert.ok(
+		googleAll.every((item) => item.label === item.value && (item.description?.length ?? 0) > 0),
+	);
+	assert.deepEqual(await values("google-tier", "f"), ["flex"]);
+	assert.deepEqual(await values("google-tier", "ST"), ["standard", "status"]);
+	assert.equal(await complete("google-tier", "batch"), null);
+	assert.equal(await complete("google-tier", "flex "), null);
+	assert.equal(await complete("google-tier", "flex extra"), null);
+
+	const ultrafastAll = await complete("ultrafast", "");
+	assert.ok(ultrafastAll !== null);
+	assert.deepEqual(
+		ultrafastAll.map((item) => item.value),
+		["on", "off", "toggle", "status", "reset --session", "--session"],
+	);
+	assert.ok(ultrafastAll.every((item) => (item.description?.length ?? 0) > 0));
+	assert.deepEqual(await values("ultrafast", "o"), ["on", "off"]);
+	assert.deepEqual(await values("ultrafast", "r"), ["reset --session"]);
+	assert.deepEqual(await values("ultrafast", "--"), ["--session"]);
+	assert.deepEqual(await values("ultrafast", "on "), ["on --session"]);
+	assert.deepEqual(await values("ultrafast", "on --s"), ["on --session"]);
+	assert.deepEqual(await values("ultrafast", "reset "), ["reset --session"]);
+	assert.deepEqual(await values("ultrafast", "--session "), [
+		"--session on",
+		"--session off",
+		"--session toggle",
+		"--session status",
+		"--session reset",
+	]);
+	assert.deepEqual(await values("ultrafast", "--session r"), ["--session reset"]);
+	assert.equal(await complete("ultrafast", "nope"), null);
+	assert.equal(await complete("ultrafast", "nope "), null);
+	assert.equal(await complete("ultrafast", "on extra"), null);
+	assert.equal(await complete("ultrafast", "--session --session"), null);
+	assert.equal(await complete("ultrafast", "on --session "), null);
+	assert.equal(await complete("ultrafast", "on --session extra"), null);
+	assert.equal(await complete("ultrafast", "--session on "), null);
+});
+
 console.log(
 	JSON.stringify({
 		ok: true,
