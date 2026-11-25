@@ -38,6 +38,7 @@
       "./extensions/fast-mode.ts",
       "./extensions/session-name.ts",
       "./extensions/setup-models.ts",
+      "./extensions/watch-video.ts",
       "./extensions/write-prompt.ts"
     ],
     "prompts": [
@@ -84,6 +85,7 @@
     }
   },
   "dependencies": {
+    "file-type": "22.3.0",
     "sh-syntax": "0.8.7"
   }
 }

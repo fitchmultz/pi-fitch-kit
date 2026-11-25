@@ -376,11 +376,18 @@ try {
 		throw new Error("Session-name session_start handler missing");
 	}
 	await sessionNameStart({}, {});
-	const toolNames = extensions.extensions
-		.flatMap(({ tools }) => [...tools.values()].map(({ definition }) => definition.name))
-		.sort();
-	if (JSON.stringify(toolNames) !== JSON.stringify(["fitch_setup_models", "name_session"])) {
+	const kitTools = extensions.extensions.flatMap(({ tools }) =>
+		[...tools.values()].map(({ definition }) => definition),
+	);
+	const toolNames = kitTools.map(({ name }) => name).sort();
+	if (
+		JSON.stringify(toolNames) !==
+		JSON.stringify(["fitch_setup_models", "name_session", "watch_video"])
+	) {
 		throw new Error(`Unexpected kit tools: ${JSON.stringify(toolNames)}`);
+	}
+	if (kitTools.find(({ name }) => name === "watch_video")?.exposure !== "hidden") {
+		throw new Error("watch_video must be hidden until a video-capable route is selected");
 	}
 	const sessionContext = sessionName.handlers.get("before_agent_start")?.[0];
 	if (!sessionContext) {
