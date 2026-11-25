@@ -1,3 +1,4 @@
+import { constants } from "node:buffer";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { openRouterVideoModels } from "./watch-video-openrouter.ts";
 
@@ -62,6 +63,9 @@ const openRouterFormats: readonly VideoFormat[] = ["mp4", "mov", "webm", "mpeg"]
 const minimaxFormats: readonly VideoFormat[] = ["mp4", "mov", "avi", "mkv"];
 const alibabaFormats: readonly VideoFormat[] = ["mp4", "mov", "avi", "mkv", "flv", "wmv"];
 const MB = 1_000_000;
+// Use the GenerateContent inline part limit as a conservative budget for the encoded request.
+// https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/video-understanding#api-endpoint-and-context-window-limits
+const vertexInlineBudget = 256 * MB;
 
 /** The endpoint and wire API must agree; a provider label can describe any local proxy. */
 export function resolveVideoRoute(model: VideoModel | undefined): VideoRoute | undefined {
@@ -132,7 +136,7 @@ function googleRoute(api: string, id: string, url: URL): VideoRoute | undefined 
 		wire: api === "google-interactions" ? "interactions" : "generate-content",
 		maxRequestBytes: Math.min(
 			endpoint === "gateway" ? 32 * 1024 * 1024 : Infinity,
-			(vertex ? 20 : 100) * MB,
+			vertex ? vertexInlineBudget : 100 * MB,
 		),
 		formats: geminiFormats,
 		...(api === "google-interactions" && model === "gemini-4-neon" ? { agentic: true } : {}),
@@ -196,7 +200,8 @@ const directCompletions: ReadonlyArray<
 	{
 		endpoint: /^api\.fireworks\.ai\/inference(?:\/v1)?\/?$/u,
 		model: /^accounts\/fireworks\/models\/glm-5p3-flash$/u,
-		maxRequestBytes: 10 * MB,
+		// Fireworks does not publish an inline cap. Bound local base64 and JSON serialization.
+		maxRequestBytes: constants.MAX_STRING_LENGTH,
 		formats: ["mp4"],
 	},
 ];

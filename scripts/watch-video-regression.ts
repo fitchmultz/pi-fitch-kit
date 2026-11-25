@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { constants } from "node:buffer";
 import { test } from "node:test";
+import { checkVideoBudget } from "../extensions/watch-video-file.ts";
 import { resolveVideoRoute } from "../extensions/watch-video-routes.ts";
 
 const google = "https://generativelanguage.googleapis.com/v1beta";
@@ -101,6 +103,44 @@ await test("only documented native video model and endpoint pairs qualify", () =
 		const model = { api, baseUrl, id, input: ["text", "image"] };
 		assert.equal(resolveVideoRoute(model), undefined, `${api} ${baseUrl} ${id}`);
 	}
+});
+
+await test("Vertex uses its inline part budget and keeps the Cloudflare gateway ceiling", () => {
+	const model = { api: "google-vertex", baseUrl: vertex, id: "gemini-3.1-pro-preview" };
+	assert.equal(resolveVideoRoute(model)?.maxRequestBytes, 256_000_000);
+	const vertexGateway = "https://gateway.ai.cloudflare.com/v1/account/gateway/google-vertex-ai";
+	assert.equal(
+		resolveVideoRoute({ ...model, baseUrl: vertexGateway })?.maxRequestBytes,
+		32 * 1024 * 1024,
+	);
+});
+
+await test("Fireworks rejects clips that would exceed Node's string limit before encoding", () => {
+	const model = {
+		api: "openai-completions",
+		baseUrl: fireworks,
+		id: "accounts/fireworks/models/glm-5p3-flash",
+	};
+	const route = resolveVideoRoute(model);
+	assert.ok(route);
+	const overhead = Buffer.byteLength(JSON.stringify("What happens in this video?"));
+	const maxVideoBytes = Math.floor((constants.MAX_STRING_LENGTH - overhead) / 4) * 3;
+	checkVideoBudget(maxVideoBytes, overhead, route.maxRequestBytes);
+	assert.throws(
+		() => checkVideoBudget(maxVideoBytes + 1, overhead, route.maxRequestBytes),
+		/the selected route can fit at most .* file bytes inline/u,
+	);
+	assert.equal(
+		resolveVideoRoute({ ...model, inputLimits: { maxRequestBytes: 25_000_000 } })?.maxRequestBytes,
+		25_000_000,
+	);
+	assert.equal(
+		resolveVideoRoute({
+			...model,
+			inputLimits: { maxRequestBytes: constants.MAX_STRING_LENGTH + 1 },
+		})?.maxRequestBytes,
+		constants.MAX_STRING_LENGTH,
+	);
 });
 
 await test("Neon agentic mode and configurable request byte ceilings", () => {
