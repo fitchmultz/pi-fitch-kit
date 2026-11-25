@@ -103,6 +103,64 @@ await test("only documented native video model and endpoint pairs qualify", () =
 	}
 });
 
+await test("Pi's video input signal qualifies new models only on implemented routes", () => {
+	const id = "future-video-model";
+	const input = ["text", "image", "video"];
+	const supported = [
+		["google-interactions", google, "interactions"],
+		["google-generative-ai", google, "generate-content"],
+		["google-vertex", vertex, "generate-content"],
+		["bedrock-converse-stream", bedrock, "converse"],
+		["openai-completions", openRouter, "completions"],
+		["openai-completions", alibaba, "completions"],
+		["openai-completions", moonshot, "completions"],
+		["openai-completions", zai, "completions"],
+		["openai-completions", fireworks, "completions"],
+		["openai-responses", openRouter, "responses"],
+		["anthropic-messages", minimax, "minimax"],
+	] as const;
+	for (const [api, baseUrl, wire] of supported) {
+		assert.equal(resolveVideoRoute({ api, baseUrl, id, input })?.wire, wire, `${api} ${baseUrl}`);
+	}
+	const unsupported = [
+		["anthropic-messages", "https://api.anthropic.com", "claude-opus-4-8"],
+		["anthropic-messages", "https://ai-gateway.vercel.sh", id],
+		["openai-completions", "https://api.openai.com/v1", id],
+		["openai-responses", "https://api.openai.com/v1", id],
+		["openai-responses", fireworks, id],
+	] as const;
+	for (const [api, baseUrl, modelId] of unsupported) {
+		assert.equal(
+			resolveVideoRoute({ api, baseUrl, id: modelId, input }),
+			undefined,
+			`${api} ${baseUrl}`,
+		);
+	}
+});
+
+await test("Vertex uses its inline part budget and keeps the Cloudflare gateway ceiling", () => {
+	const model = { api: "google-vertex", baseUrl: vertex, id: "gemini-3.1-pro-preview" };
+	assert.equal(resolveVideoRoute(model)?.maxRequestBytes, 256_000_000);
+	const vertexGateway = "https://gateway.ai.cloudflare.com/v1/account/gateway/google-vertex-ai";
+	assert.equal(
+		resolveVideoRoute({ ...model, baseUrl: vertexGateway })?.maxRequestBytes,
+		32 * 1024 * 1024,
+	);
+});
+
+await test("Fireworks applies a request ceiling only when configured", () => {
+	const model = {
+		api: "openai-completions",
+		baseUrl: fireworks,
+		id: "accounts/fireworks/models/glm-5p3-flash",
+	};
+	assert.equal(resolveVideoRoute(model)?.maxRequestBytes, Infinity);
+	assert.equal(
+		resolveVideoRoute({ ...model, inputLimits: { maxRequestBytes: 25_000_000 } })?.maxRequestBytes,
+		25_000_000,
+	);
+});
+
 await test("Neon agentic mode and configurable request byte ceilings", () => {
 	const model = { api: "google-interactions", baseUrl: gateway, id: "google/gemini-4-neon" };
 	assert.equal(resolveVideoRoute(model)?.agentic, true);
