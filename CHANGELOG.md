@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Raise the Pi floor to 1.6.1 in the manifest, setup validation, documentation, and development cohort, and add `getArgumentCompletions` handlers to the fixed-option fast-mode and Google-tier slash commands (`/anthropic-fast`, `/codex-fast`, `/fast`, `/xai-fast`, `/ultrafast`, and `/google-tier`).
+- Require Pi 1.6.1 or later.
+- Suggest arguments for `/anthropic-fast`, `/codex-fast`, `/fast`, `/xai-fast`, `/ultrafast`, and `/google-tier` using Pi's fuzzy matching.
 
 - Strip `thinking` blocks and text signatures when `write-prompt` flattens assistant history so off-transcript writer calls do not replay invalid reasoning signatures. (PFK-208)
 

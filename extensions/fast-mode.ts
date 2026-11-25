@@ -314,12 +314,6 @@ const ULTRAFAST_SESSION_VERBS: readonly AutocompleteItem[] = [
 	},
 ];
 
-const completeUltrafastSessionVerb = (prefix: string): AutocompleteItem[] | null => {
-	const needle = prefix.toLowerCase();
-	const matches = ULTRAFAST_SESSION_VERBS.filter((option) => option.label.startsWith(needle));
-	return matches.length > 0 ? matches : null;
-};
-
 const completeUltrafastArgs = (prefix: string): AutocompleteItem[] | null => {
 	const parts = prefix.trimStart().split(/\s+/);
 	if (parts.length > 2) {
@@ -331,21 +325,24 @@ const completeUltrafastArgs = (prefix: string): AutocompleteItem[] | null => {
 	}
 	const firstLower = first.toLowerCase();
 	if (firstLower === "--session") {
-		return completeUltrafastSessionVerb(second);
+		return completeCommandOptions(ULTRAFAST_SESSION_VERBS, second);
 	}
-	if (!ULTRAFAST_VERBS.has(firstLower) || !"--session".startsWith(second.toLowerCase())) {
+	if (!ULTRAFAST_VERBS.has(firstLower)) {
 		return null;
 	}
-	return [
-		{
-			value: `${firstLower} --session`,
-			label: "--session",
-			description:
-				firstLower === "reset"
-					? "Clear this session's override and follow shared mode"
-					: "Apply to this session only",
-		},
-	];
+	return completeCommandOptions(
+		[
+			{
+				value: `${firstLower} --session`,
+				label: "--session",
+				description:
+					firstLower === "reset"
+						? "Clear this session's override and follow shared mode"
+						: "Apply to this session only",
+			},
+		],
+		second,
+	);
 };
 
 const parseUltrafastArgs = (

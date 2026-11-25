@@ -1768,8 +1768,8 @@ await test("fixed-option commands provide accurate argument completions", async 
 		assert.ok(
 			all.every((item) => item.label === item.value && (item.description?.length ?? 0) > 0),
 		);
-		assert.deepEqual(await values(name, "o"), ["on", "off"]);
-		assert.deepEqual(await values(name, "ST"), ["status"]);
+		assert.deepEqual(await values(name, "o"), ["on", "off", "toggle"]);
+		assert.deepEqual(await values(name, "STS"), ["status"]);
 		assert.equal(await complete(name, "ultrafast"), null);
 		assert.equal(await complete(name, "on "), null);
 		assert.equal(await complete(name, "on extra"), null);
@@ -1785,8 +1785,8 @@ await test("fixed-option commands provide accurate argument completions", async 
 		assert.ok(
 			all.every((item) => item.label === item.value && (item.description?.length ?? 0) > 0),
 		);
-		assert.deepEqual(await values(name, "u"), ["ultrafast"]);
-		assert.deepEqual(await values(name, "o"), ["on", "off"]);
+		assert.deepEqual(await values(name, "ult"), ["ultrafast"]);
+		assert.deepEqual(await values(name, "utf"), ["ultrafast"]);
 		assert.equal(await complete(name, "nope"), null);
 		assert.equal(await complete(name, "on "), null);
 		assert.equal(await complete(name, "on --session"), null);
@@ -1802,6 +1802,7 @@ await test("fixed-option commands provide accurate argument completions", async 
 		googleAll.every((item) => item.label === item.value && (item.description?.length ?? 0) > 0),
 	);
 	assert.deepEqual(await values("google-tier", "f"), ["flex"]);
+	assert.deepEqual(await values("google-tier", "flx"), ["flex"]);
 	assert.deepEqual(await values("google-tier", "ST"), ["standard", "status"]);
 	assert.equal(await complete("google-tier", "batch"), null);
 	assert.equal(await complete("google-tier", "flex "), null);
@@ -1814,11 +1815,12 @@ await test("fixed-option commands provide accurate argument completions", async 
 		["on", "off", "toggle", "status", "reset --session", "--session"],
 	);
 	assert.ok(ultrafastAll.every((item) => (item.description?.length ?? 0) > 0));
-	assert.deepEqual(await values("ultrafast", "o"), ["on", "off"]);
-	assert.deepEqual(await values("ultrafast", "r"), ["reset --session"]);
-	assert.deepEqual(await values("ultrafast", "--"), ["--session"]);
+	assert.deepEqual(await values("ultrafast", "on"), ["on", "--session", "reset --session"]);
+	assert.deepEqual(await values("ultrafast", "rst"), ["reset --session"]);
+	assert.deepEqual(await values("ultrafast", "--"), ["--session", "reset --session"]);
 	assert.deepEqual(await values("ultrafast", "on "), ["on --session"]);
 	assert.deepEqual(await values("ultrafast", "on --s"), ["on --session"]);
+	assert.deepEqual(await values("ultrafast", "on --ssn"), ["on --session"]);
 	assert.deepEqual(await values("ultrafast", "reset "), ["reset --session"]);
 	assert.deepEqual(await values("ultrafast", "--session "), [
 		"--session on",
@@ -1827,7 +1829,7 @@ await test("fixed-option commands provide accurate argument completions", async 
 		"--session status",
 		"--session reset",
 	]);
-	assert.deepEqual(await values("ultrafast", "--session r"), ["--session reset"]);
+	assert.deepEqual(await values("ultrafast", "--session rst"), ["--session reset"]);
 	assert.equal(await complete("ultrafast", "nope"), null);
 	assert.equal(await complete("ultrafast", "nope "), null);
 	assert.equal(await complete("ultrafast", "on extra"), null);
