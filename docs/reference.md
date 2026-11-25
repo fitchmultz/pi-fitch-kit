@@ -93,6 +93,8 @@ Prior **priority**, not Ultrafast, measurements remain useful baselines: gateway
 
 `/google-tier standard`, `/google-tier flex`, and `/google-tier priority` select the shared tier for `google/*` models using `google-generative-ai` or `google-interactions`. This includes the native GenerateContent route through Cloudflare AI Gateway. Google Vertex AI and other providers are unchanged. Google enforces each model's tier availability.
 
+GenerateContent works on official Pi 1.6.1 and later, and on Fitch Pi. Interactions requires a host that exposes `google-interactions`. Fitch Pi added it in [commit `a10a7a5e0`](https://github.com/fitchmultz/pi/commit/a10a7a5e056d7bf1aee7dde5cbe29702ccfc9170) and uses it by default for `google/gemini-4-neon`. Official Pi 1.6.1 does not expose Interactions.
+
 Blank `/google-tier` and `/google-tier status` report the saved policy without changing it. A missing or invalid state file leaves native defaults unchanged; Google's default is Standard. Selecting Standard explicitly requests Standard. The choice survives restart, reload, resume, and new or forked sessions because it is shared, not session metadata. It does not change OpenAI, xAI, or Anthropic settings. Installation creates no Google tier preference.
 
 On an eligible model, the footer shows `Google standard requested`, `Google flex requested`, or `Google priority requested` after an explicit selection. These labels describe requests, not confirmation from Google. Switching to another provider hides the label but retains the preference.

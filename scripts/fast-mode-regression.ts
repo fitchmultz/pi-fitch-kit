@@ -1584,9 +1584,10 @@ for (const count of [781, 43_000]) {
 	branch.mock.restore();
 }
 
-// Test GenerateContent through the host's SDK serializer and Interactions at the payload hook.
-const { googleGenerativeAIApi } = await import("@earendil-works/pi-ai/compat");
+// Use the host's real SDK serializers, including Interactions when the host exposes it.
+const { getApiProvider, googleGenerativeAIApi } = await import("@earendil-works/pi-ai/compat");
 const googleApi = googleGenerativeAIApi();
+const googleInteractions = getApiProvider("google-interactions");
 const googleCarbon: Model<"google-generative-ai"> = {
 	id: "gemini-4-carbon",
 	name: "Gemini 4 Carbon",
@@ -1606,32 +1607,29 @@ const gatewayGoogle = {
 const googleNeon = { provider: "google", api: "google-interactions", id: "gemini-4-neon" };
 const interactionPayload = { model: googleNeon.id, input: "test", stream: true };
 const googleStatePath = join(agentDir, "google-tier.json");
-async function googleWireRequest(model: typeof googleCarbon) {
+async function googleWireRequest(
+	model: Model<Api>,
+	api: Pick<typeof googleApi, "streamSimple"> = googleApi,
+) {
 	let payload: Record<string, unknown> | undefined;
 	let errorMessage: string | undefined;
-	const capture = mock.method(globalThis, "fetch", async (_input: unknown, init?: RequestInit) => {
-		const body = init?.body;
-		assert.ok(typeof body === "string");
-		payload = requireRecord(JSON.parse(body), "Google wire payload");
-		throw new Error("payload captured");
-	});
-	const stream = googleApi.streamSimple(
+	const stream = api.streamSimple(
 		model,
 		normalizeContext({ messages: [{ role: "user", content: "test", timestamp: 0 }] }),
 		{
 			apiKey: "test",
 			maxRetries: 0,
 			onPayload: (body) => requestPayload(model, body),
+			fetch: async (input, init) => {
+				payload = requireRecord(await new Request(input, init).json(), "Google wire payload");
+				throw new Error("payload captured");
+			},
 		},
 	);
-	try {
-		for await (const event of stream) {
-			if (event.type === "error") {
-				errorMessage = event.error.errorMessage;
-			}
+	for await (const event of stream) {
+		if (event.type === "error") {
+			errorMessage = event.error.errorMessage;
 		}
-	} finally {
-		capture.mock.restore();
 	}
 	assert.ok(
 		payload,
@@ -1669,6 +1667,27 @@ for (const tier of ["priority", "flex", "standard"]) {
 		assert.equal(readFileSync(googleStatePath, "utf8"), saved);
 	}
 }
+await test(
+	"Google Interactions SDK serializes Flex and Priority at top-level service_tier",
+	{ skip: googleInteractions === undefined && "Pi host has no google-interactions API" },
+	async () => {
+		assert.ok(googleInteractions);
+		const { googleProvider } = await import("@earendil-works/pi-ai/providers/google");
+		const model = googleProvider()
+			.getModels()
+			.find(({ id }) => id === googleNeon.id);
+		assert.ok(model);
+		assert.equal(model.api, "google-interactions");
+		for (const tier of ["flex", "priority"]) {
+			await commandFor(commands, "google-tier").handler(tier, uiCtx(model));
+			const payload = await googleWireRequest(model, googleInteractions);
+			assert.equal(payload.model, model.id);
+			assert.equal(payload.service_tier, tier);
+			assert.equal(payload.serviceTier, undefined);
+			assert.equal(payload.config, undefined);
+		}
+	},
+);
 await commandFor(commands, "google-tier").handler("flex", uiCtx(gatewayGoogle));
 for (const model of [
 	MODELS.openai,
