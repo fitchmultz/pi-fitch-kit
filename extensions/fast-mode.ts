@@ -4,13 +4,16 @@ import type {
 	ExtensionContext,
 	SessionStartEvent,
 } from "@earendil-works/pi-coding-agent";
+import type { AutocompleteItem } from "@earendil-works/pi-tui";
 import {
 	ANTHROPIC_FAST_PROVIDERS,
+	ANTHROPIC_TOGGLE,
 	OPENAI_TOGGLE,
 	PRIORITY_TOGGLES,
 	SESSION_MODE_ENTRY,
 	TOGGLES,
 	ULTRAFAST_UNAVAILABLE,
+	completeCommandOptions,
 	createStateWatcher,
 	enabled,
 	fastStream,
@@ -142,6 +145,42 @@ type ToggleRequest = {
 const TOGGLE_COMMANDS = new Set(["", "status", "on", "off", "toggle"]);
 const TOGGLE_VERBS = new Set(["on", "off", "toggle", "ultrafast"]);
 
+const ANTHROPIC_TOGGLE_OPTIONS: readonly AutocompleteItem[] = [
+	{ value: "on", label: "on", description: "Enable Anthropic Opus fast mode (2x token price)" },
+	{ value: "off", label: "off", description: "Disable Anthropic Opus fast mode" },
+	{ value: "toggle", label: "toggle", description: "Toggle Anthropic Opus fast mode" },
+	{ value: "status", label: "status", description: "Show current Anthropic fast mode status" },
+];
+
+const OPENAI_TOGGLE_OPTIONS: readonly AutocompleteItem[] = [
+	{ value: "on", label: "on", description: "Enable shared OpenAI priority/fast requests" },
+	{ value: "off", label: "off", description: "Disable shared OpenAI priority and Ultrafast" },
+	{ value: "toggle", label: "toggle", description: "Toggle shared OpenAI priority/fast requests" },
+	{ value: "status", label: "status", description: "Show shared and effective OpenAI tier status" },
+	{
+		value: "ultrafast",
+		label: "ultrafast",
+		description: "Enable shared OpenAI Ultrafast (up to 6x API/credit price)",
+	},
+];
+
+const XAI_TOGGLE_OPTIONS: readonly AutocompleteItem[] = [
+	{ value: "on", label: "on", description: "Enable xAI priority/fast mode" },
+	{ value: "off", label: "off", description: "Disable xAI priority/fast mode" },
+	{ value: "toggle", label: "toggle", description: "Toggle xAI priority/fast mode" },
+	{ value: "status", label: "status", description: "Show current xAI fast mode status" },
+];
+
+const toggleOptions = (toggle: Toggle): readonly AutocompleteItem[] => {
+	if (toggle === OPENAI_TOGGLE) {
+		return OPENAI_TOGGLE_OPTIONS;
+	}
+	if (toggle === ANTHROPIC_TOGGLE) {
+		return ANTHROPIC_TOGGLE_OPTIONS;
+	}
+	return XAI_TOGGLE_OPTIONS;
+};
+
 const parseToggleCommand = (
 	args: string,
 	request: ToggleRequest,
@@ -225,6 +264,86 @@ const runToggleCommand = async (
 };
 
 const ULTRAFAST_VERBS = new Set(["on", "off", "toggle", "status", "reset"]);
+
+const ULTRAFAST_FIRST_OPTIONS: readonly AutocompleteItem[] = [
+	{
+		value: "on",
+		label: "on",
+		description: "Enable shared OpenAI Ultrafast (up to 6x API/credit price)",
+	},
+	{ value: "off", label: "off", description: "Disable shared OpenAI priority and Ultrafast" },
+	{ value: "toggle", label: "toggle", description: "Toggle shared OpenAI Ultrafast" },
+	{
+		value: "status",
+		label: "status",
+		description: "Show shared, session, effective, and last-reply status",
+	},
+	{
+		value: "reset --session",
+		label: "reset --session",
+		description: "Clear this session's override and follow shared mode",
+	},
+	{
+		value: "--session",
+		label: "--session",
+		description: "Apply to this session only (toggle if used alone)",
+	},
+];
+
+const ULTRAFAST_SESSION_VERBS: readonly AutocompleteItem[] = [
+	{ value: "--session on", label: "on", description: "Enable OpenAI Ultrafast for this session" },
+	{
+		value: "--session off",
+		label: "off",
+		description: "Disable kit OpenAI tiers for this session",
+	},
+	{
+		value: "--session toggle",
+		label: "toggle",
+		description: "Toggle OpenAI Ultrafast for this session",
+	},
+	{
+		value: "--session status",
+		label: "status",
+		description: "Show shared, session, effective, and last-reply status",
+	},
+	{
+		value: "--session reset",
+		label: "reset",
+		description: "Clear this session's override and follow shared mode",
+	},
+];
+
+const completeUltrafastArgs = (prefix: string): AutocompleteItem[] | null => {
+	const parts = prefix.trimStart().split(/\s+/);
+	if (parts.length > 2) {
+		return null;
+	}
+	const [first = "", second] = parts;
+	if (second === undefined) {
+		return completeCommandOptions(ULTRAFAST_FIRST_OPTIONS, first);
+	}
+	const firstLower = first.toLowerCase();
+	if (firstLower === "--session") {
+		return completeCommandOptions(ULTRAFAST_SESSION_VERBS, second);
+	}
+	if (!ULTRAFAST_VERBS.has(firstLower)) {
+		return null;
+	}
+	return completeCommandOptions(
+		[
+			{
+				value: `${firstLower} --session`,
+				label: "--session",
+				description:
+					firstLower === "reset"
+						? "Clear this session's override and follow shared mode"
+						: "Apply to this session only",
+			},
+		],
+		second,
+	);
+};
 
 const parseUltrafastArgs = (
 	args: string,
@@ -365,8 +484,10 @@ export default function fastMode(pi: ExtensionAPI): void {
 	pi.on("model_select", (_event, ctx) => session.updateFooter(ctx));
 
 	const registerToggleCommand = (name: string, toggle: Toggle, emptyMeansToggle = false): void => {
+		const options = toggleOptions(toggle);
 		pi.registerCommand(name, {
 			description: name === toggle.name ? toggle.description : `Alias for /${toggle.name}`,
+			getArgumentCompletions: (prefix) => completeCommandOptions(options, prefix),
 			handler: (args, ctx) =>
 				runToggleCommand(args, ctx, session, { name, toggle, emptyMeansToggle }),
 		});
@@ -378,6 +499,7 @@ export default function fastMode(pi: ExtensionAPI): void {
 	pi.registerCommand("ultrafast", {
 		description:
 			"Toggle OpenAI Ultrafast globally, or use --session for a session-only override (up to 6x API/credit price)",
+		getArgumentCompletions: completeUltrafastArgs,
 		handler: (args, ctx) => runUltrafastCommand(args, ctx, session, pi),
 	});
 	refreshListeners.push(registerGoogleTier(pi));

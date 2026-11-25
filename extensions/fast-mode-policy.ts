@@ -8,6 +8,7 @@ import {
 	getAgentDir,
 	type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
+import { type AutocompleteItem, fuzzyFilter } from "@earendil-works/pi-tui";
 import { fitClaudeRequest, sharedImageCache } from "./anthropic-image-guard.ts";
 
 // Anthropic's fast-mode research preview bills double and rejects the `speed`
@@ -142,6 +143,19 @@ export const XAI_TOGGLE: Toggle = {
 
 export const TOGGLES = [ANTHROPIC_TOGGLE, OPENAI_TOGGLE, XAI_TOGGLE];
 export const PRIORITY_TOGGLES = [OPENAI_TOGGLE, XAI_TOGGLE];
+
+/** Fuzzy-matches fixed options for the current argument token. */
+export function completeCommandOptions(
+	options: readonly AutocompleteItem[],
+	prefix: string,
+): AutocompleteItem[] | null {
+	const query = prefix.trimStart();
+	if (/\s/.test(query)) {
+		return null;
+	}
+	const matches = fuzzyFilter([...options], query, (item) => item.label);
+	return matches.length > 0 ? matches : null;
+}
 
 export type StateWatcher = {
 	start: (active: boolean) => void;

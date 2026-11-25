@@ -6,12 +6,27 @@ import {
 	type ExtensionContext,
 	getAgentDir,
 } from "@earendil-works/pi-coding-agent";
-import { type FastModel, notify } from "./fast-mode-policy.ts";
+import type { AutocompleteItem } from "@earendil-works/pi-tui";
+import { completeCommandOptions, type FastModel, notify } from "./fast-mode-policy.ts";
 
 type GoogleTier = "standard" | "flex" | "priority";
 export const GOOGLE_TIER_STATE_PATH = join(getAgentDir(), "google-tier.json");
 const STATUS_KEY = "google-tier";
 const USAGE = "Usage: /google-tier [standard|flex|priority|status]";
+const GOOGLE_TIER_OPTIONS: readonly AutocompleteItem[] = [
+	{ value: "standard", label: "standard", description: "Request Standard tier (default pricing)" },
+	{
+		value: "flex",
+		label: "flex",
+		description: "Request Flex tier (half price, slower best-effort)",
+	},
+	{
+		value: "priority",
+		label: "priority",
+		description: "Request Priority tier (premium pricing, may serve Standard)",
+	},
+	{ value: "status", label: "status", description: "Show current Google request tier" },
+];
 
 const isGoogleTier = (value: unknown): value is GoogleTier =>
 	value === "standard" || value === "flex" || value === "priority";
@@ -83,6 +98,7 @@ export function registerGoogleTier(pi: ExtensionAPI): () => void {
 	};
 	pi.registerCommand("google-tier", {
 		description: "Select Google request tier: standard, flex (half price), or priority (premium)",
+		getArgumentCompletions: (prefix) => completeCommandOptions(GOOGLE_TIER_OPTIONS, prefix),
 		handler: async (args, ctx) => {
 			context = ctx;
 			const command = args.trim().toLowerCase();
