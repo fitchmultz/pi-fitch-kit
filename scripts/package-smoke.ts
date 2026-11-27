@@ -166,7 +166,6 @@ try {
 					PATH: process.env.PATH,
 					HOME: home,
 					PI_CODING_AGENT_DIR: cliAgentDir,
-					PI_TELEMETRY: "0",
 					PI_SKIP_VERSION_CHECK: "1",
 				},
 				input: '{"id":"theme","type":"get_entries"}\n',

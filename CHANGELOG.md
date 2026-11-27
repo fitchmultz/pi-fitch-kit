@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Require Pi 1.6.1 or later.
+- Require Pi 1.7.0 or later.
 - Suggest arguments for `/anthropic-fast`, `/codex-fast`, `/fast`, `/xai-fast`, `/ultrafast`, and `/google-tier` using Pi's fuzzy matching.
 
 - Strip `thinking` blocks and text signatures when `write-prompt` flattens assistant history so off-transcript writer calls do not replay invalid reasoning signatures. (PFK-208)
