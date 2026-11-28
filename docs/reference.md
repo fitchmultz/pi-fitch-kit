@@ -121,7 +121,7 @@ GenerateContent works on official Pi 1.7.0 and later, and on Fitch Pi. Interacti
 
 Blank `/google-tier` and `/google-tier status` report the saved policy without changing it. A missing or invalid state file leaves native defaults unchanged; Google's default is Standard. Selecting Standard explicitly requests Standard. The choice survives restart, reload, resume, and new or forked sessions because it is shared, not session metadata. It does not change OpenAI, xAI, or Anthropic settings. Installation creates no Google tier preference.
 
-On an eligible model, the footer shows `Google standard requested`, `Google flex requested`, or `Google priority requested` after an explicit selection. These labels describe requests, not confirmation from Google. Switching to another provider hides the label but retains the preference.
+On an eligible model, the footer shows `Google flex` or `Google priority` when Flex or Priority is active, and adds no footer status when Standard is active. These labels describe requested tiers, not confirmation from Google. Switching to another provider hides the label while retaining the preference.
 
 The kit uses Pi's native payload hook on both routes:
 

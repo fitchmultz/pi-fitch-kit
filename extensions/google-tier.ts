@@ -76,7 +76,9 @@ const updateFooter = (ctx: ExtensionContext): void => {
 	const tier = eligible(ctx.model) ? selectedTier() : undefined;
 	ctx.ui.setStatus(
 		STATUS_KEY,
-		tier === undefined ? undefined : ctx.ui.theme.fg("accent", `Google ${tier} requested`),
+		tier === undefined || tier === "standard"
+			? undefined
+			: ctx.ui.theme.fg("accent", `Google ${tier}`),
 	);
 };
 

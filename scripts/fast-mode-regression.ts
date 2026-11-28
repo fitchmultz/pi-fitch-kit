@@ -1651,14 +1651,15 @@ for (const tier of ["priority", "flex", "standard"]) {
 		assert.equal(payload.service_tier, undefined, "Google must not receive OpenAI fields");
 		assert.deepEqual(payload.contents, [{ parts: [{ text: "test" }], role: "user" }]);
 	}
-	assert.equal(status.get("google-tier"), `accent:Google ${tier} requested`);
+	const expectedFooter = tier === "standard" ? undefined : `accent:Google ${tier}`;
+	assert.equal(status.get("google-tier"), expectedFooter);
 	assert.deepEqual(
 		await requestPayload(googleNeon, interactionPayload),
 		{ ...interactionPayload, service_tier: tier },
 		"Interactions must send the selected tier as a top-level service_tier field",
 	);
 	await runHandlers("model_select", {}, uiCtx(googleNeon));
-	assert.equal(status.get("google-tier"), `accent:Google ${tier} requested`);
+	assert.equal(status.get("google-tier"), expectedFooter);
 	await commandFor(commands, "google-tier").handler("status", uiCtx(googleNeon));
 	assert.equal(notices.at(-1)?.startsWith(`Google shared requests: ${tier}.`), true);
 	const saved = readFileSync(googleStatePath, "utf8");
@@ -1704,7 +1705,7 @@ assert.equal(
 	"Interactions tier requests must stay scoped to the google provider",
 );
 await runHandlers("model_select", {}, uiCtx(gatewayGoogle));
-assert.equal(status.get("google-tier"), "accent:Google flex requested");
+assert.equal(status.get("google-tier"), "accent:Google flex");
 await commandFor(commands, "google-tier").handler("status", uiCtx(MODELS.openai));
 assert.match(notices.at(-1) ?? "", /inactive on this model/);
 const anotherFactory = await discoverAndLoadExtensions(
@@ -1766,7 +1767,7 @@ await waitForStatus("anthropic-fast", "accent:fast");
 await runHandlers("model_select", {}, uiCtx(gatewayGoogle));
 assert.equal(status.get("google-tier"), undefined);
 writeFileSync(googleStatePath, JSON.stringify({ tier: "flex" }));
-await waitForStatus("google-tier", "accent:Google flex requested");
+await waitForStatus("google-tier", "accent:Google flex");
 const readsBeforeUnrelated = toggleFileReads.mock.callCount();
 writeFileSync(join(agentDir, "unrelated-note.json"), "{}\n");
 await sleep(60);
