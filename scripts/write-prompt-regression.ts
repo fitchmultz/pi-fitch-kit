@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as piAi from "@earendil-works/pi-ai";
 import type { RegisteredCommand } from "@earendil-works/pi-coding-agent";
+import type { TuiMouseEvent, TuiMouseEventResult } from "@earendil-works/pi-tui";
 import { gate, type DrivenCommand } from "./test-harness.ts";
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-kit-write-prompt-"));
@@ -887,6 +888,7 @@ type DialogView = {
 	render: (width: number) => string[];
 	invalidate: () => void;
 	handleInput: (data: string) => unknown;
+	handleMouse: (event: TuiMouseEvent) => TuiMouseEventResult | undefined;
 };
 let dialogFactory:
 	| ((tui: unknown, theme: unknown, kb: unknown, done: (value: string) => void) => DialogView)
@@ -1033,6 +1035,64 @@ assert.deepEqual(
 	["Accept"],
 	"Enter still confirms the action through the scrollable scrolledView",
 );
+
+const mouseAt = (type: TuiMouseEvent["type"], y: number, height: number): TuiMouseEvent => ({
+	type,
+	button: type === "wheel" ? "none" : "left",
+	x: 2,
+	y,
+	screenX: 2,
+	screenY: y + 7,
+	width: 80,
+	height,
+	shift: false,
+	alt: false,
+	ctrl: false,
+});
+const draftRow = firstPageAgain.findIndex((line) => line.includes("line 1 of"));
+assert.ok(draftRow >= 0);
+const draftWheel = { ...mouseAt("wheel", draftRow, firstPageAgain.length), wheelDelta: 3 };
+assert.deepEqual(scrolledView.handleMouse(draftWheel), { handled: true, render: true });
+assert.match(scrolledView.render(80)[draftRow] ?? "", /line 4 of/);
+assert.deepEqual(scrolledView.handleMouse({ ...draftWheel, wheelDelta: 100 }), {
+	handled: true,
+	render: true,
+});
+const wheelBottom = scrolledView.render(80);
+assert.ok(wheelBottom.some((line) => line.includes("line 40 of")));
+assert.deepEqual(scrolledView.handleMouse(draftWheel), { handled: true, render: false });
+assert.deepEqual(scrolledView.handleMouse({ ...draftWheel, wheelDelta: -100 }), {
+	handled: true,
+	render: true,
+});
+assert.deepEqual(scrolledView.render(80), firstPageAgain);
+
+const actionTop = firstPageAgain.findIndex((line) => line.includes("Accept"));
+assert.ok(actionTop > draftRow);
+const spacerWheel = { ...mouseAt("wheel", actionTop - 1, firstPageAgain.length), wheelDelta: -3 };
+assert.deepEqual(scrolledView.handleMouse(spacerWheel), { handled: true, render: false });
+const actionWheel = { ...mouseAt("wheel", actionTop, firstPageAgain.length), wheelDelta: 3 };
+assert.deepEqual(scrolledView.handleMouse(actionWheel), { handled: true, render: true });
+const actionSelected = scrolledView.render(80);
+assert.equal(
+	actionSelected[draftRow],
+	firstPageAgain[draftRow],
+	"menu wheel leaves the draft in place",
+);
+assert.match(actionSelected[actionTop + 1] ?? "", /^→ Copy prompt$/);
+
+smallTui.terminal.rows = 200;
+const resized = scrolledView.render(80);
+const denyRow = resized.findIndex((line) => line.trim() === "Deny");
+assert.ok(denyRow > actionTop);
+assert.deepEqual(scrolledView.handleMouse(mouseAt("press", denyRow, resized.length)), {
+	handled: true,
+	focus: true,
+});
+assert.deepEqual(scrolledView.handleMouse(mouseAt("click", denyRow, resized.length)), {
+	handled: true,
+});
+assert.deepEqual(chosen, ["Accept", "Deny"]);
 Reflect.set(globalThis, themeKey, priorGlobalTheme);
 
 notices.length = 0;

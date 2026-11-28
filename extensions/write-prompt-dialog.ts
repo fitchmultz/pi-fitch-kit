@@ -16,6 +16,8 @@ import {
 	Text,
 	truncateToWidth,
 	type TUI,
+	type TuiMouseEvent,
+	type TuiMouseEventResult,
 } from "@earendil-works/pi-tui";
 
 /** One-line scroll position indicator, truncated so it can never wrap. */
@@ -33,7 +35,7 @@ type DialogOptions = {
 };
 
 /** The writer's draft dialog: full draft text in a scrolling viewport plus the action list. */
-class DraftDialog {
+class DraftDialog implements Component {
 	private readonly topBorder: DynamicBorder;
 	private readonly draftText: Text;
 	private readonly scrollHint: Text;
@@ -46,7 +48,9 @@ class DraftDialog {
 	private readonly theme: Theme;
 	private scrollTop = 0;
 	private viewportLines = 1;
-	private contentLines = 0;
+	private maxScroll = 0;
+	private listTop = 0;
+	private listHeight = 0;
 
 	// The dialog renders inside the TUI's editor dock slot below the chat
 	// transcript (minimum one line) and the footer (two lines built-in,
@@ -106,32 +110,44 @@ class DraftDialog {
 		const rows = Number.isFinite(this.tui.terminal.rows)
 			? this.tui.terminal.rows
 			: Number.POSITIVE_INFINITY;
+		const top = this.topBorder.render(width);
+		const spacer = this.spacer.render(width);
+		const actions = this.list.render(width);
+		const hints = this.hints.render(width);
+		const bottom = this.bottomBorder.render(width);
+		const chromeHeight =
+			top.length + 2 * spacer.length + actions.length + hints.length + bottom.length;
+		const draft = this.renderDraft(width, rows - chromeHeight - DraftDialog.DOCK_RESERVE);
+		this.listTop = top.length + draft.length + spacer.length;
+		this.listHeight = actions.length;
+		return [...top, ...draft, ...spacer, ...actions, ...spacer, ...hints, ...bottom];
+	}
+
+	private renderDraft(width: number, free: number): readonly string[] {
 		const content = this.draftText.render(width);
-		this.contentLines = content.length;
-		const chrome = this.renderChrome(width);
-		const free = rows - chrome.length - (Number.isFinite(rows) ? DraftDialog.DOCK_RESERVE : 0);
-		if (!Number.isFinite(free) || content.length <= free) {
-			// Everything fits (or no viewport is reported): original layout.
-			this.viewportLines = Number.isFinite(free) ? Math.max(1, free) : content.length;
+		if (content.length <= free) {
+			this.viewportLines = content.length;
+			this.maxScroll = 0;
 			this.scrollTop = 0;
-			return [this.firstLine(chrome), ...content, ...chrome.slice(1)];
+			return content;
 		}
 		// One line of the free budget goes to the position indicator.
 		this.viewportLines = Math.max(1, free - 1);
-		this.scrollTop = Math.min(this.scrollTop, content.length - this.viewportLines);
-		const above = this.scrollTop;
-		const below = content.length - this.scrollTop - this.viewportLines;
+		this.maxScroll = Math.max(0, content.length - this.viewportLines);
+		this.scrollTop = Math.min(this.scrollTop, this.maxScroll);
 		this.scrollHint.setText(
 			this.theme.fg(
 				"muted",
-				truncateToWidth(positionIndicator(above, below), Math.max(1, width - 2), ""),
+				truncateToWidth(
+					positionIndicator(this.scrollTop, this.maxScroll - this.scrollTop),
+					Math.max(1, width - 2),
+					"",
+				),
 			),
 		);
 		return [
-			this.firstLine(chrome),
 			...content.slice(this.scrollTop, this.scrollTop + this.viewportLines),
 			...this.scrollHint.render(width),
-			...chrome.slice(1),
 		];
 	}
 
@@ -155,33 +171,28 @@ class DraftDialog {
 		this.tui.requestRender();
 	}
 
-	private renderChrome(width: number): string[] {
-		return [
-			...this.topBorder.render(width),
-			...this.spacer.render(width),
-			...this.list.render(width),
-			...this.spacer.render(width),
-			...this.hints.render(width),
-			...this.bottomBorder.render(width),
-		];
-	}
-
-	/** The top border line; the dialog always renders at least one chrome line. */
-	private firstLine(chrome: string[]): string {
-		const first = chrome[0];
-		return first === undefined ? "" : first;
+	handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+		const listY = event.y - this.listTop;
+		if (listY >= 0 && listY < this.listHeight) {
+			const result = this.list.handleMouse({ ...event, y: listY, height: this.listHeight });
+			return result ?? (event.type === "wheel" ? { handled: true, render: false } : undefined);
+		}
+		if (event.type === "wheel") {
+			return { handled: true, render: this.scrollBy(event.wheelDelta ?? 0) };
+		}
+		return undefined;
 	}
 
 	private scrollPage(direction: 1 | -1): void {
-		const step = Math.max(1, this.viewportLines);
-		this.scrollTop = Math.max(
-			0,
-			Math.min(
-				Math.max(0, this.contentLines - this.viewportLines),
-				this.scrollTop + direction * step,
-			),
-		);
+		this.scrollBy(direction * this.viewportLines);
 		this.tui.requestRender();
+	}
+
+	private scrollBy(lines: number): boolean {
+		const next = Math.max(0, Math.min(this.maxScroll, this.scrollTop + lines));
+		const changed = next !== this.scrollTop;
+		this.scrollTop = next;
+		return changed;
 	}
 }
 
@@ -195,8 +206,7 @@ export function pickAction(
 		return ctx.ui.select(draft, [...actions]);
 	}
 	// The dialog must stay fully readable in small terminals: the draft is
-	// clipped to the viewport and scrolled with PageUp/PageDown instead of
-	// being cut off by the TUI with no way back. Select keys are unchanged.
+	// clipped to the viewport and scrolls independently of the action list.
 	return ctx.ui.custom<string | undefined>(
 		(tui: TUI, theme: Theme, _kb: KeybindingsManager, done: (result: string | undefined) => void) =>
 			new DraftDialog(tui, theme, { draft, actions, done }),

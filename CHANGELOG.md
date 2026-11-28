@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Scroll long prompt drafts with the mouse wheel in fullscreen Pi. Use the wheel over the action list to move the selection, or click an action to choose it.
 - Require Pi 1.7.0 or later.
 - Suggest arguments for `/anthropic-fast`, `/codex-fast`, `/fast`, `/xai-fast`, `/ultrafast`, and `/google-tier` using Pi's fuzzy matching.
 
